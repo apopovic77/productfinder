@@ -17,6 +17,7 @@ function clamp(n: number, min: number, max: number) {
 }
 
 type LayoutMode = 'grid' | 'list' | 'compact' | 'large';
+type SortMode = 'name-asc' | 'name-desc' | 'price-asc' | 'price-desc' | 'weight-asc' | 'weight-desc' | 'season-desc' | 'none';
 
 type State = {
   loading: boolean;
@@ -34,6 +35,7 @@ type State = {
   mousePos: { x: number; y: number } | null;
   focusedIndex: number;
   layoutMode: LayoutMode;
+  sortMode: SortMode;
 };
 
 export default class App extends React.Component<{}, State> {
@@ -64,6 +66,7 @@ export default class App extends React.Component<{}, State> {
     mousePos: null,
     focusedIndex: -1,
     layoutMode: 'grid',
+    sortMode: 'none',
   };
 
   private getLayoutConfig(): PivotConfig<Product> {
@@ -210,7 +213,8 @@ export default class App extends React.Component<{}, State> {
       prevState.priceMin !== this.state.priceMin ||
       prevState.priceMax !== this.state.priceMax ||
       prevState.weightMin !== this.state.weightMin ||
-      prevState.weightMax !== this.state.weightMax
+      prevState.weightMax !== this.state.weightMax ||
+      prevState.sortMode !== this.state.sortMode
     ) {
       this.engine.sync(this.filteredProducts, p => p.id);
       const c = this.canvasRef.current;
@@ -374,9 +378,42 @@ export default class App extends React.Component<{}, State> {
     }
   };
 
+  private sortProducts(products: Product[]): Product[] {
+    const { sortMode } = this.state;
+    if (sortMode === 'none') return products;
+    
+    const sorted = [...products];
+    
+    switch (sortMode) {
+      case 'name-asc':
+        sorted.sort((a, b) => a.name.localeCompare(b.name));
+        break;
+      case 'name-desc':
+        sorted.sort((a, b) => b.name.localeCompare(a.name));
+        break;
+      case 'price-asc':
+        sorted.sort((a, b) => (a.price?.value ?? 0) - (b.price?.value ?? 0));
+        break;
+      case 'price-desc':
+        sorted.sort((a, b) => (b.price?.value ?? 0) - (a.price?.value ?? 0));
+        break;
+      case 'weight-asc':
+        sorted.sort((a, b) => (a.specifications?.weight ?? 0) - (b.specifications?.weight ?? 0));
+        break;
+      case 'weight-desc':
+        sorted.sort((a, b) => (b.specifications?.weight ?? 0) - (a.specifications?.weight ?? 0));
+        break;
+      case 'season-desc':
+        sorted.sort((a, b) => (b.season ?? 0) - (a.season ?? 0));
+        break;
+    }
+    
+    return sorted;
+  }
+
   private get filteredProducts(): Product[] {
     const { products, search, category, season, priceMin, priceMax, weightMin, weightMax } = this.state;
-    return products.filter(p => {
+    const filtered = products.filter(p => {
       const q = search.trim().toLowerCase();
       if (q) {
         const inName = p.name.toLowerCase().includes(q);
@@ -395,6 +432,8 @@ export default class App extends React.Component<{}, State> {
       if (weightMax && (w === undefined || w > Number(weightMax))) return false;
       return true;
     });
+    
+    return this.sortProducts(filtered);
   }
 
   private uniqueCategories(products: Product[]): string[] {
@@ -432,6 +471,16 @@ export default class App extends React.Component<{}, State> {
           <input type="number" placeholder="Max €" value={priceMax} onChange={e => this.setState({ priceMax: e.target.value })} />
           <input type="number" placeholder="Min g" value={weightMin} onChange={e => this.setState({ weightMin: e.target.value })} />
           <input type="number" placeholder="Max g" value={weightMax} onChange={e => this.setState({ weightMax: e.target.value })} />
+          <select value={this.state.sortMode} onChange={e => this.setState({ sortMode: e.target.value as SortMode })}>
+            <option value="none">Sort: None</option>
+            <option value="name-asc">Name (A-Z)</option>
+            <option value="name-desc">Name (Z-A)</option>
+            <option value="price-asc">Price (Low-High)</option>
+            <option value="price-desc">Price (High-Low)</option>
+            <option value="weight-asc">Weight (Light-Heavy)</option>
+            <option value="weight-desc">Weight (Heavy-Light)</option>
+            <option value="season-desc">Season (Newest)</option>
+          </select>
           <button onClick={() => this.setState({ search: '', category: '', season: '', priceMin: '', priceMax: '', weightMin: '', weightMax: '' })}>Reset Filters</button>
           <button onClick={() => this.viewport?.reset()}>Reset View</button>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
