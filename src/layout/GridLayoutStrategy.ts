@@ -1,4 +1,4 @@
-import { Vector2 } from '@presenter/Vector2';
+import { Vector2 } from 'arkturian-typescript-utils';
 import { LayoutNode } from './LayoutNode';
 
 export class GridLayoutStrategy<T> {

@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-REPO_ROOT="/var/www/productfinder/repo"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BUILD_COMMAND="npm run build"
 
 usage() {

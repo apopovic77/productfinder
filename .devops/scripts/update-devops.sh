@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-REPO_ROOT="/var/www/productfinder/repo"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 CONFIG_FILE="$REPO_ROOT/.devops/starter-config.json"
 DEFAULT_STARTER_PATH="/Volumes/DatenAP/Code/github-starterpack"
 

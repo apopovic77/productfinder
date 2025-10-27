@@ -1,5 +1,5 @@
-import { InterpolatedProperty } from '@presenter/InterpolatedProperty';
-import { Vector2 } from '@presenter/Vector2';
+import { InterpolatedProperty } from 'arkturian-typescript-utils';
+import { Vector2 } from 'arkturian-typescript-utils';
 
 export class LayoutNode<T> {
   id: string;

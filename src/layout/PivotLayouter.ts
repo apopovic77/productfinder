@@ -1,7 +1,7 @@
 import { LayoutNode } from './LayoutNode';
 import { GridLayoutStrategy } from './GridLayoutStrategy';
-import { WeightScalePolicy, ScaleContext } from './ScalePolicy';
-import { Vector2 } from '@presenter/Vector2';
+import { WeightScalePolicy, type ScaleContext } from './ScalePolicy';
+import { Vector2 } from 'arkturian-typescript-utils';
 
 export type Orientation = 'rows' | 'columns';
 export type Flow = 'ltr' | 'rtl' | 'ttb' | 'btt';
