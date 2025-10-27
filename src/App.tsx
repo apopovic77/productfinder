@@ -7,6 +7,7 @@ import { GridLayoutStrategy } from './layout/GridLayoutStrategy';
 import { PivotLayouter, type PivotConfig } from './layout/PivotLayouter';
 import { LayoutEngine } from './layout/LayoutEngine';
 import { CanvasRenderer } from './render/CanvasRenderer';
+import { SkeletonRenderer } from './render/SkeletonRenderer';
 import { fetchProducts } from './data/ProductRepository';
 import { ProductModal } from './components/ProductModal';
 
@@ -34,6 +35,8 @@ type State = {
 export default class App extends React.Component<{}, State> {
   private canvasRef = React.createRef<HTMLCanvasElement>();
   private renderer: CanvasRenderer<Product> | null = null;
+  private skeletonRenderer: SkeletonRenderer | null = null;
+  private skeletonRafId: number | null = null;
   private engine: LayoutEngine<Product> | null = null;
   private layouter: PivotLayouter<Product> | null = null;
   private access = new ProductLayoutAccessors();
@@ -63,6 +66,10 @@ export default class App extends React.Component<{}, State> {
     if (canvas) {
       const ctx = canvas.getContext('2d');
       if (ctx) {
+        // Initialize skeleton renderer
+        this.skeletonRenderer = new SkeletonRenderer(ctx);
+        this.startSkeletonAnimation();
+        
         const config: PivotConfig<Product> = {
           orientation: 'columns', flow: 'ltr',
           groupKey: p => this.access.groupKey(p),
@@ -72,7 +79,8 @@ export default class App extends React.Component<{}, State> {
         this.layouter = new PivotLayouter<Product>(config);
         this.engine = new LayoutEngine<Product>(this.layouter);
         this.renderer = new CanvasRenderer<Product>(ctx, () => this.engine!.all(), this.renderAccess);
-        this.renderer.start();
+        // Don't start renderer yet - wait for products to load
+        
         window.addEventListener('resize', this.handleResize);
         canvas.addEventListener('click', this.handleCanvasClick);
         canvas.addEventListener('mousemove', this.handleCanvasMouseMove);
@@ -92,6 +100,10 @@ export default class App extends React.Component<{}, State> {
     try {
       const results = await fetchProducts({ limit: 1000 });
       this.setState({ products: results || [], loading: false }, () => {
+        // Stop skeleton and start real renderer
+        this.stopSkeletonAnimation();
+        if (this.renderer) this.renderer.start();
+        
         // Trigger layout after products are loaded
         if (this.engine && canvas) {
           this.engine.sync(this.filteredProducts, p => p.id);
@@ -99,12 +111,14 @@ export default class App extends React.Component<{}, State> {
         }
       });
     } catch (e: any) {
+      this.stopSkeletonAnimation();
       this.setState({ error: e.message || 'Load error', loading: false });
     }
   }
 
   componentWillUnmount(): void {
     if (this.renderer) this.renderer.stop();
+    this.stopSkeletonAnimation();
     window.removeEventListener('resize', this.handleResize);
     document.removeEventListener('keydown', this.handleKeyDown);
     const canvas = this.canvasRef.current;
@@ -114,6 +128,24 @@ export default class App extends React.Component<{}, State> {
       canvas.removeEventListener('mouseleave', this.handleCanvasMouseLeave);
     }
   }
+  
+  private startSkeletonAnimation = () => {
+    if (!this.skeletonRenderer) return;
+    const loop = () => {
+      if (this.skeletonRenderer && this.state.loading) {
+        this.skeletonRenderer.draw(20);
+        this.skeletonRafId = requestAnimationFrame(loop);
+      }
+    };
+    loop();
+  };
+  
+  private stopSkeletonAnimation = () => {
+    if (this.skeletonRafId !== null) {
+      cancelAnimationFrame(this.skeletonRafId);
+      this.skeletonRafId = null;
+    }
+  };
 
   componentDidUpdate(prevProps: {}, prevState: State): void {
     if (!this.engine) return;
@@ -319,21 +351,6 @@ export default class App extends React.Component<{}, State> {
 
     return (
       <div className="pf-root">
-        {loading && (
-          <div style={{ 
-            position: 'absolute', 
-            top: '50%', 
-            left: '50%', 
-            transform: 'translate(-50%, -50%)',
-            zIndex: 10,
-            background: 'rgba(255,255,255,0.9)',
-            padding: '20px',
-            borderRadius: '8px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-          }}>
-            <div className="loading">Loading products...</div>
-          </div>
-        )}
         <div className="pf-toolbar">
           <input placeholder="Search" value={search} onChange={e => this.setState({ search: e.target.value })} />
           <select value={category} onChange={e => this.setState({ category: e.target.value })}>
