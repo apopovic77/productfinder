@@ -41,16 +41,32 @@ export class CanvasRenderer<T> {
       c.width = c.clientWidth; 
       c.height = c.clientHeight; 
     }
+    
     this.clear();
     const nodes = this.getNodes();
     
     for (const n of nodes) {
-      const x = n.posX.value ?? 0, y = n.posY.value ?? 0, w = n.width.value ?? 0, h = n.height.value ?? 0;
+      const x = n.posX.value ?? 0, y = n.posY.value ?? 0;
+      const w = n.width.value ?? 0, h = n.height.value ?? 0;
+      const scale = n.scale.value ?? 1;
+      const opacity = n.opacity.value ?? 1;
+      
+      // Skip if fully transparent
+      if (opacity <= 0.01) continue;
+      
       const url = this.renderAccessors.imageUrl(n.data as any);
       const img = await this.cache.load(url);
       const isHovered = this.hoveredItem === n.data;
       const isFocused = this.focusedItem === n.data;
       const isHighlighted = isHovered || isFocused;
+      
+      // Apply scale transform
+      this.ctx.save();
+      const centerX = x + w / 2;
+      const centerY = y + h / 2;
+      this.ctx.translate(centerX, centerY);
+      this.ctx.scale(scale, scale);
+      this.ctx.translate(-centerX, -centerY);
       
       // Draw highlight
       if (isHighlighted) {
@@ -62,7 +78,7 @@ export class CanvasRenderer<T> {
         this.ctx.restore();
       }
       
-      this.ctx.globalAlpha = n.opacity.value ?? 1;
+      this.ctx.globalAlpha = opacity;
       this.ctx.drawImage(img, x, y, w, h);
       this.ctx.globalAlpha = 1;
       
@@ -88,6 +104,9 @@ export class CanvasRenderer<T> {
       this.ctx.fillText(this.renderAccessors.label(n.data as any), x, y - 4);
       const price = this.renderAccessors.priceText(n.data as any);
       if (price) this.ctx.fillText(price, x, y + h + 14);
+      
+      // Restore transform
+      this.ctx.restore();
     }
   }
 }
