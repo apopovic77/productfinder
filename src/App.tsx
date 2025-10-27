@@ -8,6 +8,7 @@ import { PivotLayouter, type PivotConfig } from './layout/PivotLayouter';
 import { LayoutEngine } from './layout/LayoutEngine';
 import { CanvasRenderer } from './render/CanvasRenderer';
 import { SkeletonRenderer } from './render/SkeletonRenderer';
+import { ViewportTransform } from './utils/ViewportTransform';
 import { fetchProducts } from './data/ProductRepository';
 import { ProductModal } from './components/ProductModal';
 
@@ -37,6 +38,7 @@ export default class App extends React.Component<{}, State> {
   private renderer: CanvasRenderer<Product> | null = null;
   private skeletonRenderer: SkeletonRenderer | null = null;
   private skeletonRafId: number | null = null;
+  private viewport: ViewportTransform | null = null;
   private engine: LayoutEngine<Product> | null = null;
   private layouter: PivotLayouter<Product> | null = null;
   private access = new ProductLayoutAccessors();
@@ -66,6 +68,9 @@ export default class App extends React.Component<{}, State> {
     if (canvas) {
       const ctx = canvas.getContext('2d');
       if (ctx) {
+        // Initialize viewport transform
+        this.viewport = new ViewportTransform(canvas);
+        
         // Initialize skeleton renderer
         this.skeletonRenderer = new SkeletonRenderer(ctx);
         this.startSkeletonAnimation();
@@ -78,7 +83,7 @@ export default class App extends React.Component<{}, State> {
         };
         this.layouter = new PivotLayouter<Product>(config);
         this.engine = new LayoutEngine<Product>(this.layouter);
-        this.renderer = new CanvasRenderer<Product>(ctx, () => this.engine!.all(), this.renderAccess);
+        this.renderer = new CanvasRenderer<Product>(ctx, () => this.engine!.all(), this.renderAccess, this.viewport);
         // Don't start renderer yet - wait for products to load
         
         window.addEventListener('resize', this.handleResize);
@@ -118,6 +123,7 @@ export default class App extends React.Component<{}, State> {
 
   componentWillUnmount(): void {
     if (this.renderer) this.renderer.stop();
+    if (this.viewport) this.viewport.destroy();
     this.stopSkeletonAnimation();
     window.removeEventListener('resize', this.handleResize);
     document.removeEventListener('keydown', this.handleKeyDown);
@@ -199,8 +205,15 @@ export default class App extends React.Component<{}, State> {
     if (!canvas) return;
     
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    let x = e.clientX - rect.left;
+    let y = e.clientY - rect.top;
+    
+    // Transform to world coordinates
+    if (this.viewport) {
+      const worldPos = this.viewport.screenToWorld(x, y);
+      x = worldPos.x;
+      y = worldPos.y;
+    }
     
     // Hit test: find clicked product
     const nodes = this.engine.all();
@@ -224,8 +237,15 @@ export default class App extends React.Component<{}, State> {
     if (!canvas) return;
     
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    let x = e.clientX - rect.left;
+    let y = e.clientY - rect.top;
+    
+    // Transform to world coordinates
+    if (this.viewport) {
+      const worldPos = this.viewport.screenToWorld(x, y);
+      x = worldPos.x;
+      y = worldPos.y;
+    }
     
     // Hit test: find hovered product
     const nodes = this.engine.all();
@@ -365,7 +385,8 @@ export default class App extends React.Component<{}, State> {
           <input type="number" placeholder="Max €" value={priceMax} onChange={e => this.setState({ priceMax: e.target.value })} />
           <input type="number" placeholder="Min g" value={weightMin} onChange={e => this.setState({ weightMin: e.target.value })} />
           <input type="number" placeholder="Max g" value={weightMax} onChange={e => this.setState({ weightMax: e.target.value })} />
-          <button onClick={() => this.setState({ search: '', category: '', season: '', priceMin: '', priceMax: '', weightMin: '', weightMax: '' })}>Reset</button>
+          <button onClick={() => this.setState({ search: '', category: '', season: '', priceMin: '', priceMax: '', weightMin: '', weightMax: '' })}>Reset Filters</button>
+          <button onClick={() => this.viewport?.reset()}>Reset View</button>
         </div>
         <div className="pf-stage">
           <canvas ref={this.canvasRef} className="pf-canvas" />

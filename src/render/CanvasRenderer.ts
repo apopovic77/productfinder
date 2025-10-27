@@ -1,5 +1,6 @@
 import { ImageCache } from '../utils/ImageCache';
 import { LayoutNode } from '../layout/LayoutNode';
+import { ViewportTransform } from '../utils/ViewportTransform';
 import type { Product } from '../types/Product';
 
 export class CanvasRenderer<T> {
@@ -11,7 +12,8 @@ export class CanvasRenderer<T> {
   constructor(
     private ctx: CanvasRenderingContext2D, 
     private getNodes: () => LayoutNode<T>[], 
-    private renderAccessors: { label(item: T): string; imageUrl(item: T): string; priceText(item: T): string }
+    private renderAccessors: { label(item: T): string; imageUrl(item: T): string; priceText(item: T): string },
+    private viewport: ViewportTransform | null = null
   ) {}
   
   start() { 
@@ -43,6 +45,13 @@ export class CanvasRenderer<T> {
     }
     
     this.clear();
+    
+    // Apply viewport transform
+    this.ctx.save();
+    if (this.viewport) {
+      this.viewport.applyTransform(this.ctx);
+    }
+    
     const nodes = this.getNodes();
     
     for (const n of nodes) {
@@ -105,9 +114,12 @@ export class CanvasRenderer<T> {
       const price = this.renderAccessors.priceText(n.data as any);
       if (price) this.ctx.fillText(price, x, y + h + 14);
       
-      // Restore transform
+      // Restore item transform
       this.ctx.restore();
     }
+    
+    // Restore viewport transform
+    this.ctx.restore();
   }
 }
 
