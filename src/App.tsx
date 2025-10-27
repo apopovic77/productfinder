@@ -28,6 +28,7 @@ type State = {
   selectedProduct: Product | null;
   hoveredProduct: Product | null;
   mousePos: { x: number; y: number } | null;
+  focusedIndex: number;
 };
 
 export default class App extends React.Component<{}, State> {
@@ -53,6 +54,7 @@ export default class App extends React.Component<{}, State> {
     selectedProduct: null,
     hoveredProduct: null,
     mousePos: null,
+    focusedIndex: -1,
   };
 
   async componentDidMount() {
@@ -82,6 +84,9 @@ export default class App extends React.Component<{}, State> {
         });
       }
     }
+    
+    // Keyboard navigation
+    document.addEventListener('keydown', this.handleKeyDown);
 
     // Load products
     try {
@@ -101,6 +106,7 @@ export default class App extends React.Component<{}, State> {
   componentWillUnmount(): void {
     if (this.renderer) this.renderer.stop();
     window.removeEventListener('resize', this.handleResize);
+    document.removeEventListener('keydown', this.handleKeyDown);
     const canvas = this.canvasRef.current;
     if (canvas) {
       canvas.removeEventListener('click', this.handleCanvasClick);
@@ -129,6 +135,14 @@ export default class App extends React.Component<{}, State> {
     // Update renderer hover state
     if (prevState.hoveredProduct !== this.state.hoveredProduct && this.renderer) {
       this.renderer.hoveredItem = this.state.hoveredProduct;
+    }
+    
+    // Update renderer focus state
+    if (prevState.focusedIndex !== this.state.focusedIndex && this.renderer) {
+      const filtered = this.filteredProducts;
+      this.renderer.focusedItem = this.state.focusedIndex >= 0 && this.state.focusedIndex < filtered.length 
+        ? filtered[this.state.focusedIndex] 
+        : null;
     }
   }
 
@@ -212,6 +226,53 @@ export default class App extends React.Component<{}, State> {
     const canvas = this.canvasRef.current;
     if (canvas) canvas.style.cursor = 'default';
     this.setState({ hoveredProduct: null, mousePos: null });
+  };
+
+  private handleKeyDown = (e: KeyboardEvent) => {
+    // Don't handle if modal is open or typing in input
+    if (this.state.selectedProduct || (e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'SELECT') {
+      return;
+    }
+
+    const filtered = this.filteredProducts;
+    if (filtered.length === 0) return;
+
+    const { focusedIndex } = this.state;
+    let newIndex = focusedIndex;
+
+    switch (e.key) {
+      case 'ArrowRight':
+      case 'ArrowDown':
+        e.preventDefault();
+        newIndex = focusedIndex < 0 ? 0 : Math.min(focusedIndex + 1, filtered.length - 1);
+        break;
+      case 'ArrowLeft':
+      case 'ArrowUp':
+        e.preventDefault();
+        newIndex = focusedIndex < 0 ? 0 : Math.max(focusedIndex - 1, 0);
+        break;
+      case 'Home':
+        e.preventDefault();
+        newIndex = 0;
+        break;
+      case 'End':
+        e.preventDefault();
+        newIndex = filtered.length - 1;
+        break;
+      case 'Enter':
+      case ' ':
+        e.preventDefault();
+        if (focusedIndex >= 0 && focusedIndex < filtered.length) {
+          this.setState({ selectedProduct: filtered[focusedIndex] });
+        }
+        return;
+      default:
+        return;
+    }
+
+    if (newIndex !== focusedIndex) {
+      this.setState({ focusedIndex: newIndex });
+    }
   };
 
   private get filteredProducts(): Product[] {

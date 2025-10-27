@@ -6,6 +6,7 @@ export class CanvasRenderer<T> {
   private rafId: number | null = null;
   private cache = new ImageCache();
   public hoveredItem: T | null = null;
+  public focusedItem: T | null = null;
   
   constructor(
     private ctx: CanvasRenderingContext2D, 
@@ -48,13 +49,15 @@ export class CanvasRenderer<T> {
       const url = this.renderAccessors.imageUrl(n.data as any);
       const img = await this.cache.load(url);
       const isHovered = this.hoveredItem === n.data;
+      const isFocused = this.focusedItem === n.data;
+      const isHighlighted = isHovered || isFocused;
       
-      // Draw hover highlight
-      if (isHovered) {
+      // Draw highlight
+      if (isHighlighted) {
         this.ctx.save();
-        this.ctx.shadowColor = 'rgba(67, 56, 202, 0.5)';
+        this.ctx.shadowColor = isFocused ? 'rgba(16, 185, 129, 0.5)' : 'rgba(67, 56, 202, 0.5)';
         this.ctx.shadowBlur = 20;
-        this.ctx.fillStyle = 'rgba(67, 56, 202, 0.1)';
+        this.ctx.fillStyle = isFocused ? 'rgba(16, 185, 129, 0.1)' : 'rgba(67, 56, 202, 0.1)';
         this.ctx.fillRect(x - 4, y - 4, w + 8, h + 8);
         this.ctx.restore();
       }
@@ -63,16 +66,25 @@ export class CanvasRenderer<T> {
       this.ctx.drawImage(img, x, y, w, h);
       this.ctx.globalAlpha = 1;
       
-      // Border on hover
-      if (isHovered) {
-        this.ctx.strokeStyle = '#4338ca';
-        this.ctx.lineWidth = 3;
+      // Border
+      if (isHighlighted) {
+        this.ctx.strokeStyle = isFocused ? '#10b981' : '#4338ca';
+        this.ctx.lineWidth = isFocused ? 4 : 3;
         this.ctx.strokeRect(x, y, w, h);
+        
+        // Focus indicator (dashed outer border)
+        if (isFocused) {
+          this.ctx.setLineDash([8, 4]);
+          this.ctx.strokeStyle = '#10b981';
+          this.ctx.lineWidth = 2;
+          this.ctx.strokeRect(x - 6, y - 6, w + 12, h + 12);
+          this.ctx.setLineDash([]);
+        }
       }
       
       // label and price
-      this.ctx.fillStyle = isHovered ? '#4338ca' : '#111'; 
-      this.ctx.font = isHovered ? 'bold 12px system-ui' : '12px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+      this.ctx.fillStyle = isFocused ? '#10b981' : (isHovered ? '#4338ca' : '#111'); 
+      this.ctx.font = isHighlighted ? 'bold 12px system-ui' : '12px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
       this.ctx.fillText(this.renderAccessors.label(n.data as any), x, y - 4);
       const price = this.renderAccessors.priceText(n.data as any);
       if (price) this.ctx.fillText(price, x, y + h + 14);
