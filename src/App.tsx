@@ -114,9 +114,15 @@ export default class App extends React.Component<{}, State> {
   private handleResize = () => {
     const c = this.canvasRef.current;
     if (!c) return;
-    c.width = c.clientWidth;
-    c.height = c.clientHeight;
-    if (this.engine) this.engine.layout({ width: c.clientWidth, height: c.clientHeight });
+    
+    // Use parent element dimensions if canvas clientWidth is 0
+    const parent = c.parentElement;
+    const width = c.clientWidth || parent?.clientWidth || window.innerWidth;
+    const height = c.clientHeight || parent?.clientHeight || window.innerHeight;
+    
+    c.width = width;
+    c.height = height;
+    if (this.engine) this.engine.layout({ width, height });
   };
 
   private get filteredProducts(): Product[] {
