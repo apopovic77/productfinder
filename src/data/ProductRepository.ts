@@ -1,7 +1,15 @@
+import { DefaultApi, Configuration, type Product as OnealProduct } from 'arkturian-oneal-sdk';
 import type { Product } from '../types/Product';
 
 const API_BASE = import.meta.env.VITE_ONEAL_API_BASE || 'https://oneal-api.arkturian.com/v1';
 const API_KEY = import.meta.env.VITE_ONEAL_API_KEY || 'oneal_demo_token';
+
+// Initialize SDK
+const config = new Configuration({
+  basePath: API_BASE,
+  apiKey: API_KEY,
+});
+const api = new DefaultApi(config);
 
 export type Query = {
   search?: string;
@@ -17,25 +25,41 @@ export type Query = {
   offset?: number;
 };
 
+// Map SDK Product to our Product type
+function mapProduct(p: OnealProduct): Product {
+  return {
+    id: p.id,
+    sku: p.sku,
+    name: p.name,
+    brand: p.brand,
+    category: p.category,
+    season: p.season,
+    price: p.price,
+    media: p.media,
+    specifications: p.specifications
+  };
+}
+
 export async function fetchProducts(query: Query = {}): Promise<Product[]> {
-  const qs = new URLSearchParams();
-  Object.entries(query).forEach(([k, v]) => {
-    if (v !== undefined && v !== null && v !== '') qs.append(k, String(v));
+  const response = await api.productsGet({
+    search: query.search,
+    category: query.category,
+    season: query.season,
+    priceMin: query.price_min,
+    priceMax: query.price_max,
+    sort: query.sort as any,
+    order: query.order as any,
+    limit: query.limit,
+    offset: query.offset,
   });
-  const res = await fetch(`${API_BASE}/products?${qs.toString()}`, {
-    headers: { 'X-API-Key': API_KEY },
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
-  return data.results || [];
+  
+  const results = (response.data as any).results || [];
+  return results.map(mapProduct);
 }
 
 export async function fetchFacets(): Promise<any> {
-  const res = await fetch(`${API_BASE}/facets`, {
-    headers: { 'X-API-Key': API_KEY },
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
+  const response = await api.facetsGet();
+  return response.data;
 }
 
 
