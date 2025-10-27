@@ -66,6 +66,10 @@ export class ProductFinderController {
     // Setup favorites listener
     this.favoritesService.addListener(() => this.onDataChanged());
 
+    // Initial resize to ensure canvas has correct size
+    // Use setTimeout to ensure DOM is fully rendered
+    setTimeout(() => this.handleResize(), 0);
+
     // Load products
     try {
       const results = await fetchProducts({ limit: 1000 });
@@ -74,6 +78,9 @@ export class ProductFinderController {
       this.stopSkeletonAnimation();
       if (this.renderer) this.renderer.start();
       this.onDataChanged();
+      
+      // Resize again after data is loaded to ensure correct layout
+      setTimeout(() => this.handleResize(), 100);
     } catch (e: any) {
       this.error = e.message || 'Load error';
       this.loading = false;
@@ -198,12 +205,26 @@ export class ProductFinderController {
          // Resize
          handleResize(): void {
            if (!this.canvas) return;
-           const viewportWidth = this.canvas.parentElement?.clientWidth || this.canvas.clientWidth;
-           const viewportHeight = this.canvas.parentElement?.clientHeight || this.canvas.clientHeight;
            
-           // Simple layout - canvas matches viewport
+           // Get viewport size from parent or window
+           const parent = this.canvas.parentElement;
+           const viewportWidth = parent?.clientWidth || window.innerWidth;
+           const viewportHeight = parent?.clientHeight || window.innerHeight;
+           
+           // Ensure we have valid dimensions
+           if (viewportWidth === 0 || viewportHeight === 0) {
+             console.warn('Canvas parent has zero dimensions, using window size');
+             this.canvas.width = window.innerWidth;
+             this.canvas.height = window.innerHeight;
+             this.layoutService.layout(window.innerWidth, window.innerHeight);
+             return;
+           }
+           
+           // Set canvas size to match viewport
            this.canvas.width = viewportWidth;
            this.canvas.height = viewportHeight;
+           
+           console.log(`Canvas resized to: ${viewportWidth}x${viewportHeight}`);
            
            // Layout uses viewport size
            this.layoutService.layout(viewportWidth, viewportHeight);
