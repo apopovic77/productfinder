@@ -49,13 +49,7 @@ export default class App extends React.Component<{}, State> {
   };
 
   async componentDidMount() {
-    try {
-      const results = await fetchProducts({ limit: 1000 });
-      this.setState({ products: results || [], loading: false });
-    } catch (e: any) {
-      this.setState({ error: e.message || 'Load error', loading: false });
-    }
-
+    // Initialize canvas first
     const canvas = this.canvasRef.current;
     if (canvas) {
       const ctx = canvas.getContext('2d');
@@ -68,13 +62,29 @@ export default class App extends React.Component<{}, State> {
         };
         this.layouter = new PivotLayouter<Product>(config);
         this.engine = new LayoutEngine<Product>(this.layouter);
-        this.engine.sync(this.filteredProducts, p => p.id);
-        this.engine.layout({ width: canvas.clientWidth, height: canvas.clientHeight });
         this.renderer = new CanvasRenderer<Product>(ctx, () => this.engine!.all(), this.renderAccess);
         this.renderer.start();
         window.addEventListener('resize', this.handleResize);
-        this.handleResize();
+        
+        // Set initial canvas size
+        requestAnimationFrame(() => {
+          this.handleResize();
+        });
       }
+    }
+
+    // Load products
+    try {
+      const results = await fetchProducts({ limit: 1000 });
+      this.setState({ products: results || [], loading: false }, () => {
+        // Trigger layout after products are loaded
+        if (this.engine && canvas) {
+          this.engine.sync(this.filteredProducts, p => p.id);
+          this.engine.layout({ width: canvas.clientWidth, height: canvas.clientHeight });
+        }
+      });
+    } catch (e: any) {
+      this.setState({ error: e.message || 'Load error', loading: false });
     }
   }
 
@@ -149,11 +159,25 @@ export default class App extends React.Component<{}, State> {
     const cats = this.uniqueCategories(this.state.products);
     const seasons = this.uniqueSeasons(this.state.products);
 
-    if (loading) return <div className="container"><div className="loading">Loading…</div></div>;
     if (error) return <div className="container"><div className="error">{error}</div></div>;
 
     return (
       <div className="pf-root">
+        {loading && (
+          <div style={{ 
+            position: 'absolute', 
+            top: '50%', 
+            left: '50%', 
+            transform: 'translate(-50%, -50%)',
+            zIndex: 10,
+            background: 'rgba(255,255,255,0.9)',
+            padding: '20px',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+          }}>
+            <div className="loading">Loading products...</div>
+          </div>
+        )}
         <div className="pf-toolbar">
           <input placeholder="Search" value={search} onChange={e => this.setState({ search: e.target.value })} />
           <select value={category} onChange={e => this.setState({ category: e.target.value })}>
