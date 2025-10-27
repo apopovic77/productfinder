@@ -8,6 +8,7 @@ import { PivotLayouter, type PivotConfig } from './layout/PivotLayouter';
 import { LayoutEngine } from './layout/LayoutEngine';
 import { CanvasRenderer } from './render/CanvasRenderer';
 import { fetchProducts } from './data/ProductRepository';
+import { ProductModal } from './components/ProductModal';
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -24,6 +25,7 @@ type State = {
   priceMax: string;
   weightMin: string;
   weightMax: string;
+  selectedProduct: Product | null;
 };
 
 export default class App extends React.Component<{}, State> {
@@ -46,6 +48,7 @@ export default class App extends React.Component<{}, State> {
     priceMax: '',
     weightMin: '',
     weightMax: '',
+    selectedProduct: null,
   };
 
   async componentDidMount() {
@@ -65,6 +68,7 @@ export default class App extends React.Component<{}, State> {
         this.renderer = new CanvasRenderer<Product>(ctx, () => this.engine!.all(), this.renderAccess);
         this.renderer.start();
         window.addEventListener('resize', this.handleResize);
+        canvas.addEventListener('click', this.handleCanvasClick);
         
         // Set initial canvas size
         requestAnimationFrame(() => {
@@ -91,6 +95,8 @@ export default class App extends React.Component<{}, State> {
   componentWillUnmount(): void {
     if (this.renderer) this.renderer.stop();
     window.removeEventListener('resize', this.handleResize);
+    const canvas = this.canvasRef.current;
+    if (canvas) canvas.removeEventListener('click', this.handleCanvasClick);
   }
 
   componentDidUpdate(prevProps: {}, prevState: State): void {
@@ -123,6 +129,31 @@ export default class App extends React.Component<{}, State> {
     c.width = width;
     c.height = height;
     if (this.engine) this.engine.layout({ width, height });
+  };
+
+  private handleCanvasClick = (e: MouseEvent) => {
+    if (!this.engine) return;
+    
+    const canvas = this.canvasRef.current;
+    if (!canvas) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // Hit test: find clicked product
+    const nodes = this.engine.all();
+    for (const node of nodes) {
+      const nx = node.posX.value ?? 0;
+      const ny = node.posY.value ?? 0;
+      const nw = node.width.value ?? 0;
+      const nh = node.height.value ?? 0;
+      
+      if (x >= nx && x <= nx + nw && y >= ny && y <= ny + nh) {
+        this.setState({ selectedProduct: node.data });
+        return;
+      }
+    }
   };
 
   private get filteredProducts(): Product[] {
@@ -161,7 +192,7 @@ export default class App extends React.Component<{}, State> {
   }
 
   render() {
-    const { loading, error, search, category, season, priceMin, priceMax, weightMin, weightMax } = this.state;
+    const { loading, error, search, category, season, priceMin, priceMax, weightMin, weightMax, selectedProduct } = this.state;
     const cats = this.uniqueCategories(this.state.products);
     const seasons = this.uniqueSeasons(this.state.products);
 
@@ -203,6 +234,11 @@ export default class App extends React.Component<{}, State> {
         <div className="pf-stage">
           <canvas ref={this.canvasRef} className="pf-canvas" />
         </div>
+        
+        <ProductModal 
+          product={selectedProduct} 
+          onClose={() => this.setState({ selectedProduct: null })} 
+        />
       </div>
     );
   }
