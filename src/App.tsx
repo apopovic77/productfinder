@@ -113,12 +113,20 @@ export default class App extends React.Component<{}, State> {
 
   private handleResize = () => {
     const c = this.canvasRef.current;
-    if (!c) return;
+    if (!c || !c.parentElement) return;
     
-    // Use parent element dimensions if canvas clientWidth is 0
+    // Get dimensions from parent element since canvas is a replaced element
     const parent = c.parentElement;
-    const width = c.clientWidth || parent?.clientWidth || window.innerWidth;
-    const height = c.clientHeight || parent?.clientHeight || window.innerHeight;
+    const width = parent.clientWidth || window.innerWidth;
+    const height = parent.clientHeight || window.innerHeight;
+    
+    console.log('Canvas resize:', { 
+      width, 
+      height, 
+      parentWidth: parent.clientWidth,
+      parentHeight: parent.clientHeight,
+      canvasOffset: c.offsetWidth 
+    });
     
     c.width = width;
     c.height = height;
