@@ -43,6 +43,7 @@ done
 
 cd "$REPO_ROOT"
 
+# Check for uncommitted changes
 if [[ -n "$(git status --porcelain)" ]]; then
   echo "Error: working tree has uncommitted changes. Please commit or stash them first." >&2
   exit 1
@@ -51,7 +52,13 @@ fi
 printf '\n==> Syncing %s branch\n' "$DEV_BRANCH"
 "$CHECKOUT_SCRIPT" "$DEV_BRANCH"
 
-git push origin "$DEV_BRANCH"
+# Check if dev has unpushed commits
+if [[ -n "$(git log origin/$DEV_BRANCH..$DEV_BRANCH 2>/dev/null)" ]]; then
+  printf '⚠️  %s has unpushed commits. Pushing to origin...\n' "$DEV_BRANCH"
+  git push origin "$DEV_BRANCH"
+else
+  printf '✓ %s is already up to date with origin\n' "$DEV_BRANCH"
+fi
 
 if [[ "$run_build" == true ]]; then
   printf '\n==> Running local production build\n'

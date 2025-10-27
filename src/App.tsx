@@ -120,14 +120,6 @@ export default class App extends React.Component<{}, State> {
     const width = parent.clientWidth || window.innerWidth;
     const height = parent.clientHeight || window.innerHeight;
     
-    console.log('Canvas resize:', { 
-      width, 
-      height, 
-      parentWidth: parent.clientWidth,
-      parentHeight: parent.clientHeight,
-      canvasOffset: c.offsetWidth 
-    });
-    
     c.width = width;
     c.height = height;
     if (this.engine) this.engine.layout({ width, height });
