@@ -102,8 +102,11 @@ export class ProductFinderController {
     
     this.layoutService.sync(filtered);
     
-    // Recalculate canvas size based on filtered products
-    this.handleResize();
+    // Only re-layout, don't resize canvas
+    // Canvas size should only change on actual window resize
+    if (this.canvas) {
+      this.layoutService.layout(this.canvas.width, this.canvas.height);
+    }
     
     this.notifyListeners();
   }

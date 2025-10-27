@@ -22,7 +22,7 @@ export class SmartGridLayoutStrategy<T> {
   constructor(private config: GridConfig) {}
 
   /**
-   * Calculate optimal number of columns based on product count and aspect ratio
+   * Calculate optimal number of columns to fit ALL products on screen
    */
   private calculateOptimalColumns(
     productCount: number, 
@@ -32,40 +32,47 @@ export class SmartGridLayoutStrategy<T> {
     if (productCount === 0) return 1;
     if (productCount === 1) return 1;
 
-    // Start with a reasonable estimate based on available width
-    const estimatedCols = Math.floor(availableWidth / (this.config.minCellSize + this.config.spacing));
-    const maxCols = Math.min(productCount, Math.max(2, estimatedCols));
-    
-    // Try different column counts and find best fit
-    let bestCols = Math.max(2, Math.floor(Math.sqrt(productCount))); // Start with sqrt as baseline
+    // Start with square root as baseline (most balanced layout)
+    let bestCols = Math.max(2, Math.ceil(Math.sqrt(productCount)));
     let bestScore = Infinity;
 
-    for (let cols = 2; cols <= maxCols; cols++) {
+    // Try different column counts
+    const minCols = 2;
+    const maxCols = productCount;
+
+    for (let cols = minCols; cols <= maxCols; cols++) {
       const rows = Math.ceil(productCount / cols);
       
       // Calculate cell size for this layout
       const cellWidth = (availableWidth - (cols - 1) * this.config.spacing) / cols;
       const cellHeight = (availableHeight - (rows - 1) * this.config.spacing) / rows;
       
+      // Cell size is limited by the smaller dimension
       const cellSize = Math.min(cellWidth, cellHeight);
       
-      // Prefer layouts where cell size is reasonable
-      // Don't skip if out of bounds, just score it worse
+      // Skip if cell size is too small to be usable
+      if (cellSize < 50) continue;
+      
+      // Score based on:
+      // 1. How well it fills the screen (prefer larger cells)
+      // 2. How balanced the grid is (prefer square-ish layouts)
+      // 3. Prefer cells within the configured size range
+      
       let score = 0;
       
-      // Penalty for being outside size constraints
+      // Prefer larger cells (better visibility)
+      score += (300 - cellSize) * 0.5;
+      
+      // Prefer balanced layouts (aspect ratio close to 1)
+      const gridAspect = (cols * cellSize) / (rows * cellSize);
+      score += Math.abs(gridAspect - 1.0) * 50;
+      
+      // Prefer cells within the configured range (but don't enforce it)
       if (cellSize < this.config.minCellSize) {
-        score += (this.config.minCellSize - cellSize) * 2;
+        score += (this.config.minCellSize - cellSize) * 0.1;
       } else if (cellSize > this.config.maxCellSize) {
-        score += (cellSize - this.config.maxCellSize) * 0.5;
+        score += (cellSize - this.config.maxCellSize) * 0.1;
       }
-      
-      // Prefer more columns (better use of horizontal space)
-      score += (maxCols - cols) * 10;
-      
-      // Prefer square-ish aspect ratios
-      const aspectRatio = cellWidth / cellHeight;
-      score += Math.abs(aspectRatio - 1.0) * 20;
 
       if (score < bestScore) {
         bestScore = score;
@@ -73,11 +80,11 @@ export class SmartGridLayoutStrategy<T> {
       }
     }
 
-    return Math.max(2, bestCols); // Always at least 2 columns
+    return bestCols;
   }
 
   /**
-   * Layout products in a perfect matrix grid
+   * Layout products in a perfect matrix grid - ALL products fit on screen!
    */
   layout(
     viewportWidth: number,
@@ -91,23 +98,31 @@ export class SmartGridLayoutStrategy<T> {
     const availableWidth = viewportWidth - 2 * this.config.margin;
     const availableHeight = viewportHeight - 2 * this.config.margin;
 
-    // Calculate optimal columns
+    // Calculate optimal columns to fit ALL products
     const cols = this.calculateOptimalColumns(nodes.length, availableWidth, availableHeight);
     const rows = Math.ceil(nodes.length / cols);
 
-    // Calculate cell size to fit perfectly
+    // Calculate cell size to fit ALL products perfectly
+    // This ensures everything is visible without scrolling
     const cellWidth = (availableWidth - (cols - 1) * this.config.spacing) / cols;
     const cellHeight = (availableHeight - (rows - 1) * this.config.spacing) / rows;
-    const cellSize = Math.min(
-      Math.max(this.config.minCellSize, Math.min(cellWidth, cellHeight)),
-      this.config.maxCellSize
-    );
+    
+    // Use the smaller dimension to ensure square cells that fit
+    let cellSize = Math.min(cellWidth, cellHeight);
+    
+    // Only apply constraints as soft limits (prefer but don't enforce)
+    // This ensures ALL products are visible even if cells are smaller than minCellSize
+    if (cellSize < 50) {
+      console.warn(`Cell size ${cellSize}px is very small for ${nodes.length} products. Consider filtering.`);
+    }
 
-    // Center the grid if it doesn't fill the viewport
+    // Center the grid
     const totalGridWidth = cols * cellSize + (cols - 1) * this.config.spacing;
     const totalGridHeight = rows * cellSize + (rows - 1) * this.config.spacing;
     const startX = this.config.margin + (availableWidth - totalGridWidth) / 2;
     const startY = this.config.margin + (availableHeight - totalGridHeight) / 2;
+
+    console.log(`Grid: ${cols}x${rows}, Cell: ${cellSize.toFixed(1)}px, Total: ${nodes.length} products`);
 
     // Place products in grid
     nodes.forEach((node, index) => {
