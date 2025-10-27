@@ -20,13 +20,15 @@ type DeveloperOverlayProps = {
   onSettingsChange: (settings: DeveloperSettings) => void;
   productCount: number;
   fps?: number;
+  zoom?: number;
 };
 
 export const DeveloperOverlay: React.FC<DeveloperOverlayProps> = ({
   settings,
   onSettingsChange,
   productCount,
-  fps = 0
+  fps = 0,
+  zoom = 1
 }) => {
   const [isOpen, setIsOpen] = React.useState(false);
   const [isMinimized, setIsMinimized] = React.useState(false);
@@ -108,6 +110,22 @@ export const DeveloperOverlay: React.FC<DeveloperOverlayProps> = ({
                 <span className="dev-stat-label">FPS:</span>
                 <span className="dev-stat-value">{fps.toFixed(1)}</span>
               </div>
+              <div className="dev-stat">
+                <span className="dev-stat-label">Zoom:</span>
+                <span className="dev-stat-value" style={{ 
+                  color: zoom > 5 ? '#10b981' : zoom > 2 ? '#f59e0b' : '#6b7280' 
+                }}>
+                  {zoom.toFixed(2)}x
+                </span>
+              </div>
+            </div>
+            <div style={{ 
+              marginTop: '8px', 
+              fontSize: '11px', 
+              color: '#9ca3af',
+              fontStyle: 'italic'
+            }}>
+              💡 Scroll to zoom (max 10x), Ctrl+Drag to pan
             </div>
           </div>
 

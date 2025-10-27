@@ -43,19 +43,22 @@ done
 
 cd "$REPO_ROOT"
 
-# Check for uncommitted changes
+# Auto-commit any uncommitted changes
 if [[ -n "$(git status --porcelain)" ]]; then
-  echo "Error: working tree has uncommitted changes. Please commit or stash them first." >&2
-  exit 1
+  printf '⚠️  Uncommitted changes detected. Auto-committing...\n'
+  git add -A
+  git commit -m "chore: auto-commit before release [$(date +%Y-%m-%d\ %H:%M:%S)]"
+  printf '✓ Changes committed\n'
 fi
 
 printf '\n==> Syncing %s branch\n' "$DEV_BRANCH"
 "$CHECKOUT_SCRIPT" "$DEV_BRANCH"
 
-# Check if dev has unpushed commits
+# Check if dev has unpushed commits (including the auto-commit above)
 if [[ -n "$(git log origin/$DEV_BRANCH..$DEV_BRANCH 2>/dev/null)" ]]; then
   printf '⚠️  %s has unpushed commits. Pushing to origin...\n' "$DEV_BRANCH"
   git push origin "$DEV_BRANCH"
+  printf '✓ %s pushed to origin\n' "$DEV_BRANCH"
 else
   printf '✓ %s is already up to date with origin\n' "$DEV_BRANCH"
 fi

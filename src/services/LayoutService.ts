@@ -2,24 +2,48 @@ import type { Product } from '../types/Product';
 import { ProductLayoutAccessors } from '../layout/Accessors';
 import { WeightScalePolicy } from '../layout/ScalePolicy';
 import { SimpleLayouter, type SimpleLayoutConfig } from '../layout/SimpleLayouter';
+import { PivotLayouter, type PivotConfig } from '../layout/PivotLayouter';
+import { ShelfLayoutStrategy } from '../layout/ShelfLayoutStrategy';
 import { LayoutEngine } from '../layout/LayoutEngine';
 
-export type LayoutMode = 'grid' | 'masonry' | 'compact' | 'large';
+export type LayoutMode = 'grid' | 'masonry' | 'compact' | 'large' | 'pivot';
 
 export class LayoutService {
-  private mode: LayoutMode = 'grid';
+  private mode: LayoutMode = 'pivot'; // Start with pivot layout!
   private engine: LayoutEngine<Product>;
-  private layouter: SimpleLayouter<Product>;
+  private layouter: SimpleLayouter<Product> | PivotLayouter<Product>;
   private access = new ProductLayoutAccessors();
   private scalePolicy = new WeightScalePolicy();
 
   constructor() {
-    const config = this.createConfig(this.mode);
-    this.layouter = new SimpleLayouter<Product>(config);
+    this.layouter = this.createLayouter(this.mode);
     this.engine = new LayoutEngine<Product>(this.layouter);
   }
 
-  private createConfig(mode: LayoutMode): SimpleLayoutConfig<Product> {
+  private createLayouter(mode: LayoutMode): SimpleLayouter<Product> | PivotLayouter<Product> {
+    if (mode === 'pivot') {
+      // Pivot layout with horizontal shelves (categories)
+      const pivotConfig: PivotConfig<Product> = {
+        orientation: 'rows',
+        flow: 'ltr',
+        groupKey: (p: Product) => p.category?.[0] || 'Uncategorized',
+        frameGap: 40,
+        framePadding: 20,
+        itemGap: 12,
+        rowBaseHeight: 150,
+        innerLayoutType: 'shelf',
+        access: this.access,
+        scale: this.scalePolicy
+      };
+      return new PivotLayouter<Product>(pivotConfig);
+    }
+    
+    // Grid/Masonry layouts
+    const config = this.createGridConfig(mode);
+    return new SimpleLayouter<Product>(config);
+  }
+
+  private createGridConfig(mode: LayoutMode): SimpleLayoutConfig<Product> {
     switch (mode) {
       case 'masonry':
         return {
@@ -76,8 +100,7 @@ export class LayoutService {
   setMode(mode: LayoutMode): void {
     if (this.mode === mode) return;
     this.mode = mode;
-    const config = this.createConfig(mode);
-    this.layouter = new SimpleLayouter<Product>(config);
+    this.layouter = this.createLayouter(mode);
     // Update layouter on existing engine to preserve nodes!
     this.engine.setLayouter(this.layouter);
   }
@@ -99,8 +122,11 @@ export class LayoutService {
   }
 
   updateGridConfig(gridConfig: { spacing: number; margin: number; minCellSize: number; maxCellSize: number }): void {
+    // Only works for grid layouts, not pivot
+    if (this.mode === 'pivot') return;
+    
     // Recreate layouter with new grid config
-    const config = this.createConfig(this.mode);
+    const config = this.createGridConfig(this.mode);
     config.gridConfig = gridConfig;
     this.layouter = new SimpleLayouter<Product>(config);
     this.engine.setLayouter(this.layouter);

@@ -3,8 +3,8 @@ import { Vector2 } from 'arkturian-typescript-utils';
 export class ViewportTransform {
   public scale = 1;
   public offset = new Vector2(0, 0);
-  public minScale = 0.5;
-  public maxScale = 3;
+  public minScale = 0.1;
+  public maxScale = 10; // Allow 10x zoom for quality inspection
   
   private isDragging = false;
   private dragStart = new Vector2(0, 0);
@@ -44,7 +44,8 @@ export class ViewportTransform {
   private handleWheel = (e: WheelEvent) => {
     e.preventDefault();
     
-    const delta = -e.deltaY * 0.001;
+    // Increased zoom speed for better control (0.002 instead of 0.001)
+    const delta = -e.deltaY * 0.002;
     const newScale = Math.max(this.minScale, Math.min(this.maxScale, this.scale * (1 + delta)));
     
     // Zoom towards mouse position

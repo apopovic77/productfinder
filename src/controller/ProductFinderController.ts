@@ -285,5 +285,10 @@ export class ProductFinderController {
     this.layoutService.updateGridConfig(gridConfig);
     this.handleResize(); // Re-layout with new config
   }
+
+  getZoom(): number {
+    const viewport = this.viewportService.getTransform();
+    return viewport?.scale ?? 1;
+  }
 }
 

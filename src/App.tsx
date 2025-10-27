@@ -37,6 +37,7 @@ type State = {
   // Developer Settings
   devSettings: DeveloperSettings;
   fps: number;
+  zoom: number;
 };
 
 export default class App extends React.Component<{}, State> {
@@ -59,7 +60,7 @@ export default class App extends React.Component<{}, State> {
     weightMin: '',
     weightMax: '',
     sortMode: 'none',
-    layoutMode: 'grid',
+    layoutMode: 'pivot',
     showOnlyFavorites: false,
     
     selectedProduct: null,
@@ -79,6 +80,7 @@ export default class App extends React.Component<{}, State> {
       animationSpeed: 0.4
     },
     fps: 60,
+    zoom: 1,
   };
 
   async componentDidMount() {
@@ -185,7 +187,8 @@ export default class App extends React.Component<{}, State> {
       const now = performance.now();
       const delta = now - this.lastFrameTime;
       const fps = 1000 / delta;
-      this.setState({ fps });
+      const zoom = this.controller.getZoom();
+      this.setState({ fps, zoom });
       this.lastFrameTime = now;
     }, 500); // Update every 500ms
   };
@@ -333,32 +336,36 @@ export default class App extends React.Component<{}, State> {
           >
             ❤️ Favorites {showOnlyFavorites ? 'ON' : 'OFF'}
           </button>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
-            <button 
-              onClick={() => this.controller.setLayoutMode('grid')}
-              style={{ fontWeight: layoutMode === 'grid' ? 'bold' : 'normal' }}
-            >
-              📊 Grid
-            </button>
-            <button 
-              onClick={() => this.controller.setLayoutMode('masonry')}
-              style={{ fontWeight: layoutMode === 'masonry' ? 'bold' : 'normal' }}
-            >
-              🧱 Masonry
-            </button>
-            <button 
-              onClick={() => this.controller.setLayoutMode('compact')}
-              style={{ fontWeight: layoutMode === 'compact' ? 'bold' : 'normal' }}
-            >
-              🔬 Compact
-            </button>
-            <button 
-              onClick={() => this.controller.setLayoutMode('large')}
-              style={{ fontWeight: layoutMode === 'large' ? 'bold' : 'normal' }}
-            >
-              🔭 Large
-            </button>
-          </div>
+          <button 
+            onClick={() => this.controller.setLayoutMode('pivot')}
+            style={{ fontWeight: layoutMode === 'pivot' ? 'bold' : 'normal' }}
+          >
+            📚 Pivot
+          </button>
+          <button 
+            onClick={() => this.controller.setLayoutMode('grid')}
+            style={{ fontWeight: layoutMode === 'grid' ? 'bold' : 'normal' }}
+          >
+            📊 Grid
+          </button>
+          <button 
+            onClick={() => this.controller.setLayoutMode('masonry')}
+            style={{ fontWeight: layoutMode === 'masonry' ? 'bold' : 'normal' }}
+          >
+            🧱 Masonry
+          </button>
+          <button 
+            onClick={() => this.controller.setLayoutMode('compact')}
+            style={{ fontWeight: layoutMode === 'compact' ? 'bold' : 'normal' }}
+          >
+            🔬 Compact
+          </button>
+          <button 
+            onClick={() => this.controller.setLayoutMode('large')}
+            style={{ fontWeight: layoutMode === 'large' ? 'bold' : 'normal' }}
+          >
+            🔭 Large
+          </button>
         </div>
         <div className="pf-stage">
           <canvas ref={this.canvasRef} className="pf-canvas" />
@@ -396,6 +403,7 @@ export default class App extends React.Component<{}, State> {
           onSettingsChange={this.handleDevSettingsChange}
           productCount={this.state.filteredProducts.length}
           fps={this.state.fps}
+          zoom={this.state.zoom}
         />
       </div>
     );

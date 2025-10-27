@@ -12,28 +12,54 @@ export class ProductRenderAccessors {
   
   /**
    * Get optimized image URL for grid display
-   * Converts Shopify CDN URLs to smaller thumbnail versions
-   * e.g., _1200x.png → _400x.png for better performance
+   * 
+   * ALL images now go through Storage API proxy for:
+   * - WebP conversion (30-50% smaller files)
+   * - Optimized quality (80% - visually lossless, much smaller)
+   * - Automatic caching (24h TTL)
+   * - Consistent transformation pipeline
    */
   imageUrl(p: Product): string { 
-    const originalUrl = p.media?.[0]?.src;
+    const media = p.media?.[0];
+    if (!media) return 'https://via.placeholder.com/256?text=No+Image';
+    
+    const originalUrl = media.src;
     if (!originalUrl) return 'https://via.placeholder.com/256?text=No+Image';
     
-    // Optimize Shopify CDN images
-    // Replace _1200x, _800x, etc. with _400x for grid thumbnails
-    if (originalUrl.includes('oneal.eu/cdn/shop/files/')) {
-      return originalUrl.replace(/_\d+x\.(png|jpg|jpeg|webp)/i, '_400x.$1');
+    // ALL images go through Storage API proxy
+    // The Oneal API already returns Storage proxy URLs in the resolved format,
+    // but for the standard format, we need to construct them here
+    if (originalUrl.includes('api.arkturian.com/storage/proxy')) {
+      // Already a proxy URL (from resolved format)
+      return originalUrl;
     }
     
-    // For other CDNs, return original URL
-    return originalUrl;
+    // Construct Storage API proxy URL for external images
+    const encodedUrl = encodeURIComponent(originalUrl);
+    return `https://api.arkturian.com/storage/proxy?url=${encodedUrl}&width=400&format=webp&quality=80`;
   }
   
   /**
    * Get full-size image URL for modal/detail view
+   * 
+   * ALL images go through Storage API proxy for consistent delivery
    */
   fullImageUrl(p: Product): string {
-    return p.media?.[0]?.src || 'https://via.placeholder.com/800?text=No+Image';
+    const media = p.media?.[0];
+    if (!media) return 'https://via.placeholder.com/800?text=No+Image';
+    
+    const originalUrl = media.src;
+    if (!originalUrl) return 'https://via.placeholder.com/800?text=No+Image';
+    
+    // ALL images go through Storage API proxy
+    if (originalUrl.includes('api.arkturian.com/storage/proxy')) {
+      // Already a proxy URL - just adjust parameters for full size
+      return originalUrl.replace(/width=\d+/, 'width=1200').replace(/quality=\d+/, 'quality=90');
+    }
+    
+    // Construct Storage API proxy URL for high-quality images
+    const encodedUrl = encodeURIComponent(originalUrl);
+    return `https://api.arkturian.com/storage/proxy?url=${encodedUrl}&width=1200&format=jpg&quality=90`;
   }
   
   priceText(p: Product): string { return p.price?.formatted || ''; }

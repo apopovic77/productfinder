@@ -65,9 +65,7 @@ export class CanvasRenderer<T> {
       
       const url = this.renderAccessors.imageUrl(n.data as any);
       const img = await this.cache.load(url);
-      const isHovered = this.hoveredItem === n.data;
       const isFocused = this.focusedItem === n.data;
-      const isHighlighted = isHovered || isFocused;
       
       // Apply scale transform
       this.ctx.save();
@@ -77,34 +75,24 @@ export class CanvasRenderer<T> {
       this.ctx.scale(scale, scale);
       this.ctx.translate(-centerX, -centerY);
       
-      // Draw highlight
-      if (isHighlighted) {
-        this.ctx.save();
-        this.ctx.shadowColor = isFocused ? 'rgba(16, 185, 129, 0.5)' : 'rgba(67, 56, 202, 0.5)';
-        this.ctx.shadowBlur = 20;
-        this.ctx.fillStyle = isFocused ? 'rgba(16, 185, 129, 0.1)' : 'rgba(67, 56, 202, 0.1)';
-        this.ctx.fillRect(x - 4, y - 4, w + 8, h + 8);
-        this.ctx.restore();
-      }
-      
+      // Draw image (no hover effects - tooltip is enough!)
       this.ctx.globalAlpha = opacity;
       this.ctx.drawImage(img, x, y, w, h);
       this.ctx.globalAlpha = 1;
       
-      // Border
-      if (isHighlighted) {
-        this.ctx.strokeStyle = isFocused ? '#10b981' : '#4338ca';
-        this.ctx.lineWidth = isFocused ? 4 : 3;
+      // Only show focus indicator for keyboard navigation
+      if (isFocused) {
+        // Subtle green border for focused item
+        this.ctx.strokeStyle = '#10b981';
+        this.ctx.lineWidth = 3;
         this.ctx.strokeRect(x, y, w, h);
         
-        // Focus indicator (dashed outer border)
-        if (isFocused) {
-          this.ctx.setLineDash([8, 4]);
-          this.ctx.strokeStyle = '#10b981';
-          this.ctx.lineWidth = 2;
-          this.ctx.strokeRect(x - 6, y - 6, w + 12, h + 12);
-          this.ctx.setLineDash([]);
-        }
+        // Dashed outer border for extra visibility
+        this.ctx.setLineDash([8, 4]);
+        this.ctx.strokeStyle = '#10b981';
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeRect(x - 6, y - 6, w + 12, h + 12);
+        this.ctx.setLineDash([]);
       }
       
       // NO TEXT RENDERING - Clean Microsoft Pivot style!
