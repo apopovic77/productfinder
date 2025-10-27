@@ -20,6 +20,7 @@ export class LayoutEngine<T> {
   // Persistent node pool - nodes are reused, not recreated
   private nodes = new Map<string, LayoutNode<T>>();
   private layouter: ILayouter<T>;
+  private orderedIds: string[] = []; // Track order of items
   
   constructor(layouter: ILayouter<T>) {
     this.layouter = layouter;
@@ -38,12 +39,17 @@ export class LayoutEngine<T> {
    * - Existing nodes: Keep and update data only
    * - New items: Create new nodes (with fresh InterpolatedProperties)
    * - Removed items: Delete nodes
+   * - IMPORTANT: Preserves the order of items for sorting!
    */
   sync(items: T[], idOf: (t: T) => string) {
     const keep = new Set<string>();
+    this.orderedIds = []; // Reset order
+    
     for (const it of items) {
       const id = idOf(it);
       keep.add(id);
+      this.orderedIds.push(id); // Track order
+      
       // IMPORTANT: Only create node if it doesn't exist yet!
       // This preserves InterpolatedProperty state for smooth animations
       if (!this.nodes.has(id)) {
@@ -60,11 +66,19 @@ export class LayoutEngine<T> {
   }
   
   layout(view: { width: number; height: number }) {
-    this.layouter.compute(Array.from(this.nodes.values()), view);
+    // Get nodes in the correct order (as provided in sync)
+    const orderedNodes = this.orderedIds
+      .map(id => this.nodes.get(id))
+      .filter((n): n is LayoutNode<T> => n !== undefined);
+    
+    this.layouter.compute(orderedNodes, view);
   }
   
   all(): LayoutNode<T>[] { 
-    return Array.from(this.nodes.values()); 
+    // Return nodes in the correct order
+    return this.orderedIds
+      .map(id => this.nodes.get(id))
+      .filter((n): n is LayoutNode<T> => n !== undefined);
   }
 }
 
