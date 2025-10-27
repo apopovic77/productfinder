@@ -107,12 +107,8 @@ export class CanvasRenderer<T> {
         }
       }
       
-      // label and price
-      this.ctx.fillStyle = isFocused ? '#10b981' : (isHovered ? '#4338ca' : '#111'); 
-      this.ctx.font = isHighlighted ? 'bold 12px system-ui' : '12px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
-      this.ctx.fillText(this.renderAccessors.label(n.data as any), x, y - 4);
-      const price = this.renderAccessors.priceText(n.data as any);
-      if (price) this.ctx.fillText(price, x, y + h + 14);
+      // NO TEXT RENDERING - Clean Microsoft Pivot style!
+      // Text will be shown in tooltip on hover
       
       // Restore item transform
       this.ctx.restore();

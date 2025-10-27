@@ -27,29 +27,33 @@ export class LayoutService {
           orientation: 'rows', flow: 'ltr',
           groupKey: () => 'all',
           frameGap: 12, framePadding: 12, itemGap: 12, rowBaseHeight: 180,
-          access: this.access, scale: this.scalePolicy, innerFactory: () => new GridLayoutStrategy<Product>()
+          access: this.access, scale: this.scalePolicy, 
+          innerLayoutType: 'shelf'
         };
       case 'compact':
         return {
           orientation: 'columns', flow: 'ltr',
           groupKey: p => this.access.groupKey(p),
           frameGap: 12, framePadding: 8, itemGap: 8, rowBaseHeight: 80,
-          access: this.access, scale: this.scalePolicy, innerFactory: () => new GridLayoutStrategy<Product>()
+          access: this.access, scale: this.scalePolicy, 
+          innerLayoutType: 'shelf'
         };
       case 'large':
         return {
           orientation: 'columns', flow: 'ltr',
           groupKey: p => this.access.groupKey(p),
           frameGap: 32, framePadding: 20, itemGap: 20, rowBaseHeight: 200,
-          access: this.access, scale: this.scalePolicy, innerFactory: () => new GridLayoutStrategy<Product>()
+          access: this.access, scale: this.scalePolicy, 
+          innerLayoutType: 'shelf'
         };
       case 'grid':
       default:
         return {
           orientation: 'columns', flow: 'ltr',
           groupKey: p => this.access.groupKey(p),
-          frameGap: 24, framePadding: 12, itemGap: 12, rowBaseHeight: 120,
-          access: this.access, scale: this.scalePolicy, innerFactory: () => new GridLayoutStrategy<Product>()
+          frameGap: 100, framePadding: 50, itemGap: 12, rowBaseHeight: 150,
+          access: this.access, scale: this.scalePolicy, 
+          innerLayoutType: 'shelf' // Microsoft Pivot style!
         };
     }
   }
