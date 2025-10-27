@@ -37,7 +37,7 @@ export class ProductModal extends React.Component<Props> {
             <div className="modal-image">
               {product.media && product.media.length > 0 ? (
                 <img 
-                  src={product.media[0].src} 
+                  src={product.fullImageUrl}
                   alt={product.media[0].alt || product.name}
                 />
               ) : (

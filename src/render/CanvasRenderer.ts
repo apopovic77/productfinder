@@ -1,18 +1,16 @@
-import { ImageCache } from '../utils/ImageCache';
 import { LayoutNode } from '../layout/LayoutNode';
 import { ViewportTransform } from '../utils/ViewportTransform';
 import type { Product } from '../types/Product';
 
 export class CanvasRenderer<T> {
   private rafId: number | null = null;
-  private cache = new ImageCache();
   public hoveredItem: T | null = null;
   public focusedItem: T | null = null;
   
   constructor(
     private ctx: CanvasRenderingContext2D, 
     private getNodes: () => LayoutNode<T>[], 
-    private renderAccessors: { label(item: T): string; imageUrl(item: T): string; priceText(item: T): string },
+    private renderAccessors: { label(item: T): string; priceText(item: T): string },
     private viewport: ViewportTransform | null = null
   ) {}
   
@@ -63,8 +61,17 @@ export class CanvasRenderer<T> {
       // Skip if fully transparent
       if (opacity <= 0.01) continue;
       
-      const url = this.renderAccessors.imageUrl(n.data as any);
-      const img = await this.cache.load(url);
+      // Get product and ensure image is loaded (OOP self-managed)
+      const product = n.data as any as Product;
+      if (!product.isImageReady) {
+        // Trigger async load (non-blocking)
+        product.loadImage();
+        continue;
+      }
+      
+      const img = product.image;
+      if (!img) continue;
+      
       const isFocused = this.focusedItem === n.data;
       
       // Apply scale transform

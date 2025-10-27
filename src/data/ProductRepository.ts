@@ -1,5 +1,5 @@
 import { DefaultApi, Configuration, type Product as OnealProduct } from 'arkturian-oneal-sdk';
-import type { Product } from '../types/Product';
+import { Product, type ProductData } from '../types/Product';
 
 const API_BASE = import.meta.env.VITE_ONEAL_API_BASE || 'https://oneal-api.arkturian.com/v1';
 const API_KEY = import.meta.env.VITE_ONEAL_API_KEY || 'oneal_demo_token';
@@ -25,9 +25,11 @@ export type Query = {
   offset?: number;
 };
 
-// Map SDK Product to our Product type
+/**
+ * Map SDK Product to our OOP Product class instance
+ */
 function mapProduct(p: OnealProduct): Product {
-  return {
+  const data: ProductData = {
     id: p.id,
     sku: p.sku,
     name: p.name,
@@ -38,6 +40,8 @@ function mapProduct(p: OnealProduct): Product {
     media: p.media,
     specifications: p.specifications
   };
+  
+  return new Product(data);
 }
 
 export async function fetchProducts(query: Query = {}): Promise<Product[]> {
@@ -54,7 +58,12 @@ export async function fetchProducts(query: Query = {}): Promise<Product[]> {
   });
   
   const results = (response.data as any).results || [];
-  return results.map(mapProduct);
+  const products = results.map(mapProduct);
+  
+  // Preload images for better UX (non-blocking)
+  Product.preloadImages(products);
+  
+  return products;
 }
 
 export async function fetchFacets(): Promise<any> {
