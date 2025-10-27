@@ -30,32 +30,42 @@ export class SmartGridLayoutStrategy<T> {
     availableHeight: number
   ): number {
     if (productCount === 0) return 1;
+    if (productCount === 1) return 1;
 
-    // Target aspect ratio (width/height) for cells
-    const targetAspectRatio = 1.0; // Square cells
+    // Start with a reasonable estimate based on available width
+    const estimatedCols = Math.floor(availableWidth / (this.config.minCellSize + this.config.spacing));
+    const maxCols = Math.min(productCount, Math.max(2, estimatedCols));
     
     // Try different column counts and find best fit
-    let bestCols = 1;
+    let bestCols = Math.max(2, Math.floor(Math.sqrt(productCount))); // Start with sqrt as baseline
     let bestScore = Infinity;
 
-    for (let cols = 1; cols <= productCount; cols++) {
+    for (let cols = 2; cols <= maxCols; cols++) {
       const rows = Math.ceil(productCount / cols);
       
       // Calculate cell size for this layout
       const cellWidth = (availableWidth - (cols - 1) * this.config.spacing) / cols;
       const cellHeight = (availableHeight - (rows - 1) * this.config.spacing) / rows;
       
-      // Check if within size constraints
       const cellSize = Math.min(cellWidth, cellHeight);
-      if (cellSize < this.config.minCellSize || cellSize > this.config.maxCellSize) {
-        continue;
+      
+      // Prefer layouts where cell size is reasonable
+      // Don't skip if out of bounds, just score it worse
+      let score = 0;
+      
+      // Penalty for being outside size constraints
+      if (cellSize < this.config.minCellSize) {
+        score += (this.config.minCellSize - cellSize) * 2;
+      } else if (cellSize > this.config.maxCellSize) {
+        score += (cellSize - this.config.maxCellSize) * 0.5;
       }
-
-      // Score based on how well it uses space and aspect ratio
+      
+      // Prefer more columns (better use of horizontal space)
+      score += (maxCols - cols) * 10;
+      
+      // Prefer square-ish aspect ratios
       const aspectRatio = cellWidth / cellHeight;
-      const aspectScore = Math.abs(aspectRatio - targetAspectRatio);
-      const utilizationScore = 1 - (cellSize / this.config.maxCellSize);
-      const score = aspectScore + utilizationScore * 0.5;
+      score += Math.abs(aspectRatio - 1.0) * 20;
 
       if (score < bestScore) {
         bestScore = score;
@@ -63,7 +73,7 @@ export class SmartGridLayoutStrategy<T> {
       }
     }
 
-    return bestCols;
+    return Math.max(2, bestCols); // Always at least 2 columns
   }
 
   /**
