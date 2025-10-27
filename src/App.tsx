@@ -26,6 +26,8 @@ type State = {
   weightMin: string;
   weightMax: string;
   selectedProduct: Product | null;
+  hoveredProduct: Product | null;
+  mousePos: { x: number; y: number } | null;
 };
 
 export default class App extends React.Component<{}, State> {
@@ -49,6 +51,8 @@ export default class App extends React.Component<{}, State> {
     weightMin: '',
     weightMax: '',
     selectedProduct: null,
+    hoveredProduct: null,
+    mousePos: null,
   };
 
   async componentDidMount() {
@@ -69,6 +73,8 @@ export default class App extends React.Component<{}, State> {
         this.renderer.start();
         window.addEventListener('resize', this.handleResize);
         canvas.addEventListener('click', this.handleCanvasClick);
+        canvas.addEventListener('mousemove', this.handleCanvasMouseMove);
+        canvas.addEventListener('mouseleave', this.handleCanvasMouseLeave);
         
         // Set initial canvas size
         requestAnimationFrame(() => {
@@ -96,7 +102,11 @@ export default class App extends React.Component<{}, State> {
     if (this.renderer) this.renderer.stop();
     window.removeEventListener('resize', this.handleResize);
     const canvas = this.canvasRef.current;
-    if (canvas) canvas.removeEventListener('click', this.handleCanvasClick);
+    if (canvas) {
+      canvas.removeEventListener('click', this.handleCanvasClick);
+      canvas.removeEventListener('mousemove', this.handleCanvasMouseMove);
+      canvas.removeEventListener('mouseleave', this.handleCanvasMouseLeave);
+    }
   }
 
   componentDidUpdate(prevProps: {}, prevState: State): void {
@@ -114,6 +124,11 @@ export default class App extends React.Component<{}, State> {
       this.engine.sync(this.filteredProducts, p => p.id);
       const c = this.canvasRef.current;
       if (c) this.engine.layout({ width: c.clientWidth, height: c.clientHeight });
+    }
+    
+    // Update renderer hover state
+    if (prevState.hoveredProduct !== this.state.hoveredProduct && this.renderer) {
+      this.renderer.hoveredItem = this.state.hoveredProduct;
     }
   }
 
@@ -156,6 +171,49 @@ export default class App extends React.Component<{}, State> {
     }
   };
 
+  private handleCanvasMouseMove = (e: MouseEvent) => {
+    if (!this.engine) return;
+    
+    const canvas = this.canvasRef.current;
+    if (!canvas) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // Hit test: find hovered product
+    const nodes = this.engine.all();
+    let found: Product | null = null;
+    
+    for (const node of nodes) {
+      const nx = node.posX.value ?? 0;
+      const ny = node.posY.value ?? 0;
+      const nw = node.width.value ?? 0;
+      const nh = node.height.value ?? 0;
+      
+      if (x >= nx && x <= nx + nw && y >= ny && y <= ny + nh) {
+        found = node.data;
+        break;
+      }
+    }
+    
+    if (found !== this.state.hoveredProduct) {
+      this.setState({ 
+        hoveredProduct: found,
+        mousePos: found ? { x: e.clientX, y: e.clientY } : null
+      });
+      canvas.style.cursor = found ? 'pointer' : 'default';
+    } else if (found) {
+      this.setState({ mousePos: { x: e.clientX, y: e.clientY } });
+    }
+  };
+
+  private handleCanvasMouseLeave = () => {
+    const canvas = this.canvasRef.current;
+    if (canvas) canvas.style.cursor = 'default';
+    this.setState({ hoveredProduct: null, mousePos: null });
+  };
+
   private get filteredProducts(): Product[] {
     const { products, search, category, season, priceMin, priceMax, weightMin, weightMax } = this.state;
     return products.filter(p => {
@@ -192,7 +250,7 @@ export default class App extends React.Component<{}, State> {
   }
 
   render() {
-    const { loading, error, search, category, season, priceMin, priceMax, weightMin, weightMax, selectedProduct } = this.state;
+    const { loading, error, search, category, season, priceMin, priceMax, weightMin, weightMax, selectedProduct, hoveredProduct, mousePos } = this.state;
     const cats = this.uniqueCategories(this.state.products);
     const seasons = this.uniqueSeasons(this.state.products);
 
@@ -239,6 +297,29 @@ export default class App extends React.Component<{}, State> {
           product={selectedProduct} 
           onClose={() => this.setState({ selectedProduct: null })} 
         />
+        
+        {hoveredProduct && mousePos && (
+          <div 
+            className="pf-tooltip"
+            style={{
+              position: 'fixed',
+              left: mousePos.x + 15,
+              top: mousePos.y + 15,
+              pointerEvents: 'none',
+            }}
+          >
+            <div className="pf-tooltip-content">
+              <div className="pf-tooltip-name">{hoveredProduct.name}</div>
+              {hoveredProduct.price && (
+                <div className="pf-tooltip-price">{hoveredProduct.price.formatted}</div>
+              )}
+              {hoveredProduct.brand && (
+                <div className="pf-tooltip-brand">{hoveredProduct.brand}</div>
+              )}
+              <div className="pf-tooltip-hint">Click for details</div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

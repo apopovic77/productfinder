@@ -49,3 +49,58 @@ html, body, #root {
 
 .container { padding: 24px; }
 .loading, .error { font-size: 14px; color: #1f2937; }
+
+.pf-tooltip {
+  z-index: 999;
+  animation: tooltipFadeIn 0.15s ease-out;
+}
+
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pf-tooltip-content {
+  background: rgba(17, 24, 39, 0.95);
+  color: white;
+  padding: 12px 16px;
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(8px);
+  max-width: 300px;
+}
+
+.pf-tooltip-name {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  line-height: 1.3;
+}
+
+.pf-tooltip-price {
+  font-size: 16px;
+  font-weight: 700;
+  color: #10b981;
+  margin-bottom: 4px;
+}
+
+.pf-tooltip-brand {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-bottom: 8px;
+}
+
+.pf-tooltip-hint {
+  font-size: 11px;
+  color: #6b7280;
+  font-style: italic;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 8px;
+  margin-top: 8px;
+}
