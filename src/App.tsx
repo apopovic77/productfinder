@@ -16,6 +16,8 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
+type LayoutMode = 'grid' | 'list' | 'compact' | 'large';
+
 type State = {
   loading: boolean;
   error: string | null;
@@ -31,6 +33,7 @@ type State = {
   hoveredProduct: Product | null;
   mousePos: { x: number; y: number } | null;
   focusedIndex: number;
+  layoutMode: LayoutMode;
 };
 
 export default class App extends React.Component<{}, State> {
@@ -60,7 +63,44 @@ export default class App extends React.Component<{}, State> {
     hoveredProduct: null,
     mousePos: null,
     focusedIndex: -1,
+    layoutMode: 'grid',
   };
+
+  private getLayoutConfig(): PivotConfig<Product> {
+    const { layoutMode } = this.state;
+    
+    switch (layoutMode) {
+      case 'list':
+        return {
+          orientation: 'rows', flow: 'ltr',
+          groupKey: () => 'all',
+          frameGap: 12, framePadding: 12, itemGap: 12, rowBaseHeight: 180,
+          access: this.access, scale: this.scalePolicy, innerFactory: () => new GridLayoutStrategy<Product>()
+        };
+      case 'compact':
+        return {
+          orientation: 'columns', flow: 'ltr',
+          groupKey: p => this.access.groupKey(p),
+          frameGap: 12, framePadding: 8, itemGap: 8, rowBaseHeight: 80,
+          access: this.access, scale: this.scalePolicy, innerFactory: () => new GridLayoutStrategy<Product>()
+        };
+      case 'large':
+        return {
+          orientation: 'columns', flow: 'ltr',
+          groupKey: p => this.access.groupKey(p),
+          frameGap: 32, framePadding: 20, itemGap: 20, rowBaseHeight: 200,
+          access: this.access, scale: this.scalePolicy, innerFactory: () => new GridLayoutStrategy<Product>()
+        };
+      case 'grid':
+      default:
+        return {
+          orientation: 'columns', flow: 'ltr',
+          groupKey: p => this.access.groupKey(p),
+          frameGap: 24, framePadding: 12, itemGap: 12, rowBaseHeight: 120,
+          access: this.access, scale: this.scalePolicy, innerFactory: () => new GridLayoutStrategy<Product>()
+        };
+    }
+  }
 
   async componentDidMount() {
     // Initialize canvas first
@@ -75,12 +115,7 @@ export default class App extends React.Component<{}, State> {
         this.skeletonRenderer = new SkeletonRenderer(ctx);
         this.startSkeletonAnimation();
         
-        const config: PivotConfig<Product> = {
-          orientation: 'columns', flow: 'ltr',
-          groupKey: p => this.access.groupKey(p),
-          frameGap: 24, framePadding: 12, itemGap: 12, rowBaseHeight: 120,
-          access: this.access, scale: this.scalePolicy, innerFactory: () => new GridLayoutStrategy<Product>()
-        };
+        const config = this.getLayoutConfig();
         this.layouter = new PivotLayouter<Product>(config);
         this.engine = new LayoutEngine<Product>(this.layouter);
         this.renderer = new CanvasRenderer<Product>(ctx, () => this.engine!.all(), this.renderAccess, this.viewport);
@@ -155,6 +190,18 @@ export default class App extends React.Component<{}, State> {
 
   componentDidUpdate(prevProps: {}, prevState: State): void {
     if (!this.engine) return;
+    
+    // Rebuild layouter if layout mode changed
+    if (prevState.layoutMode !== this.state.layoutMode && this.layouter) {
+      const config = this.getLayoutConfig();
+      this.layouter = new PivotLayouter<Product>(config);
+      this.engine = new LayoutEngine<Product>(this.layouter);
+      const c = this.canvasRef.current;
+      this.engine.sync(this.filteredProducts, p => p.id);
+      if (c) this.engine.layout({ width: c.clientWidth, height: c.clientHeight });
+      return;
+    }
+    
     if (
       prevState.products !== this.state.products ||
       prevState.search !== this.state.search ||
@@ -387,6 +434,32 @@ export default class App extends React.Component<{}, State> {
           <input type="number" placeholder="Max g" value={weightMax} onChange={e => this.setState({ weightMax: e.target.value })} />
           <button onClick={() => this.setState({ search: '', category: '', season: '', priceMin: '', priceMax: '', weightMin: '', weightMax: '' })}>Reset Filters</button>
           <button onClick={() => this.viewport?.reset()}>Reset View</button>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
+            <button 
+              onClick={() => this.setState({ layoutMode: 'grid' })}
+              style={{ fontWeight: this.state.layoutMode === 'grid' ? 'bold' : 'normal' }}
+            >
+              Grid
+            </button>
+            <button 
+              onClick={() => this.setState({ layoutMode: 'list' })}
+              style={{ fontWeight: this.state.layoutMode === 'list' ? 'bold' : 'normal' }}
+            >
+              List
+            </button>
+            <button 
+              onClick={() => this.setState({ layoutMode: 'compact' })}
+              style={{ fontWeight: this.state.layoutMode === 'compact' ? 'bold' : 'normal' }}
+            >
+              Compact
+            </button>
+            <button 
+              onClick={() => this.setState({ layoutMode: 'large' })}
+              style={{ fontWeight: this.state.layoutMode === 'large' ? 'bold' : 'normal' }}
+            >
+              Large
+            </button>
+          </div>
         </div>
         <div className="pf-stage">
           <canvas ref={this.canvasRef} className="pf-canvas" />
