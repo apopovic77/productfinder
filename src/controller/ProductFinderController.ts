@@ -94,9 +94,9 @@ export class ProductFinderController {
     filtered = this.favoritesService.filter(filtered);
     
     this.layoutService.sync(filtered);
-    if (this.canvas) {
-      this.layoutService.layout(this.canvas.clientWidth, this.canvas.clientHeight);
-    }
+    
+    // Recalculate canvas size based on filtered products
+    this.handleResize();
     
     this.notifyListeners();
   }
@@ -198,11 +198,24 @@ export class ProductFinderController {
   // Resize
   handleResize(): void {
     if (!this.canvas) return;
-    const width = this.canvas.parentElement?.clientWidth || this.canvas.clientWidth;
-    const height = this.canvas.parentElement?.clientHeight || this.canvas.clientHeight;
-    this.canvas.width = width;
-    this.canvas.height = height;
-    this.layoutService.layout(width, height);
+    const viewportWidth = this.canvas.parentElement?.clientWidth || this.canvas.clientWidth;
+    const viewportHeight = this.canvas.parentElement?.clientHeight || this.canvas.clientHeight;
+    
+    // Calculate required canvas width based on number of categories
+    const products = this.getFilteredProducts();
+    const categories = new Set(products.flatMap(p => p.category || []));
+    const numCategories = Math.max(1, categories.size);
+    
+    // Each category needs ~800px (400px min + spacing)
+    const minWidthPerCategory = 800;
+    const requiredWidth = Math.max(viewportWidth, numCategories * minWidthPerCategory);
+    
+    // Canvas needs to be large enough for all categories
+    this.canvas.width = requiredWidth;
+    this.canvas.height = viewportHeight;
+    
+    // Layout uses full canvas width
+    this.layoutService.layout(requiredWidth, viewportHeight);
   }
 
   // Skeleton Animation
