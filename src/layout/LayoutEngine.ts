@@ -13,8 +13,19 @@ import { PivotLayouter } from './PivotLayouter';
 export class LayoutEngine<T> {
   // Persistent node pool - nodes are reused, not recreated
   private nodes = new Map<string, LayoutNode<T>>();
+  private layouter: PivotLayouter<T>;
   
-  constructor(private layouter: PivotLayouter<T>) {}
+  constructor(layouter: PivotLayouter<T>) {
+    this.layouter = layouter;
+  }
+  
+  /**
+   * Update the layouter while keeping nodes intact.
+   * This allows changing layout modes without losing InterpolatedProperty state.
+   */
+  setLayouter(layouter: PivotLayouter<T>): void {
+    this.layouter = layouter;
+  }
   
   /**
    * Sync items with node pool.

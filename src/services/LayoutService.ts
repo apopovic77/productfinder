@@ -59,7 +59,8 @@ export class LayoutService {
     this.mode = mode;
     const config = this.createConfig(mode);
     this.layouter = new PivotLayouter<Product>(config);
-    this.engine = new LayoutEngine<Product>(this.layouter);
+    // Update layouter on existing engine to preserve nodes!
+    this.engine.setLayouter(this.layouter);
   }
 
   getMode(): LayoutMode {
