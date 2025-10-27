@@ -3,6 +3,7 @@ import './App.css';
 import type { Product } from './types/Product';
 import { ProductFinderController } from './controller/ProductFinderController';
 import { ProductModal } from './components/ProductModal';
+import { DeveloperOverlay, type DeveloperSettings } from './components/DeveloperOverlay';
 import type { SortMode } from './services/FilterService';
 import type { LayoutMode } from './services/LayoutService';
 
@@ -32,11 +33,18 @@ type State = {
   hoveredProduct: Product | null;
   mousePos: { x: number; y: number } | null;
   focusedIndex: number;
+  
+  // Developer Settings
+  devSettings: DeveloperSettings;
+  fps: number;
 };
 
 export default class App extends React.Component<{}, State> {
   private canvasRef = React.createRef<HTMLCanvasElement>();
   private controller = new ProductFinderController();
+  private fpsInterval: number | null = null;
+  private lastFrameTime = performance.now();
+  private frameCount = 0;
 
   state: State = {
     loading: true,
@@ -58,6 +66,19 @@ export default class App extends React.Component<{}, State> {
     hoveredProduct: null,
     mousePos: null,
     focusedIndex: -1,
+    
+    devSettings: {
+      gridConfig: {
+        spacing: 12,
+        margin: 20,
+        minCellSize: 120,
+        maxCellSize: 250
+      },
+      showDebugInfo: false,
+      showBoundingBoxes: false,
+      animationSpeed: 0.4
+    },
+    fps: 60,
   };
 
   async componentDidMount() {
@@ -83,12 +104,16 @@ export default class App extends React.Component<{}, State> {
     canvas.addEventListener('mouseleave', this.handleCanvasMouseLeave);
     document.addEventListener('keydown', this.handleKeyDown);
 
+    // Start FPS counter
+    this.startFPSCounter();
+
     // Initial resize
     requestAnimationFrame(() => this.handleResize());
   }
 
   componentWillUnmount(): void {
     this.controller.destroy();
+    this.stopFPSCounter();
     window.removeEventListener('resize', this.handleResize);
     document.removeEventListener('keydown', this.handleKeyDown);
     const canvas = this.canvasRef.current;
@@ -153,6 +178,29 @@ export default class App extends React.Component<{}, State> {
 
   private handleResize = () => {
     this.controller.handleResize();
+  };
+
+  private startFPSCounter = () => {
+    this.fpsInterval = window.setInterval(() => {
+      const now = performance.now();
+      const delta = now - this.lastFrameTime;
+      const fps = 1000 / delta;
+      this.setState({ fps });
+      this.lastFrameTime = now;
+    }, 500); // Update every 500ms
+  };
+
+  private stopFPSCounter = () => {
+    if (this.fpsInterval !== null) {
+      clearInterval(this.fpsInterval);
+      this.fpsInterval = null;
+    }
+  };
+
+  private handleDevSettingsChange = (newSettings: DeveloperSettings) => {
+    this.setState({ devSettings: newSettings });
+    // Apply settings to controller/layout
+    this.controller.updateGridConfig(newSettings.gridConfig);
   };
 
   private handleCanvasClick = (e: MouseEvent) => {
@@ -342,6 +390,13 @@ export default class App extends React.Component<{}, State> {
             </div>
           </div>
         )}
+
+        <DeveloperOverlay
+          settings={this.state.devSettings}
+          onSettingsChange={this.handleDevSettingsChange}
+          productCount={this.state.filteredProducts.length}
+          fps={this.state.fps}
+        />
       </div>
     );
   }

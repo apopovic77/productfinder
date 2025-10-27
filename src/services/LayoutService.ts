@@ -97,5 +97,13 @@ export class LayoutService {
   layout(width: number, height: number): void {
     this.engine.layout({ width, height });
   }
+
+  updateGridConfig(gridConfig: { spacing: number; margin: number; minCellSize: number; maxCellSize: number }): void {
+    // Recreate layouter with new grid config
+    const config = this.createConfig(this.mode);
+    config.gridConfig = gridConfig;
+    this.layouter = new SimpleLayouter<Product>(config);
+    this.engine.setLayouter(this.layouter);
+  }
 }
 

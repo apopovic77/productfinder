@@ -255,5 +255,11 @@ export class ProductFinderController {
   getUniqueSeasons(): number[] {
     return this.filterService.getUniqueSeasons(this.products);
   }
+
+  // Developer Settings
+  updateGridConfig(gridConfig: { spacing: number; margin: number; minCellSize: number; maxCellSize: number }): void {
+    this.layoutService.updateGridConfig(gridConfig);
+    this.handleResize(); // Re-layout with new config
+  }
 }
 
