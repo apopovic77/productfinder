@@ -1,59 +1,74 @@
 import type { Product } from '../types/Product';
 import { ProductLayoutAccessors } from '../layout/Accessors';
 import { WeightScalePolicy } from '../layout/ScalePolicy';
-import { GridLayoutStrategy } from '../layout/GridLayoutStrategy';
-import { PivotLayouter, type PivotConfig } from '../layout/PivotLayouter';
+import { SimpleLayouter, type SimpleLayoutConfig } from '../layout/SimpleLayouter';
 import { LayoutEngine } from '../layout/LayoutEngine';
 
-export type LayoutMode = 'grid' | 'list' | 'compact' | 'large';
+export type LayoutMode = 'grid' | 'masonry' | 'compact' | 'large';
 
 export class LayoutService {
   private mode: LayoutMode = 'grid';
   private engine: LayoutEngine<Product>;
-  private layouter: PivotLayouter<Product>;
+  private layouter: SimpleLayouter<Product>;
   private access = new ProductLayoutAccessors();
   private scalePolicy = new WeightScalePolicy();
 
   constructor() {
     const config = this.createConfig(this.mode);
-    this.layouter = new PivotLayouter<Product>(config);
+    this.layouter = new SimpleLayouter<Product>(config);
     this.engine = new LayoutEngine<Product>(this.layouter);
   }
 
-  private createConfig(mode: LayoutMode): PivotConfig<Product> {
+  private createConfig(mode: LayoutMode): SimpleLayoutConfig<Product> {
     switch (mode) {
-      case 'list':
+      case 'masonry':
         return {
-          orientation: 'rows', flow: 'ltr',
-          groupKey: () => 'all',
-          frameGap: 12, framePadding: 12, itemGap: 12, rowBaseHeight: 180,
-          access: this.access, scale: this.scalePolicy, 
-          innerLayoutType: 'shelf'
+          mode: 'masonry',
+          gridConfig: {
+            spacing: 12,
+            margin: 20,
+            minCellSize: 100,
+            maxCellSize: 250
+          },
+          access: this.access,
+          scale: this.scalePolicy
         };
       case 'compact':
         return {
-          orientation: 'columns', flow: 'ltr',
-          groupKey: p => this.access.groupKey(p),
-          frameGap: 12, framePadding: 8, itemGap: 8, rowBaseHeight: 80,
-          access: this.access, scale: this.scalePolicy, 
-          innerLayoutType: 'shelf'
+          mode: 'grid',
+          gridConfig: {
+            spacing: 8,
+            margin: 15,
+            minCellSize: 80,
+            maxCellSize: 150
+          },
+          access: this.access,
+          scale: this.scalePolicy
         };
       case 'large':
         return {
-          orientation: 'columns', flow: 'ltr',
-          groupKey: p => this.access.groupKey(p),
-          frameGap: 32, framePadding: 20, itemGap: 20, rowBaseHeight: 200,
-          access: this.access, scale: this.scalePolicy, 
-          innerLayoutType: 'shelf'
+          mode: 'grid',
+          gridConfig: {
+            spacing: 20,
+            margin: 30,
+            minCellSize: 200,
+            maxCellSize: 400
+          },
+          access: this.access,
+          scale: this.scalePolicy
         };
       case 'grid':
       default:
         return {
-          orientation: 'columns', flow: 'ltr',
-          groupKey: p => this.access.groupKey(p),
-          frameGap: 100, framePadding: 50, itemGap: 12, rowBaseHeight: 150,
-          access: this.access, scale: this.scalePolicy, 
-          innerLayoutType: 'shelf' // Microsoft Pivot style!
+          mode: 'grid',
+          gridConfig: {
+            spacing: 12,
+            margin: 20,
+            minCellSize: 120,
+            maxCellSize: 250
+          },
+          access: this.access,
+          scale: this.scalePolicy
         };
     }
   }
@@ -62,7 +77,7 @@ export class LayoutService {
     if (this.mode === mode) return;
     this.mode = mode;
     const config = this.createConfig(mode);
-    this.layouter = new PivotLayouter<Product>(config);
+    this.layouter = new SimpleLayouter<Product>(config);
     // Update layouter on existing engine to preserve nodes!
     this.engine.setLayouter(this.layouter);
   }

@@ -287,28 +287,28 @@ export default class App extends React.Component<{}, State> {
           </button>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: '8px' }}>
             <button 
-              onClick={() => this.setState({ layoutMode: 'grid' })}
+              onClick={() => this.controller.setLayoutMode('grid')}
               style={{ fontWeight: layoutMode === 'grid' ? 'bold' : 'normal' }}
             >
-              Grid
+              📊 Grid
             </button>
             <button 
-              onClick={() => this.setState({ layoutMode: 'list' })}
-              style={{ fontWeight: layoutMode === 'list' ? 'bold' : 'normal' }}
+              onClick={() => this.controller.setLayoutMode('masonry')}
+              style={{ fontWeight: layoutMode === 'masonry' ? 'bold' : 'normal' }}
             >
-              List
+              🧱 Masonry
             </button>
             <button 
-              onClick={() => this.setState({ layoutMode: 'compact' })}
+              onClick={() => this.controller.setLayoutMode('compact')}
               style={{ fontWeight: layoutMode === 'compact' ? 'bold' : 'normal' }}
             >
-              Compact
+              🔬 Compact
             </button>
             <button 
-              onClick={() => this.setState({ layoutMode: 'large' })}
+              onClick={() => this.controller.setLayoutMode('large')}
               style={{ fontWeight: layoutMode === 'large' ? 'bold' : 'normal' }}
             >
-              Large
+              🔭 Large
             </button>
           </div>
         </div>

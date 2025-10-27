@@ -1,5 +1,11 @@
 import { LayoutNode } from './LayoutNode';
-import { PivotLayouter } from './PivotLayouter';
+
+/**
+ * Interface for any layouter that can compute layout for nodes
+ */
+export interface ILayouter<T> {
+  compute(nodes: LayoutNode<T>[], view: { width: number; height: number }): void;
+}
 
 /**
  * LayoutEngine manages a persistent pool of LayoutNodes.
@@ -13,9 +19,9 @@ import { PivotLayouter } from './PivotLayouter';
 export class LayoutEngine<T> {
   // Persistent node pool - nodes are reused, not recreated
   private nodes = new Map<string, LayoutNode<T>>();
-  private layouter: PivotLayouter<T>;
+  private layouter: ILayouter<T>;
   
-  constructor(layouter: PivotLayouter<T>) {
+  constructor(layouter: ILayouter<T>) {
     this.layouter = layouter;
   }
   
@@ -23,7 +29,7 @@ export class LayoutEngine<T> {
    * Update the layouter while keeping nodes intact.
    * This allows changing layout modes without losing InterpolatedProperty state.
    */
-  setLayouter(layouter: PivotLayouter<T>): void {
+  setLayouter(layouter: ILayouter<T>): void {
     this.layouter = layouter;
   }
   

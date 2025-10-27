@@ -195,28 +195,19 @@ export class ProductFinderController {
     }
   }
 
-  // Resize
-  handleResize(): void {
-    if (!this.canvas) return;
-    const viewportWidth = this.canvas.parentElement?.clientWidth || this.canvas.clientWidth;
-    const viewportHeight = this.canvas.parentElement?.clientHeight || this.canvas.clientHeight;
-    
-    // Calculate required canvas width based on number of categories
-    const products = this.getFilteredProducts();
-    const categories = new Set(products.flatMap(p => p.category || []));
-    const numCategories = Math.max(1, categories.size);
-    
-    // Each category needs ~800px (400px min + spacing)
-    const minWidthPerCategory = 800;
-    const requiredWidth = Math.max(viewportWidth, numCategories * minWidthPerCategory);
-    
-    // Canvas needs to be large enough for all categories
-    this.canvas.width = requiredWidth;
-    this.canvas.height = viewportHeight;
-    
-    // Layout uses full canvas width
-    this.layoutService.layout(requiredWidth, viewportHeight);
-  }
+         // Resize
+         handleResize(): void {
+           if (!this.canvas) return;
+           const viewportWidth = this.canvas.parentElement?.clientWidth || this.canvas.clientWidth;
+           const viewportHeight = this.canvas.parentElement?.clientHeight || this.canvas.clientHeight;
+           
+           // Simple layout - canvas matches viewport
+           this.canvas.width = viewportWidth;
+           this.canvas.height = viewportHeight;
+           
+           // Layout uses viewport size
+           this.layoutService.layout(viewportWidth, viewportHeight);
+         }
 
   // Skeleton Animation
   private startSkeletonAnimation(): void {
