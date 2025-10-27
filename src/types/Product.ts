@@ -68,38 +68,27 @@ export class Product {
   
   /**
    * Get the primary image URL
+   * Uses original Shopify CDN URLs directly (no proxy needed)
    */
   get imageUrl(): string {
     const media = this.media?.[0];
     if (!media?.src) return 'https://via.placeholder.com/256?text=No+Image';
     
-    const originalUrl = media.src;
-    
-    // If already a Storage API proxy URL, use it
-    if (originalUrl.includes('api.arkturian.com/storage/proxy')) {
-      return originalUrl;
-    }
-    
-    // Construct Storage API proxy URL for optimization
-    const encodedUrl = encodeURIComponent(originalUrl);
-    return `https://api.arkturian.com/storage/proxy?url=${encodedUrl}&width=400&format=webp&quality=80`;
+    // Return original Shopify CDN URL directly
+    // Shopify CDN is fast, has CDN, and proper SSL certificates
+    return media.src;
   }
   
   /**
    * Get full-size image URL for detail view
+   * Uses original Shopify CDN URLs directly
    */
   get fullImageUrl(): string {
     const media = this.media?.[0];
     if (!media?.src) return 'https://via.placeholder.com/800?text=No+Image';
     
-    const originalUrl = media.src;
-    
-    if (originalUrl.includes('api.arkturian.com/storage/proxy')) {
-      return originalUrl.replace(/width=\d+/, 'width=1200').replace(/quality=\d+/, 'quality=90');
-    }
-    
-    const encodedUrl = encodeURIComponent(originalUrl);
-    return `https://api.arkturian.com/storage/proxy?url=${encodedUrl}&width=1200&format=jpg&quality=90`;
+    // Return original Shopify CDN URL directly
+    return media.src;
   }
   
   /**

@@ -22,9 +22,12 @@ html, body, #root {
   border-radius: 10px;
   padding: 8px;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 8px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.08);
   backdrop-filter: blur(8px);
+  max-width: 95vw;
 }
 
 .pf-toolbar input, .pf-toolbar select, .pf-toolbar button {
