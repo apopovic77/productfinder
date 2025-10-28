@@ -2,10 +2,11 @@ import type { Product } from '../types/Product';
 import { ProductLayoutAccessors } from '../layout/Accessors';
 import { WeightScalePolicy } from '../layout/ScalePolicy';
 import { SimpleLayouter, type SimpleLayoutConfig } from '../layout/SimpleLayouter';
-import { PivotLayouter, type PivotConfig } from '../layout/PivotLayouter';
+import { PivotLayouter, type PivotConfig, type Orientation } from '../layout/PivotLayouter';
 import { PivotGroup } from '../layout/PivotGroup';
 import { ShelfLayoutStrategy } from '../layout/ShelfLayoutStrategy';
 import { LayoutEngine } from '../layout/LayoutEngine';
+import { Vector2 } from 'arkturian-typescript-utils';
 import { PivotDrillDownService, type GroupDimension, type PriceBucketConfig, type PriceBucketMode } from './PivotDrillDownService';
 
 export type LayoutMode = 'grid' | 'masonry' | 'compact' | 'large' | 'pivot';
@@ -23,6 +24,10 @@ export class LayoutService {
   private pivotConfig: PivotConfig<Product>;
   private animationDuration = 0.4;
   private priceBucketConfig: PriceBucketConfig = { mode: 'static', bucketCount: 5 };
+  private lastKnownPositions = new Map<string, { x: number; y: number; w: number; h: number }>();
+  private dimensionOrders = new Map<GroupDimension, Map<string, number>>();
+  private displayOrderIds: string[] = [];
+  private nodeToGroup = new Map<string, string>();
 
   constructor() {
     this.pivotConfig = this.createDefaultPivotConfig();
@@ -51,7 +56,7 @@ export class LayoutService {
   
   private createDefaultPivotConfig(): PivotConfig<Product> {
     return {
-      orientation: 'rows',
+      orientation: 'columns',
       flow: 'ltr',
       groupKey: (p: Product) => this.drillDownService.getGroupKey(p),
       frameGap: 40,
@@ -63,7 +68,13 @@ export class LayoutService {
       smallGroupThreshold: 8,
       innerLayoutType: 'shelf',
       access: this.access,
-      scale: this.scalePolicy
+      scale: this.scalePolicy,
+      onGroupLayout: (_group, nodes) => {
+        for (const node of nodes) {
+          this.nodeToGroup.set(node.id, _group);
+          this.displayOrderIds.push(node.id);
+        }
+      }
     };
   }
   
@@ -164,6 +175,10 @@ export class LayoutService {
   }
 
   layout(width: number, height: number): void {
+    if (this.mode === 'pivot' && this.layouter instanceof PivotLayouter) {
+      this.displayOrderIds = [];
+      this.nodeToGroup.clear();
+    }
     this.engine.layout({ width, height });
   }
 
@@ -224,8 +239,29 @@ export class LayoutService {
     return this.drillDownService.getHierarchy();
   }
   
+  getAvailablePivotDimensions(): GroupDimension[] {
+    if (this.mode !== 'pivot') return [];
+    const products = this.engine.all().map(n => n.data);
+    return this.drillDownService.getAvailableDimensions(products);
+  }
+
   canUsePivotDimension(dimension: GroupDimension): boolean {
     return this.drillDownService.canUseDimension(dimension);
+  }
+
+  getPivotOrientation(): Orientation {
+    return this.pivotConfig.orientation;
+  }
+
+  setPivotOrientation(orientation: Orientation): void {
+    if (this.pivotConfig.orientation === orientation) return;
+    this.pivotConfig = {
+      ...this.pivotConfig,
+      orientation
+    };
+    this.layouter = new PivotLayouter<Product>(this.pivotConfig);
+    this.engine.setLayouter(this.layouter);
+    this.updatePivotGroups();
   }
   
   /**
@@ -304,20 +340,142 @@ export class LayoutService {
     }
   }
   
+  getDisplayOrder(): Product[] {
+    if (this.displayOrderIds.length === 0) {
+      return this.engine.all().map(n => n.data);
+    }
+    const nodeMap = new Map<string, Product>();
+    for (const node of this.engine.all()) {
+      nodeMap.set(node.id, node.data);
+    }
+    return this.displayOrderIds
+      .map(id => nodeMap.get(id))
+      .filter((p): p is Product => Boolean(p));
+  }
+  
+  getDisplayOrderForGroup(groupKey: string): Product[] {
+    const all = this.getDisplayOrder();
+    return all.filter(p => this.drillDownService.getGroupKey(p) === groupKey);
+  }
+  
+  getGroupKeyForProduct(product: Product): string {
+    const id = product.id;
+    const mapped = this.nodeToGroup.get(id);
+    if (mapped) return mapped;
+    return this.drillDownService.getGroupKey(product);
+  }
+
+  private updateCanonicalOrders(source: Product[]): void {
+    const ensureOrder = (dimension: GroupDimension, key: string) => {
+      if (!key) return;
+      let map = this.dimensionOrders.get(dimension);
+      if (!map) {
+        map = new Map<string, number>();
+        this.dimensionOrders.set(dimension, map);
+      }
+      if (!map.has(key)) {
+        map.set(key, map.size);
+        this.drillDownService.setDimensionOrder(dimension, map);
+      }
+    };
+
+    for (const product of source) {
+      const categories = product.category ?? [];
+      const category = categories[0] ?? 'Uncategorized';
+      ensureOrder('category', category);
+      const metaSource = (product as any).meta?.source;
+      if (metaSource) {
+        ensureOrder('subcategory', String(metaSource).toUpperCase());
+      } else if (categories.length > 1) {
+        const sub = categories.slice(1).find(part => part !== category) ?? categories[1];
+        ensureOrder('subcategory', sub);
+      }
+      if (product.brand) {
+        ensureOrder('brand', product.brand);
+      }
+      if (product.season) {
+        ensureOrder('season', String(product.season));
+      }
+    }
+  }
+  
   /**
    * Override sync to update pivot groups
    */
-  sync(products: Product[]): void {
+  sync(products: Product[], canonicalSource?: Product[]): void {
+    if (canonicalSource) {
+      this.updateCanonicalOrders(canonicalSource);
+    }
+    this.cacheCurrentNodePositions();
     // Apply drill-down filters
     const filtered = this.mode === 'pivot' 
       ? this.drillDownService.filterProducts(products)
       : products;
     
     this.engine.sync(filtered, p => p.id);
+    this.primeNewNodesFromCache();
     this.applyAnimationDuration();
     
     if (this.mode === 'pivot') {
       this.updatePivotGroups();
     }
+  }
+  
+  private cacheCurrentNodePositions(): void {
+    for (const node of this.engine.all()) {
+      const posX = node.posX.value ?? node.posX.targetValue ?? 0;
+      const posY = node.posY.value ?? node.posY.targetValue ?? 0;
+      const width = node.width.value ?? node.width.targetValue ?? 0;
+      const height = node.height.value ?? node.height.targetValue ?? 0;
+      this.lastKnownPositions.set(node.id, { x: posX, y: posY, w: width, h: height });
+    }
+  }
+  
+  private primeNewNodesFromCache(): void {
+    for (const node of this.engine.all()) {
+      if (node.isNew) {
+        const cached = this.lastKnownPositions.get(node.id);
+        if (cached) {
+          node.prime(new Vector2(cached.x, cached.y), new Vector2(cached.w, cached.h));
+        }
+      }
+    }
+  }
+
+  /**
+   * Calculate content bounds from all layout nodes
+   * Used for viewport bounds checking and fit-to-content scale
+   */
+  getContentBounds(): { width: number; height: number; minX: number; minY: number; maxX: number; maxY: number } | null {
+    const nodes = this.engine.all();
+    if (nodes.length === 0) {
+      return null;
+    }
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    for (const node of nodes) {
+      const x = node.posX.targetValue ?? node.posX.value ?? 0;
+      const y = node.posY.targetValue ?? node.posY.value ?? 0;
+      const w = node.width.targetValue ?? node.width.value ?? 0;
+      const h = node.height.targetValue ?? node.height.value ?? 0;
+
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x + w);
+      maxY = Math.max(maxY, y + h);
+    }
+
+    return {
+      minX,
+      minY,
+      maxX,
+      maxY,
+      width: maxX - minX,
+      height: maxY - minY
+    };
   }
 }

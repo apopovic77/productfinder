@@ -39,14 +39,19 @@ export class CanvasRenderer<T> {
   }
   
   private async draw() {
-    const c = this.ctx.canvas; 
-    if (c.width !== c.clientWidth || c.height !== c.clientHeight) { 
-      c.width = c.clientWidth; 
-      c.height = c.clientHeight; 
+    const c = this.ctx.canvas;
+    if (c.width !== c.clientWidth || c.height !== c.clientHeight) {
+      c.width = c.clientWidth;
+      c.height = c.clientHeight;
     }
-    
+
     this.clear();
-    
+
+    // Update viewport interpolation (smooth camera)
+    if (this.viewport) {
+      this.viewport.update();
+    }
+
     // Apply viewport transform
     this.ctx.save();
     if (this.viewport) {

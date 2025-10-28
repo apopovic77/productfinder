@@ -36,6 +36,28 @@ export const DeveloperOverlay: React.FC<DeveloperOverlayProps> = ({
   const [isOpen, setIsOpen] = React.useState(false);
   const [isMinimized, setIsMinimized] = React.useState(false);
 
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'F1') {
+        e.preventDefault();
+        setIsOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    const onToggle = () => setIsOpen(prev => !prev);
+    const onOpen = () => setIsOpen(true);
+    const onClose = () => setIsOpen(false);
+    window.addEventListener('pf-toggle-dev-overlay' as any, onToggle as EventListener);
+    window.addEventListener('pf-open-dev-overlay' as any, onOpen as EventListener);
+    window.addEventListener('pf-close-dev-overlay' as any, onClose as EventListener);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('pf-toggle-dev-overlay' as any, onToggle as EventListener);
+      window.removeEventListener('pf-open-dev-overlay' as any, onOpen as EventListener);
+      window.removeEventListener('pf-close-dev-overlay' as any, onClose as EventListener);
+    };
+  }, []);
+
   const updateGridConfig = (key: keyof GridConfig, value: number) => {
     onSettingsChange({
       ...settings,
@@ -75,17 +97,7 @@ export const DeveloperOverlay: React.FC<DeveloperOverlayProps> = ({
     alert('Settings copied to clipboard!');
   };
 
-  if (!isOpen) {
-    return (
-      <button 
-        className="dev-overlay-toggle"
-        onClick={() => setIsOpen(true)}
-        title="Open Developer Overlay"
-      >
-        🛠️
-      </button>
-    );
-  }
+  if (!isOpen) return null;
 
   return (
     <div className={`dev-overlay ${isMinimized ? 'minimized' : ''}`}>

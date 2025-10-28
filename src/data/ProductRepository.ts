@@ -38,7 +38,8 @@ function mapProduct(p: OnealProduct): Product {
     season: p.season,
     price: p.price,
     media: p.media,
-    specifications: p.specifications
+    specifications: p.specifications,
+    meta: p.meta as any
   };
   
   return new Product(data);
@@ -70,5 +71,4 @@ export async function fetchFacets(): Promise<any> {
   const response = await api.facetsGet();
   return response.data;
 }
-
 

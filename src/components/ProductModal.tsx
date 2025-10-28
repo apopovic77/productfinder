@@ -1,11 +1,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import type { Product, MediaItem } from '../types/Product';
 import './ProductModal.css';
 
 type Props = {
-  product: Product | null;
+  product: Product;
   onClose: () => void;
+  onPrev?: () => void;
+  onNext?: () => void;
+  hasPrev?: boolean;
+  hasNext?: boolean;
+  direction?: number;
 };
 
 const formatSpecValue = (label: string, value: string | number | undefined) => {
@@ -19,42 +24,94 @@ const getHeroMedia = (media?: MediaItem[]): MediaItem | undefined => {
   return hero ?? media[0];
 };
 
-export const ProductModal: React.FC<Props> = ({ product, onClose }) => {
+const imageVariants = {
+  enter: (direction: number) => ({
+    opacity: 0,
+    x: direction >= 0 ? 70 : -70,
+    rotate: direction >= 0 ? 5 : -5,
+    scale: 0.9
+  }),
+  center: {
+    opacity: 1,
+    x: 0,
+    rotate: 0,
+    scale: 1
+  },
+  exit: (direction: number) => ({
+    opacity: 0,
+    x: direction <= 0 ? 50 : -50,
+    rotate: direction <= 0 ? 3 : -3,
+    scale: 0.9
+  })
+};
+
+const transition = { type: 'spring', stiffness: 420, damping: 36, mass: 0.6 };
+
+export const ProductModal: React.FC<Props> = ({ product, onClose, onPrev, onNext, hasPrev = false, hasNext = false, direction = 0 }) => {
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [imageDirection, setImageDirection] = useState(direction);
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-      if (!product?.media || product.media.length === 0) return;
-      if (e.key === 'ArrowRight') {
-        setSelectedIndex(prev => (prev + 1) % product.media!.length);
-      }
-      if (e.key === 'ArrowLeft') {
-        setSelectedIndex(prev => {
-          const total = product.media!.length;
-          return (prev - 1 + total) % total;
-        });
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [product, onClose]);
+  const media = product.media ?? [];
+  const totalMedia = media.length;
 
   useEffect(() => {
     setSelectedIndex(0);
-  }, [product?.id]);
+    setImageDirection(direction ?? 0);
+  }, [product.id, direction]);
 
-  const media = product?.media ?? [];
+  const moveToIndex = useCallback((targetIndex: number) => {
+    if (!totalMedia) return;
+    const normalized = (targetIndex + totalMedia) % totalMedia;
+    if (normalized === selectedIndex) return;
+    const dir = normalized > selectedIndex ? 1 : -1;
+    setImageDirection(dir);
+    setSelectedIndex(normalized);
+  }, [selectedIndex, totalMedia]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (!totalMedia) return;
+      if (e.key === 'ArrowRight') {
+        moveToIndex(selectedIndex + 1);
+      }
+      if (e.key === 'ArrowLeft') {
+        moveToIndex(selectedIndex - 1);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [moveToIndex, onClose, selectedIndex, totalMedia]);
+
+  useEffect(() => {
+    const handleModalNav = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight' && hasNext) {
+        e.preventDefault();
+        setImageDirection(1);
+        onNext?.();
+      }
+      if (e.key === 'ArrowLeft' && hasPrev) {
+        e.preventDefault();
+        setImageDirection(-1);
+        onPrev?.();
+      }
+    };
+    window.addEventListener('keydown', handleModalNav);
+    return () => window.removeEventListener('keydown', handleModalNav);
+  }, [hasNext, hasPrev, onNext, onPrev]);
+
   const heroMedia = useMemo(() => {
-    if (!product) return undefined;
-    if (media.length === 0) return undefined;
+    if (!totalMedia) return undefined;
     return media[selectedIndex] ?? getHeroMedia(media);
-  }, [media, product, selectedIndex]);
+  }, [media, selectedIndex, totalMedia]);
 
-  const meta = product
-    ? ((product as unknown as { meta?: { description?: string; status?: string; product_url?: string } }).meta)
-    : undefined;
+  const meta = (product as unknown as { meta?: { description?: string; status?: string; product_url?: string } }).meta;
+  const description = meta?.description ?? (product.specifications as any)?.description;
+
   const handlePrimaryAction = useCallback(() => {
     const url = meta?.product_url;
     if (url) {
@@ -65,24 +122,20 @@ export const ProductModal: React.FC<Props> = ({ product, onClose }) => {
   }, [meta?.product_url, onClose]);
 
   const handleCopySku = useCallback(() => {
-    if (!product?.sku || !navigator.clipboard) return;
+    if (!product.sku || !navigator.clipboard) return;
     navigator.clipboard.writeText(product.sku).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }).catch(() => {});
-  }, [product?.sku]);
-
-  if (!product) return null;
-
-  const description = meta?.description ?? (product.specifications as any)?.description;
+  }, [product.sku]);
 
   const categories = product.category ?? [];
   const priceText = product.price?.formatted;
-  const seasonLabel =
-    product.season ? `Season ${product.season}` : undefined;
+  const seasonLabel = product.season ? `Season ${product.season}` : undefined;
   const heroCallout = product.brand
     ? `${product.brand.toUpperCase()} · ${categories[0] ?? 'Collection'}`
     : categories[0] ?? 'Product Spotlight';
+
   const specs = [
     formatSpecValue('SKU', product.sku),
     formatSpecValue('Status', meta?.status),
@@ -92,6 +145,16 @@ export const ProductModal: React.FC<Props> = ({ product, onClose }) => {
     formatSpecValue('Shell', product.specifications?.shell_material),
     formatSpecValue('Liner', product.specifications?.liner_material)
   ].filter((item): item is { label: string; value: string } => item !== null);
+
+  const handlePrevProduct = () => {
+    setImageDirection(-1);
+    onPrev?.();
+  };
+
+  const handleNextProduct = () => {
+    setImageDirection(1);
+    onNext?.();
+  };
 
   return (
     <motion.div
@@ -117,30 +180,48 @@ export const ProductModal: React.FC<Props> = ({ product, onClose }) => {
         <div className="pf-modal-layout">
           <div className="pf-modal-visual">
             <div className="pf-modal-media">
-              {heroMedia ? (
-                <img
-                  src={heroMedia.src}
-                  alt={heroMedia.alt || product.name}
-                  loading="lazy"
-                />
-              ) : (
-                <div className="pf-modal-placeholder">
-                  <span>{product.name[0]}</span>
-                </div>
-              )}
+              <AnimatePresence mode="wait" initial={false}>
+                {heroMedia ? (
+                  <motion.img
+                    key={heroMedia.src}
+                    src={heroMedia.src}
+                    alt={heroMedia.alt || product.name}
+                    loading="lazy"
+                    custom={imageDirection}
+                    variants={imageVariants}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    transition={transition}
+                  />
+                ) : (
+                  <motion.div
+                    key="placeholder"
+                    className="pf-modal-placeholder"
+                    custom={imageDirection}
+                    variants={imageVariants}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    transition={transition}
+                  >
+                    <span>{product.name[0]}</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
               <div className="pf-modal-media-glow" />
             </div>
 
-            {media.length > 1 && (
+            {totalMedia > 1 && (
               <div className="pf-modal-thumbs">
                 {media.map((item, idx) => (
                   <button
                     key={`${item.src}-${idx}`}
                     className={idx === selectedIndex ? 'pf-thumb active' : 'pf-thumb'}
-                    onClick={() => setSelectedIndex(idx)}
+                    onClick={() => moveToIndex(idx)}
                     aria-label={`Show image ${idx + 1}`}
                   >
-                    <img src={item.src} alt={item.alt || `${product.name} ${idx + 1}`} />
+                    <img src={item.src} alt={item.alt || `${product.name} ${idx + 1}`} loading="lazy" />
                   </button>
                 ))}
               </div>
@@ -198,7 +279,7 @@ export const ProductModal: React.FC<Props> = ({ product, onClose }) => {
               <p className="pf-modal-description">{description}</p>
             )}
 
-            {product.media && product.media.length > 1 && (
+            {totalMedia > 1 && (
               <p className="pf-modal-hint">Nutze die Pfeiltasten oder klicke auf eine Vorschau für weitere Ansichten.</p>
             )}
 
@@ -217,6 +298,24 @@ export const ProductModal: React.FC<Props> = ({ product, onClose }) => {
                   {copied ? 'SKU kopiert ✓' : 'SKU kopieren'}
                 </button>
               )}
+              <div className="pf-modal-cycle">
+                <button
+                  className="pf-modal-cycle-btn"
+                  onClick={handlePrevProduct}
+                  disabled={!hasPrev}
+                  aria-label="Previous product"
+                >
+                  ‹ Prev
+                </button>
+                <button
+                  className="pf-modal-cycle-btn"
+                  onClick={handleNextProduct}
+                  disabled={!hasNext}
+                  aria-label="Next product"
+                >
+                  Next ›
+                </button>
+              </div>
             </div>
           </div>
         </div>

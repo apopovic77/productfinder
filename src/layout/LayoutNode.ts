@@ -66,7 +66,13 @@ export class LayoutNode<T> {
     this.opacity.setDuration(duration);
     this.scale.setDuration(duration);
   }
-}
 
+  prime(pos: Vector2, size: Vector2) {
+    this.posX.setImmediate(pos.x);
+    this.posY.setImmediate(pos.y);
+    this.width.setImmediate(size.x);
+    this.height.setImmediate(size.y);
+  }
+}
 
 

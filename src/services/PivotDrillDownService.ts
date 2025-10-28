@@ -56,11 +56,13 @@ export class PivotDrillDownService {
   private filterStack: DrillDownFilter[] = [];
   private rootDimensionIndex = 0;
   private currentDimensionIndex = 0;
-  private priceBucketMode: PriceBucketMode = 'static';
-  private priceBucketCount = 5;
-  private currentPriceBuckets: PriceBucket[] = [];
-  private priceBucketMap = new Map<string, PriceBucket>();
-  private currentCurrency: string | undefined;
+private priceBucketMode: PriceBucketMode = 'static';
+private priceBucketCount = 5;
+private currentPriceBuckets: PriceBucket[] = [];
+private priceBucketMap = new Map<string, PriceBucket>();
+private currentCurrency: string | undefined;
+private dimensionOrder = new Map<GroupDimension, Map<string, number>>();
+  private readonly priceRefineThreshold = 8;
 
   /**
    * Current grouping dimension (derived from hierarchy + filter depth)
@@ -100,6 +102,10 @@ export class PivotDrillDownService {
     this.priceBucketMode = mode;
     this.priceBucketCount = Math.max(1, bucketCount);
     this.invalidatePriceBuckets();
+  }
+
+  setDimensionOrder(dimension: GroupDimension, order: Map<string, number>): void {
+    this.dimensionOrder.set(dimension, new Map(order));
   }
   
   setGroupingDimension(dimension: GroupDimension): void {
@@ -245,17 +251,17 @@ export class PivotDrillDownService {
       this.invalidatePriceBuckets();
       return new Map();
     }
-    
+
     this.ensureMeaningfulDimension(filtered);
-    
+
     if (this.currentDimension === 'price-range') {
       this.recomputePriceBuckets(filtered);
     } else {
       this.currentPriceBuckets = [];
       this.priceBucketMap.clear();
     }
-    const groups = new Map<string, Product[]>();
-    
+    let groups = new Map<string, Product[]>();
+
     for (const product of filtered) {
       const key = this.getDimensionValue(product, this.currentDimension);
       if (!groups.has(key)) {
@@ -263,7 +269,21 @@ export class PivotDrillDownService {
       }
       groups.get(key)!.push(product);
     }
-    
+
+    const order = this.dimensionOrder.get(this.currentDimension);
+    if (order) {
+      const orderedKeys = Array.from(groups.keys()).sort((a, b) => {
+        const idxA = order.get(a) ?? Number.MAX_SAFE_INTEGER;
+        const idxB = order.get(b) ?? Number.MAX_SAFE_INTEGER;
+        return idxA - idxB || a.localeCompare(b);
+      });
+      const ordered = new Map<string, Product[]>();
+      for (const key of orderedKeys) {
+        ordered.set(key, groups.get(key)!);
+      }
+      groups = ordered;
+    }
+
     return groups;
   }
   
@@ -280,8 +300,8 @@ export class PivotDrillDownService {
   createGroups(products: Product[]): PivotGroup[] {
     const groups = this.groupProducts(products);
     const result: PivotGroup[] = [];
-    const sortedKeys = Array.from(groups.keys()).sort();
-    
+    const sortedKeys = this.sortKeysForDimension(Array.from(groups.keys()), this.currentDimension);
+
     for (const key of sortedKeys) {
       result.push(new PivotGroup(
         key,
@@ -332,12 +352,17 @@ export class PivotDrillDownService {
       case 'category':
         return this.getCategoryParts(product)[0] || CATEGORY_UNKNOWN_LABEL;
       case 'subcategory': {
+        const metaSource = (product as any).meta?.source;
+        if (typeof metaSource === 'string' && metaSource.length) {
+          return metaSource.toUpperCase();
+        }
         const parts = this.getCategoryParts(product);
-        if (parts.length <= 1) {
+        const top = parts[0];
+        const remainder = parts.filter(part => part !== top);
+        if (remainder.length === 0) {
           return SUBCATEGORY_UNKNOWN_LABEL;
         }
-        const subParts = parts.slice(1);
-        return subParts.join(' / ');
+        return remainder[0];
       }
       
       case 'brand':
@@ -374,10 +399,16 @@ export class PivotDrillDownService {
     const { buckets, currency } = this.buildPriceBuckets(products);
     this.currentPriceBuckets = buckets;
     this.priceBucketMap.clear();
+    const order = new Map<string, number>();
+    let orderIndex = 0;
     for (const bucket of buckets) {
       if (bucket.hasPrice) {
         this.priceBucketMap.set(bucket.label, bucket);
+        order.set(bucket.label, orderIndex++);
       }
+    }
+    if (order.size) {
+      this.setDimensionOrder('price-range', order);
     }
     this.currentCurrency = currency;
   }
@@ -407,24 +438,35 @@ export class PivotDrillDownService {
       return { buckets, currency };
     }
     
-    const priceBuckets = this.computePriceBuckets(numericPrices, currency);
+    let priceBuckets = this.computePriceBuckets(numericPrices, currency);
+
+    if (this.hasFilterFor('price-range') && numericPrices.length > this.priceRefineThreshold) {
+      const desired = Math.min(
+        Math.max(2, Math.ceil(numericPrices.length / this.priceRefineThreshold)),
+        this.priceBucketCount * 2
+      );
+      priceBuckets = this.computePriceBuckets(numericPrices, currency, desired);
+    }
+    buckets.push(...priceBuckets);
     if (hasNoPrice) {
       buckets.push(this.createNoPriceBucket());
     }
-    buckets.push(...priceBuckets);
     return { buckets, currency };
   }
   
-  private computePriceBuckets(values: number[], currency?: string): PriceBucket[] {
+  private computePriceBuckets(values: number[], currency?: string, desiredCount?: number): PriceBucket[] {
     const uniqueCount = new Set(values).size;
-    const desiredCount = Math.max(1, Math.min(this.priceBucketCount, uniqueCount));
-    switch (this.priceBucketMode) {
+    const target = Math.max(1, Math.min(desiredCount ?? this.priceBucketCount, uniqueCount));
+    const mode = this.priceBucketMode === 'static' && desiredCount && desiredCount > this.priceBucketCount
+      ? 'equal-width'
+      : this.priceBucketMode;
+    switch (mode) {
       case 'equal-width':
-        return this.computeEqualWidthBuckets(values, desiredCount, currency);
+        return this.computeEqualWidthBuckets(values, target, currency);
       case 'quantile':
-        return this.computeQuantileBuckets(values, desiredCount, currency);
+        return this.computeQuantileBuckets(values, target, currency);
       case 'kmeans':
-        return this.computeKMeansBuckets(values, desiredCount, currency);
+        return this.computeKMeansBuckets(values, target, currency);
       case 'static':
       default:
         return this.computeStaticBuckets(currency);
@@ -697,6 +739,34 @@ export class PivotDrillDownService {
     }
   }
   
+  private sortKeysForDimension(keys: string[], dimension: GroupDimension): string[] {
+    if (dimension === 'price-range') {
+      return keys.sort((a, b) => {
+        const bucketA = this.priceBucketMap.get(a);
+        const bucketB = this.priceBucketMap.get(b);
+        if (bucketA && bucketB) {
+          if (bucketA.min !== bucketB.min) return bucketA.min - bucketB.min;
+          if (bucketA.max !== bucketB.max) return bucketA.max - bucketB.max;
+        } else if (bucketA) {
+          return -1;
+        } else if (bucketB) {
+          return 1;
+        }
+        return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+      });
+    }
+    const order = this.dimensionOrder.get(dimension);
+    if (!order) {
+      return keys.sort((a, b) => a.localeCompare(b));
+    }
+    return keys.sort((a, b) => {
+      const idxA = order.get(a) ?? Number.MAX_SAFE_INTEGER;
+      const idxB = order.get(b) ?? Number.MAX_SAFE_INTEGER;
+      if (idxA !== idxB) return idxA - idxB;
+      return a.localeCompare(b);
+    });
+  }
+  
   /**
    * Synchronise current dimension with the drill-down stack/root dimension
    */
@@ -725,5 +795,17 @@ export class PivotDrillDownService {
       return this.hasFilterFor('category');
     }
     return true;
+  }
+
+  getAvailableDimensions(products: Product[]): GroupDimension[] {
+    const filtered = this.filterProducts(products);
+    const available: GroupDimension[] = [];
+    for (const dimension of this.hierarchy) {
+      if (!this.canUseDimension(dimension)) continue;
+      if (this.countDistinctValues(filtered, dimension) > 1) {
+        available.push(dimension);
+      }
+    }
+    return available;
   }
 }

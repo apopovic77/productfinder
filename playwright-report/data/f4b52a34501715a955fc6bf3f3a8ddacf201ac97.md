@@ -8,8 +8,18 @@
         - textbox "Search" [ref=e3]
         - combobox [ref=e4]:
           - option "All Categories" [selected]
+          - option "Accessories"
+          - option "Clothing"
+          - option "Gloves"
+          - option "Helmets"
+          - option "MTB"
+          - option "MX"
+          - option "Other"
+          - option "Protectors"
+          - option "Shoes"
         - combobox [ref=e5]:
           - option "All Seasons" [selected]
+          - option "2000"
         - spinbutton [ref=e6]
         - spinbutton [ref=e7]
         - spinbutton [ref=e8]
@@ -29,12 +39,21 @@
         - button "📚 Pivot" [ref=e14] [cursor=pointer]
         - combobox [ref=e15]:
           - option "By Category" [selected]
+          - option "By Subcategory" [disabled]
           - option "By Brand"
           - option "By Season"
           - option "By Price"
-        - button "📊 Grid" [ref=e16] [cursor=pointer]
-        - button "🧱 Masonry" [ref=e17] [cursor=pointer]
-        - button "🔬 Compact" [ref=e18] [cursor=pointer]
-        - button "🔭 Large" [ref=e19] [cursor=pointer]
-      - button "🛠️" [ref=e21] [cursor=pointer]
+        - button "← Back" [disabled] [ref=e16] [cursor=pointer]
+        - button "📊 Grid" [ref=e17] [cursor=pointer]
+        - button "🧱 Masonry" [ref=e18] [cursor=pointer]
+        - button "🔬 Compact" [ref=e19] [cursor=pointer]
+        - button "🔭 Large" [ref=e20] [cursor=pointer]
+      - generic "Pivot navigation" [ref=e23]:
+        - button "All" [disabled] [ref=e24]
+        - button "Category" [disabled] [ref=e26]
+        - button "Subcategory" [disabled] [ref=e27]
+        - button "Brand" [ref=e28] [cursor=pointer]
+        - button "Season" [ref=e29] [cursor=pointer]
+        - button "Price" [ref=e30] [cursor=pointer]
+      - button "🛠️" [ref=e31] [cursor=pointer]
 ```

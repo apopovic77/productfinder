@@ -1,6 +1,7 @@
 import type { Product } from '../types/Product';
 import { FilterService, type FilterCriteria, type SortMode } from '../services/FilterService';
 import { LayoutService, type LayoutMode } from '../services/LayoutService';
+import type { Orientation } from '../layout/PivotLayouter';
 import { FavoritesService } from '../services/FavoritesService';
 import { ViewportService } from '../services/ViewportService';
 import { CanvasRenderer } from '../render/CanvasRenderer';
@@ -76,6 +77,7 @@ export class ProductFinderController {
     try {
       const results = await fetchProducts({ limit: 1000 });
       this.products = results || [];
+      console.log('[ProductFinder] loaded products:', this.products.length);
       this.loading = false;
       this.stopSkeletonAnimation();
       if (this.renderer) this.renderer.start();
@@ -101,16 +103,27 @@ export class ProductFinderController {
   private onDataChanged(): void {
     let filtered = this.filterService.filterAndSort(this.products);
     filtered = this.favoritesService.filter(filtered);
-    
-    this.layoutService.sync(filtered);
-    
+
+    this.layoutService.sync(filtered, this.products);
+
     // Only re-layout, don't resize canvas
     // Canvas size should only change on actual window resize
     if (this.canvas) {
       this.layoutService.layout(this.canvas.width, this.canvas.height);
+      this.updateViewportBounds();
     }
-    
+
     this.notifyListeners();
+  }
+
+  /**
+   * Update viewport bounds based on current layout
+   */
+  private updateViewportBounds(): void {
+    const bounds = this.layoutService.getContentBounds();
+    if (bounds) {
+      this.viewportService.setContentBounds(bounds);
+    }
   }
 
   getFilteredProducts(): Product[] {
@@ -210,29 +223,33 @@ export class ProductFinderController {
          // Resize
          handleResize(): void {
            if (!this.canvas) return;
-           
+
            // Get viewport size from parent or window
            const parent = this.canvas.parentElement;
            const viewportWidth = parent?.clientWidth || window.innerWidth;
            const viewportHeight = parent?.clientHeight || window.innerHeight;
-           
+
            // Ensure we have valid dimensions
            if (viewportWidth === 0 || viewportHeight === 0) {
              console.warn('Canvas parent has zero dimensions, using window size');
              this.canvas.width = window.innerWidth;
              this.canvas.height = window.innerHeight;
              this.layoutService.layout(window.innerWidth, window.innerHeight);
+             this.updateViewportBounds();
+             this.viewportService.updateViewportSize();
              return;
            }
-           
+
            // Set canvas size to match viewport
            this.canvas.width = viewportWidth;
            this.canvas.height = viewportHeight;
-           
+
            console.log(`Canvas resized to: ${viewportWidth}x${viewportHeight}`);
-           
+
            // Layout uses viewport size
            this.layoutService.layout(viewportWidth, viewportHeight);
+           this.updateViewportBounds();
+           this.viewportService.updateViewportSize();
          }
 
   // Skeleton Animation
@@ -317,8 +334,33 @@ export class ProductFinderController {
     return this.layoutService.getPivotDimensions();
   }
   
+  getAvailablePivotDimensions(): GroupDimension[] {
+    return this.layoutService.getAvailablePivotDimensions();
+  }
+  
   canUsePivotDimension(dimension: GroupDimension): boolean {
     return this.layoutService.canUsePivotDimension(dimension);
+  }
+  
+  getDisplayOrder(): Product[] {
+    return this.layoutService.getDisplayOrder();
+  }
+  
+  getDisplayOrderForGroup(groupKey: string): Product[] {
+    return this.layoutService.getDisplayOrderForGroup(groupKey);
+  }
+  
+  getGroupKeyForProduct(product: Product): string {
+    return this.layoutService.getGroupKeyForProduct(product);
+  }
+  
+  getPivotOrientation(): Orientation {
+    return this.layoutService.getPivotOrientation();
+  }
+
+  setPivotOrientation(orientation: Orientation): void {
+    this.layoutService.setPivotOrientation(orientation);
+    this.onDataChanged();
   }
   
   drillDownPivot(value: string): void {

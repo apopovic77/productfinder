@@ -57,15 +57,20 @@
   position: absolute;
   top: 16px;
   right: 16px;
-  width: 40px;
-  height: 40px;
-  border-radius: 999px;
-  border: 1px solid rgba(148, 163, 255, 0.35);
-  background: rgba(15, 23, 42, 0.6);
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 255, 0.45);
+  background: rgba(15, 23, 42, 0.65);
   color: #f5f7ff;
   font-size: 24px;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .pf-modal-close:hover {
@@ -317,6 +322,33 @@
   flex-wrap: wrap;
   gap: 12px;
   margin-top: 12px;
+}
+
+.pf-modal-cycle {
+  margin-left: auto;
+  display: flex;
+  gap: 10px;
+}
+
+
+.pf-modal-cycle-btn {
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(148, 163, 255, 0.3);
+  color: rgba(226, 232, 255, 0.85);
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.pf-modal-cycle-btn:hover:not(:disabled) {
+  border-color: rgba(148, 163, 255, 0.55);
+  transform: translateY(-1px);
+}
+
+.pf-modal-cycle-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .pf-modal-description {

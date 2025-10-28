@@ -8,6 +8,7 @@ import { DeveloperOverlay, type DeveloperSettings } from './components/Developer
 import type { SortMode } from './services/FilterService';
 import type { LayoutMode } from './services/LayoutService';
 import type { GroupDimension } from './services/PivotDrillDownService';
+import type { Orientation } from './layout/PivotLayouter';
 
 const PIVOT_DIMENSION_LABELS: Record<GroupDimension, string> = {
   'category': 'Category',
@@ -37,14 +38,19 @@ type State = {
   sortMode: SortMode;
   layoutMode: LayoutMode;
   showOnlyFavorites: boolean;
+  showFilters: boolean;
   
   // Pivot State
   pivotDimension: GroupDimension;
   pivotBreadcrumbs: string[];
   pivotDimensions: GroupDimension[];
+  pivotOrientation: Orientation;
   
   // Interaction State
   selectedProduct: Product | null;
+  selectedIndex: number;
+  modalDirection: number;
+  modalSequence: string[];
   hoveredProduct: Product | null;
   mousePos: { x: number; y: number } | null;
   focusedIndex: number;
@@ -77,12 +83,17 @@ export default class App extends React.Component<{}, State> {
     sortMode: 'none',
     layoutMode: 'pivot',
     showOnlyFavorites: false,
+    showFilters: true,
     
     pivotDimension: 'category',
     pivotBreadcrumbs: ['All'],
     pivotDimensions: ['category', 'subcategory', 'brand', 'season', 'price-range'],
+    pivotOrientation: 'columns',
     
     selectedProduct: null,
+    selectedIndex: -1,
+    modalDirection: 0,
+    modalSequence: [],
     hoveredProduct: null,
     mousePos: null,
     focusedIndex: -1,
@@ -90,13 +101,13 @@ export default class App extends React.Component<{}, State> {
     devSettings: {
       gridConfig: {
         spacing: 1,
-        margin: 40,
+        margin: 50,
         minCellSize: 120,
         maxCellSize: 250
       },
       showDebugInfo: false,
       showBoundingBoxes: false,
-      animationDuration: 1,
+      animationDuration: 0.4,
       priceBucketMode: 'static',
       priceBucketCount: 5
     },
@@ -110,24 +121,48 @@ export default class App extends React.Component<{}, State> {
 
     // Initialize controller
     await this.controller.initialize(canvas);
+    this.controller.updateGridConfig(this.state.devSettings.gridConfig);
     this.controller.setAnimationDuration(this.state.devSettings.animationDuration);
     this.controller.setPriceBucketConfig(
       this.state.devSettings.priceBucketMode,
       this.state.devSettings.priceBucketCount
     );
-    this.syncPivotUI();
-    
+    const orientation = this.computePivotOrientation();
+    this.controller.setPivotOrientation(orientation);
+    this.setState({ pivotOrientation: orientation }, () => this.syncPivotUI());
+
     // Listen to controller state changes
     this.controller.addListener(state => {
+      const currentProduct = this.state.selectedProduct;
+      const groupKey = currentProduct ? this.controller.getGroupKeyForProduct(currentProduct) : undefined;
+      const sequence = groupKey
+        ? this.controller.getDisplayOrderForGroup(groupKey).map(p => p.id)
+        : this.controller.getDisplayOrder().map(p => p.id);
       this.setState({
         loading: state.loading,
         error: state.error,
         filteredProducts: state.filteredProducts,
-      }, this.syncPivotUI);
+        modalSequence: sequence
+      }, () => {
+        this.syncPivotUI();
+        if (this.state.selectedProduct) {
+          const idx = sequence.indexOf(this.state.selectedProduct.id);
+          if (idx >= 0) {
+            const updatedProduct = this.controller.getDisplayOrder().find(p => p.id === sequence[idx])
+              ?? this.state.filteredProducts.find(p => p.id === sequence[idx]);
+            if (updatedProduct) {
+              this.setState({ selectedIndex: idx, selectedProduct: updatedProduct, modalDirection: 0 });
+            }
+          } else {
+            this.setState({ selectedProduct: null, selectedIndex: -1, modalDirection: 0 });
+          }
+        }
+      });
     });
 
     // Setup event listeners
     window.addEventListener('resize', this.handleResize);
+    window.addEventListener('resize', this.handleOrientationChange);
     canvas.addEventListener('click', this.handleCanvasClick);
     canvas.addEventListener('mousemove', this.handleCanvasMouseMove);
     canvas.addEventListener('mouseleave', this.handleCanvasMouseLeave);
@@ -151,6 +186,7 @@ export default class App extends React.Component<{}, State> {
       canvas.removeEventListener('mousemove', this.handleCanvasMouseMove);
       canvas.removeEventListener('mouseleave', this.handleCanvasMouseLeave);
     }
+    window.removeEventListener('resize', this.handleOrientationChange);
   }
 
   componentDidUpdate(prevProps: {}, prevState: State): void {
@@ -209,11 +245,32 @@ export default class App extends React.Component<{}, State> {
     this.controller.handleResize();
   };
   
+  private handleOrientationChange = () => {
+    const orientation = this.computePivotOrientation();
+    if (orientation !== this.state.pivotOrientation) {
+      this.controller.setPivotOrientation(orientation);
+      this.setState({ pivotOrientation: orientation });
+    }
+  };
+  
+  private computePivotOrientation(): Orientation {
+    const { innerWidth, innerHeight } = window;
+    return innerWidth >= innerHeight ? 'columns' : 'rows';
+  }
+  
   private syncPivotUI = () => {
+    const currentDim = this.controller.getPivotDimension();
+    const availableDims = this.controller.getAvailablePivotDimensions();
+    const dims = availableDims.includes(currentDim)
+      ? availableDims
+      : [currentDim, ...availableDims];
+    const sequence = this.controller.getDisplayOrder().map(p => p.id);
     this.setState({
       pivotBreadcrumbs: this.controller.getPivotBreadcrumbs(),
-      pivotDimension: this.controller.getPivotDimension(),
-      pivotDimensions: this.controller.getPivotDimensions(),
+      pivotDimension: currentDim,
+      pivotDimensions: dims,
+      pivotOrientation: this.controller.getPivotOrientation(),
+      modalSequence: sequence
     });
   };
 
@@ -248,6 +305,8 @@ export default class App extends React.Component<{}, State> {
     this.controller.updateGridConfig(newSettings.gridConfig);
     this.controller.setAnimationDuration(newSettings.animationDuration);
     this.controller.setPriceBucketConfig(newSettings.priceBucketMode, newSettings.priceBucketCount);
+    const orientation = this.computePivotOrientation();
+    this.controller.setPivotOrientation(orientation);
   };
 
   private handleBreadcrumbClick = (index: number) => {
@@ -273,6 +332,17 @@ export default class App extends React.Component<{}, State> {
     this.syncPivotUI();
   };
 
+  private showRelativeProduct = (delta: number) => {
+    const { filteredProducts, selectedIndex, modalSequence } = this.state;
+    if (selectedIndex < 0 || modalSequence.length === 0) return;
+    const nextIndex = selectedIndex + delta;
+    if (nextIndex < 0 || nextIndex >= modalSequence.length) return;
+    const nextId = modalSequence[nextIndex];
+    const nextProduct = filteredProducts.find(p => p.id === nextId) || this.controller.getDisplayOrder().find(p => p.id === nextId);
+    if (!nextProduct) return;
+    this.setState({ selectedProduct: nextProduct, selectedIndex: nextIndex, modalDirection: Math.sign(delta) });
+  };
+
   private handleCanvasClick = (e: MouseEvent) => {
     const canvas = this.canvasRef.current;
     if (!canvas) return;
@@ -291,7 +361,10 @@ export default class App extends React.Component<{}, State> {
     // Otherwise check for product click
     const product = this.controller.hitTest(x, y);
     if (product) {
-      this.setState({ selectedProduct: product });
+      const groupKey = this.controller.getGroupKeyForProduct(product);
+      const sequence = this.controller.getDisplayOrderForGroup(groupKey).map(p => p.id);
+      const idx = sequence.indexOf(product.id);
+      this.setState({ selectedProduct: product, selectedIndex: idx, modalDirection: 0, modalSequence: sequence });
     }
   };
 
@@ -356,7 +429,11 @@ export default class App extends React.Component<{}, State> {
       case ' ':
         e.preventDefault();
         if (focusedIndex >= 0 && focusedIndex < filteredProducts.length) {
-          this.setState({ selectedProduct: filteredProducts[focusedIndex] });
+          const product = filteredProducts[focusedIndex];
+          const groupKey = this.controller.getGroupKeyForProduct(product);
+          const sequence = this.controller.getDisplayOrderForGroup(groupKey).map(p => p.id);
+          const seqIndex = sequence.indexOf(product.id);
+          this.setState({ selectedProduct: product, selectedIndex: seqIndex, modalDirection: 0, modalSequence: sequence });
         }
         return;
       default:
@@ -370,127 +447,147 @@ export default class App extends React.Component<{}, State> {
 
   render() {
     const { loading, error, selectedProduct, hoveredProduct, mousePos } = this.state;
-    const { search, category, season, priceMin, priceMax, weightMin, weightMax, sortMode, layoutMode, showOnlyFavorites, pivotDimension, pivotBreadcrumbs, pivotDimensions } = this.state;
+    const { search, category, season, priceMin, priceMax, weightMin, weightMax, sortMode, layoutMode, showOnlyFavorites, showFilters, pivotDimension, pivotBreadcrumbs, pivotDimensions } = this.state;
 
     const cats = this.controller.getUniqueCategories();
     const seasons = this.controller.getUniqueSeasons();
 
     if (error) return <div className="container"><div className="error">{error}</div></div>;
 
-  return (
+    return (
       <div className="pf-root">
-        <div className="pf-toolbar">
-          <input placeholder="Search" value={search} onChange={e => this.setState({ search: e.target.value })} />
-          <select value={category} onChange={e => this.setState({ category: e.target.value })}>
-            <option value="">All Categories</option>
-            {cats.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
-          <select value={season} onChange={e => this.setState({ season: e.target.value })}>
-            <option value="">All Seasons</option>
-            {seasons.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <input type="number" placeholder="Min €" value={priceMin} onChange={e => this.setState({ priceMin: e.target.value })} />
-          <input type="number" placeholder="Max €" value={priceMax} onChange={e => this.setState({ priceMax: e.target.value })} />
-          <input type="number" placeholder="Min g" value={weightMin} onChange={e => this.setState({ weightMin: e.target.value })} />
-          <input type="number" placeholder="Max g" value={weightMax} onChange={e => this.setState({ weightMax: e.target.value })} />
-          <select value={sortMode} onChange={e => this.setState({ sortMode: e.target.value as SortMode })}>
-            <option value="none">Sort: None</option>
-            <option value="name-asc">Name (A-Z)</option>
-            <option value="name-desc">Name (Z-A)</option>
-            <option value="price-asc">Price (Low-High)</option>
-            <option value="price-desc">Price (High-Low)</option>
-            <option value="weight-asc">Weight (Light-Heavy)</option>
-            <option value="weight-desc">Weight (Heavy-Light)</option>
-            <option value="season-desc">Season (Newest)</option>
-          </select>
-          <button onClick={() => this.setState({ search: '', category: '', season: '', priceMin: '', priceMax: '', weightMin: '', weightMax: '' })}>Reset Filters</button>
-          <button onClick={() => this.controller.resetViewport()}>Reset View</button>
+        <div className={`pf-toolbar ${showFilters ? '' : 'collapsed'}`}>
           <button 
-            onClick={() => this.setState({ showOnlyFavorites: !showOnlyFavorites })}
-            style={{ fontWeight: showOnlyFavorites ? 'bold' : 'normal' }}
+            className="pf-toolbar-toggle"
+            type="button"
+            aria-expanded={showFilters}
+            onClick={() => this.setState({ showFilters: !showFilters })}
           >
-            ❤️ Favorites {showOnlyFavorites ? 'ON' : 'OFF'}
+            {showFilters ? 'Hide Filters' : 'Show Filters'}
           </button>
-          <button 
-            onClick={() => this.controller.setLayoutMode('pivot')}
-            style={{ fontWeight: layoutMode === 'pivot' ? 'bold' : 'normal' }}
+          <button
+            type="button"
+            className="pf-toolbar-dev"
+            onClick={() => window.dispatchEvent(new Event('pf-toggle-dev-overlay'))}
+            title="Toggle developer overlay (F1)"
           >
-            📚 Pivot
+            🛠 Dev
           </button>
-          
-          {layoutMode === 'pivot' && (
+          {showFilters && (
             <>
-              <select 
-                value={pivotDimension}
-                onChange={(e) => {
-                  const dim = e.target.value as GroupDimension;
-                  this.controller.setPivotDimension(dim);
-                  this.syncPivotUI();
-                }}
-              >
-                <option value="category">By Category</option>
-                <option value="subcategory" disabled={!this.controller.canUsePivotDimension('subcategory')}>
-                  By Subcategory
-                </option>
-                <option value="brand">By Brand</option>
-                <option value="season">By Season</option>
-                <option value="price-range">By Price</option>
+              <input
+                placeholder="Search"
+                value={search}
+                onChange={e => this.setState({ search: e.target.value })}
+              />
+              <select value={category} onChange={e => this.setState({ category: e.target.value })}>
+                <option value="">All Categories</option>
+                {cats.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+              <select value={season} onChange={e => this.setState({ season: e.target.value })}>
+                <option value="">All Seasons</option>
+                {seasons.map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+              <input
+                type="number"
+                placeholder="Min €"
+                value={priceMin}
+                onChange={e => this.setState({ priceMin: e.target.value })}
+              />
+              <input
+                type="number"
+                placeholder="Max €"
+                value={priceMax}
+                onChange={e => this.setState({ priceMax: e.target.value })}
+              />
+              <input
+                type="number"
+                placeholder="Min g"
+                value={weightMin}
+                onChange={e => this.setState({ weightMin: e.target.value })}
+              />
+              <input
+                type="number"
+                placeholder="Max g"
+                value={weightMax}
+                onChange={e => this.setState({ weightMax: e.target.value })}
+              />
+              <select value={sortMode} onChange={e => this.setState({ sortMode: e.target.value as SortMode })}>
+                <option value="none">Sort: None</option>
+                <option value="name-asc">Name (A-Z)</option>
+                <option value="name-desc">Name (Z-A)</option>
+                <option value="price-asc">Price (Low-High)</option>
+                <option value="price-desc">Price (High-Low)</option>
+                <option value="weight-asc">Weight (Light-Heavy)</option>
+                <option value="weight-desc">Weight (Heavy-Light)</option>
+                <option value="season-desc">Season (Newest)</option>
               </select>
               <button
-                onClick={() => {
-                  this.controller.drillUpPivot();
-                  this.syncPivotUI();
-                }}
-                disabled={!this.controller.canDrillUpPivot()}
+                type="button"
+                onClick={() => this.setState({
+                  search: '',
+                  category: '',
+                  season: '',
+                  priceMin: '',
+                  priceMax: '',
+                  weightMin: '',
+                  weightMax: ''
+                })}
               >
-                ← Back
+                Reset Filters
               </button>
-              
-              {pivotBreadcrumbs.length > 1 && (
-                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                  {pivotBreadcrumbs.map((crumb, i) => (
-                    <React.Fragment key={i}>
-                      {i > 0 && <span style={{ color: '#9ca3af' }}>›</span>}
-                      <button
-                        onClick={() => this.handleBreadcrumbClick(i)}
-                        disabled={i === pivotBreadcrumbs.length - 1}
-                        style={{ 
-                          fontWeight: i === pivotBreadcrumbs.length - 1 ? 'bold' : 'normal',
-                          padding: '4px 8px'
-                        }}
-                      >
-                        {crumb}
-                      </button>
-                    </React.Fragment>
-                  ))}
-                </div>
-              )}
+              <button type="button" onClick={() => this.controller.resetViewport()}>
+                Reset View
+              </button>
+              <button
+                type="button"
+                className={showOnlyFavorites ? 'pf-active' : ''}
+                onClick={() => this.setState({ showOnlyFavorites: !showOnlyFavorites })}
+              >
+                ❤️ Favorites {showOnlyFavorites ? 'ON' : 'OFF'}
+              </button>
+              <span className="pf-toolbar-divider" aria-hidden="true" />
+              <button
+                type="button"
+                className={layoutMode === 'pivot' ? 'pf-active' : ''}
+                onClick={() => this.setState({ layoutMode: 'pivot' })}
+              >
+                📚 Pivot
+              </button>
+              <button
+                type="button"
+                className={layoutMode === 'grid' ? 'pf-active' : ''}
+                onClick={() => this.setState({ layoutMode: 'grid' })}
+              >
+                📊 Grid
+              </button>
+              <button
+                type="button"
+                className={layoutMode === 'masonry' ? 'pf-active' : ''}
+                onClick={() => this.setState({ layoutMode: 'masonry' })}
+              >
+                🧱 Masonry
+              </button>
+              <button
+                type="button"
+                className={layoutMode === 'compact' ? 'pf-active' : ''}
+                onClick={() => this.setState({ layoutMode: 'compact' })}
+              >
+                🔬 Compact
+              </button>
+              <button
+                type="button"
+                className={layoutMode === 'large' ? 'pf-active' : ''}
+                onClick={() => this.setState({ layoutMode: 'large' })}
+              >
+                🔭 Large
+              </button>
             </>
           )}
-          <button 
-            onClick={() => this.controller.setLayoutMode('grid')}
-            style={{ fontWeight: layoutMode === 'grid' ? 'bold' : 'normal' }}
-          >
-            📊 Grid
-          </button>
-          <button 
-            onClick={() => this.controller.setLayoutMode('masonry')}
-            style={{ fontWeight: layoutMode === 'masonry' ? 'bold' : 'normal' }}
-          >
-            🧱 Masonry
-          </button>
-          <button 
-            onClick={() => this.controller.setLayoutMode('compact')}
-            style={{ fontWeight: layoutMode === 'compact' ? 'bold' : 'normal' }}
-          >
-            🔬 Compact
-          </button>
-          <button 
-            onClick={() => this.controller.setLayoutMode('large')}
-            style={{ fontWeight: layoutMode === 'large' ? 'bold' : 'normal' }}
-          >
-            🔭 Large
-        </button>
         </div>
         <div className="pf-stage">
           <canvas ref={this.canvasRef} className="pf-canvas" />
@@ -532,9 +629,13 @@ export default class App extends React.Component<{}, State> {
         <AnimatePresence>
           {selectedProduct && (
             <ProductModal
-              key={selectedProduct.id}
               product={selectedProduct}
-              onClose={() => this.setState({ selectedProduct: null })}
+              hasPrev={this.state.selectedIndex > 0}
+              hasNext={this.state.selectedIndex < this.state.filteredProducts.length - 1}
+              direction={this.state.modalDirection}
+              onPrev={() => this.showRelativeProduct(-1)}
+              onNext={() => this.showRelativeProduct(1)}
+              onClose={() => this.setState({ selectedProduct: null, selectedIndex: -1, modalDirection: 0 })}
             />
           )}
         </AnimatePresence>

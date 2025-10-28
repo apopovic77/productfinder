@@ -28,6 +28,7 @@ export type ProductData = {
   price?: Price;
   media?: MediaItem[];
   specifications?: ProductSpecifications;
+  meta?: Record<string, any>;
 };
 
 /**
@@ -48,6 +49,7 @@ export class Product {
   public readonly price?: Price;
   public readonly media?: MediaItem[];
   public readonly specifications?: ProductSpecifications;
+  public readonly meta?: Record<string, any>;
   
   // Image state (self-managed)
   private _image: HTMLImageElement | null = null;
@@ -64,6 +66,7 @@ export class Product {
     this.price = data.price;
     this.media = data.media;
     this.specifications = data.specifications;
+    this.meta = data.meta;
   }
   
   /**
@@ -199,6 +202,14 @@ export class Product {
     if (size <= 0) return src;
     try {
       const url = new URL(src);
+      if (url.hostname.includes('api-storage.arkturian.com')) {
+        const params = url.searchParams;
+        params.set('width', String(size));
+        params.set('format', 'webp');
+        params.set('quality', '70');
+        url.search = params.toString();
+        return url.toString();
+      }
       if (!url.hostname.includes('cdn.shopify.com')) {
         return src;
       }
@@ -224,4 +235,3 @@ export class Product {
     await Promise.allSettled(products.map(p => p.loadImage()));
   }
 }
-

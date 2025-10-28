@@ -1,14 +1,37 @@
+:root {
+  color-scheme: dark;
+  --pf-bg: radial-gradient(circle at 20% 20%, rgba(93, 123, 255, 0.24), transparent 55%),
+    radial-gradient(circle at 80% 10%, rgba(137, 73, 255, 0.18), transparent 45%),
+    #080d1e;
+  --pf-panel: rgba(17, 24, 48, 0.86);
+  --pf-panel-strong: rgba(21, 30, 61, 0.92);
+  --pf-border: rgba(124, 148, 255, 0.28);
+  --pf-border-strong: rgba(160, 176, 255, 0.45);
+  --pf-text: #f2f5ff;
+  --pf-text-muted: #9ea7d6;
+  --pf-accent: #7c8dff;
+  --pf-accent-strong: #556dff;
+}
+
 html, body, #root {
   height: 100%;
   margin: 0;
+}
+
+body {
+  background: var(--pf-bg);
+  color: var(--pf-text);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 .pf-root {
   position: relative;
   height: 100%;
   width: 100%;
-  background: #f7fafc;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  font-family: inherit;
+  color: var(--pf-text);
+  overflow: hidden;
+  background: linear-gradient(145deg, rgba(17, 25, 52, 0.92), rgba(8, 12, 32, 0.98));
 }
 
 .pf-toolbar {
@@ -17,16 +40,16 @@ html, body, #root {
   left: 12px;
   right: 12px;
   z-index: 2;
-  background: rgba(255,255,255,0.9);
-  border: 1px solid rgba(0,0,0,0.08);
-  border-radius: 12px;
-  padding: 12px;
+  background: var(--pf-panel);
+  border: 1px solid var(--pf-border);
+  border-radius: 18px;
+  padding: 14px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
-  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
-  backdrop-filter: blur(8px);
+  gap: 12px;
+  box-shadow: 0 24px 70px rgba(5, 9, 28, 0.45);
+  backdrop-filter: blur(14px);
   box-sizing: border-box;
   min-width: 320px;
 }
@@ -53,27 +76,82 @@ html, body, #root {
   background: rgba(0,0,0,0.3);
 }
 
-.pf-toolbar input, .pf-toolbar select, .pf-toolbar button {
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  padding: 6px 12px;
-  background: #fff;
+.pf-toolbar input,
+.pf-toolbar select,
+.pf-toolbar button {
+  border: 1px solid rgba(129, 146, 255, 0.18);
+  border-radius: 999px;
+  padding: 7px 16px;
+  background: rgba(24, 33, 66, 0.72);
   flex: 0 0 auto;
   white-space: nowrap;
-  font-size: 14px;
+  font-size: 13px;
   min-width: max-content;
+  color: var(--pf-text);
+  transition: border 0.25s ease, background 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
 }
 
 .pf-toolbar input {
   min-width: 120px;
+  border-radius: 12px;
+}
+
+.pf-toolbar input::placeholder {
+  color: rgba(205, 214, 255, 0.6);
 }
 
 .pf-toolbar select {
   min-width: 150px;
-}
+  border-radius: 12px;
+  }
 
 .pf-toolbar button {
   min-width: 80px;
+  cursor: pointer;
+}
+
+.pf-toolbar input:focus,
+.pf-toolbar select:focus {
+  outline: none;
+  border-color: var(--pf-border-strong);
+  box-shadow: 0 0 0 4px rgba(124, 148, 255, 0.12);
+}
+
+.pf-toolbar button:hover {
+  border-color: var(--pf-border-strong);
+  background: rgba(38, 50, 94, 0.85);
+}
+
+.pf-toolbar-dev {
+  font-weight: 600;
+  background: rgba(124, 141, 255, 0.25);
+  border-color: rgba(124, 141, 255, 0.45);
+}
+
+.pf-toolbar.collapsed {
+  gap: 0;
+}
+
+.pf-toolbar-toggle {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pf-toolbar-divider {
+  width: 1px;
+  height: 24px;
+  background: rgba(15, 23, 42, 0.12);
+  margin: 0 4px;
+}
+
+.pf-toolbar .pf-active {
+  background: var(--pf-accent-strong);
+  color: #fff;
+  border-color: rgba(197, 206, 255, 0.8);
+  font-weight: 600;
+  box-shadow: 0 16px 40px -28px rgba(93, 117, 255, 0.85);
 }
 
 .pf-stage {
@@ -81,12 +159,14 @@ html, body, #root {
   inset: 0;
   width: 100%;
   height: 100%;
+  z-index: 0;
 }
 
 .pf-canvas {
   display: block;
   position: absolute;
   inset: 0;
+  z-index: 1;
 }
 
 .pf-pivot-footer {
@@ -98,12 +178,12 @@ html, body, #root {
   flex-direction: column;
   gap: 8px;
   align-items: center;
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 12px;
-  padding: 10px 16px;
-  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
-  backdrop-filter: blur(6px);
+  background: rgba(21, 31, 60, 0.92);
+  border: 1px solid var(--pf-border);
+  border-radius: 999px;
+  padding: 12px 18px;
+  box-shadow: 0 30px 70px -35px rgba(8, 12, 34, 0.9);
+  backdrop-filter: blur(12px);
   z-index: 100;
 }
 
@@ -116,26 +196,29 @@ html, body, #root {
 }
 
 .pf-pivot-chip {
-  border: 1px solid #cbd5e1;
+  border: 1px solid rgba(123, 143, 255, 0.35);
   border-radius: 999px;
-  background: #ffffff;
-  padding: 6px 14px;
-  font-size: 13px;
+  background: rgba(34, 45, 82, 0.85);
+  padding: 7px 16px;
+  font-size: 12px;
   cursor: pointer;
   transition: all 0.15s ease;
+  color: var(--pf-text-muted);
+  backdrop-filter: blur(6px);
 }
 
 .pf-pivot-chip:hover:not(:disabled) {
-  background: #eef2ff;
-  border-color: #4338ca;
-  color: #4338ca;
+  background: rgba(106, 128, 255, 0.3);
+  border-color: rgba(140, 160, 255, 0.6);
+  color: var(--pf-text);
 }
 
 .pf-pivot-chip.active {
-  background: #4338ca;
+  background: var(--pf-accent-strong);
   color: #ffffff;
-  border-color: #4338ca;
+  border-color: rgba(198, 208, 255, 0.8);
   cursor: default;
+  box-shadow: 0 16px 42px -20px rgba(93, 120, 255, 0.85);
 }
 
 .pf-pivot-chip:disabled {
@@ -157,6 +240,19 @@ html, body, #root {
 
 .container { padding: 24px; }
 .loading, .error { font-size: 14px; color: #1f2937; }
+
+.pf-tooltip {
+  background: rgba(22, 29, 60, 0.92);
+  border-radius: 12px;
+  border: 1px solid rgba(126, 146, 255, 0.35);
+  color: var(--pf-text);
+  box-shadow: 0 24px 60px -30px rgba(8, 11, 32, 0.8);
+  backdrop-filter: blur(10px);
+}
+
+.pf-tooltip-price {
+  color: var(--pf-accent);
+}
 
 .pf-tooltip {
   z-index: 999;
