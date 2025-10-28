@@ -74,9 +74,7 @@ export class Product {
     const media = this.media?.[0];
     if (!media?.src) return 'https://via.placeholder.com/256?text=No+Image';
     
-    // Return original Shopify CDN URL directly
-    // Shopify CDN is fast, has CDN, and proper SSL certificates
-    return media.src;
+    return this.getSizedImageUrl(media.src, 320);
   }
   
   /**
@@ -196,7 +194,29 @@ export class Product {
     Product.imageCache.clear();
     Product.loadingPromises.clear();
   }
-  
+
+  private getSizedImageUrl(src: string, size: number): string {
+    if (size <= 0) return src;
+    try {
+      const url = new URL(src);
+      if (!url.hostname.includes('cdn.shopify.com')) {
+        return src;
+      }
+      
+      const path = url.pathname;
+      const lastDot = path.lastIndexOf('.');
+      if (lastDot === -1) {
+        return src;
+      }
+      
+      const base = path.slice(0, lastDot).replace(/_(\d+x\d+|pico|icon|thumb|small|compact|medium|large|grande|master)$/, '');
+      const ext = path.slice(lastDot);
+      url.pathname = `${base}_${size}x${size}${ext}`;
+      return url.toString();
+    } catch {
+      return src;
+    }
+  }
   /**
    * Static method to preload images for multiple products
    */
@@ -204,5 +224,4 @@ export class Product {
     await Promise.allSettled(products.map(p => p.loadImage()));
   }
 }
-
 

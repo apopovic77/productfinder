@@ -56,8 +56,17 @@ export class LayoutNode<T> {
       this.isNew = false;
     }
   }
+  
+  setAnimationDuration(seconds: number) {
+    const duration = Math.max(0.01, seconds);
+    this.posX.setDuration(duration);
+    this.posY.setDuration(duration);
+    this.width.setDuration(duration);
+    this.height.setDuration(duration);
+    this.opacity.setDuration(duration);
+    this.scale.setDuration(duration);
+  }
 }
-
 
 
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import './DeveloperOverlay.css';
+import type { PriceBucketMode } from '../services/PivotDrillDownService';
 
 export type GridConfig = {
   spacing: number;
@@ -12,7 +13,9 @@ export type DeveloperSettings = {
   gridConfig: GridConfig;
   showDebugInfo: boolean;
   showBoundingBoxes: boolean;
-  animationSpeed: number;
+  animationDuration: number;
+  priceBucketMode: PriceBucketMode;
+  priceBucketCount: number;
 };
 
 type DeveloperOverlayProps = {
@@ -60,7 +63,9 @@ export const DeveloperOverlay: React.FC<DeveloperOverlayProps> = ({
       },
       showDebugInfo: false,
       showBoundingBoxes: false,
-      animationSpeed: 0.4
+      animationDuration: 0.4,
+      priceBucketMode: 'static',
+      priceBucketCount: 5
     });
   };
 
@@ -196,15 +201,49 @@ export const DeveloperOverlay: React.FC<DeveloperOverlayProps> = ({
             
             <div className="dev-control">
               <label>
-                Animation Speed: <strong>{settings.animationSpeed.toFixed(2)}</strong>
+                Animation Duration: <strong>{settings.animationDuration.toFixed(2)}s</strong>
               </label>
               <input
                 type="range"
                 min="0.1"
-                max="1.0"
-                step="0.05"
-                value={settings.animationSpeed}
-                onChange={(e) => updateSetting('animationSpeed', Number(e.target.value))}
+                max="5.0"
+                step="0.1"
+                value={settings.animationDuration}
+                onChange={(e) => updateSetting('animationDuration', Number(e.target.value))}
+              />
+            </div>
+          </div>
+
+          {/* Price Buckets */}
+          <div className="dev-section">
+            <h4>💰 Price Buckets</h4>
+
+            <div className="dev-control">
+              <label>
+                Mode: <strong>{settings.priceBucketMode}</strong>
+              </label>
+              <select
+                value={settings.priceBucketMode}
+                onChange={(e) => updateSetting('priceBucketMode', e.target.value as PriceBucketMode)}
+              >
+                <option value="static">Static ranges</option>
+                <option value="equal-width">Equal width</option>
+                <option value="quantile">Quantile (equal count)</option>
+                <option value="kmeans">K-means clustering</option>
+              </select>
+            </div>
+
+            <div className="dev-control">
+              <label>
+                Buckets: <strong>{settings.priceBucketCount}</strong>
+              </label>
+              <input
+                type="range"
+                min="1"
+                max="8"
+                step="1"
+                value={settings.priceBucketCount}
+                onChange={(e) => updateSetting('priceBucketCount', Number(e.target.value))}
               />
             </div>
           </div>
@@ -252,4 +291,3 @@ export const DeveloperOverlay: React.FC<DeveloperOverlayProps> = ({
     </div>
   );
 };
-

@@ -1,17 +1,20 @@
 import { LayoutNode } from '../layout/LayoutNode';
 import { ViewportTransform } from '../utils/ViewportTransform';
 import type { Product } from '../types/Product';
+import type { GroupHeaderInfo } from '../layout/PivotLayouter';
 
 export class CanvasRenderer<T> {
   private rafId: number | null = null;
   public hoveredItem: T | null = null;
   public focusedItem: T | null = null;
+  public hoveredGroupKey: string | null = null;
   
   constructor(
     private ctx: CanvasRenderingContext2D, 
     private getNodes: () => LayoutNode<T>[], 
     private renderAccessors: { label(item: T): string; priceText(item: T): string },
-    private viewport: ViewportTransform | null = null
+    private viewport: ViewportTransform | null = null,
+    private getGroupHeaders: () => GroupHeaderInfo[] = () => []
   ) {}
   
   start() { 
@@ -107,6 +110,45 @@ export class CanvasRenderer<T> {
       
       // Restore item transform
       this.ctx.restore();
+    }
+    
+    // Draw group headers (after products, so they're on top)
+    const groupHeaders = this.getGroupHeaders();
+    for (const header of groupHeaders) {
+      const isHovered = this.hoveredGroupKey === header.key;
+      
+      // Draw background
+      this.ctx.fillStyle = isHovered 
+        ? 'rgba(67, 56, 202, 0.1)' 
+        : 'rgba(255, 255, 255, 0.95)';
+      this.ctx.fillRect(header.x, header.y, header.width, header.height);
+      
+      // Draw border
+      this.ctx.strokeStyle = isHovered ? '#4338ca' : '#e5e7eb';
+      this.ctx.lineWidth = isHovered ? 2 : 1;
+      this.ctx.strokeRect(header.x, header.y, header.width, header.height);
+      
+      // Draw text
+      this.ctx.fillStyle = isHovered ? '#4338ca' : '#1f2937';
+      this.ctx.font = isHovered ? 'bold 16px system-ui' : '14px system-ui';
+      this.ctx.textAlign = 'center';
+      this.ctx.textBaseline = 'middle';
+      this.ctx.fillText(
+        header.label, 
+        header.x + header.width / 2, 
+        header.y + header.height / 2
+      );
+      
+      // Draw click hint on hover
+      if (isHovered) {
+        this.ctx.font = '11px system-ui';
+        this.ctx.fillStyle = '#9ca3af';
+        this.ctx.fillText(
+          'Click to drill down', 
+          header.x + header.width / 2, 
+          header.y + header.height / 2 + 12
+        );
+      }
     }
     
     // Restore viewport transform

@@ -7,6 +7,7 @@ import { CanvasRenderer } from '../render/CanvasRenderer';
 import { SkeletonRenderer } from '../render/SkeletonRenderer';
 import { ProductRenderAccessors } from '../layout/Accessors';
 import { fetchProducts } from '../data/ProductRepository';
+import type { GroupDimension, PriceBucketMode } from '../services/PivotDrillDownService';
 
 export type ControllerState = {
   loading: boolean;
@@ -60,7 +61,8 @@ export class ProductFinderController {
       this.ctx,
       () => this.layoutService.getEngine().all(),
       this.renderAccess,
-      this.viewportService.getTransform()
+      this.viewportService.getTransform(),
+      () => this.layoutService.getGroupHeaders()
     );
 
     // Setup favorites listener
@@ -285,10 +287,121 @@ export class ProductFinderController {
     this.layoutService.updateGridConfig(gridConfig);
     this.handleResize(); // Re-layout with new config
   }
+  
+  setAnimationDuration(duration: number): void {
+    this.layoutService.setAnimationDuration(duration);
+  }
+  
+  setPriceBucketConfig(mode: PriceBucketMode, bucketCount: number): void {
+    this.layoutService.setPriceBucketConfig(mode, bucketCount);
+    this.onDataChanged();
+  }
 
   getZoom(): number {
     const viewport = this.viewportService.getTransform();
     return viewport?.scale ?? 1;
   }
+  
+  // === Pivot Drill-Down Methods ===
+  
+  setPivotDimension(dimension: GroupDimension): void {
+    this.layoutService.setPivotDimension(dimension);
+    this.onDataChanged();
+  }
+  
+  getPivotDimension(): GroupDimension {
+    return this.layoutService.getPivotDimension();
+  }
+  
+  getPivotDimensions(): GroupDimension[] {
+    return this.layoutService.getPivotDimensions();
+  }
+  
+  canUsePivotDimension(dimension: GroupDimension): boolean {
+    return this.layoutService.canUsePivotDimension(dimension);
+  }
+  
+  drillDownPivot(value: string): void {
+    this.layoutService.drillDownPivot(value);
+    this.onDataChanged();
+  }
+  
+  drillUpPivot(): void {
+    this.layoutService.drillUpPivot();
+    this.onDataChanged();
+  }
+  
+  resetPivot(): void {
+    this.layoutService.resetPivot();
+    this.onDataChanged();
+  }
+  
+  getPivotBreadcrumbs(): string[] {
+    return this.layoutService.getPivotBreadcrumbs();
+  }
+  
+  canDrillUpPivot(): boolean {
+    return this.layoutService.canDrillUpPivot();
+  }
+  
+  canDrillDownPivot(): boolean {
+    return this.layoutService.canDrillDownPivot();
+  }
+  
+  /**
+   * Handle click on canvas - check for group header clicks
+   */
+  handleGroupHeaderClick(canvasX: number, canvasY: number): boolean {
+    if (!this.canvas || this.layoutService.getMode() !== 'pivot') return false;
+    
+    // Transform canvas coordinates to world coordinates
+    const viewport = this.viewportService.getTransform();
+    if (!viewport) return false;
+    
+    const worldX = (canvasX - viewport.offset.x) / viewport.scale;
+    const worldY = (canvasY - viewport.offset.y) / viewport.scale;
+    
+    // Check if click is on any group header
+    const headers = this.layoutService.getGroupHeaders();
+    for (const header of headers) {
+      if (worldX >= header.x && worldX <= header.x + header.width &&
+          worldY >= header.y && worldY <= header.y + header.height) {
+        // Click on group header - drill down!
+        if (this.layoutService.canDrillDownPivot()) {
+          this.layoutService.drillDownPivot(header.key);
+          this.onDataChanged();
+          return true;
+        }
+        return false;
+      }
+    }
+    
+    return false;
+  }
+  
+  /**
+   * Handle mouse move - check for group header hover
+   */
+  handleGroupHeaderHover(canvasX: number, canvasY: number): string | null {
+    if (!this.canvas || this.layoutService.getMode() !== 'pivot') return null;
+    if (!this.layoutService.canDrillDownPivot()) return null;
+    
+    // Transform canvas coordinates to world coordinates
+    const viewport = this.viewportService.getTransform();
+    if (!viewport) return null;
+    
+    const worldX = (canvasX - viewport.offset.x) / viewport.scale;
+    const worldY = (canvasY - viewport.offset.y) / viewport.scale;
+    
+    // Check if hover is on any group header
+    const headers = this.layoutService.getGroupHeaders();
+    for (const header of headers) {
+      if (worldX >= header.x && worldX <= header.x + header.width &&
+          worldY >= header.y && worldY <= header.y + header.height) {
+        return header.key;
+      }
+    }
+    
+    return null;
+  }
 }
-

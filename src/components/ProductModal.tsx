@@ -1,5 +1,5 @@
-import React from 'react';
-import type { Product } from '../types/Product';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import type { Product, MediaItem } from '../types/Product';
 import './ProductModal.css';
 
 type Props = {
@@ -7,122 +7,187 @@ type Props = {
   onClose: () => void;
 };
 
-export class ProductModal extends React.Component<Props> {
-  componentDidMount() {
-    document.addEventListener('keydown', this.handleKeyDown);
-  }
+const formatSpecValue = (label: string, value: string | number | undefined) => {
+  if (!value && value !== 0) return null;
+  return { label, value: String(value) };
+};
 
-  componentWillUnmount() {
-    document.removeEventListener('keydown', this.handleKeyDown);
-  }
+const getHeroMedia = (media?: MediaItem[]): MediaItem | undefined => {
+  if (!media || media.length === 0) return undefined;
+  const hero = media.find(item => item.type === 'hero');
+  return hero ?? media[0];
+};
 
-  private handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      this.props.onClose();
+export const ProductModal: React.FC<Props> = ({ product, onClose }) => {
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+      if (!product?.media || product.media.length === 0) return;
+      if (e.key === 'ArrowRight') {
+        setSelectedIndex(prev => (prev + 1) % product.media!.length);
+      }
+      if (e.key === 'ArrowLeft') {
+        setSelectedIndex(prev => {
+          const total = product.media!.length;
+          return (prev - 1 + total) % total;
+        });
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [product, onClose]);
+
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [product?.id]);
+
+  const media = product?.media ?? [];
+  const heroMedia = useMemo(() => {
+    if (!product) return undefined;
+    if (media.length === 0) return undefined;
+    return media[selectedIndex] ?? getHeroMedia(media);
+  }, [media, product, selectedIndex]);
+
+  const handlePrimaryAction = useCallback(() => {
+    const url = (product as any)?.meta?.product_url;
+    if (url) {
+      window.open(url, '_blank', 'noopener');
+      return;
     }
-  };
+    onClose();
+  }, [product, onClose]);
 
-  render() {
-    const { product, onClose } = this.props;
-    if (!product) return null;
+  const handleCopySku = useCallback(() => {
+    if (!product?.sku || !navigator.clipboard) return;
+    navigator.clipboard.writeText(product.sku).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {});
+  }, [product?.sku]);
 
-    return (
-      <div className="modal-overlay" onClick={onClose}>
-        <div className="modal-content" onClick={e => e.stopPropagation()}>
-          <button className="modal-close" onClick={onClose} aria-label="Close">
-            ×
-          </button>
+  if (!product) return null;
 
-          <div className="modal-body">
-            <div className="modal-image">
-              {product.media && product.media.length > 0 ? (
-                <img 
-                  src={product.fullImageUrl}
-                  alt={product.media[0].alt || product.name}
+  const categories = product.category ?? [];
+  const priceText = product.price?.formatted;
+  const seasonLabel =
+    product.season ? `Season ${product.season}` : undefined;
+  const specs = [
+    formatSpecValue('SKU', product.sku),
+    formatSpecValue('Season', product.season),
+    formatSpecValue('Weight', product.specifications?.weight ? `${product.specifications.weight} g` : undefined),
+    formatSpecValue('Dimensions', product.specifications?.dimensions),
+    formatSpecValue('Shell', product.specifications?.shell_material),
+    formatSpecValue('Liner', product.specifications?.liner_material)
+  ].filter((item): item is { label: string; value: string } => item !== null);
+
+  return (
+    <div className="pf-modal-backdrop" onClick={onClose}>
+      <div className="pf-modal-shell" onClick={e => e.stopPropagation()}>
+        <div className="pf-modal-ambient" />
+        <button className="pf-modal-close" onClick={onClose} aria-label="Close">
+          ×
+        </button>
+
+        <div className="pf-modal-layout">
+          <div className="pf-modal-visual">
+            <div className="pf-modal-media">
+              {heroMedia ? (
+                <img
+                  src={heroMedia.src}
+                  alt={heroMedia.alt || product.name}
+                  loading="lazy"
                 />
               ) : (
-                <div className="modal-image-placeholder">No Image</div>
+                <div className="pf-modal-placeholder">
+                  <span>{product.name[0]}</span>
+                </div>
               )}
+              <div className="pf-modal-media-glow" />
             </div>
 
-            <div className="modal-info">
-              <h2>{product.name}</h2>
-              
-              {product.brand && (
-                <div className="modal-brand">
-                  <strong>Brand:</strong> {product.brand}
-                </div>
-              )}
+            {media.length > 1 && (
+              <div className="pf-modal-thumbs">
+                {media.map((item, idx) => (
+                  <button
+                    key={`${item.src}-${idx}`}
+                    className={idx === selectedIndex ? 'pf-thumb active' : 'pf-thumb'}
+                    onClick={() => setSelectedIndex(idx)}
+                    aria-label={`Show image ${idx + 1}`}
+                  >
+                    <img src={item.src} alt={item.alt || `${product.name} ${idx + 1}`} />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
+          <div className="pf-modal-panel">
+            <div className="pf-modal-meta">
+              {product.brand && <span className="pf-modal-brand">{product.brand}</span>}
+              {product.sku && <span className="pf-modal-sku">#{product.sku}</span>}
+            </div>
+
+            <h2 className="pf-modal-title">{product.name}</h2>
+
+            {priceText && (
+              <div className="pf-modal-price-row">
+                <span className="pf-modal-price">{priceText}</span>
+                {product.specifications?.weight && (
+                  <span className="pf-modal-sub">{product.specifications.weight} g</span>
+                )}
+              </div>
+            )}
+
+            {(categories.length > 0 || seasonLabel) && (
+              <div className="pf-modal-tags">
+                {categories.map(cat => (
+                  <span key={cat} className="pf-modal-chip">{cat}</span>
+                ))}
+                {seasonLabel && (
+                  <span className="pf-modal-chip ghost">{seasonLabel}</span>
+                )}
+              </div>
+            )}
+
+            {specs.length > 0 && (
+              <div className="pf-modal-specs">
+                {specs.map(spec => (
+                  <div key={spec.label} className="pf-modal-spec">
+                    <span className="pf-modal-spec-label">{spec.label}</span>
+                    <span className="pf-modal-spec-value">{spec.value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {product.media && product.media.length > 1 && (
+              <p className="pf-modal-hint">Nutze die Pfeiltasten oder klicke auf eine Vorschau für weitere Ansichten.</p>
+            )}
+
+            <div className="pf-modal-actions">
+              <button
+                className="pf-modal-button primary"
+                onClick={handlePrimaryAction}
+              >
+                Produktseite ansehen
+              </button>
               {product.sku && (
-                <div className="modal-sku">
-                  <strong>SKU:</strong> {product.sku}
-                </div>
-              )}
-
-              {product.price && (
-                <div className="modal-price">
-                  {product.price.formatted}
-                </div>
-              )}
-
-              {product.category && product.category.length > 0 && (
-                <div className="modal-categories">
-                  <strong>Categories:</strong>
-                  <div className="modal-tags">
-                    {product.category.map(cat => (
-                      <span key={cat} className="modal-tag">{cat}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {product.season && (
-                <div className="modal-season">
-                  <strong>Season:</strong> {product.season}
-                </div>
-              )}
-
-              {product.specifications && (
-                <div className="modal-specs">
-                  <strong>Specifications:</strong>
-                  <ul>
-                    {product.specifications.weight && (
-                      <li>Weight: {product.specifications.weight}g</li>
-                    )}
-                    {product.specifications.dimensions && (
-                      <li>Dimensions: {product.specifications.dimensions}</li>
-                    )}
-                    {product.specifications.shell_material && (
-                      <li>Shell Material: {product.specifications.shell_material}</li>
-                    )}
-                    {product.specifications.liner_material && (
-                      <li>Liner Material: {product.specifications.liner_material}</li>
-                    )}
-                  </ul>
-                </div>
-              )}
-
-              {product.media && product.media.length > 1 && (
-                <div className="modal-gallery">
-                  <strong>Gallery:</strong>
-                  <div className="modal-thumbnails">
-                    {product.media.map((media, idx) => (
-                      <img 
-                        key={idx}
-                        src={media.src} 
-                        alt={media.alt || `${product.name} ${idx + 1}`}
-                        className="modal-thumbnail"
-                      />
-                    ))}
-                  </div>
-                </div>
+                <button
+                  className="pf-modal-button ghost"
+                  onClick={handleCopySku}
+                >
+                  {copied ? 'SKU kopiert ✓' : 'SKU kopieren'}
+                </button>
               )}
             </div>
           </div>
         </div>
       </div>
-    );
-  }
-}
+    </div>
+  );
+};
 
+export default ProductModal;

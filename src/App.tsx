@@ -2,10 +2,19 @@ import React from 'react';
 import './App.css';
 import type { Product } from './types/Product';
 import { ProductFinderController } from './controller/ProductFinderController';
-import { ProductModal } from './components/ProductModal';
+import ProductModal from './components/ProductModal';
 import { DeveloperOverlay, type DeveloperSettings } from './components/DeveloperOverlay';
 import type { SortMode } from './services/FilterService';
 import type { LayoutMode } from './services/LayoutService';
+import type { GroupDimension } from './services/PivotDrillDownService';
+
+const PIVOT_DIMENSION_LABELS: Record<GroupDimension, string> = {
+  'category': 'Category',
+  'subcategory': 'Subcategory',
+  'brand': 'Brand',
+  'season': 'Season',
+  'price-range': 'Price'
+};
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -28,6 +37,11 @@ type State = {
   layoutMode: LayoutMode;
   showOnlyFavorites: boolean;
   
+  // Pivot State
+  pivotDimension: GroupDimension;
+  pivotBreadcrumbs: string[];
+  pivotDimensions: GroupDimension[];
+  
   // Interaction State
   selectedProduct: Product | null;
   hoveredProduct: Product | null;
@@ -43,9 +57,9 @@ type State = {
 export default class App extends React.Component<{}, State> {
   private canvasRef = React.createRef<HTMLCanvasElement>();
   private controller = new ProductFinderController();
-  private fpsInterval: number | null = null;
-  private lastFrameTime = performance.now();
-  private frameCount = 0;
+  private fpsRaf: number | null = null;
+  private fpsLastSample = 0;
+  private fpsFrameCount = 0;
 
   state: State = {
     loading: true,
@@ -63,6 +77,10 @@ export default class App extends React.Component<{}, State> {
     layoutMode: 'pivot',
     showOnlyFavorites: false,
     
+    pivotDimension: 'category',
+    pivotBreadcrumbs: ['All'],
+    pivotDimensions: ['category', 'brand', 'season', 'price-range'],
+    
     selectedProduct: null,
     hoveredProduct: null,
     mousePos: null,
@@ -77,7 +95,7 @@ export default class App extends React.Component<{}, State> {
       },
       showDebugInfo: false,
       showBoundingBoxes: false,
-      animationSpeed: 0.4
+      animationDuration: 0.4
     },
     fps: 60,
     zoom: 1,
@@ -89,6 +107,12 @@ export default class App extends React.Component<{}, State> {
 
     // Initialize controller
     await this.controller.initialize(canvas);
+    this.controller.setAnimationDuration(this.state.devSettings.animationDuration);
+    this.controller.setPriceBucketConfig(
+      this.state.devSettings.priceBucketMode,
+      this.state.devSettings.priceBucketCount
+    );
+    this.syncPivotUI();
     
     // Listen to controller state changes
     this.controller.addListener(state => {
@@ -96,7 +120,7 @@ export default class App extends React.Component<{}, State> {
         loading: state.loading,
         error: state.error,
         filteredProducts: state.filteredProducts,
-      });
+      }, this.syncPivotUI);
     });
 
     // Setup event listeners
@@ -181,22 +205,37 @@ export default class App extends React.Component<{}, State> {
   private handleResize = () => {
     this.controller.handleResize();
   };
+  
+  private syncPivotUI = () => {
+    this.setState({
+      pivotBreadcrumbs: this.controller.getPivotBreadcrumbs(),
+      pivotDimension: this.controller.getPivotDimension(),
+      pivotDimensions: this.controller.getPivotDimensions(),
+    });
+  };
 
   private startFPSCounter = () => {
-    this.fpsInterval = window.setInterval(() => {
-      const now = performance.now();
-      const delta = now - this.lastFrameTime;
-      const fps = 1000 / delta;
-      const zoom = this.controller.getZoom();
-      this.setState({ fps, zoom });
-      this.lastFrameTime = now;
-    }, 500); // Update every 500ms
+    this.fpsLastSample = performance.now();
+    this.fpsFrameCount = 0;
+    const tick = (now: number) => {
+      this.fpsFrameCount += 1;
+      if (now - this.fpsLastSample >= 500) {
+        const elapsed = now - this.fpsLastSample;
+        const fps = (this.fpsFrameCount * 1000) / elapsed;
+        const zoom = this.controller.getZoom();
+        this.setState({ fps, zoom });
+        this.fpsFrameCount = 0;
+        this.fpsLastSample = now;
+      }
+      this.fpsRaf = requestAnimationFrame(tick);
+    };
+    this.fpsRaf = requestAnimationFrame(tick);
   };
 
   private stopFPSCounter = () => {
-    if (this.fpsInterval !== null) {
-      clearInterval(this.fpsInterval);
-      this.fpsInterval = null;
+    if (this.fpsRaf !== null) {
+      cancelAnimationFrame(this.fpsRaf);
+      this.fpsRaf = null;
     }
   };
 
@@ -204,6 +243,30 @@ export default class App extends React.Component<{}, State> {
     this.setState({ devSettings: newSettings });
     // Apply settings to controller/layout
     this.controller.updateGridConfig(newSettings.gridConfig);
+    this.controller.setAnimationDuration(newSettings.animationDuration);
+    this.controller.setPriceBucketConfig(newSettings.priceBucketMode, newSettings.priceBucketCount);
+  };
+
+  private handleBreadcrumbClick = (index: number) => {
+    const { pivotBreadcrumbs } = this.state;
+    if (index < 0 || index >= pivotBreadcrumbs.length) return;
+    if (index === pivotBreadcrumbs.length - 1) return; // current level
+    if (index === 0) {
+      this.controller.resetPivot();
+    } else {
+      const levelsToRemove = pivotBreadcrumbs.length - 1 - index;
+      for (let i = 0; i < levelsToRemove; i++) {
+        this.controller.drillUpPivot();
+      }
+    }
+    this.syncPivotUI();
+  };
+
+  private handleDimensionClick = (dimension: GroupDimension) => {
+    if (dimension === this.state.pivotDimension) return;
+    if (!this.controller.canUsePivotDimension(dimension)) return;
+    this.controller.setPivotDimension(dimension);
+    this.syncPivotUI();
   };
 
   private handleCanvasClick = (e: MouseEvent) => {
@@ -214,6 +277,14 @@ export default class App extends React.Component<{}, State> {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
+    // Check for group header click first (in pivot mode)
+    const groupHeaderClicked = this.controller.handleGroupHeaderClick(x, y);
+    if (groupHeaderClicked) {
+      this.syncPivotUI();
+      return;
+    }
+
+    // Otherwise check for product click
     const product = this.controller.hitTest(x, y);
     if (product) {
       this.setState({ selectedProduct: product });
@@ -295,14 +366,14 @@ export default class App extends React.Component<{}, State> {
 
   render() {
     const { loading, error, selectedProduct, hoveredProduct, mousePos } = this.state;
-    const { search, category, season, priceMin, priceMax, weightMin, weightMax, sortMode, layoutMode, showOnlyFavorites } = this.state;
+    const { search, category, season, priceMin, priceMax, weightMin, weightMax, sortMode, layoutMode, showOnlyFavorites, pivotDimension, pivotBreadcrumbs, pivotDimensions } = this.state;
 
     const cats = this.controller.getUniqueCategories();
     const seasons = this.controller.getUniqueSeasons();
 
     if (error) return <div className="container"><div className="error">{error}</div></div>;
 
-    return (
+  return (
       <div className="pf-root">
         <div className="pf-toolbar">
           <input placeholder="Search" value={search} onChange={e => this.setState({ search: e.target.value })} />
@@ -342,6 +413,53 @@ export default class App extends React.Component<{}, State> {
           >
             📚 Pivot
           </button>
+          
+          {layoutMode === 'pivot' && (
+            <>
+              <select 
+                value={pivotDimension}
+                onChange={(e) => {
+                  const dim = e.target.value as GroupDimension;
+                  this.controller.setPivotDimension(dim);
+                  this.syncPivotUI();
+                }}
+              >
+                <option value="category">By Category</option>
+                <option value="brand">By Brand</option>
+                <option value="season">By Season</option>
+                <option value="price-range">By Price</option>
+              </select>
+              <button
+                onClick={() => {
+                  this.controller.drillUpPivot();
+                  this.syncPivotUI();
+                }}
+                disabled={!this.controller.canDrillUpPivot()}
+              >
+                ← Back
+              </button>
+              
+              {pivotBreadcrumbs.length > 1 && (
+                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                  {pivotBreadcrumbs.map((crumb, i) => (
+                    <React.Fragment key={i}>
+                      {i > 0 && <span style={{ color: '#9ca3af' }}>›</span>}
+                      <button
+                        onClick={() => this.handleBreadcrumbClick(i)}
+                        disabled={i === pivotBreadcrumbs.length - 1}
+                        style={{ 
+                          fontWeight: i === pivotBreadcrumbs.length - 1 ? 'bold' : 'normal',
+                          padding: '4px 8px'
+                        }}
+                      >
+                        {crumb}
+                      </button>
+                    </React.Fragment>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
           <button 
             onClick={() => this.controller.setLayoutMode('grid')}
             style={{ fontWeight: layoutMode === 'grid' ? 'bold' : 'normal' }}
@@ -365,12 +483,45 @@ export default class App extends React.Component<{}, State> {
             style={{ fontWeight: layoutMode === 'large' ? 'bold' : 'normal' }}
           >
             🔭 Large
-          </button>
+        </button>
         </div>
         <div className="pf-stage">
           <canvas ref={this.canvasRef} className="pf-canvas" />
         </div>
-        
+
+        {layoutMode === 'pivot' && (
+          <div className="pf-pivot-footer">
+            <div className="pf-pivot-footrow" aria-label="Pivot navigation">
+              {pivotBreadcrumbs.map((crumb, i) => (
+                <React.Fragment key={`${crumb}-${i}`}>
+                  {i > 0 && <span className="pf-pivot-sep">›</span>}
+                  <button
+                    className={`pf-pivot-chip ${i === pivotBreadcrumbs.length - 1 ? 'active' : ''}`}
+                    onClick={() => this.handleBreadcrumbClick(i)}
+                    disabled={i === pivotBreadcrumbs.length - 1}
+                  >
+                    {crumb}
+                  </button>
+                </React.Fragment>
+              ))}
+              {pivotDimensions.length > 0 && <span className="pf-pivot-divider" />}
+              {pivotDimensions.map(dim => {
+                const enabled = this.controller.canUsePivotDimension(dim) || dim === pivotDimension;
+                return (
+                  <button
+                    key={dim}
+                    className={`pf-pivot-chip ${dim === pivotDimension ? 'active' : ''}`}
+                    onClick={() => enabled && this.handleDimensionClick(dim)}
+                    disabled={!enabled || dim === pivotDimension}
+                  >
+                    {PIVOT_DIMENSION_LABELS[dim] ?? dim}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <ProductModal 
           product={selectedProduct} 
           onClose={() => this.setState({ selectedProduct: null })} 
@@ -409,4 +560,3 @@ export default class App extends React.Component<{}, State> {
     );
   }
 }
-
