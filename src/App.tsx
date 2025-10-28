@@ -89,14 +89,14 @@ export default class App extends React.Component<{}, State> {
     
     devSettings: {
       gridConfig: {
-        spacing: 12,
-        margin: 20,
+        spacing: 1,
+        margin: 40,
         minCellSize: 120,
         maxCellSize: 250
       },
       showDebugInfo: false,
       showBoundingBoxes: false,
-      animationDuration: 0.4,
+      animationDuration: 1,
       priceBucketMode: 'static',
       priceBucketCount: 5
     },
@@ -256,6 +256,7 @@ export default class App extends React.Component<{}, State> {
     if (index === pivotBreadcrumbs.length - 1) return; // current level
     if (index === 0) {
       this.controller.resetPivot();
+      this.controller.setPivotDimension('category');
     } else {
       const levelsToRemove = pivotBreadcrumbs.length - 1 - index;
       for (let i = 0; i < levelsToRemove; i++) {

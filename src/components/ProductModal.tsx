@@ -52,14 +52,17 @@ export const ProductModal: React.FC<Props> = ({ product, onClose }) => {
     return media[selectedIndex] ?? getHeroMedia(media);
   }, [media, product, selectedIndex]);
 
+  const meta = product
+    ? ((product as unknown as { meta?: { description?: string; status?: string; product_url?: string } }).meta)
+    : undefined;
   const handlePrimaryAction = useCallback(() => {
-    const url = (product as any)?.meta?.product_url;
+    const url = meta?.product_url;
     if (url) {
       window.open(url, '_blank', 'noopener');
       return;
     }
     onClose();
-  }, [product, onClose]);
+  }, [meta?.product_url, onClose]);
 
   const handleCopySku = useCallback(() => {
     if (!product?.sku || !navigator.clipboard) return;
@@ -71,6 +74,8 @@ export const ProductModal: React.FC<Props> = ({ product, onClose }) => {
 
   if (!product) return null;
 
+  const description = meta?.description ?? (product.specifications as any)?.description;
+
   const categories = product.category ?? [];
   const priceText = product.price?.formatted;
   const seasonLabel =
@@ -80,6 +85,7 @@ export const ProductModal: React.FC<Props> = ({ product, onClose }) => {
     : categories[0] ?? 'Product Spotlight';
   const specs = [
     formatSpecValue('SKU', product.sku),
+    formatSpecValue('Status', meta?.status),
     formatSpecValue('Season', product.season),
     formatSpecValue('Weight', product.specifications?.weight ? `${product.specifications.weight} g` : undefined),
     formatSpecValue('Dimensions', product.specifications?.dimensions),
@@ -188,8 +194,8 @@ export const ProductModal: React.FC<Props> = ({ product, onClose }) => {
               </div>
             )}
 
-            {product.description && (
-              <p className="pf-modal-description">{product.description}</p>
+            {description && (
+              <p className="pf-modal-description">{description}</p>
             )}
 
             {product.media && product.media.length > 1 && (
