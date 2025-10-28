@@ -105,6 +105,7 @@ export class PivotDrillDownService {
   setGroupingDimension(dimension: GroupDimension): void {
     const index = this.getDimensionIndex(dimension);
     if (index === this.currentDimensionIndex || index < 0) return;
+    if (!this.canUseDimension(dimension)) return;
     this.currentDimensionIndex = index;
     this.currentDimension = this.hierarchy[this.currentDimensionIndex];
     if (this.currentDimension !== 'price-range') {
@@ -116,7 +117,12 @@ export class PivotDrillDownService {
    * Can we drill further into the hierarchy?
    */
   canDrillDown(): boolean {
-    return this.currentDimensionIndex < this.hierarchy.length - 1;
+    for (let i = this.currentDimensionIndex + 1; i < this.hierarchy.length; i++) {
+      const dim = this.hierarchy[i];
+      if (dim === 'subcategory' && !this.hasFilterFor('category')) continue;
+      return true;
+    }
+    return false;
   }
   
   /**
@@ -130,8 +136,12 @@ export class PivotDrillDownService {
    * Peek at the next dimension (if any)
    */
   getNextDimension(): GroupDimension | null {
-    if (!this.canDrillDown()) return null;
-    return this.hierarchy[this.currentDimensionIndex + 1];
+    for (let i = this.currentDimensionIndex + 1; i < this.hierarchy.length; i++) {
+      const dim = this.hierarchy[i];
+      if (dim === 'subcategory' && !this.hasFilterFor('category')) continue;
+      return dim;
+    }
+    return null;
   }
   
   /**

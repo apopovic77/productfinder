@@ -196,12 +196,22 @@
   line-height: 1.15;
   font-weight: 700;
   color: #f1f5ff;
+  letter-spacing: -0.015em;
+}
+
+.pf-modal-subtitle {
+  margin: 6px 0 0;
+  font-size: 1rem;
+  color: rgba(198, 204, 255, 0.7);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .pf-modal-pillrow {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  margin-top: 12px;
 }
 
 .pf-modal-pill {
@@ -248,6 +258,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  margin-top: 6px;
 }
 
 .pf-modal-chip {
@@ -306,6 +317,13 @@
   flex-wrap: wrap;
   gap: 12px;
   margin-top: 12px;
+}
+
+.pf-modal-description {
+  margin: 12px 0 0;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: rgba(219, 234, 254, 0.78);
 }
 
 .pf-modal-button {

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
 import type { Product, MediaItem } from '../types/Product';
 import './ProductModal.css';
 
@@ -74,6 +75,9 @@ export const ProductModal: React.FC<Props> = ({ product, onClose }) => {
   const priceText = product.price?.formatted;
   const seasonLabel =
     product.season ? `Season ${product.season}` : undefined;
+  const heroCallout = product.brand
+    ? `${product.brand.toUpperCase()} · ${categories[0] ?? 'Collection'}`
+    : categories[0] ?? 'Product Spotlight';
   const specs = [
     formatSpecValue('SKU', product.sku),
     formatSpecValue('Season', product.season),
@@ -84,8 +88,21 @@ export const ProductModal: React.FC<Props> = ({ product, onClose }) => {
   ].filter((item): item is { label: string; value: string } => item !== null);
 
   return (
-    <div className="pf-modal-backdrop" onClick={onClose}>
-      <div className="pf-modal-shell" onClick={e => e.stopPropagation()}>
+    <motion.div
+      className="pf-modal-backdrop"
+      onClick={onClose}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      <motion.div
+        className="pf-modal-shell"
+        onClick={e => e.stopPropagation()}
+        initial={{ opacity: 0, scale: 0.95, y: 24 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 16 }}
+        transition={{ duration: 0.35, ease: 'easeOut' }}
+      >
         <div className="pf-modal-ambient" />
         <button className="pf-modal-close" onClick={onClose} aria-label="Close">
           ×
@@ -131,6 +148,7 @@ export const ProductModal: React.FC<Props> = ({ product, onClose }) => {
             </div>
 
             <h2 className="pf-modal-title">{product.name}</h2>
+            <p className="pf-modal-subtitle">{heroCallout}</p>
 
             {priceText && (
               <div className="pf-modal-price-row">
@@ -140,6 +158,13 @@ export const ProductModal: React.FC<Props> = ({ product, onClose }) => {
                 )}
               </div>
             )}
+
+            <div className="pf-modal-pillrow">
+              <span className="pf-modal-pill">SPOTLIGHT PRODUCT</span>
+              {product.specifications?.shell_material && (
+                <span className="pf-modal-pill ghost">{product.specifications.shell_material}</span>
+              )}
+            </div>
 
             {(categories.length > 0 || seasonLabel) && (
               <div className="pf-modal-tags">
@@ -161,6 +186,10 @@ export const ProductModal: React.FC<Props> = ({ product, onClose }) => {
                   </div>
                 ))}
               </div>
+            )}
+
+            {product.description && (
+              <p className="pf-modal-description">{product.description}</p>
             )}
 
             {product.media && product.media.length > 1 && (
@@ -185,8 +214,8 @@ export const ProductModal: React.FC<Props> = ({ product, onClose }) => {
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 };
 

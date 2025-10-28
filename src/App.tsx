@@ -3,6 +3,7 @@ import './App.css';
 import type { Product } from './types/Product';
 import { ProductFinderController } from './controller/ProductFinderController';
 import ProductModal from './components/ProductModal';
+import { AnimatePresence } from 'framer-motion';
 import { DeveloperOverlay, type DeveloperSettings } from './components/DeveloperOverlay';
 import type { SortMode } from './services/FilterService';
 import type { LayoutMode } from './services/LayoutService';
@@ -79,7 +80,7 @@ export default class App extends React.Component<{}, State> {
     
     pivotDimension: 'category',
     pivotBreadcrumbs: ['All'],
-    pivotDimensions: ['category', 'brand', 'season', 'price-range'],
+    pivotDimensions: ['category', 'subcategory', 'brand', 'season', 'price-range'],
     
     selectedProduct: null,
     hoveredProduct: null,
@@ -95,7 +96,9 @@ export default class App extends React.Component<{}, State> {
       },
       showDebugInfo: false,
       showBoundingBoxes: false,
-      animationDuration: 0.4
+      animationDuration: 0.4,
+      priceBucketMode: 'static',
+      priceBucketCount: 5
     },
     fps: 60,
     zoom: 1,
@@ -425,6 +428,9 @@ export default class App extends React.Component<{}, State> {
                 }}
               >
                 <option value="category">By Category</option>
+                <option value="subcategory" disabled={!this.controller.canUsePivotDimension('subcategory')}>
+                  By Subcategory
+                </option>
                 <option value="brand">By Brand</option>
                 <option value="season">By Season</option>
                 <option value="price-range">By Price</option>
@@ -522,10 +528,15 @@ export default class App extends React.Component<{}, State> {
           </div>
         )}
 
-        <ProductModal 
-          product={selectedProduct} 
-          onClose={() => this.setState({ selectedProduct: null })} 
-        />
+        <AnimatePresence>
+          {selectedProduct && (
+            <ProductModal
+              key={selectedProduct.id}
+              product={selectedProduct}
+              onClose={() => this.setState({ selectedProduct: null })}
+            />
+          )}
+        </AnimatePresence>
         
         {hoveredProduct && mousePos && (
           <div 

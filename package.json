@@ -16,6 +16,7 @@
     "arkturian-oneal-sdk": "^1.0.0",
     "arkturian-typescript-utils": "^1.0.0",
     "axios": "^1.12.2",
+    "framer-motion": "^11.0.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "zustand": "^5.0.8"
