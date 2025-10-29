@@ -43,6 +43,13 @@ done
 
 cd "$REPO_ROOT"
 
+current_branch="$(git rev-parse --abbrev-ref HEAD)"
+if [[ "$current_branch" != "$DEV_BRANCH" ]]; then
+  printf '❌ release.sh must be executed while checked out on "%s".\n' "$DEV_BRANCH" >&2
+  printf '   Current branch: "%s". Please run `git checkout %s` and try again.\n' "$current_branch" "$DEV_BRANCH" >&2
+  exit 1
+fi
+
 # Auto-commit any uncommitted changes
 if [[ -n "$(git status --porcelain)" ]]; then
   printf '⚠️  Uncommitted changes detected. Auto-committing...\n'
