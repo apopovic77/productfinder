@@ -8,13 +8,16 @@ import { ShelfLayoutStrategy } from '../layout/ShelfLayoutStrategy';
 import { LayoutEngine } from '../layout/LayoutEngine';
 import { Vector2 } from 'arkturian-typescript-utils';
 import { PivotDrillDownService, type GroupDimension, type PriceBucketConfig, type PriceBucketMode } from './PivotDrillDownService';
+import { HeroLayouter } from '../layout/HeroLayouter';
+import type { PivotAnalysisResult, PivotDimensionDefinition } from './PivotDimensionAnalyzer';
 
 export type LayoutMode = 'grid' | 'masonry' | 'compact' | 'large' | 'pivot';
 
 export class LayoutService {
   private mode: LayoutMode = 'pivot'; // Start with pivot layout!
   private engine: LayoutEngine<Product>;
-  private layouter: SimpleLayouter<Product> | PivotLayouter<Product>;
+  private layouter: SimpleLayouter<Product> | PivotLayouter<Product> | HeroLayouter<Product>;
+  private heroLayouter: HeroLayouter<Product> | null = null;
   private access = new ProductLayoutAccessors();
   private scalePolicy = new WeightScalePolicy();
   
@@ -28,6 +31,7 @@ export class LayoutService {
   private dimensionOrders = new Map<GroupDimension, Map<string, number>>();
   private displayOrderIds: string[] = [];
   private nodeToGroup = new Map<string, string>();
+  private pivotModel: PivotAnalysisResult | null = null;
 
   constructor() {
     this.pivotConfig = this.createDefaultPivotConfig();
@@ -77,6 +81,24 @@ export class LayoutService {
       }
     };
   }
+
+  private createHeroLayouter(): HeroLayouter<Product> {
+    return new HeroLayouter<Product>({
+      spacing: Math.max(24, this.pivotConfig.itemGap ?? 12),
+      targetHeightRatio: 0.8,
+      minHeight: this.pivotConfig.minCellSize ?? 120,
+      horizontalPadding: this.pivotConfig.framePadding ?? 40,
+      onLayout: nodes => {
+        this.displayOrderIds = [];
+        this.nodeToGroup.clear();
+        for (const node of nodes) {
+          this.displayOrderIds.push(node.id);
+          const key = this.drillDownService.getGroupKey(node.data);
+          this.nodeToGroup.set(node.id, key);
+        }
+      }
+    });
+  }
   
   private updatePivotConfigFromGrid(gridConfig: { spacing: number; margin: number; minCellSize: number; maxCellSize: number }) {
     const padding = Math.max(0, Math.round(gridConfig.margin));
@@ -98,6 +120,7 @@ export class LayoutService {
     };
     
     this.layouter = new PivotLayouter<Product>(this.pivotConfig);
+    this.heroLayouter = null;
     this.engine.setLayouter(this.layouter);
     this.applyAnimationDuration();
     this.updatePivotGroups();
@@ -161,9 +184,18 @@ export class LayoutService {
     if (this.mode === mode) return;
     this.mode = mode;
     this.layouter = this.createLayouter(mode);
+    if (mode !== 'pivot') {
+      this.heroLayouter = null;
+    }
     // Update layouter on existing engine to preserve nodes!
     this.engine.setLayouter(this.layouter);
     this.applyAnimationDuration();
+  }
+
+  setPivotModel(model: PivotAnalysisResult | null): void {
+    this.pivotModel = model;
+    this.drillDownService.setModel(model);
+    this.pivotGroups = [];
   }
 
   getMode(): LayoutMode {
@@ -175,7 +207,22 @@ export class LayoutService {
   }
 
   layout(width: number, height: number): void {
-    if (this.mode === 'pivot' && this.layouter instanceof PivotLayouter) {
+    if (this.mode === 'pivot') {
+      const heroActive = this.drillDownService.isHeroModeActive();
+      if (heroActive) {
+        if (!(this.layouter instanceof HeroLayouter)) {
+          this.heroLayouter = this.createHeroLayouter();
+          this.layouter = this.heroLayouter;
+          this.engine.setLayouter(this.layouter);
+          this.applyAnimationDuration();
+        }
+      } else {
+        if (!(this.layouter instanceof PivotLayouter)) {
+          this.layouter = new PivotLayouter<Product>(this.pivotConfig);
+          this.engine.setLayouter(this.layouter);
+          this.applyAnimationDuration();
+        }
+      }
       this.displayOrderIds = [];
       this.nodeToGroup.clear();
     }
@@ -237,6 +284,10 @@ export class LayoutService {
   
   getPivotDimensions(): GroupDimension[] {
     return this.drillDownService.getHierarchy();
+  }
+
+  getPivotDimensionDefinitions(): PivotDimensionDefinition[] {
+    return this.pivotModel?.dimensions ?? [];
   }
   
   getAvailablePivotDimensions(): GroupDimension[] {
@@ -307,6 +358,10 @@ export class LayoutService {
   canDrillDownPivot(): boolean {
     return this.drillDownService.canDrillDown();
   }
+
+  isPivotHeroMode(): boolean {
+    return this.drillDownService.isHeroModeActive();
+  }
   
   /**
    * Get pivot groups (for rendering)
@@ -366,6 +421,14 @@ export class LayoutService {
   }
 
   private updateCanonicalOrders(source: Product[]): void {
+    if (!this.pivotModel) return;
+    const orderedDims = new Set(
+      this.pivotModel.dimensions
+        .filter(def => def.role === 'category' || def.role === 'class')
+        .map(def => def.key)
+    );
+    if (!orderedDims.size) return;
+
     const ensureOrder = (dimension: GroupDimension, key: string) => {
       if (!key) return;
       let map = this.dimensionOrders.get(dimension);
@@ -380,21 +443,9 @@ export class LayoutService {
     };
 
     for (const product of source) {
-      const categories = product.category ?? [];
-      const category = categories[0] ?? 'Uncategorized';
-      ensureOrder('category', category);
-      const metaSource = (product as any).meta?.source;
-      if (metaSource) {
-        ensureOrder('subcategory', String(metaSource).toUpperCase());
-      } else if (categories.length > 1) {
-        const sub = categories.slice(1).find(part => part !== category) ?? categories[1];
-        ensureOrder('subcategory', sub);
-      }
-      if (product.brand) {
-        ensureOrder('brand', product.brand);
-      }
-      if (product.season) {
-        ensureOrder('season', String(product.season));
+      for (const dimension of orderedDims) {
+        const value = this.drillDownService.resolveValue(product, dimension);
+        ensureOrder(dimension, value);
       }
     }
   }
@@ -418,6 +469,13 @@ export class LayoutService {
     
     if (this.mode === 'pivot') {
       this.updatePivotGroups();
+      // ensure display order matches current groups immediately
+      this.displayOrderIds = [];
+      this.nodeToGroup.clear();
+      for (const node of this.engine.all()) {
+        this.displayOrderIds.push(node.id);
+        this.nodeToGroup.set(node.id, this.drillDownService.getGroupKey(node.data));
+      }
     }
   }
   

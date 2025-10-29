@@ -1,10 +1,13 @@
 import type { Product } from '../types/Product';
 import { PivotGroup } from '../layout/PivotGroup';
+import type {
+  NumericBucket,
+  PivotAnalysisResult,
+  PivotDimensionDefinition,
+  PivotDimensionKind,
+} from './PivotDimensionAnalyzer';
 
-/**
- * Grouping dimension (what to group by)
- */
-export type GroupDimension = 'category' | 'subcategory' | 'brand' | 'season' | 'price-range';
+export type GroupDimension = string;
 
 export type PriceBucketMode = 'static' | 'equal-width' | 'quantile' | 'kmeans';
 
@@ -16,707 +19,382 @@ export type PriceBucketConfig = {
 type DrillDownFilter = {
   dimension: GroupDimension;
   value: string;
-  priceRange?: { min: number; max: number; inclusiveMax: boolean };
+  range?: { min: number; max: number; inclusiveMax: boolean };
 };
 
-type PriceBucket = {
-  label: string;
-  min: number;
-  max: number;
-  inclusiveMax: boolean;
-  hasPrice: boolean;
-  displayMax?: number;
+type NumericDimensionState = {
+  buckets: NumericBucket[];
+  bucketMap: Map<string, NumericBucket>;
+  unit?: string;
 };
 
-/**
- * Drill-down state (current filter path)
- */
 export type DrillDownState = {
   dimension: GroupDimension;
   filters: DrillDownFilter[];
 };
 
-const DIMENSION_HIERARCHY: GroupDimension[] = [
-  'category',
-  'subcategory',
-  'brand',
-  'season',
-  'price-range'
-];
+const UNKNOWN_LABEL = 'Unknown';
+const NONE_LABEL = 'None';
 
-const CATEGORY_UNKNOWN_LABEL = 'Uncategorized';
-const SUBCATEGORY_UNKNOWN_LABEL = 'Other';
+const DEFAULT_HERO_THRESHOLD = 10;
+const PRICE_REFINE_THRESHOLD = 8;
 
 /**
- * Service for managing pivot drill-down state and grouping logic
- * OOP design: Encapsulates all drill-down logic
+ * Service for managing pivot drill-down state using dynamically analysed dimensions.
  */
 export class PivotDrillDownService {
-  private readonly hierarchy = DIMENSION_HIERARCHY;
+  private analysis: PivotAnalysisResult | null = null;
+  private dimensions: PivotDimensionDefinition[] = [];
+  private dimensionByKey = new Map<GroupDimension, PivotDimensionDefinition>();
+  private hierarchy: GroupDimension[] = [];
+
   private filterStack: DrillDownFilter[] = [];
   private rootDimensionIndex = 0;
   private currentDimensionIndex = 0;
-private priceBucketMode: PriceBucketMode = 'static';
-private priceBucketCount = 5;
-private currentPriceBuckets: PriceBucket[] = [];
-private priceBucketMap = new Map<string, PriceBucket>();
-private currentCurrency: string | undefined;
-private dimensionOrder = new Map<GroupDimension, Map<string, number>>();
-  private readonly priceRefineThreshold = 8;
+  private currentDimensionKey: GroupDimension | null = null;
 
-  /**
-   * Current grouping dimension (derived from hierarchy + filter depth)
-   */
-  private currentDimension: GroupDimension = this.hierarchy[this.currentDimensionIndex];
-  
-  /**
-   * Get current grouping dimension
-   */
-  getDimension(): GroupDimension {
-    return this.currentDimension;
-  }
-  
-  /**
-   * Set grouping dimension (resets drill-down path)
-   */
-  setDimension(dimension: GroupDimension): void {
-    this.rootDimensionIndex = this.getDimensionIndex(dimension);
-    this.currentDimensionIndex = this.rootDimensionIndex;
-    this.currentDimension = this.hierarchy[this.currentDimensionIndex];
+  private priceBucketMode: PriceBucketMode = 'static';
+  private priceBucketCount = 5;
+  private numericStates = new Map<GroupDimension, NumericDimensionState>();
+  private dimensionOrder = new Map<GroupDimension, Map<string, number>>();
+
+  private heroThreshold = DEFAULT_HERO_THRESHOLD;
+  private heroModeActive = false;
+
+  setModel(analysis: PivotAnalysisResult | null): void {
+    this.analysis = analysis;
+    this.dimensions = analysis?.dimensions ?? [];
+    this.dimensionByKey.clear();
+    this.hierarchy = [];
+    for (const dimension of this.dimensions) {
+      this.dimensionByKey.set(dimension.key, dimension);
+      this.hierarchy.push(dimension.key);
+    }
     this.filterStack = [];
-    this.invalidatePriceBuckets();
+    this.numericStates.clear();
+    this.heroModeActive = false;
+
+    const preferred = this.dimensions.find(d => d.role === 'category') ?? this.dimensions[0];
+    if (preferred) {
+      const index = this.hierarchy.indexOf(preferred.key);
+      this.rootDimensionIndex = index >= 0 ? index : 0;
+      this.currentDimensionIndex = this.rootDimensionIndex;
+      this.currentDimensionKey = this.hierarchy[this.currentDimensionIndex] ?? null;
+    } else {
+      this.rootDimensionIndex = 0;
+      this.currentDimensionIndex = 0;
+      this.currentDimensionKey = null;
+    }
   }
-  
-  /**
-   * Get current filter stack (breadcrumb path)
-   */
-  getFilters(): DrillDownFilter[] {
-    return this.filterStack.map(f => ({
-      dimension: f.dimension,
-      value: f.value,
-      priceRange: f.priceRange ? { ...f.priceRange } : undefined
-    }));
+
+  setHeroThreshold(threshold: number): void {
+    this.heroThreshold = Math.max(1, Math.floor(threshold));
   }
-  
+
   setPriceBucketConfig({ mode, bucketCount }: PriceBucketConfig): void {
     this.priceBucketMode = mode;
     this.priceBucketCount = Math.max(1, bucketCount);
-    this.invalidatePriceBuckets();
+    this.numericStates.clear();
   }
 
   setDimensionOrder(dimension: GroupDimension, order: Map<string, number>): void {
     this.dimensionOrder.set(dimension, new Map(order));
   }
-  
-  setGroupingDimension(dimension: GroupDimension): void {
-    const index = this.getDimensionIndex(dimension);
-    if (index === this.currentDimensionIndex || index < 0) return;
-    if (!this.canUseDimension(dimension)) return;
+
+  setDimension(dimension: GroupDimension): void {
+    if (!this.hasDimension(dimension)) return;
+    const index = this.hierarchy.indexOf(dimension);
+    if (index === -1) return;
+    this.rootDimensionIndex = index;
     this.currentDimensionIndex = index;
-    this.currentDimension = this.hierarchy[this.currentDimensionIndex];
-    if (this.currentDimension !== 'price-range') {
-      this.invalidatePriceBuckets();
+    this.currentDimensionKey = dimension;
+    this.filterStack = [];
+    this.numericStates.clear();
+    this.heroModeActive = false;
+  }
+
+  setGroupingDimension(dimension: GroupDimension): void {
+    if (!this.hasDimension(dimension)) return;
+    if (!this.canUseDimension(dimension)) return;
+    const index = this.hierarchy.indexOf(dimension);
+    if (index === -1) return;
+    this.currentDimensionIndex = index;
+    this.currentDimensionKey = dimension;
+    if (!this.isNumericDimension(dimension)) {
+      this.numericStates.delete(dimension);
     }
   }
-  
-  /**
-   * Can we drill further into the hierarchy?
-   */
+
+  getDimension(): GroupDimension {
+    return this.currentDimensionKey ?? this.hierarchy[this.currentDimensionIndex] ?? this.hierarchy[0] ?? '';
+  }
+
+  getHierarchy(): GroupDimension[] {
+    return [...this.hierarchy];
+  }
+
+  getAvailableDimensions(products: Product[]): GroupDimension[] {
+    const filtered = this.filterProducts(products);
+    const dims: GroupDimension[] = [];
+    for (const key of this.hierarchy) {
+      if (!this.canUseDimension(key)) continue;
+      if (this.countDistinctValues(filtered, key) > 1) {
+        dims.push(key);
+      }
+    }
+    return dims;
+  }
+
+  getDimensionsByRole(role: PivotDimensionKind): PivotDimensionDefinition[] {
+    return this.dimensions.filter(d => d.role === role);
+  }
+
+  canUseDimension(dimension: GroupDimension): boolean {
+    const def = this.dimensionByKey.get(dimension);
+    if (!def) return false;
+    if (def.parentKey) {
+      return this.filterStack.some(f => f.dimension === def.parentKey);
+    }
+    return true;
+  }
+
   canDrillDown(): boolean {
-    for (let i = this.currentDimensionIndex + 1; i < this.hierarchy.length; i++) {
-      const dim = this.hierarchy[i];
-      if (dim === 'subcategory' && !this.hasFilterFor('category')) continue;
-      return true;
+    if (this.filterStack.length >= this.hierarchy.length) return false;
+    const index = this.currentDimensionIndex;
+    for (let i = index + 1; i < this.hierarchy.length; i++) {
+      const key = this.hierarchy[i];
+      if (!this.canUseDimension(key)) continue;
+      if (this.hasDimension(key)) return true;
     }
     return false;
   }
-  
-  /**
-   * Can we drill up to a previous level?
-   */
+
   canDrillUp(): boolean {
     return this.filterStack.length > 0;
   }
-  
-  /**
-   * Peek at the next dimension (if any)
-   */
-  getNextDimension(): GroupDimension | null {
-    for (let i = this.currentDimensionIndex + 1; i < this.hierarchy.length; i++) {
-      const dim = this.hierarchy[i];
-      if (dim === 'subcategory' && !this.hasFilterFor('category')) continue;
-      return dim;
-    }
-    return null;
-  }
-  
-  /**
-   * Drill down into the current group, advancing to the next dimension if possible
-   */
+
   drillDown(value: string): boolean {
+    const dimension = this.getDimension();
+    const def = this.dimensionByKey.get(dimension);
+    if (!def) return false;
     const trimmed = value?.trim();
     if (!trimmed) return false;
-    
-    const entry: DrillDownFilter = { dimension: this.currentDimension, value: trimmed };
-    if (this.currentDimension === 'price-range') {
-      const bucket = this.priceBucketMap.get(trimmed);
+
+    const entry: DrillDownFilter = { dimension, value: trimmed };
+    if (this.isNumericDimension(dimension)) {
+      const state = this.numericStates.get(dimension);
+      const bucket = state?.bucketMap.get(trimmed);
       if (bucket) {
-        entry.priceRange = { min: bucket.min, max: bucket.max, inclusiveMax: bucket.inclusiveMax };
+        entry.range = { min: bucket.min, max: bucket.max, inclusiveMax: bucket.inclusiveMax };
       }
     }
     this.filterStack.push(entry);
-    this.invalidatePriceBuckets();
-    
-    if (this.currentDimension === 'price-range') {
-      // Stay on price-range to allow further refinement; ensureMeaningfulDimension will advance if needed
-    } else if (this.currentDimensionIndex < this.hierarchy.length - 1) {
-      this.currentDimensionIndex += 1;
+    this.syncDimensionWithStack();
+    this.heroModeActive = false;
+    if (this.isNumericDimension(dimension)) {
+      this.numericStates.delete(dimension);
     }
-    
-    this.currentDimension = this.hierarchy[this.currentDimensionIndex];
     return true;
   }
-  
-  /**
-   * Drill up (remove last filter) and revert to the previous dimension
-   */
+
   drillUp(): boolean {
     if (!this.filterStack.length) return false;
-    
-    this.filterStack.pop();
+    const removed = this.filterStack.pop()!;
+    if (this.isNumericDimension(removed.dimension)) {
+      this.numericStates.delete(removed.dimension);
+    }
     this.syncDimensionWithStack();
-    this.invalidatePriceBuckets();
+    this.heroModeActive = false;
     return true;
   }
-  
-  /**
-   * Reset to the root level (clear all filters)
-   */
+
   reset(): void {
     this.filterStack = [];
     this.currentDimensionIndex = this.rootDimensionIndex;
-    this.currentDimension = this.hierarchy[this.currentDimensionIndex];
-    this.invalidatePriceBuckets();
+    this.currentDimensionKey = this.hierarchy[this.currentDimensionIndex] ?? null;
+    this.numericStates.clear();
+    this.heroModeActive = false;
   }
-  
-  /**
-   * Get filtered products based on current drill-down state
-   */
+
+  getFilters(): DrillDownFilter[] {
+    return this.filterStack.map(f => ({
+      dimension: f.dimension,
+      value: f.value,
+      range: f.range ? { ...f.range } : undefined,
+    }));
+  }
+
+  getBreadcrumbs(): string[] {
+    return ['All', ...this.filterStack.map(f => f.value)];
+  }
+
+  getState(): DrillDownState {
+    return {
+      dimension: this.hierarchy[this.rootDimensionIndex] ?? '',
+      filters: this.getFilters(),
+    };
+  }
+
+  setState(state: DrillDownState): void {
+    const idx = this.hierarchy.indexOf(state.dimension);
+    if (idx >= 0) {
+      this.rootDimensionIndex = idx;
+      this.currentDimensionIndex = idx;
+      this.currentDimensionKey = this.hierarchy[idx] ?? null;
+    }
+    this.filterStack = state.filters.map(f => ({
+      dimension: f.dimension,
+      value: f.value,
+      range: f.range ? { ...f.range } : undefined,
+    }));
+    this.numericStates.clear();
+    this.syncDimensionWithStack();
+  }
+
   filterProducts(products: Product[]): Product[] {
-    let filtered = [...products];
-    for (const filter of this.filterStack) {
-      filtered = filtered.filter(p => this.matchesFilter(p, filter));
-    }
-    return filtered;
+    if (!this.filterStack.length) return [...products];
+    return products.filter(product => {
+      for (const filter of this.filterStack) {
+        if (!this.matchesFilter(product, filter)) return false;
+      }
+      return true;
+    });
   }
 
-  private hasFilterFor(dimension: GroupDimension): boolean {
-    return this.filterStack.some(f => f.dimension === dimension);
-  }
-
-  private getCategoryParts(product: Product): string[] {
-    const parts = product.category;
-    if (Array.isArray(parts) && parts.length) return parts;
-    return [];
-  }
-  
-  private matchesFilter(product: Product, filter: DrillDownFilter): boolean {
-    switch (filter.dimension) {
-      case 'price-range': {
-        const price = product.price?.value;
-        if (price === undefined || price === null) return false;
-        if (filter.priceRange) {
-          const { min, max, inclusiveMax } = filter.priceRange;
-          const upperOk = max === Infinity ? true : inclusiveMax ? price <= max : price < max;
-          return price >= min && upperOk;
-        }
-        return this.getDimensionValue(product, 'price-range') === filter.value;
-      }
-      case 'subcategory': {
-        const subValue = this.getDimensionValue(product, 'subcategory');
-        return subValue === filter.value;
-      }
-      default:
-        return this.getDimensionValue(product, filter.dimension) === filter.value;
-    }
-  }
-  
-  /**
-   * Group products by current dimension
-   * IMPORTANT: Groups FILTERED products (after drill-down)
-  */
   groupProducts(products: Product[]): Map<string, Product[]> {
+    if (!products.length) {
+      this.heroModeActive = false;
+      return new Map();
+    }
+
     const filtered = this.filterProducts(products);
-    if (filtered.length === 0) {
-      this.invalidatePriceBuckets();
+    this.heroModeActive = filtered.length > 0 && filtered.length <= this.heroThreshold;
+
+    if (!filtered.length) {
+      this.numericStates.clear();
       return new Map();
     }
 
     this.ensureMeaningfulDimension(filtered);
 
-    if (this.currentDimension === 'price-range') {
-      this.recomputePriceBuckets(filtered);
-    } else {
-      this.currentPriceBuckets = [];
-      this.priceBucketMap.clear();
+    const dimension = this.getDimension();
+    if (this.isNumericDimension(dimension)) {
+      this.recomputeNumericBuckets(filtered, dimension);
     }
-    let groups = new Map<string, Product[]>();
 
+    const groups = new Map<string, Product[]>();
     for (const product of filtered) {
-      const key = this.getDimensionValue(product, this.currentDimension);
-      if (!groups.has(key)) {
-        groups.set(key, []);
-      }
+      const key = this.getDimensionValue(product, dimension);
+      if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(product);
     }
-
-    const order = this.dimensionOrder.get(this.currentDimension);
-    if (order) {
-      const orderedKeys = Array.from(groups.keys()).sort((a, b) => {
-        const idxA = order.get(a) ?? Number.MAX_SAFE_INTEGER;
-        const idxB = order.get(b) ?? Number.MAX_SAFE_INTEGER;
-        return idxA - idxB || a.localeCompare(b);
-      });
-      const ordered = new Map<string, Product[]>();
-      for (const key of orderedKeys) {
-        ordered.set(key, groups.get(key)!);
-      }
-      groups = ordered;
-    }
-
-    return groups;
+    return this.sortGroups(groups, dimension);
   }
-  
-  /**
-  * Resolve the current grouping key for a product (used by the layouter)
-  */
-  getGroupKey(product: Product): string {
-    return this.getDimensionValue(product, this.currentDimension);
-  }
-  
-  /**
-   * Create PivotGroup hierarchy from products
-   */
+
   createGroups(products: Product[]): PivotGroup[] {
-    const groups = this.groupProducts(products);
-    const result: PivotGroup[] = [];
-    const sortedKeys = this.sortKeysForDimension(Array.from(groups.keys()), this.currentDimension);
+    const grouped = this.groupProducts(products);
+    const dimension = this.getDimension();
+    const def = this.dimensionByKey.get(dimension);
+    const label = def?.label ?? dimension;
 
-    for (const key of sortedKeys) {
+    const keys = Array.from(grouped.keys());
+    const result: PivotGroup[] = [];
+    for (const key of keys) {
       result.push(new PivotGroup(
         key,
-        this.formatGroupLabel(key, this.currentDimension),
+        this.formatGroupLabel(key, label),
         this.filterStack.length
       ));
     }
-    
     return result;
   }
-  
-  /**
-   * Get breadcrumb path for UI
-   */
-  getBreadcrumbs(): string[] {
-    return ['All', ...this.filterStack.map(filter => filter.value)];
-  }
-  
-  /**
-   * Get current state
-   */
-  getState(): DrillDownState {
-    return {
-      dimension: this.hierarchy[this.rootDimensionIndex],
-      filters: this.getFilters()
-    };
-  }
-  
-  /**
-   * Restore state
-   */
-  setState(state: DrillDownState): void {
-    this.rootDimensionIndex = this.getDimensionIndex(state.dimension);
-    this.filterStack = state.filters.map(f => ({
-      dimension: f.dimension,
-      value: f.value,
-      priceRange: f.priceRange ? { ...f.priceRange } : undefined
-    }));
-    this.syncDimensionWithStack();
-    this.invalidatePriceBuckets();
-  }
-  
-  /**
-   * Extract value from product for a given dimension
-   */
-  private getDimensionValue(product: Product, dimension: GroupDimension): string {
-    switch (dimension) {
-      case 'category':
-        return this.getCategoryParts(product)[0] || CATEGORY_UNKNOWN_LABEL;
-      case 'subcategory': {
-        const metaSource = (product as any).meta?.source;
-        if (typeof metaSource === 'string' && metaSource.length) {
-          return metaSource.toUpperCase();
-        }
-        const parts = this.getCategoryParts(product);
-        const top = parts[0];
-        const remainder = parts.filter(part => part !== top);
-        if (remainder.length === 0) {
-          return SUBCATEGORY_UNKNOWN_LABEL;
-        }
-        return remainder[0];
-      }
-      
-      case 'brand':
-        return product.brand || 'Unknown';
-      
-      case 'season':
-        return product.season ? `${product.season}` : 'No Season';
-      
-      case 'price-range': {
-        const price = product.price?.value;
-        if (price === undefined || price === null || !isFinite(price)) {
-          return 'No Price';
-        }
-        const bucket = this.findPriceBucket(price);
-        return bucket?.label ?? this.formatPriceRange(price, undefined, true, this.currentCurrency);
-      }
-    }
-  }
-  
-  private findPriceBucket(value: number): PriceBucket | undefined {
-    for (const bucket of this.currentPriceBuckets) {
-      if (!bucket.hasPrice) continue;
-      const upperOk = bucket.max === Infinity
-        ? true
-        : bucket.inclusiveMax ? value <= bucket.max : value < bucket.max;
-      if (value >= bucket.min && upperOk) {
-        return bucket;
-      }
-    }
-    return undefined;
-  }
-  
-  private recomputePriceBuckets(products: Product[]): void {
-    const { buckets, currency } = this.buildPriceBuckets(products);
-    this.currentPriceBuckets = buckets;
-    this.priceBucketMap.clear();
-    const order = new Map<string, number>();
-    let orderIndex = 0;
-    for (const bucket of buckets) {
-      if (bucket.hasPrice) {
-        this.priceBucketMap.set(bucket.label, bucket);
-        order.set(bucket.label, orderIndex++);
-      }
-    }
-    if (order.size) {
-      this.setDimensionOrder('price-range', order);
-    }
-    this.currentCurrency = currency;
-  }
-  
-  private buildPriceBuckets(products: Product[]): { buckets: PriceBucket[]; currency?: string } {
-    const buckets: PriceBucket[] = [];
-    const numericPrices: number[] = [];
-    let currency: string | undefined;
-    let hasNoPrice = false;
-    
-    for (const product of products) {
-      const value = product.price?.value;
-      if (value === undefined || value === null || !isFinite(value)) {
-        hasNoPrice = true;
-        continue;
-      }
-      numericPrices.push(value);
-      if (!currency && product.price?.currency) {
-        currency = product.price.currency;
-      }
-    }
-    
-    if (numericPrices.length === 0) {
-      if (hasNoPrice) {
-        buckets.push(this.createNoPriceBucket());
-      }
-      return { buckets, currency };
-    }
-    
-    let priceBuckets = this.computePriceBuckets(numericPrices, currency);
 
-    if (this.hasFilterFor('price-range') && numericPrices.length > this.priceRefineThreshold) {
-      const desired = Math.min(
-        Math.max(2, Math.ceil(numericPrices.length / this.priceRefineThreshold)),
-        this.priceBucketCount * 2
-      );
-      priceBuckets = this.computePriceBuckets(numericPrices, currency, desired);
-    }
-    buckets.push(...priceBuckets);
-    if (hasNoPrice) {
-      buckets.push(this.createNoPriceBucket());
-    }
-    return { buckets, currency };
+  getGroupKey(product: Product): string {
+    const dimension = this.getDimension();
+    return this.getDimensionValue(product, dimension);
   }
-  
-  private computePriceBuckets(values: number[], currency?: string, desiredCount?: number): PriceBucket[] {
-    const uniqueCount = new Set(values).size;
-    const target = Math.max(1, Math.min(desiredCount ?? this.priceBucketCount, uniqueCount));
-    const mode = this.priceBucketMode === 'static' && desiredCount && desiredCount > this.priceBucketCount
-      ? 'equal-width'
-      : this.priceBucketMode;
-    switch (mode) {
-      case 'equal-width':
-        return this.computeEqualWidthBuckets(values, target, currency);
-      case 'quantile':
-        return this.computeQuantileBuckets(values, target, currency);
-      case 'kmeans':
-        return this.computeKMeansBuckets(values, target, currency);
-      case 'static':
-      default:
-        return this.computeStaticBuckets(currency);
-    }
+
+  isHeroModeActive(): boolean {
+    return this.heroModeActive;
   }
-  
-  private computeStaticBuckets(currency?: string): PriceBucket[] {
-    const thresholds = [50, 100, 200, 500];
-    const buckets: PriceBucket[] = [];
-    let lower = 0;
-    for (const threshold of thresholds) {
-      buckets.push(this.createBucket(lower, threshold, false, currency, threshold));
-      lower = threshold;
-    }
-    buckets.push(this.createBucket(lower, Infinity, true, currency));
-    return buckets;
+
+  private hasDimension(key: GroupDimension): boolean {
+    return this.dimensionByKey.has(key);
   }
-  
-  private computeEqualWidthBuckets(values: number[], bucketCount: number, currency?: string): PriceBucket[] {
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    if (bucketCount <= 1 || min === max) {
-      return [this.createBucket(min, Infinity, true, currency, max)];
-    }
-    const buckets: PriceBucket[] = [];
-    const step = (max - min) / bucketCount;
-    let lower = min;
-    for (let i = 0; i < bucketCount; i++) {
-      const upper = i === bucketCount - 1 ? Infinity : lower + step;
-      const inclusive = i === bucketCount - 1;
-      const displayMax = inclusive ? max : upper;
-      buckets.push(this.createBucket(lower, upper, inclusive, currency, displayMax));
-      lower = upper;
-    }
-    return buckets;
+
+  private isNumericDimension(dimension: GroupDimension): boolean {
+    const def = this.dimensionByKey.get(dimension);
+    return !!def && (def.type === 'number' || !!def.numeric);
   }
-  
-  private computeQuantileBuckets(values: number[], bucketCount: number, currency?: string): PriceBucket[] {
-    const sorted = [...values].sort((a, b) => a - b);
-    if (bucketCount <= 1) {
-      return [this.createBucket(sorted[0], Infinity, true, currency, sorted[sorted.length - 1])];
+
+  private matchesFilter(product: Product, filter: DrillDownFilter): boolean {
+    const def = this.dimensionByKey.get(filter.dimension);
+    if (!def) return true;
+
+    if (filter.range) {
+      const numeric = this.extractNumericValue(product, def);
+      if (numeric === undefined || numeric === null) return false;
+      const upperOk = filter.range.max === Infinity
+        ? true
+        : filter.range.inclusiveMax
+          ? numeric <= filter.range.max
+          : numeric < filter.range.max;
+      return numeric >= filter.range.min && upperOk;
     }
-    
-    const buckets: PriceBucket[] = [];
-    let startIndex = 0;
-    const length = sorted.length;
-    
-    for (let i = 0; i < bucketCount; i++) {
-      const targetEnd = i === bucketCount - 1
-        ? length - 1
-        : Math.floor((length * (i + 1)) / bucketCount) - 1;
-      let endIndex = Math.max(startIndex, targetEnd);
-      const endValue = sorted[endIndex];
-      
-      if (i < bucketCount - 1) {
-        while (endIndex + 1 < length && sorted[endIndex + 1] === endValue) {
-          endIndex++;
-        }
-      } else {
-        endIndex = length - 1;
-      }
-      
-      const lower = sorted[startIndex];
-      const nextStart = endIndex + 1 < length ? sorted[endIndex + 1] : sorted[length - 1];
-      const upper = i === bucketCount - 1 ? Infinity : nextStart;
-      const inclusive = i === bucketCount - 1;
-      const displayMax = inclusive ? sorted[endIndex] : sorted[endIndex];
-      buckets.push(this.createBucket(lower, upper, inclusive, currency, displayMax));
-      startIndex = endIndex + 1;
-      if (startIndex >= length) break;
-    }
-    
-    return buckets;
+
+    const value = this.getDimensionValue(product, filter.dimension);
+    return value === filter.value;
   }
-  
-  private computeKMeansBuckets(values: number[], bucketCount: number, currency?: string): PriceBucket[] {
-    const sorted = [...values].sort((a, b) => a - b);
-    if (bucketCount <= 1) {
-      return [this.createBucket(sorted[0], Infinity, true, currency, sorted[sorted.length - 1])];
-    }
-    
-    let k = bucketCount;
-    let centers = Array.from({ length: k }, (_, i) => sorted[Math.floor((sorted.length - 1) * (i + 0.5) / k)]);
-    let assignments = new Array(sorted.length).fill(0);
-    
-    for (let iteration = 0; iteration < 30; iteration++) {
-      let changed = false;
-      
-      for (let idx = 0; idx < sorted.length; idx++) {
-        const value = sorted[idx];
-        let bestCluster = 0;
-        let bestDistance = Math.abs(value - centers[0]);
-        for (let c = 1; c < centers.length; c++) {
-          const distance = Math.abs(value - centers[c]);
-          if (distance < bestDistance) {
-            bestDistance = distance;
-            bestCluster = c;
-          }
-        }
-        if (assignments[idx] !== bestCluster) {
-          assignments[idx] = bestCluster;
-          changed = true;
-        }
-      }
-      
-      const sums = new Array(centers.length).fill(0);
-      const counts = new Array(centers.length).fill(0);
-      for (let idx = 0; idx < sorted.length; idx++) {
-        const cluster = assignments[idx];
-        sums[cluster] += sorted[idx];
-        counts[cluster] += 1;
-      }
-      
-      const newCenters: number[] = [];
-      const clusterIndexMap = new Map<number, number>();
-      for (let c = 0; c < centers.length; c++) {
-        if (counts[c] > 0) {
-          newCenters.push(sums[c] / counts[c]);
-          clusterIndexMap.set(c, newCenters.length - 1);
-        }
-      }
-      
-      if (newCenters.length === centers.length && !changed) {
-        centers = newCenters;
-        break;
-      }
-      
-      centers = newCenters;
-      assignments = assignments.map(cluster => clusterIndexMap.get(cluster) ?? 0);
-      k = centers.length;
-      if (k === 0) {
-        centers = [sorted.reduce((acc, v) => acc + v, 0) / sorted.length];
-        assignments = new Array(sorted.length).fill(0);
-        k = 1;
-        break;
-      }
-    }
-    
-    const clusters: number[][] = Array.from({ length: k }, () => []);
-    for (let idx = 0; idx < sorted.length; idx++) {
-      clusters[assignments[idx]].push(sorted[idx]);
-    }
-    const populated = clusters.filter(cluster => cluster.length > 0).sort((a, b) => a[0] - b[0]);
-    return this.buildBucketsFromClusters(populated, currency);
-  }
-  
-  private buildBucketsFromClusters(clusters: number[][], currency?: string): PriceBucket[] {
-    const buckets: PriceBucket[] = [];
-    for (let i = 0; i < clusters.length; i++) {
-      const values = clusters[i].sort((a, b) => a - b);
-      const lower = values[0];
-      const maxValue = values[values.length - 1];
-      const nextMin = i < clusters.length - 1 ? clusters[i + 1][0] : maxValue;
-      const upper = i === clusters.length - 1 ? Infinity : (maxValue + nextMin) / 2;
-      const inclusive = i === clusters.length - 1;
-      const displayMax = inclusive ? maxValue : maxValue;
-      buckets.push(this.createBucket(lower, upper, inclusive, currency, displayMax));
-    }
-    return buckets;
-  }
-  
-  private createBucket(min: number, max: number, inclusive: boolean, currency?: string, displayMax?: number): PriceBucket {
-    const label = this.formatPriceRange(min, displayMax ?? (inclusive || max === Infinity ? max : max), inclusive || max === Infinity, currency);
-    return {
-      label,
-      min,
-      max,
-      inclusiveMax: inclusive || max === Infinity,
-      hasPrice: true,
-      displayMax: displayMax
-    };
-  }
-  
-  private createNoPriceBucket(): PriceBucket {
-    return {
-      label: 'No Price',
-      min: 0,
-      max: 0,
-      inclusiveMax: true,
-      hasPrice: false
-    };
-  }
-  
-  private formatPriceRange(min: number, displayMax: number | undefined, inclusive: boolean, currency?: string): string {
-    const format = this.formatPrice.bind(this, currency);
-    const minText = format(min);
-    
-    if (displayMax === undefined || displayMax === Infinity) {
-      return `${minText}+`;
-    }
-    
-    if (Math.abs(displayMax - min) < 0.01) {
-      return minText;
-    }
-    
-    const maxText = format(displayMax);
-    if (inclusive) {
-      return `${minText} - ${maxText}`;
-    }
-    return `${minText} - <${maxText}`;
-  }
-  
-  private formatPrice(currency: string | undefined, value: number): string {
-    if (!isFinite(value)) {
-      return '∞';
-    }
-    if (currency) {
-      return new Intl.NumberFormat(undefined, {
-        style: 'currency',
-        currency,
-        maximumFractionDigits: value >= 100 ? 0 : 2
-      }).format(value);
-    }
-    const rounded = value >= 100 ? Math.round(value) : Math.round(value * 100) / 100;
-    return `€${rounded}`;
-  }
-  
-  private invalidatePriceBuckets(): void {
-    this.currentPriceBuckets = [];
-    this.priceBucketMap.clear();
-    this.currentCurrency = undefined;
-  }
-  
+
   private ensureMeaningfulDimension(products: Product[]): void {
     if (!products.length) return;
     let index = this.currentDimensionIndex;
-    while (index < this.hierarchy.length - 1) {
-      const dimension = this.hierarchy[index];
-      if (dimension === 'subcategory' && !this.hasFilterFor('category')) {
+    while (index < this.hierarchy.length) {
+      const key = this.hierarchy[index];
+      if (!this.canUseDimension(key)) {
         index++;
         continue;
       }
-      const distinct = this.countDistinctValues(products, dimension);
+      const distinct = this.countDistinctValues(products, key);
       if (distinct > 1) break;
       index++;
     }
+    if (index >= this.hierarchy.length) {
+      index = this.currentDimensionIndex;
+    }
     if (index !== this.currentDimensionIndex) {
       this.currentDimensionIndex = index;
-      this.currentDimension = this.hierarchy[index];
-      if (this.currentDimension !== 'price-range') {
-        this.invalidatePriceBuckets();
+      this.currentDimensionKey = this.hierarchy[index] ?? null;
+      if (this.currentDimensionKey && !this.isNumericDimension(this.currentDimensionKey)) {
+        this.numericStates.delete(this.currentDimensionKey);
       }
     }
   }
-  
+
+  private syncDimensionWithStack(): void {
+    if (!this.filterStack.length) {
+      this.currentDimensionIndex = this.rootDimensionIndex;
+    } else {
+      const last = this.filterStack[this.filterStack.length - 1];
+      const lastIndex = this.hierarchy.indexOf(last.dimension);
+      this.currentDimensionIndex = Math.min(
+        lastIndex >= 0 ? lastIndex + 1 : this.rootDimensionIndex,
+        this.hierarchy.length - 1
+      );
+    }
+    this.currentDimensionKey = this.hierarchy[this.currentDimensionIndex] ?? null;
+  }
+
   private countDistinctValues(products: Product[], dimension: GroupDimension): number {
-    if (!products.length) return 0;
-    if (dimension === 'price-range') {
-      const { buckets } = this.buildPriceBuckets(products);
-      return buckets.length;
+    const def = this.dimensionByKey.get(dimension);
+    if (!def) return 0;
+    if (this.isNumericDimension(dimension)) {
+      const numeric = products
+        .map(p => this.extractNumericValue(p, def))
+        .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+      if (!numeric.length) return 0;
+      const buckets = this.buildNumericBuckets(numeric, def);
+      return buckets.length || new Set(numeric).size;
     }
     const values = new Set<string>();
     for (const product of products) {
@@ -724,88 +402,397 @@ private dimensionOrder = new Map<GroupDimension, Map<string, number>>();
     }
     return values.size;
   }
-  
-  /**
-   * Format group label for display
-   */
-  private formatGroupLabel(key: string, dimension: GroupDimension): string {
-    switch (dimension) {
-      case 'season':
-        return `Season ${key}`;
-      case 'price-range':
-        return key;
+
+  private getDimensionValue(product: Product, dimension: GroupDimension): string {
+    const def = this.dimensionByKey.get(dimension);
+    if (!def) return UNKNOWN_LABEL;
+    if (this.isNumericDimension(dimension)) {
+      const numeric = this.extractNumericValue(product, def);
+      if (numeric === undefined || numeric === null || !Number.isFinite(numeric)) {
+        return NONE_LABEL;
+      }
+      const bucket = this.findBucket(dimension, numeric);
+      if (bucket) return bucket.label;
+      return this.formatNumeric(numeric, def.numeric?.unit);
+    }
+    const raw = this.extractRawValue(product, def);
+    if (raw === undefined || raw === null || raw === '') {
+      return UNKNOWN_LABEL;
+    }
+    return String(raw);
+  }
+
+  private extractRawValue(product: Product, def: PivotDimensionDefinition): unknown {
+    switch (def.source.type) {
+      case 'category': {
+        const list = Array.isArray(product.category) ? product.category.filter(Boolean) : [];
+        if (!list.length) return null;
+        const requestedLevel = def.source.level;
+        if (requestedLevel === 0) {
+          return list[0];
+        }
+
+        const topCategories = this.dimensionOrder.get('category:0');
+        const disallowed = new Set<string>();
+        disallowed.add(list[0]);
+        for (const filter of this.filterStack) {
+          const filterDef = this.dimensionByKey.get(filter.dimension);
+          if (filterDef?.source.type === 'category') {
+            disallowed.add(filter.value);
+          }
+        }
+
+        for (let i = requestedLevel; i < list.length; i++) {
+          const candidate = list[i];
+          if (!candidate) continue;
+          if (disallowed.has(candidate)) continue;
+          if (topCategories?.has(candidate)) continue;
+          return candidate;
+        }
+
+        return null;
+      }
+      case 'attribute': {
+        const attr = product.getAttributeValue(def.source.key);
+        if (attr !== undefined) return attr;
+        return product.attributes?.[def.source.key]?.value ?? null;
+      }
+      case 'property': {
+        const key = def.source.key;
+        if (key === 'brand') return product.brand ?? null;
+        if (key === 'season') return product.season ?? null;
+        if (key === 'price') return product.price?.value ?? null;
+        if (key === 'weight') return product.weight ?? null;
+        if ((product as any)[key] !== undefined) return (product as any)[key];
+        if (product.meta && (product.meta as any)[key] !== undefined) {
+          return (product.meta as any)[key];
+        }
+        return product.getAttributeValue(key);
+      }
       default:
-        return key;
+        return null;
     }
   }
-  
-  private sortKeysForDimension(keys: string[], dimension: GroupDimension): string[] {
-    if (dimension === 'price-range') {
-      return keys.sort((a, b) => {
-        const bucketA = this.priceBucketMap.get(a);
-        const bucketB = this.priceBucketMap.get(b);
-        if (bucketA && bucketB) {
-          if (bucketA.min !== bucketB.min) return bucketA.min - bucketB.min;
-          if (bucketA.max !== bucketB.max) return bucketA.max - bucketB.max;
-        } else if (bucketA) {
-          return -1;
-        } else if (bucketB) {
-          return 1;
-        }
-        return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
-      });
+
+  private extractNumericValue(product: Product, def: PivotDimensionDefinition): number | undefined {
+    const raw = this.extractRawValue(product, def);
+    if (typeof raw === 'number') return raw;
+    if (typeof raw === 'string') {
+      const parsed = Number(raw.replace(/[^\d.-]/g, ''));
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    const attr = product.attributes?.[def.source.type === 'attribute' ? def.source.key : ''];
+    if (attr && typeof attr.normalizedValue === 'number') return attr.normalizedValue;
+    return undefined;
+  }
+
+  private formatNumeric(value: number, unit?: string): string {
+    if (!Number.isFinite(value)) return NONE_LABEL;
+    const abs = Math.abs(value);
+    let formatted: string;
+    if (abs >= 1000) formatted = value.toFixed(0);
+    else if (abs >= 100) formatted = value.toFixed(1);
+    else formatted = value.toFixed(2);
+    return unit ? `${formatted} ${unit}` : formatted;
+  }
+
+  private formatGroupLabel(value: string, dimensionLabel: string): string {
+    if (value === UNKNOWN_LABEL) return `${dimensionLabel}: ${UNKNOWN_LABEL}`;
+    if (value === NONE_LABEL) return `${dimensionLabel}: ${NONE_LABEL}`;
+    return value;
+  }
+
+  private sortGroups(groups: Map<string, Product[]>, dimension: GroupDimension): Map<string, Product[]> {
+    const keys = Array.from(groups.keys());
+    const def = this.dimensionByKey.get(dimension);
+    if (this.isNumericDimension(dimension)) {
+      const state = this.numericStates.get(dimension);
+      return new Map(
+        keys
+          .sort((a, b) => {
+            const bucketA = state?.bucketMap.get(a);
+            const bucketB = state?.bucketMap.get(b);
+            if (bucketA && bucketB) {
+              if (bucketA.min !== bucketB.min) return bucketA.min - bucketB.min;
+              if (bucketA.max !== bucketB.max) return bucketA.max - bucketB.max;
+            }
+            return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+          })
+          .map(key => [key, groups.get(key)!] as [string, Product[]])
+      );
     }
     const order = this.dimensionOrder.get(dimension);
-    if (!order) {
-      return keys.sort((a, b) => a.localeCompare(b));
+    if (order) {
+      return new Map(
+        keys
+          .sort((a, b) => {
+            const idxA = order.get(a) ?? Number.MAX_SAFE_INTEGER;
+            const idxB = order.get(b) ?? Number.MAX_SAFE_INTEGER;
+            if (idxA !== idxB) return idxA - idxB;
+            return a.localeCompare(b);
+          })
+          .map(key => [key, groups.get(key)!] as [string, Product[]])
+      );
     }
-    return keys.sort((a, b) => {
-      const idxA = order.get(a) ?? Number.MAX_SAFE_INTEGER;
-      const idxB = order.get(b) ?? Number.MAX_SAFE_INTEGER;
-      if (idxA !== idxB) return idxA - idxB;
-      return a.localeCompare(b);
+    if (def?.role === 'category' || def?.role === 'class') {
+      return new Map(keys.sort().map(key => [key, groups.get(key)!] as [string, Product[]]));
+    }
+    return new Map(
+      keys
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+        .map(key => [key, groups.get(key)!] as [string, Product[]])
+    );
+  }
+
+  private recomputeNumericBuckets(products: Product[], dimension: GroupDimension): void {
+    const def = this.dimensionByKey.get(dimension);
+    if (!def) return;
+
+    const values = products
+      .map(p => this.extractNumericValue(p, def))
+      .filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+
+    if (!values.length) {
+      this.numericStates.delete(dimension);
+      return;
+    }
+
+    let bucketCount = this.priceBucketCount;
+    if (values.length > PRICE_REFINE_THRESHOLD && this.hasFilterFor(dimension)) {
+      bucketCount = Math.min(this.priceBucketCount * 2, Math.max(2, Math.ceil(values.length / PRICE_REFINE_THRESHOLD)));
+    }
+
+    const buckets = this.buildNumericBuckets(values, def, bucketCount);
+    const bucketMap = new Map<string, NumericBucket>();
+    buckets.forEach(bucket => bucketMap.set(bucket.label, bucket));
+    this.numericStates.set(dimension, {
+      buckets,
+      bucketMap,
+      unit: def.numeric?.unit,
     });
   }
-  
-  /**
-   * Synchronise current dimension with the drill-down stack/root dimension
-   */
-  private syncDimensionWithStack(): void {
-    if (!this.filterStack.length) {
-      this.currentDimensionIndex = this.rootDimensionIndex;
-    } else {
-      const lastFilter = this.filterStack[this.filterStack.length - 1];
-      const lastIndex = this.getDimensionIndex(lastFilter.dimension);
-      this.currentDimensionIndex = Math.min(lastIndex + 1, this.hierarchy.length - 1);
+
+  private buildNumericBuckets(values: number[], def: PivotDimensionDefinition, desiredCount?: number): NumericBucket[] {
+    if (!values.length) return [];
+
+    const uniqueCount = new Set(values).size;
+    const target = Math.max(1, Math.min(desiredCount ?? this.priceBucketCount, uniqueCount));
+    const mode = this.priceBucketMode === 'static' && (!def.numeric?.buckets || target !== this.priceBucketCount)
+      ? 'equal-width'
+      : this.priceBucketMode;
+
+    switch (mode) {
+      case 'static':
+        if (def.numeric?.buckets?.length) return def.numeric.buckets;
+        return this.computeEqualWidthBuckets(values, target, def.numeric?.unit);
+      case 'quantile':
+        return this.computeQuantileBuckets(values, target, def.numeric?.unit);
+      case 'kmeans':
+        return this.computeKMeansBuckets(values, target, def.numeric?.unit);
+      case 'equal-width':
+      default:
+        return this.computeEqualWidthBuckets(values, target, def.numeric?.unit);
     }
-    this.currentDimension = this.hierarchy[this.currentDimensionIndex];
-  }
-  
-  private getDimensionIndex(dimension: GroupDimension): number {
-    const idx = this.hierarchy.indexOf(dimension);
-    return idx >= 0 ? idx : 0;
-  }
-  
-  getHierarchy(): GroupDimension[] {
-    return [...this.hierarchy];
   }
 
-  canUseDimension(dimension: GroupDimension): boolean {
-    if (dimension === 'subcategory') {
-      return this.hasFilterFor('category');
+  private computeEqualWidthBuckets(values: number[], bucketCount: number, unit?: string): NumericBucket[] {
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    if (bucketCount <= 1 || min === max) {
+      return [{
+        label: this.formatRange(min, Infinity, true, unit),
+        min,
+        max: Infinity,
+        inclusiveMax: true,
+      }];
     }
-    return true;
+    const buckets: NumericBucket[] = [];
+    const step = (max - min) / bucketCount;
+    let lower = min;
+    for (let i = 0; i < bucketCount; i++) {
+      const isLast = i === bucketCount - 1;
+      const upper = isLast ? Infinity : lower + step;
+      buckets.push({
+        label: this.formatRange(lower, upper, isLast, unit),
+        min: lower,
+        max: upper,
+        inclusiveMax: isLast,
+      });
+      lower = upper;
+    }
+    return buckets;
   }
 
-  getAvailableDimensions(products: Product[]): GroupDimension[] {
-    const filtered = this.filterProducts(products);
-    const available: GroupDimension[] = [];
-    for (const dimension of this.hierarchy) {
-      if (!this.canUseDimension(dimension)) continue;
-      if (this.countDistinctValues(filtered, dimension) > 1) {
-        available.push(dimension);
+  private computeQuantileBuckets(values: number[], bucketCount: number, unit?: string): NumericBucket[] {
+    const sorted = [...values].sort((a, b) => a - b);
+    if (bucketCount <= 1) {
+      const min = sorted[0];
+      const max = sorted[sorted.length - 1];
+      return [{
+        label: this.formatRange(min, Infinity, true, unit),
+        min,
+        max: Infinity,
+        inclusiveMax: true,
+      }];
+    }
+
+    const buckets: NumericBucket[] = [];
+    const length = sorted.length;
+    let startIndex = 0;
+
+    for (let i = 0; i < bucketCount; i++) {
+      const targetEnd = i === bucketCount - 1
+        ? length - 1
+        : Math.floor((length * (i + 1)) / bucketCount) - 1;
+      let endIndex = Math.max(startIndex, targetEnd);
+      const endValue = sorted[endIndex];
+
+      if (i < bucketCount - 1) {
+        while (endIndex + 1 < length && sorted[endIndex + 1] === endValue) {
+          endIndex++;
+        }
+      }
+
+      const min = sorted[startIndex];
+      const max = i === bucketCount - 1 ? Infinity : sorted[endIndex + 1] ?? endValue;
+      buckets.push({
+        label: this.formatRange(min, max, i === bucketCount - 1, unit),
+        min,
+        max,
+        inclusiveMax: i === bucketCount - 1,
+      });
+      startIndex = endIndex + 1;
+    }
+
+    return buckets;
+  }
+
+  private computeKMeansBuckets(values: number[], bucketCount: number, unit?: string): NumericBucket[] {
+    if (bucketCount <= 1) {
+      const min = Math.min(...values);
+      return [{
+        label: this.formatRange(min, Infinity, true, unit),
+        min,
+        max: Infinity,
+        inclusiveMax: true,
+      }];
+    }
+
+    const data = [...values].sort((a, b) => a - b);
+    let centroids = this.initialiseCentroids(data, bucketCount);
+    let assignments = new Array(data.length).fill(0);
+
+    for (let iteration = 0; iteration < 20; iteration++) {
+      let changed = false;
+      for (let i = 0; i < data.length; i++) {
+        let best = 0;
+        let bestDist = Math.abs(data[i] - centroids[0]);
+        for (let c = 1; c < centroids.length; c++) {
+          const dist = Math.abs(data[i] - centroids[c]);
+          if (dist < bestDist) {
+            bestDist = dist;
+            best = c;
+          }
+        }
+        if (assignments[i] !== best) {
+          assignments[i] = best;
+          changed = true;
+        }
+      }
+      if (!changed) break;
+      const newCentroids = new Array(centroids.length).fill(0);
+      const counts = new Array(centroids.length).fill(0);
+      for (let i = 0; i < data.length; i++) {
+        const cluster = assignments[i];
+        newCentroids[cluster] += data[i];
+        counts[cluster] += 1;
+      }
+      for (let c = 0; c < centroids.length; c++) {
+        if (counts[c] > 0) {
+          newCentroids[c] /= counts[c];
+        } else {
+          newCentroids[c] = centroids[c];
+        }
+      }
+      centroids = newCentroids;
+    }
+
+    const clusters: Array<{ min: number; max: number }> = centroids.map(() => ({
+      min: Number.POSITIVE_INFINITY,
+      max: Number.NEGATIVE_INFINITY,
+    }));
+    for (let i = 0; i < data.length; i++) {
+      const cluster = assignments[i];
+      clusters[cluster].min = Math.min(clusters[cluster].min, data[i]);
+      clusters[cluster].max = Math.max(clusters[cluster].max, data[i]);
+    }
+
+    clusters.sort((a, b) => a.min - b.min);
+    const buckets: NumericBucket[] = [];
+    for (let i = 0; i < clusters.length; i++) {
+      const isLast = i === clusters.length - 1;
+      const cluster = clusters[i];
+      const nextMin = clusters[i + 1]?.min ?? Infinity;
+      const upper = isLast ? Infinity : (cluster.max + nextMin) / 2;
+      buckets.push({
+        label: this.formatRange(cluster.min, upper, isLast, unit),
+        min: cluster.min,
+        max: upper,
+        inclusiveMax: isLast,
+      });
+    }
+    return buckets;
+  }
+
+  private initialiseCentroids(values: number[], bucketCount: number): number[] {
+    const centroids: number[] = [];
+    const step = values.length / bucketCount;
+    for (let i = 0; i < bucketCount; i++) {
+      const idx = Math.floor(i * step + step / 2);
+      centroids.push(values[Math.min(idx, values.length - 1)]);
+    }
+    return centroids;
+  }
+
+  private findBucket(dimension: GroupDimension, value: number): NumericBucket | undefined {
+    const state = this.numericStates.get(dimension);
+    if (!state) return undefined;
+    for (const bucket of state.buckets) {
+      const upperOk = bucket.max === Infinity
+        ? true
+        : bucket.inclusiveMax
+          ? value <= bucket.max
+          : value < bucket.max;
+      if (value >= bucket.min && upperOk) {
+        return bucket;
       }
     }
-    return available;
+    return undefined;
+  }
+
+  private hasFilterFor(dimension: GroupDimension): boolean {
+    return this.filterStack.some(f => f.dimension === dimension);
+  }
+
+  private formatRange(min: number, max: number, inclusive: boolean, unit?: string): string {
+    const toText = (v: number) => {
+      if (!Number.isFinite(v)) return '∞';
+      if (Math.abs(v) >= 1000) return v.toFixed(0);
+      if (Math.abs(v) >= 100) return v.toFixed(1);
+      return v.toFixed(2);
+    };
+    const format = (v: number) => (unit ? `${toText(v)} ${unit}` : toText(v));
+    if (!Number.isFinite(max)) {
+      return `${format(min)}+`;
+    }
+    const maxText = format(max);
+    if (inclusive) {
+      return `${format(min)} – ${maxText}`;
+    }
+    return `${format(min)} – < ${maxText}`;
+  }
+
+  resolveValue(product: Product, dimension: GroupDimension): string {
+    return this.getDimensionValue(product, dimension);
   }
 }

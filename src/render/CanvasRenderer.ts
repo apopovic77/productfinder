@@ -3,41 +3,281 @@ import { ViewportTransform } from '../utils/ViewportTransform';
 import type { Product } from '../types/Product';
 import type { GroupHeaderInfo } from '../layout/PivotLayouter';
 
+type LoadTask = {
+  nodeId: string;
+  storageId: number;
+  size: number;
+  priority: number; // Lower = higher priority
+};
+
 export class CanvasRenderer<T> {
   private rafId: number | null = null;
+  private lodUpdateInterval: number | null = null;
+  private queueProcessInterval: number | null = null;
   public hoveredItem: T | null = null;
   public focusedItem: T | null = null;
   public hoveredGroupKey: string | null = null;
-  
+
+  // Image LOD tracking: nodeId -> current loaded size
+  private loadedImageSizes = new Map<string, number>();
+
+  // Queue for pending image loads with re-check
+  private loadQueue: LoadTask[] = [];
+  private isProcessingQueue = false;
+
   constructor(
-    private ctx: CanvasRenderingContext2D, 
-    private getNodes: () => LayoutNode<T>[], 
+    private ctx: CanvasRenderingContext2D,
+    private getNodes: () => LayoutNode<T>[],
     private renderAccessors: { label(item: T): string; priceText(item: T): string },
     private viewport: ViewportTransform | null = null,
     private getGroupHeaders: () => GroupHeaderInfo[] = () => []
   ) {}
   
-  start() { 
-    this.stop(); 
-    const loop = () => { 
-      this.draw(); 
-      this.rafId = requestAnimationFrame(loop); 
-    }; 
-    this.rafId = requestAnimationFrame(loop); 
+  start() {
+    this.stop();
+
+    // Render loop (60 FPS)
+    const loop = () => {
+      this.draw();
+      this.rafId = requestAnimationFrame(loop);
+    };
+    this.rafId = requestAnimationFrame(loop);
+
+    // LOD update loop (1 FPS = 1000ms interval)
+    // Scans visible nodes and adds load tasks to queue
+    // TEMPORARILY DISABLED FOR TESTING
+    // this.lodUpdateInterval = window.setInterval(() => {
+    //   this.updateImageLOD();
+    // }, 1000);
+
+    // Queue processing loop (10 FPS = 100ms interval)
+    // Processes queue with re-check for visibility
+    // TEMPORARILY DISABLED FOR TESTING
+    // this.queueProcessInterval = window.setInterval(() => {
+    //   this.processQueue();
+    // }, 100);
   }
-  
-  stop() { 
-    if (this.rafId) cancelAnimationFrame(this.rafId); 
-    this.rafId = null; 
+
+  stop() {
+    if (this.rafId) cancelAnimationFrame(this.rafId);
+    this.rafId = null;
+
+    if (this.lodUpdateInterval) clearInterval(this.lodUpdateInterval);
+    this.lodUpdateInterval = null;
+
+    if (this.queueProcessInterval) clearInterval(this.queueProcessInterval);
+    this.queueProcessInterval = null;
   }
-  
+
+  /**
+   * Update image LOD based on screen size (1 FPS)
+   * Scans visible nodes and adds load tasks to queue
+   * Queue processor will re-check visibility before loading
+   */
+  private updateImageLOD() {
+    if (!this.viewport) return;
+
+    const nodes = this.getNodes();
+    const scale = this.viewport.scale;
+    const canvas = this.ctx.canvas;
+
+    // Calculate visible viewport bounds in world space
+    const viewportLeft = -this.viewport.offset.x / scale;
+    const viewportTop = -this.viewport.offset.y / scale;
+    const viewportRight = viewportLeft + (canvas.width / scale);
+    const viewportBottom = viewportTop + (canvas.height / scale);
+
+    let queuedCount = 0;
+
+    for (const node of nodes) {
+      const x = node.posX.value ?? 0;
+      const y = node.posY.value ?? 0;
+      const w = node.width.value ?? 0;
+      const h = node.height.value ?? 0;
+
+      // Visibility check: is this node in the visible viewport?
+      const isVisible = !(
+        x + w < viewportLeft ||   // completely left of viewport
+        x > viewportRight ||       // completely right of viewport
+        y + h < viewportTop ||     // completely above viewport
+        y > viewportBottom         // completely below viewport
+      );
+
+      if (!isVisible) continue; // Skip invisible nodes
+
+      // Calculate screen space size
+      const screenWidth = w * scale;
+      const screenHeight = h * scale;
+      const screenSize = Math.max(screenWidth, screenHeight);
+
+      // Determine required image size: 150px or 1300px
+      const requiredSize = screenSize > 400 ? 1300 : 150;
+
+      // Check if we need to load a different size
+      const currentSize = this.loadedImageSizes.get(node.id);
+      if (currentSize !== requiredSize) {
+        const product = node.data as any;
+        const storageId = product.primaryImage?.storage_id;
+
+        if (storageId) {
+          // Calculate priority (lower = higher priority)
+          // Center of viewport = priority 0, edges = higher priority
+          const centerX = (viewportLeft + viewportRight) / 2;
+          const centerY = (viewportTop + viewportBottom) / 2;
+          const nodeCenterX = x + w / 2;
+          const nodeCenterY = y + h / 2;
+          const distanceFromCenter = Math.sqrt(
+            Math.pow(nodeCenterX - centerX, 2) + Math.pow(nodeCenterY - centerY, 2)
+          );
+
+          // Check if already in queue
+          const alreadyQueued = this.loadQueue.some(
+            task => task.nodeId === node.id && task.size === requiredSize
+          );
+
+          if (!alreadyQueued) {
+            this.loadQueue.push({
+              nodeId: node.id,
+              storageId,
+              size: requiredSize,
+              priority: distanceFromCenter
+            });
+            queuedCount++;
+          }
+        }
+      }
+    }
+
+    // Sort queue by priority (lower = higher priority = center items first)
+    if (queuedCount > 0) {
+      this.loadQueue.sort((a, b) => a.priority - b.priority);
+    }
+  }
+
+  /**
+   * Process image load queue (10 FPS)
+   * Re-checks visibility before loading, cancels stale requests
+   * Loads max 3 images per cycle to prevent blocking
+   */
+  private processQueue() {
+    if (!this.viewport || this.loadQueue.length === 0 || this.isProcessingQueue) return;
+
+    this.isProcessingQueue = true;
+
+    const nodes = this.getNodes();
+    const scale = this.viewport.scale;
+    const canvas = this.ctx.canvas;
+
+    // Calculate current viewport bounds
+    const viewportLeft = -this.viewport.offset.x / scale;
+    const viewportTop = -this.viewport.offset.y / scale;
+    const viewportRight = viewportLeft + (canvas.width / scale);
+    const viewportBottom = viewportTop + (canvas.height / scale);
+
+    const MAX_LOADS_PER_CYCLE = 3; // Load 3 images per 100ms = 30 images/second
+    let loadedThisCycle = 0;
+
+    // Process queue from highest priority (front) to lowest priority (back)
+    while (this.loadQueue.length > 0 && loadedThisCycle < MAX_LOADS_PER_CYCLE) {
+      const task = this.loadQueue.shift()!;
+
+      // Find the node
+      const node = nodes.find(n => n.id === task.nodeId);
+      if (!node) continue; // Node no longer exists
+
+      // Re-check visibility
+      const x = node.posX.value ?? 0;
+      const y = node.posY.value ?? 0;
+      const w = node.width.value ?? 0;
+      const h = node.height.value ?? 0;
+
+      const isVisible = !(
+        x + w < viewportLeft ||
+        x > viewportRight ||
+        y + h < viewportTop ||
+        y > viewportBottom
+      );
+
+      if (!isVisible) {
+        // Node is no longer visible, skip this task
+        continue;
+      }
+
+      // Re-check if we still need this size
+      const screenWidth = w * scale;
+      const screenHeight = h * scale;
+      const screenSize = Math.max(screenWidth, screenHeight);
+      const requiredSize = screenSize > 400 ? 1300 : 150;
+
+      if (requiredSize !== task.size) {
+        // Required size changed, skip this task (new task will be queued on next update)
+        continue;
+      }
+
+      const currentSize = this.loadedImageSizes.get(task.nodeId);
+      if (currentSize === requiredSize) {
+        // Already loaded, skip
+        continue;
+      }
+
+      // Load the image (async, fire-and-forget)
+      // On error, Product will keep existing image (see Product.loadImageFromUrl)
+      this.loadImageForNode(node, task.size);
+
+      // Mark as attempted (so we don't try again immediately)
+      // If it fails, the old image stays visible (better than nothing)
+      this.loadedImageSizes.set(task.nodeId, task.size);
+
+      loadedThisCycle++;
+    }
+
+    this.isProcessingQueue = false;
+  }
+
+  /**
+   * Load image for a node with specific size (async, fire-and-forget)
+   * On error, the Product keeps its existing image
+   */
+  private loadImageForNode(node: LayoutNode<T>, size: number) {
+    const product = node.data as any;
+
+    // Check if this is a Product with storage_id and loadImageFromUrl method
+    if (!product.primaryImage?.storage_id || typeof product.loadImageFromUrl !== 'function') {
+      return;
+    }
+
+    const storageId = product.primaryImage.storage_id;
+    const imageUrl = `https://api-storage.arkturian.com/storage/media/${storageId}?width=${size}&format=webp&quality=85`;
+
+    // Trigger async image load
+    // Product.loadImageFromUrl will:
+    // - Update product._image on success
+    // - Keep existing image on error
+    product.loadImageFromUrl(imageUrl);
+  }
+
   private clear() { 
     const c = this.ctx.canvas; 
     this.ctx.clearRect(0,0,c.width,c.height); 
     this.ctx.fillStyle = '#fff'; 
     this.ctx.fillRect(0,0,c.width,c.height); 
   }
-  
+
+  private drawRoundedRect(x: number, y: number, width: number, height: number, radius: number) {
+    const r = Math.min(radius, height / 2, width / 2);
+    this.ctx.beginPath();
+    this.ctx.moveTo(x + r, y);
+    this.ctx.lineTo(x + width - r, y);
+    this.ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+    this.ctx.lineTo(x + width, y + height - r);
+    this.ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+    this.ctx.lineTo(x + r, y + height);
+    this.ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+    this.ctx.lineTo(x, y + r);
+    this.ctx.quadraticCurveTo(x, y, x + r, y);
+    this.ctx.closePath();
+  }
+
   private async draw() {
     const c = this.ctx.canvas;
     if (c.width !== c.clientWidth || c.height !== c.clientHeight) {
@@ -121,20 +361,32 @@ export class CanvasRenderer<T> {
     const groupHeaders = this.getGroupHeaders();
     for (const header of groupHeaders) {
       const isHovered = this.hoveredGroupKey === header.key;
-      
-      // Draw background
-      this.ctx.fillStyle = isHovered 
-        ? 'rgba(67, 56, 202, 0.1)' 
-        : 'rgba(255, 255, 255, 0.95)';
-      this.ctx.fillRect(header.x, header.y, header.width, header.height);
-      
-      // Draw border
-      this.ctx.strokeStyle = isHovered ? '#4338ca' : '#e5e7eb';
+
+      const radius = Math.min(22, header.height / 2);
+      const gradient = this.ctx.createLinearGradient(
+        header.x,
+        header.y,
+        header.x,
+        header.y + header.height
+      );
+      if (isHovered) {
+        gradient.addColorStop(0, 'rgba(68, 203, 255, 0.95)');
+        gradient.addColorStop(1, 'rgba(51, 148, 255, 0.95)');
+      } else {
+        gradient.addColorStop(0, 'rgba(134, 206, 255, 0.92)');
+        gradient.addColorStop(1, 'rgba(92, 164, 255, 0.95)');
+      }
+
+      this.drawRoundedRect(header.x, header.y, header.width, header.height, radius);
+      this.ctx.fillStyle = gradient;
+      this.ctx.fill();
+
       this.ctx.lineWidth = isHovered ? 2 : 1;
-      this.ctx.strokeRect(header.x, header.y, header.width, header.height);
-      
+      this.ctx.strokeStyle = isHovered ? 'rgba(41, 116, 255, 0.9)' : 'rgba(134, 190, 255, 0.7)';
+      this.ctx.stroke();
+
       // Draw text
-      this.ctx.fillStyle = isHovered ? '#4338ca' : '#1f2937';
+      this.ctx.fillStyle = isHovered ? '#0f172a' : '#0b1a33';
       this.ctx.font = isHovered ? 'bold 16px system-ui' : '14px system-ui';
       this.ctx.textAlign = 'center';
       this.ctx.textBaseline = 'middle';
@@ -147,7 +399,7 @@ export class CanvasRenderer<T> {
       // Draw click hint on hover
       if (isHovered) {
         this.ctx.font = '11px system-ui';
-        this.ctx.fillStyle = '#9ca3af';
+        this.ctx.fillStyle = 'rgba(15, 23, 42, 0.65)';
         this.ctx.fillText(
           'Click to drill down', 
           header.x + header.width / 2, 
@@ -160,6 +412,5 @@ export class CanvasRenderer<T> {
     this.ctx.restore();
   }
 }
-
 
 

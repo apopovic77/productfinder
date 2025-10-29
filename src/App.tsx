@@ -9,14 +9,8 @@ import type { SortMode } from './services/FilterService';
 import type { LayoutMode } from './services/LayoutService';
 import type { GroupDimension } from './services/PivotDrillDownService';
 import type { Orientation } from './layout/PivotLayouter';
-
-const PIVOT_DIMENSION_LABELS: Record<GroupDimension, string> = {
-  'category': 'Category',
-  'subcategory': 'Subcategory',
-  'brand': 'Brand',
-  'season': 'Season',
-  'price-range': 'Price'
-};
+import type { PivotGroup } from './layout/PivotGroup';
+import type { PivotDimensionDefinition } from './services/PivotDimensionAnalyzer';
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -45,6 +39,9 @@ type State = {
   pivotBreadcrumbs: string[];
   pivotDimensions: GroupDimension[];
   pivotOrientation: Orientation;
+  pivotGroups: PivotGroup[];
+  pivotDefinitions: PivotDimensionDefinition[];
+  isPivotHeroMode: boolean;
   
   // Interaction State
   selectedProduct: Product | null;
@@ -54,7 +51,7 @@ type State = {
   hoveredProduct: Product | null;
   mousePos: { x: number; y: number } | null;
   focusedIndex: number;
-  
+
   // Developer Settings
   devSettings: DeveloperSettings;
   fps: number;
@@ -87,8 +84,11 @@ export default class App extends React.Component<{}, State> {
     
     pivotDimension: 'category',
     pivotBreadcrumbs: ['All'],
-    pivotDimensions: ['category', 'subcategory', 'brand', 'season', 'price-range'],
+    pivotDimensions: [],
     pivotOrientation: 'columns',
+    pivotGroups: [],
+    pivotDefinitions: [],
+    isPivotHeroMode: false,
     
     selectedProduct: null,
     selectedIndex: -1,
@@ -142,6 +142,7 @@ export default class App extends React.Component<{}, State> {
         loading: state.loading,
         error: state.error,
         filteredProducts: state.filteredProducts,
+        pivotGroups: state.pivotGroups,
         modalSequence: sequence
       }, () => {
         this.syncPivotUI();
@@ -261,16 +262,20 @@ export default class App extends React.Component<{}, State> {
   private syncPivotUI = () => {
     const currentDim = this.controller.getPivotDimension();
     const availableDims = this.controller.getAvailablePivotDimensions();
-    const dims = availableDims.includes(currentDim)
-      ? availableDims
-      : [currentDim, ...availableDims];
+    const definitions = this.controller.getPivotDimensionDefinitions();
+    const preferredOrder = definitions.map(def => def.key);
+    const dims = preferredOrder.filter(key => key === currentDim || availableDims.includes(key));
+    if (!dims.includes(currentDim)) dims.unshift(currentDim);
     const sequence = this.controller.getDisplayOrder().map(p => p.id);
     this.setState({
       pivotBreadcrumbs: this.controller.getPivotBreadcrumbs(),
       pivotDimension: currentDim,
       pivotDimensions: dims,
+      pivotDefinitions: definitions,
       pivotOrientation: this.controller.getPivotOrientation(),
-      modalSequence: sequence
+      pivotGroups: this.controller.getPivotGroups(),
+      modalSequence: sequence,
+      isPivotHeroMode: this.controller.isPivotHeroMode()
     });
   };
 
@@ -315,7 +320,10 @@ export default class App extends React.Component<{}, State> {
     if (index === pivotBreadcrumbs.length - 1) return; // current level
     if (index === 0) {
       this.controller.resetPivot();
-      this.controller.setPivotDimension('category');
+      const defaultDim = this.controller.getPivotDimensionDefinitions()[0]?.key;
+      if (defaultDim) {
+        this.controller.setPivotDimension(defaultDim);
+      }
     } else {
       const levelsToRemove = pivotBreadcrumbs.length - 1 - index;
       for (let i = 0; i < levelsToRemove; i++) {
@@ -327,8 +335,12 @@ export default class App extends React.Component<{}, State> {
 
   private handleDimensionClick = (dimension: GroupDimension) => {
     if (dimension === this.state.pivotDimension) return;
-    if (!this.controller.canUsePivotDimension(dimension)) return;
     this.controller.setPivotDimension(dimension);
+    this.syncPivotUI();
+  };
+
+  private handleGroupSelect = (groupKey: string) => {
+    this.controller.drillDownGroup(groupKey);
     this.syncPivotUI();
   };
 
@@ -447,184 +459,127 @@ export default class App extends React.Component<{}, State> {
 
   render() {
     const { loading, error, selectedProduct, hoveredProduct, mousePos } = this.state;
-    const { search, category, season, priceMin, priceMax, weightMin, weightMax, sortMode, layoutMode, showOnlyFavorites, showFilters, pivotDimension, pivotBreadcrumbs, pivotDimensions } = this.state;
+    const {
+      search,
+      category,
+      season,
+      priceMin,
+      priceMax,
+      weightMin,
+      weightMax,
+      sortMode,
+      layoutMode,
+      showOnlyFavorites,
+      showFilters,
+      pivotDimension,
+      pivotBreadcrumbs,
+      pivotDimensions,
+      pivotDefinitions,
+      pivotGroups,
+      isPivotHeroMode
+    } = this.state;
 
     const cats = this.controller.getUniqueCategories();
     const seasons = this.controller.getUniqueSeasons();
+
+    const getDimensionLabel = (dim: GroupDimension) => pivotDefinitions.find(d => d.key === dim)?.label ?? dim;
 
     if (error) return <div className="container"><div className="error">{error}</div></div>;
 
     return (
       <div className="pf-root">
-        <div className={`pf-toolbar ${showFilters ? '' : 'collapsed'}`}>
-          <button 
-            className="pf-toolbar-toggle"
-            type="button"
-            aria-expanded={showFilters}
-            onClick={() => this.setState({ showFilters: !showFilters })}
-          >
-            {showFilters ? 'Hide Filters' : 'Show Filters'}
-          </button>
-          <button
-            type="button"
-            className="pf-toolbar-dev"
-            onClick={() => window.dispatchEvent(new Event('pf-toggle-dev-overlay'))}
-            title="Toggle developer overlay (F1)"
-          >
-            🛠 Dev
-          </button>
-          {showFilters && (
-            <>
-              <input
-                placeholder="Search"
-                value={search}
-                onChange={e => this.setState({ search: e.target.value })}
-              />
-              <select value={category} onChange={e => this.setState({ category: e.target.value })}>
-                <option value="">All Categories</option>
-                {cats.map(c => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-              <select value={season} onChange={e => this.setState({ season: e.target.value })}>
-                <option value="">All Seasons</option>
-                {seasons.map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-              <input
-                type="number"
-                placeholder="Min €"
-                value={priceMin}
-                onChange={e => this.setState({ priceMin: e.target.value })}
-              />
-              <input
-                type="number"
-                placeholder="Max €"
-                value={priceMax}
-                onChange={e => this.setState({ priceMax: e.target.value })}
-              />
-              <input
-                type="number"
-                placeholder="Min g"
-                value={weightMin}
-                onChange={e => this.setState({ weightMin: e.target.value })}
-              />
-              <input
-                type="number"
-                placeholder="Max g"
-                value={weightMax}
-                onChange={e => this.setState({ weightMax: e.target.value })}
-              />
-              <select value={sortMode} onChange={e => this.setState({ sortMode: e.target.value as SortMode })}>
-                <option value="none">Sort: None</option>
-                <option value="name-asc">Name (A-Z)</option>
-                <option value="name-desc">Name (Z-A)</option>
-                <option value="price-asc">Price (Low-High)</option>
-                <option value="price-desc">Price (High-Low)</option>
-                <option value="weight-asc">Weight (Light-Heavy)</option>
-                <option value="weight-desc">Weight (Heavy-Light)</option>
-                <option value="season-desc">Season (Newest)</option>
-              </select>
-              <button
-                type="button"
-                onClick={() => this.setState({
-                  search: '',
-                  category: '',
-                  season: '',
-                  priceMin: '',
-                  priceMax: '',
-                  weightMin: '',
-                  weightMax: ''
-                })}
-              >
-                Reset Filters
-              </button>
-              <button type="button" onClick={() => this.controller.resetViewport()}>
-                Reset View
-              </button>
-              <button
-                type="button"
-                className={showOnlyFavorites ? 'pf-active' : ''}
-                onClick={() => this.setState({ showOnlyFavorites: !showOnlyFavorites })}
-              >
-                ❤️ Favorites {showOnlyFavorites ? 'ON' : 'OFF'}
-              </button>
-              <span className="pf-toolbar-divider" aria-hidden="true" />
-              <button
-                type="button"
-                className={layoutMode === 'pivot' ? 'pf-active' : ''}
-                onClick={() => this.setState({ layoutMode: 'pivot' })}
-              >
-                📚 Pivot
-              </button>
-              <button
-                type="button"
-                className={layoutMode === 'grid' ? 'pf-active' : ''}
-                onClick={() => this.setState({ layoutMode: 'grid' })}
-              >
-                📊 Grid
-              </button>
-              <button
-                type="button"
-                className={layoutMode === 'masonry' ? 'pf-active' : ''}
-                onClick={() => this.setState({ layoutMode: 'masonry' })}
-              >
-                🧱 Masonry
-              </button>
-              <button
-                type="button"
-                className={layoutMode === 'compact' ? 'pf-active' : ''}
-                onClick={() => this.setState({ layoutMode: 'compact' })}
-              >
-                🔬 Compact
-              </button>
-              <button
-                type="button"
-                className={layoutMode === 'large' ? 'pf-active' : ''}
-                onClick={() => this.setState({ layoutMode: 'large' })}
-              >
-                🔭 Large
-              </button>
-            </>
-          )}
-        </div>
+        {/* Primary toolbar intentionally hidden to maximize canvas area. Developer overlay remains accessible via F1. */}
         <div className="pf-stage">
           <canvas ref={this.canvasRef} className="pf-canvas" />
         </div>
 
-        {layoutMode === 'pivot' && (
-          <div className="pf-pivot-footer">
-            <div className="pf-pivot-footrow" aria-label="Pivot navigation">
+        <div className="pf-bottom-bar">
+          <div className="pf-bottom-section pf-bottom-left">
+            <span className="pf-bottom-label">Path</span>
+            <div className="pf-bottom-crumbs">
               {pivotBreadcrumbs.map((crumb, i) => (
                 <React.Fragment key={`${crumb}-${i}`}>
                   {i > 0 && <span className="pf-pivot-sep">›</span>}
-                  <button
-                    className={`pf-pivot-chip ${i === pivotBreadcrumbs.length - 1 ? 'active' : ''}`}
+                  <span
+                    role="button"
+                    tabIndex={i === pivotBreadcrumbs.length - 1 ? -1 : 0}
+                    className={`pf-bottom-crumb ${i === pivotBreadcrumbs.length - 1 ? 'active' : ''}`}
                     onClick={() => this.handleBreadcrumbClick(i)}
-                    disabled={i === pivotBreadcrumbs.length - 1}
+                    onKeyDown={evt => {
+                      if (evt.key === 'Enter' || evt.key === ' ') {
+                        evt.preventDefault();
+                        this.handleBreadcrumbClick(i);
+                      }
+                    }}
                   >
                     {crumb}
-                  </button>
+                  </span>
                 </React.Fragment>
               ))}
-              {pivotDimensions.length > 0 && <span className="pf-pivot-divider" />}
-              {pivotDimensions.map(dim => {
-                const enabled = this.controller.canUsePivotDimension(dim) || dim === pivotDimension;
-                return (
-                  <button
-                    key={dim}
-                    className={`pf-pivot-chip ${dim === pivotDimension ? 'active' : ''}`}
-                    onClick={() => enabled && this.handleDimensionClick(dim)}
-                    disabled={!enabled || dim === pivotDimension}
-                  >
-                    {PIVOT_DIMENSION_LABELS[dim] ?? dim}
-                  </button>
-                );
-              })}
             </div>
           </div>
-        )}
+
+          <div className="pf-bottom-section pf-bottom-center">
+            <span className="pf-bottom-label">Dimensions</span>
+            <div className="pf-bottom-dimensions">
+              {layoutMode === 'pivot' ? (
+                <>
+                  <div className="pf-bottom-dimension-row">
+                    {pivotDimensions.map(dim => (
+                      <button
+                        type="button"
+                        key={dim}
+                        className={`pf-pivot-chip ${dim === pivotDimension ? 'active' : ''}`}
+                        onClick={() => this.handleDimensionClick(dim)}
+                        disabled={dim === pivotDimension}
+                        aria-current={dim === pivotDimension}
+                      >
+                        {getDimensionLabel(dim)}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="pf-bottom-groups">
+                    {pivotGroups.length > 0 ? (
+                      pivotGroups.map(group => (
+                        <button
+                          type="button"
+                          key={group.key}
+                          className="pf-pivot-group-chip"
+                          onClick={() => this.handleGroupSelect(group.key)}
+                        >
+                          {group.label}
+                          <span className="pf-pivot-group-count">{this.controller.getDisplayOrderForGroup(group.key).length}</span>
+                        </button>
+                      ))
+                    ) : (
+                      <span className="pf-bottom-placeholder">No groups available</span>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <span className="pf-bottom-placeholder">Dimensions available in Pivot layout</span>
+              )}
+            </div>
+          </div>
+
+          <div className="pf-bottom-section pf-bottom-right">
+            <label className="pf-bottom-label" htmlFor="pf-bottom-sort">Sort</label>
+            <select
+              id="pf-bottom-sort"
+              value={sortMode}
+              onChange={e => this.setState({ sortMode: e.target.value as SortMode })}
+            >
+              <option value="none">None</option>
+              <option value="name-asc">Name (A-Z)</option>
+              <option value="name-desc">Name (Z-A)</option>
+              <option value="price-asc">Price (Low-High)</option>
+              <option value="price-desc">Price (High-Low)</option>
+              <option value="weight-asc">Weight (Light-Heavy)</option>
+              <option value="weight-desc">Weight (Heavy-Light)</option>
+              <option value="season-desc">Season (Newest)</option>
+            </select>
+          </div>
+        </div>
 
         <AnimatePresence>
           {selectedProduct && (

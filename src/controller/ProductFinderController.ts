@@ -1,7 +1,6 @@
 import type { Product } from '../types/Product';
 import { FilterService, type FilterCriteria, type SortMode } from '../services/FilterService';
 import { LayoutService, type LayoutMode } from '../services/LayoutService';
-import type { Orientation } from '../layout/PivotLayouter';
 import { FavoritesService } from '../services/FavoritesService';
 import { ViewportService } from '../services/ViewportService';
 import { CanvasRenderer } from '../render/CanvasRenderer';
@@ -9,12 +8,16 @@ import { SkeletonRenderer } from '../render/SkeletonRenderer';
 import { ProductRenderAccessors } from '../layout/Accessors';
 import { fetchProducts } from '../data/ProductRepository';
 import type { GroupDimension, PriceBucketMode } from '../services/PivotDrillDownService';
+import { PivotDimensionAnalyzer, type PivotAnalysisResult, type PivotDimensionDefinition } from '../services/PivotDimensionAnalyzer';
+import type { Orientation } from '../layout/PivotLayouter';
+import type { PivotGroup } from '../layout/PivotGroup';
 
 export type ControllerState = {
   loading: boolean;
   error: string | null;
   products: Product[];
   filteredProducts: Product[];
+  pivotGroups: PivotGroup[];
 };
 
 export type StateChangeListener = (state: ControllerState) => void;
@@ -31,6 +34,8 @@ export class ProductFinderController {
   private skeletonRenderer: SkeletonRenderer | null = null;
   private skeletonRafId: number | null = null;
   private renderAccess = new ProductRenderAccessors();
+  private pivotAnalyzer = new PivotDimensionAnalyzer();
+  private pivotModel: PivotAnalysisResult | null = null;
 
   // State
   private products: Product[] = [];
@@ -77,7 +82,8 @@ export class ProductFinderController {
     try {
       const results = await fetchProducts({ limit: 1000 });
       this.products = results || [];
-      console.log('[ProductFinder] loaded products:', this.products.length);
+      this.pivotModel = this.pivotAnalyzer.analyze(this.products);
+      this.layoutService.setPivotModel(this.pivotModel);
       this.loading = false;
       this.stopSkeletonAnimation();
       if (this.renderer) this.renderer.start();
@@ -104,26 +110,19 @@ export class ProductFinderController {
     let filtered = this.filterService.filterAndSort(this.products);
     filtered = this.favoritesService.filter(filtered);
 
-    this.layoutService.sync(filtered, this.products);
-
+    const analyzerSource = filtered.length > 0 ? filtered : this.products;
+    this.pivotModel = this.pivotAnalyzer.analyze(analyzerSource);
+    this.layoutService.setPivotModel(this.pivotModel);
+    
+    this.layoutService.sync(filtered, analyzerSource);
+    
     // Only re-layout, don't resize canvas
     // Canvas size should only change on actual window resize
     if (this.canvas) {
       this.layoutService.layout(this.canvas.width, this.canvas.height);
-      this.updateViewportBounds();
     }
-
+    
     this.notifyListeners();
-  }
-
-  /**
-   * Update viewport bounds based on current layout
-   */
-  private updateViewportBounds(): void {
-    const bounds = this.layoutService.getContentBounds();
-    if (bounds) {
-      this.viewportService.setContentBounds(bounds);
-    }
   }
 
   getFilteredProducts(): Product[] {
@@ -223,33 +222,29 @@ export class ProductFinderController {
          // Resize
          handleResize(): void {
            if (!this.canvas) return;
-
+           
            // Get viewport size from parent or window
            const parent = this.canvas.parentElement;
            const viewportWidth = parent?.clientWidth || window.innerWidth;
            const viewportHeight = parent?.clientHeight || window.innerHeight;
-
+           
            // Ensure we have valid dimensions
            if (viewportWidth === 0 || viewportHeight === 0) {
              console.warn('Canvas parent has zero dimensions, using window size');
              this.canvas.width = window.innerWidth;
              this.canvas.height = window.innerHeight;
              this.layoutService.layout(window.innerWidth, window.innerHeight);
-             this.updateViewportBounds();
-             this.viewportService.updateViewportSize();
              return;
            }
-
+           
            // Set canvas size to match viewport
            this.canvas.width = viewportWidth;
            this.canvas.height = viewportHeight;
-
+           
            console.log(`Canvas resized to: ${viewportWidth}x${viewportHeight}`);
-
+           
            // Layout uses viewport size
            this.layoutService.layout(viewportWidth, viewportHeight);
-           this.updateViewportBounds();
-           this.viewportService.updateViewportSize();
          }
 
   // Skeleton Animation
@@ -286,6 +281,7 @@ export class ProductFinderController {
       error: this.error,
       products: this.products,
       filteredProducts: this.getFilteredProducts(),
+      pivotGroups: this.layoutService.getPivotGroups(),
     };
     this.listeners.forEach(l => l(state));
   }
@@ -333,7 +329,16 @@ export class ProductFinderController {
   getPivotDimensions(): GroupDimension[] {
     return this.layoutService.getPivotDimensions();
   }
-  
+
+  getPivotDimensionDefinitions(): PivotDimensionDefinition[] {
+    return this.layoutService.getPivotDimensionDefinitions();
+  }
+
+  getPivotDimensionLabel(dimension: GroupDimension): string {
+    const def = this.layoutService.getPivotDimensionDefinitions().find(d => d.key === dimension);
+    return def?.label ?? dimension;
+  }
+
   getAvailablePivotDimensions(): GroupDimension[] {
     return this.layoutService.getAvailablePivotDimensions();
   }
@@ -341,19 +346,7 @@ export class ProductFinderController {
   canUsePivotDimension(dimension: GroupDimension): boolean {
     return this.layoutService.canUsePivotDimension(dimension);
   }
-  
-  getDisplayOrder(): Product[] {
-    return this.layoutService.getDisplayOrder();
-  }
-  
-  getDisplayOrderForGroup(groupKey: string): Product[] {
-    return this.layoutService.getDisplayOrderForGroup(groupKey);
-  }
-  
-  getGroupKeyForProduct(product: Product): string {
-    return this.layoutService.getGroupKeyForProduct(product);
-  }
-  
+
   getPivotOrientation(): Orientation {
     return this.layoutService.getPivotOrientation();
   }
@@ -381,13 +374,38 @@ export class ProductFinderController {
   getPivotBreadcrumbs(): string[] {
     return this.layoutService.getPivotBreadcrumbs();
   }
-  
+
   canDrillUpPivot(): boolean {
     return this.layoutService.canDrillUpPivot();
   }
-  
+
   canDrillDownPivot(): boolean {
     return this.layoutService.canDrillDownPivot();
+  }
+
+  getPivotGroups(): PivotGroup[] {
+    return this.layoutService.getPivotGroups();
+  }
+
+  isPivotHeroMode(): boolean {
+    return this.layoutService.isPivotHeroMode();
+  }
+
+  getDisplayOrder(): Product[] {
+    return this.layoutService.getDisplayOrder();
+  }
+
+  getDisplayOrderForGroup(groupKey: string): Product[] {
+    return this.layoutService.getDisplayOrderForGroup(groupKey);
+  }
+
+  getGroupKeyForProduct(product: Product): string {
+    return this.layoutService.getGroupKeyForProduct(product);
+  }
+
+  drillDownGroup(groupKey: string): void {
+    this.layoutService.drillDownPivot(groupKey);
+    this.onDataChanged();
   }
   
   /**
@@ -409,12 +427,9 @@ export class ProductFinderController {
       if (worldX >= header.x && worldX <= header.x + header.width &&
           worldY >= header.y && worldY <= header.y + header.height) {
         // Click on group header - drill down!
-        if (this.layoutService.canDrillDownPivot()) {
-          this.layoutService.drillDownPivot(header.key);
-          this.onDataChanged();
-          return true;
-        }
-        return false;
+        this.layoutService.drillDownPivot(header.key);
+        this.onDataChanged();
+        return true;
       }
     }
     

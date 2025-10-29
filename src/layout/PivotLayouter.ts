@@ -170,23 +170,13 @@ export class PivotLayouter<T> {
           if (this.config.itemSort) list.sort((a, b) => this.config.itemSort!(a.data, b.data));
 
           const productsInThisGroup = list.length;
-          const smallGroupThreshold = this.config.smallGroupThreshold ?? 8;
           const cellSize = globalCellSize;
-
-          const maxRows = Math.max(1, Math.floor((matrixHeight + spacing) / (cellSize + spacing)));
-          const maxPossibleCols = Math.max(1, Math.floor((matrixWidth + spacing) / (cellSize + spacing)));
-
-          const minNeededCols = Math.ceil(productsInThisGroup / Math.max(1, maxRows));
-          const maxUsableCols = Math.max(1, maxPossibleCols);
-          let colsInFrame = Math.min(maxUsableCols, Math.max(1, productsInThisGroup));
-
-          if (maxRows > 0) {
-            const minColsForHeight = Math.min(maxUsableCols, minNeededCols);
-            colsInFrame = Math.max(colsInFrame, minColsForHeight);
-          }
-
-          const rowsInFrame = Math.ceil(productsInThisGroup / colsInFrame);
-          const renderAsRow = productsInThisGroup > 0 && productsInThisGroup <= smallGroupThreshold;
+          const maxColsForFrame = Math.max(1, Math.floor((matrixWidth + spacing) / (cellSize + spacing)));
+          const colsInFrame = Math.max(
+            1,
+            Math.min(globalCols, maxColsForFrame, productsInThisGroup)
+          );
+          const rowsInFrame = Math.max(1, Math.ceil(productsInThisGroup / colsInFrame));
 
           this.groupHeaders.push({
             key: k,
@@ -199,39 +189,21 @@ export class PivotLayouter<T> {
 
           const baseY = offsetY + headerHeight + spacing;
 
-          if (renderAsRow) {
-            const totalWidth = productsInThisGroup * (cellSize + spacing) - spacing;
-            const startX = this.config.framePadding + Math.max(0, (matrixWidth - totalWidth) / 2);
-            for (let index = 0; index < list.length; index++) {
-              const node = list[index];
+          for (let row = 0; row < rowsInFrame; row++) {
+            for (let col = 0; col < colsInFrame; col++) {
+              const productIndex = row * colsInFrame + col;
+              if (productIndex >= list.length) break;
+              const node = list[productIndex];
               const scale = deriveScale(node);
               const finalSize = cellSize * scale;
-              const x = startX + index * (cellSize + spacing);
-              const y = baseY;
+              const x = this.config.framePadding + spacing + col * (cellSize + spacing);
+              const y = baseY + row * (cellSize + spacing);
               node.posX.value = x;
               node.posY.value = y;
               node.width.value = finalSize;
               node.height.value = finalSize;
               node.scale.value = 1;
               node.opacity.value = 1;
-            }
-          } else {
-            for (let row = 0; row < rowsInFrame; row++) {
-              for (let col = 0; col < colsInFrame; col++) {
-                const productIndex = row * colsInFrame + col;
-                if (productIndex >= list.length) break;
-                const node = list[productIndex];
-                const scale = deriveScale(node);
-                const finalSize = cellSize * scale;
-                const x = this.config.framePadding + spacing + col * (cellSize + spacing);
-                const y = baseY + row * (cellSize + spacing);
-                node.posX.value = x;
-                node.posY.value = y;
-                node.width.value = finalSize;
-                node.height.value = finalSize;
-                node.scale.value = 1;
-                node.opacity.value = 1;
-              }
             }
           }
 
@@ -330,83 +302,51 @@ export class PivotLayouter<T> {
         this.config.onGroupLayout?.(k, list);
         
         const productsInThisGroup = list.length;
-        const smallGroupThreshold = this.config.smallGroupThreshold ?? 8;
-        
-        // Use global cell size, but calculate cols/rows for THIS group's product count
         const cellSize = globalCellSize;
         
-        // Calculate how many rows fit in the available height with this cell size
-        const maxRows = Math.floor((matrixHeight + this.config.itemGap) / (cellSize + this.config.itemGap));
+        const maxColsForFrame = Math.max(
+          1,
+          Math.floor((matrixWidth + this.config.itemGap) / (cellSize + this.config.itemGap))
+        );
+        const colsInFrame = Math.max(
+          1,
+          Math.min(globalCols, maxColsForFrame, productsInThisGroup)
+        );
+        const rowsInFrame = Math.max(1, Math.ceil(productsInThisGroup / colsInFrame));
         
-        // Calculate maximum possible columns that fit in the frame width
-        const maxPossibleCols = Math.floor((matrixWidth + this.config.itemGap) / (cellSize + this.config.itemGap));
-        
-        // Calculate minimum columns needed for THIS group
-        const minNeededCols = Math.ceil(productsInThisGroup / Math.max(1, maxRows));
-        
-        const maxUsableCols = Math.max(1, maxPossibleCols);
-        let colsInFrame = Math.min(maxUsableCols, Math.max(1, productsInThisGroup));
-        
-        if (maxRows > 0) {
-          const minColsForHeight = Math.min(maxUsableCols, minNeededCols);
-          colsInFrame = Math.max(colsInFrame, minColsForHeight);
-        }
-        
-        const rowsInFrame = Math.ceil(productsInThisGroup / colsInFrame);
-        const renderAsRow = productsInThisGroup > 0 && productsInThisGroup <= smallGroupThreshold;
-        
-        // Debug output
-        console.log(`Group ${k}: products=${productsInThisGroup}, cellSize=${cellSize}, maxRows=${maxRows}, minNeeded=${minNeededCols}, maxPossible=${maxPossibleCols}, cols=${colsInFrame}, rows=${rowsInFrame}`);
-        
-        // Store group header position (at bottom of screen)
+        const headerY = view.height - headerHeight - this.config.framePadding;
+
+        // Store group header position at bottom of column (classic Pivot style)
         this.groupHeaders.push({
           key: k,
           label: k,
           x: offsetX,
-          y: view.height - headerHeight,
+          y: headerY,
           width: frameWidth,
           height: headerHeight
         });
         
+        const baseY = headerY - this.config.itemGap - cellSize;
+
         // Layout products in a grid within this column (BOTTOM TO TOP, LEFT TO RIGHT)
-        // Use C# CellMatrixLayouter logic: rows first (y), then columns (x)
-        // This fills HORIZONTALLY first (left-to-right), then moves up
-        if (renderAsRow) {
-          const totalWidth = productsInThisGroup * (cellSize + spacing) - spacing;
-          const startX = offsetX + Math.max(spacing, (frameWidth - totalWidth) / 2);
-          for (let index = 0; index < list.length; index++) {
-            const node = list[index];
+        for (let row = 0; row < rowsInFrame; row++) {
+          for (let col = 0; col < colsInFrame; col++) {
+            const productIndex = row * colsInFrame + col;
+            if (productIndex >= list.length) break;
+            
+            const node = list[productIndex];
             const scale = deriveScale(node);
             const finalSize = cellSize * scale;
-            const x = startX + index * (cellSize + spacing);
-            const y = view.height - headerHeight - this.config.itemGap - cellSize;
+            
+            const x = offsetX + this.config.itemGap + col * (cellSize + spacing);
+            const y = baseY - row * (cellSize + spacing);
+             
             node.posX.value = x;
             node.posY.value = y;
             node.width.value = finalSize;
             node.height.value = finalSize;
             node.scale.value = 1;
             node.opacity.value = 1;
-          }
-        } else {
-          for (let row = 0; row < rowsInFrame; row++) {
-            for (let col = 0; col < colsInFrame; col++) {
-              const productIndex = row * colsInFrame + col;
-              if (productIndex >= list.length) break;
-              
-              const node = list[productIndex];
-              const scale = deriveScale(node);
-              const finalSize = cellSize * scale;
-              
-              const x = offsetX + this.config.itemGap + col * (cellSize + this.config.itemGap);
-              const y = view.height - headerHeight - this.config.itemGap - (row + 1) * (cellSize + this.config.itemGap);
-              
-              node.posX.value = x;
-              node.posY.value = y;
-              node.width.value = finalSize;
-              node.height.value = finalSize;
-              node.scale.value = 1;
-              node.opacity.value = 1;
-            }
           }
         }
         

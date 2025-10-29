@@ -5,11 +5,13 @@ import type { Product } from '../types/Product';
  */
 export class ProductLayoutAccessors {
   groupKey(p: Product): string { 
-    return p.brand || (p.category?.[0] || 'Unknown'); 
+    const brandAttr = p.getAttributeValue('brand');
+    const categoryAttr = p.getAttributeValue('category');
+    return String(brandAttr ?? categoryAttr ?? p.brand ?? p.category?.[0] ?? 'Unknown'); 
   }
   
   weight(p: Product): number | undefined { 
-    return p.weight; // Delegates to Product.weight getter
+    return p.weight;
   }
   
   aspect(p: Product): number | undefined { 
@@ -26,11 +28,11 @@ export class ProductLayoutAccessors {
  */
 export class ProductRenderAccessors {
   label(p: Product): string { 
-    return p.name; 
+    return p.displayName ?? p.name; 
   }
   
   priceText(p: Product): string { 
-    return p.priceText; // Delegates to Product.priceText getter
+    return p.priceText;
   }
 }
 
