@@ -133,54 +133,36 @@ export class ProductFinderController {
    * Should be called after layout changes.
    */
   private updateContentBounds(): void {
-    const nodes = this.layoutService.getEngine().all();
+    // Use LayoutService's method which correctly uses targetValue for bounds
+    const bounds = this.layoutService.getContentBounds();
 
-    if (nodes.length === 0) {
-      console.warn('[ProductFinderController] No nodes to calculate bounds from');
+    if (!bounds) {
+      console.warn('[ProductFinderController] No content bounds available');
       return;
     }
 
-    // Find bounding box of all nodes
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-
-    // Include product nodes in bounds
-    for (const node of nodes) {
-      const x = node.posX.value ?? 0;
-      const y = node.posY.value ?? 0;
-      const w = node.width.value ?? 0;
-      const h = node.height.value ?? 0;
-
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      maxX = Math.max(maxX, x + w);
-      maxY = Math.max(maxY, y + h);
-    }
-
-    // Also include group headers in bounds (bucket buttons)
-    const headers = this.layoutService.getGroupHeaders();
-    for (const header of headers) {
-      minX = Math.min(minX, header.x);
-      minY = Math.min(minY, header.y);
-      maxX = Math.max(maxX, header.x + header.width);
-      maxY = Math.max(maxY, header.y + header.height);
-    }
-
     // Set content bounds on viewport
-    this.viewportService.setContentBounds({
-      width: maxX - minX,
-      height: maxY - minY,
-      minX,
-      minY,
-      maxX,
-      maxY,
-    });
+    this.viewportService.setContentBounds(bounds);
 
-    // Reset viewport to fit all content (only on first load or significant changes)
-    // This ensures the user sees all content initially
-    this.viewportService.resetToFitContent();
+    // Different viewport behavior for hero mode (product presentation)
+    const isHeroMode = this.layoutService.isPivotHeroMode();
+
+    if (isHeroMode) {
+      // Hero mode: Horizontal-only scrolling, scale 1.0, start at left
+      this.viewportService.setLockVerticalPan(true);  // Lock vertical panning
+
+      const viewport = this.viewportService.getTransform();
+      if (viewport && this.canvas) {
+        const scale = 1.0;
+        const offsetX = -bounds.minX * scale;  // Start at left edge (first product visible)
+        const offsetY = (this.canvas.height - bounds.height * scale) / 2 - bounds.minY * scale;  // Center vertically
+        viewport.setImmediate(scale, offsetX, offsetY);
+      }
+    } else {
+      // Normal mode: Enable vertical panning, fit all content
+      this.viewportService.setLockVerticalPan(false);  // Enable vertical panning
+      this.viewportService.resetToFitContent();
+    }
   }
 
   getFilteredProducts(): Product[] {

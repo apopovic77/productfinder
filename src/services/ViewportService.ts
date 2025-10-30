@@ -44,6 +44,13 @@ export class ViewportService {
   }
 
   /**
+   * Lock vertical panning (horizontal-only scrolling, e.g., for hero mode)
+   */
+  setLockVerticalPan(lock: boolean): void {
+    this.transform?.setLockVerticalPan(lock);
+  }
+
+  /**
    * Update viewport size when canvas resizes
    */
   updateViewportSize(): void {

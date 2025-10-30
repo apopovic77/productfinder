@@ -35,7 +35,7 @@ export default function AnnotationTester(): JSX.Element {
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const pollRef = useRef<number | null>(null);
 
-  const headers = useMemo(() => ({ 'X-API-Key': apiKey }), [apiKey]);
+  const headers = useMemo(() => ({ 'X-API-KEY': apiKey }), [apiKey]);
 
   useEffect(() => {
     return () => {
@@ -71,7 +71,9 @@ export default function AnnotationTester(): JSX.Element {
     const res = await fetch(url, { method: 'POST', headers });
     if (!res.ok) {
       setLoading(false);
-      alert(`Analyze start failed: ${res.status} ${res.statusText}`);
+      let detail = '';
+      try { detail = await res.text(); } catch {}
+      alert(`Analyze start failed: ${res.status} ${res.statusText}${detail ? `\n${detail}` : ''}`);
       return;
     }
     const json = await res.json();
@@ -90,6 +92,10 @@ export default function AnnotationTester(): JSX.Element {
             await fetchAnnotations();
           }
         }
+      } else {
+        let t = '';
+        try { t = await s.text(); } catch {}
+        console.warn('Task status error', s.status, t);
       }
     }, 1500);
   };
@@ -115,7 +121,7 @@ export default function AnnotationTester(): JSX.Element {
         <label>API Key</label>
         <input value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="X-API-Key" style={{ padding: 8 }} />
         <div style={{ gridColumn: '2 / span 1', fontSize: 12, opacity: 0.7, marginTop: -6, marginBottom: 6 }}>
-          Using: {DEFAULT_API_KEY ? 'default key from env or demo'} : 'set manually'
+          Using: {DEFAULT_API_KEY ? 'default key from env or demo' : 'set manually'}
         </div>
 
         <label>Vision Mode</label>

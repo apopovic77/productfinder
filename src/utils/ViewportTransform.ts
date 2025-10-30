@@ -29,6 +29,7 @@ export class ViewportTransform {
   private enableRubberBanding = true;
   private rubberBandResistance = 0.5; // 0-1, how much resistance (higher = more resistance)
   private rubberBandSpringBack = 0.08; // Speed of spring back (higher = faster)
+  private lockVerticalPan = false; // If true, disable vertical panning and rubber banding
 
   // Content bounds for bounds checking
   private contentBounds: ContentBounds | null = null;
@@ -64,6 +65,13 @@ export class ViewportTransform {
     this.viewportWidth = this.canvas.width;
     this.viewportHeight = this.canvas.height;
     this.calculateFitToContentScale();
+  }
+
+  /**
+   * Lock vertical panning (horizontal-only scrolling)
+   */
+  setLockVerticalPan(lock: boolean): void {
+    this.lockVerticalPan = lock;
   }
 
   /**
@@ -137,8 +145,9 @@ export class ViewportTransform {
     const shouldCenterX = scaledWidth < this.viewportWidth;
     const shouldCenterY = scaledHeight < this.viewportHeight;
 
-    const centerX = (this.viewportWidth - scaledWidth) / 2;
-    const centerY = (this.viewportHeight - scaledHeight) / 2;
+    // Center content accounting for its origin (minX, minY)
+    const centerX = (this.viewportWidth - scaledWidth) / 2 - this.contentBounds.minX * this.targetScale;
+    const centerY = (this.viewportHeight - scaledHeight) / 2 - this.contentBounds.minY * this.targetScale;
 
     // Bounds: content edges can't go past viewport edges
     const maxOffsetX = shouldCenterX ? centerX : 0;
@@ -183,17 +192,20 @@ export class ViewportTransform {
       }
     }
 
-    if (bounds.shouldCenterY) {
-      const distanceY = bounds.centerY - this.targetOffset.y;
-      this.targetOffset.y += distanceY * this.rubberBandSpringBack;
-    } else {
-      // Spring back if outside bounds
-      if (this.targetOffset.y > bounds.maxOffsetY) {
-        const overflow = this.targetOffset.y - bounds.maxOffsetY;
-        this.targetOffset.y -= overflow * this.rubberBandSpringBack;
-      } else if (this.targetOffset.y < bounds.minOffsetY) {
-        const overflow = bounds.minOffsetY - this.targetOffset.y;
-        this.targetOffset.y += overflow * this.rubberBandSpringBack;
+    // Skip Y-axis rubber banding if vertical pan is locked
+    if (!this.lockVerticalPan) {
+      if (bounds.shouldCenterY) {
+        const distanceY = bounds.centerY - this.targetOffset.y;
+        this.targetOffset.y += distanceY * this.rubberBandSpringBack;
+      } else {
+        // Spring back if outside bounds
+        if (this.targetOffset.y > bounds.maxOffsetY) {
+          const overflow = this.targetOffset.y - bounds.maxOffsetY;
+          this.targetOffset.y -= overflow * this.rubberBandSpringBack;
+        } else if (this.targetOffset.y < bounds.minOffsetY) {
+          const overflow = bounds.minOffsetY - this.targetOffset.y;
+          this.targetOffset.y += overflow * this.rubberBandSpringBack;
+        }
       }
     }
   }
@@ -225,8 +237,8 @@ export class ViewportTransform {
       }
     }
 
-    // Y-axis resistance
-    if (!bounds.shouldCenterY) {
+    // Y-axis resistance (skip if vertical pan is locked)
+    if (!this.lockVerticalPan && !bounds.shouldCenterY) {
       if (newOffsetY > bounds.maxOffsetY) {
         const overflow = newOffsetY - bounds.maxOffsetY;
         resistedDy = dy - overflow * this.rubberBandResistance;
@@ -234,6 +246,9 @@ export class ViewportTransform {
         const overflow = bounds.minOffsetY - newOffsetY;
         resistedDy = dy + overflow * this.rubberBandResistance;
       }
+    } else if (this.lockVerticalPan) {
+      // Block vertical dragging completely
+      resistedDy = 0;
     }
 
     return { dx: resistedDx, dy: resistedDy };

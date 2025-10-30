@@ -264,30 +264,8 @@ export default class App extends React.Component<{}, State> {
     const availableDims = this.controller.getAvailablePivotDimensions();
     const definitions = this.controller.getPivotDimensionDefinitions();
     const preferredOrder = definitions.map(def => def.key);
-    const dims: GroupDimension[] = [];
-    const seen = new Set<GroupDimension>();
-    const pushIfNew = (key: GroupDimension) => {
-      if (key && !seen.has(key)) {
-        seen.add(key);
-        dims.push(key);
-      }
-    };
-
-    for (const key of preferredOrder) {
-      if (key === currentDim || availableDims.includes(key)) {
-        pushIfNew(key);
-      }
-    }
-    if (seen.has(currentDim)) {
-      const idx = dims.indexOf(currentDim);
-      if (idx > 0) {
-        dims.splice(idx, 1);
-        dims.unshift(currentDim);
-      }
-    } else {
-      dims.unshift(currentDim);
-      seen.add(currentDim);
-    }
+    // Keep a stable order based on analyzer definitions. Do not reorder chips dynamically.
+    const dims: GroupDimension[] = [...preferredOrder];
     const sequence = this.controller.getDisplayOrder().map(p => p.id);
     this.setState({
       pivotBreadcrumbs: this.controller.getPivotBreadcrumbs(),
@@ -500,6 +478,9 @@ export default class App extends React.Component<{}, State> {
       isPivotHeroMode
     } = this.state;
 
+    // Compute availability live but keep chip order stable
+    const availableDimsNow = this.controller.getAvailablePivotDimensions();
+
     const cats = this.controller.getUniqueCategories();
     const seasons = this.controller.getUniqueSeasons();
 
@@ -550,10 +531,11 @@ export default class App extends React.Component<{}, State> {
                       <button
                         type="button"
                         key={dim}
-                        className={`pf-pivot-chip ${dim === pivotDimension ? 'active' : ''}`}
+                      className={`pf-pivot-chip ${dim === pivotDimension ? 'active' : ''}`}
                         onClick={() => this.handleDimensionClick(dim)}
-                        disabled={dim === pivotDimension}
-                        aria-current={dim === pivotDimension}
+                      disabled={dim === pivotDimension || !availableDimsNow.includes(dim)}
+                      aria-current={dim === pivotDimension}
+                      aria-disabled={!availableDimsNow.includes(dim)}
                       >
                         {getDimensionLabel(dim)}
                       </button>

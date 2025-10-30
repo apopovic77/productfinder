@@ -200,7 +200,7 @@ export class PivotDimensionAnalyzer {
       categories.forEach((value, index) => {
         if (!value) return;
         const key = `category:${index}`;
-        const label = index === 0 ? 'Category' : index === 1 ? 'Subcategory' : `Category ${index + 1}`;
+        const label = index === 0 ? 'Produktkategorie' : index === 1 ? 'Unterkategorie' : `Kategorie ${index + 1}`;
         const candidate = ensureCandidate(
           key,
           label,
@@ -264,6 +264,11 @@ export class PivotDimensionAnalyzer {
 
       // Attributes
       for (const [attrKey, attr] of Object.entries(product.attributes ?? {})) {
+        // Avoid duplicating canonical properties as attribute-based dimensions
+        // These are already handled above (category hierarchy, brand/season/price/weight)
+        if (attrKey === 'category' || attrKey === 'brand' || attrKey === 'season' || attrKey === 'price' || attrKey === 'weight') {
+          continue;
+        }
         if (!attr) continue;
         const attrType = this.normalizeAttributeType(attr);
         const label = attr.label?.trim() || toLabel(attrKey);

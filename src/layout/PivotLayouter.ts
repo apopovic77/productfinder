@@ -2,6 +2,7 @@ import { LayoutNode } from './LayoutNode';
 import { GridLayoutStrategy } from './GridLayoutStrategy';
 import { ShelfLayoutStrategy } from './ShelfLayoutStrategy';
 import { WeightScalePolicy, type ScaleContext } from './ScalePolicy';
+import { SCALE_CONFIG } from '../config/ScaleConfig';
 import { PivotGroup } from './PivotGroup';
 import { Vector2 } from 'arkturian-typescript-utils';
 
@@ -76,15 +77,16 @@ export class PivotLayouter<T> {
 
     // Calculate weight context for scaling
     const weights: number[] = [];
-    nodes.forEach(n => { 
-      const w = this.config.access.weight(n.data); 
-      if (typeof w === 'number') weights.push(w); 
+    nodes.forEach(n => {
+      const w = this.config.access.weight(n.data);
+      if (typeof w === 'number') weights.push(w);
     });
-    const ctx: ScaleContext = { 
-      weightMin: weights.length ? Math.min(...weights) : undefined, 
-      weightMax: weights.length ? Math.max(...weights) : undefined, 
-      clampMin: 0.8, 
-      clampMax: 1.4 
+    const scaleEnabled = SCALE_CONFIG.enabled && (SCALE_CONFIG.weight?.enabled ?? true);
+    const ctx: ScaleContext = {
+      weightMin: scaleEnabled && weights.length ? Math.min(...weights) : undefined,
+      weightMax: scaleEnabled && weights.length ? Math.max(...weights) : undefined,
+      clampMin: SCALE_CONFIG.weight?.clampMin ?? 0.8,
+      clampMax: SCALE_CONFIG.weight?.clampMax ?? 1.4,
     };
 
     const baseH = this.config.rowBaseHeight || 120;

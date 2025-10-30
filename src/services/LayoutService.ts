@@ -528,6 +528,7 @@ export class LayoutService {
     let maxX = -Infinity;
     let maxY = -Infinity;
 
+    // Include product nodes in bounds
     for (const node of nodes) {
       const x = node.posX.targetValue ?? node.posX.value ?? 0;
       const y = node.posY.targetValue ?? node.posY.value ?? 0;
@@ -538,6 +539,15 @@ export class LayoutService {
       minY = Math.min(minY, y);
       maxX = Math.max(maxX, x + w);
       maxY = Math.max(maxY, y + h);
+    }
+
+    // Also include group headers in bounds (bucket buttons in pivot mode)
+    const headers = this.getGroupHeaders();
+    for (const header of headers) {
+      minX = Math.min(minX, header.x);
+      minY = Math.min(minY, header.y);
+      maxX = Math.max(maxX, header.x + header.width);
+      maxY = Math.max(maxY, header.y + header.height);
     }
 
     return {
