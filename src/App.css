@@ -22,8 +22,12 @@ html, body, #root {
 body {
   width: 100%;
   height: 100%;
-  background: linear-gradient(140deg, #1386e5 0%, #34aff1 50%, #08d6e0 100%);
-  color: var(--pf-text);
+  background: linear-gradient(
+    145deg,
+    #117be0 0%,     /* tieferes, sattes Blau oben */
+    #2aa8ef 45%,    /* lebendiges Cyan in der Mitte */
+    #12d4de 100%    /* leuchtendes Türkis unten */
+  );color: var(--pf-text);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
