@@ -113,16 +113,60 @@ export class ProductFinderController {
     const analyzerSource = filtered.length > 0 ? filtered : this.products;
     this.pivotModel = this.pivotAnalyzer.analyze(analyzerSource);
     this.layoutService.setPivotModel(this.pivotModel);
-    
+
     this.layoutService.sync(filtered, analyzerSource);
-    
+
     // Only re-layout, don't resize canvas
     // Canvas size should only change on actual window resize
     if (this.canvas) {
       this.layoutService.layout(this.canvas.width, this.canvas.height);
+
+      // Calculate and set content bounds after layout
+      this.updateContentBounds();
     }
-    
+
     this.notifyListeners();
+  }
+
+  /**
+   * Calculate content bounds from all visible nodes and update viewport.
+   * Should be called after layout changes.
+   */
+  private updateContentBounds(): void {
+    const nodes = this.layoutService.getEngine().all();
+
+    if (nodes.length === 0) {
+      console.warn('[ProductFinderController] No nodes to calculate bounds from');
+      return;
+    }
+
+    // Find bounding box of all nodes
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    for (const node of nodes) {
+      const x = node.posX.value ?? 0;
+      const y = node.posY.value ?? 0;
+      const w = node.width.value ?? 0;
+      const h = node.height.value ?? 0;
+
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x + w);
+      maxY = Math.max(maxY, y + h);
+    }
+
+    // Set content bounds on viewport
+    this.viewportService.setContentBounds({
+      width: maxX - minX,
+      height: maxY - minY,
+      minX,
+      minY,
+      maxX,
+      maxY,
+    });
   }
 
   getFilteredProducts(): Product[] {
@@ -234,17 +278,19 @@ export class ProductFinderController {
              this.canvas.width = window.innerWidth;
              this.canvas.height = window.innerHeight;
              this.layoutService.layout(window.innerWidth, window.innerHeight);
+             this.updateContentBounds();
              return;
            }
-           
+
            // Set canvas size to match viewport
            this.canvas.width = viewportWidth;
            this.canvas.height = viewportHeight;
-           
+
            console.log(`Canvas resized to: ${viewportWidth}x${viewportHeight}`);
-           
+
            // Layout uses viewport size
            this.layoutService.layout(viewportWidth, viewportHeight);
+           this.updateContentBounds();
          }
 
   // Skeleton Animation
