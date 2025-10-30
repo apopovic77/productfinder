@@ -146,6 +146,7 @@ export class ProductFinderController {
     let maxX = -Infinity;
     let maxY = -Infinity;
 
+    // Include product nodes in bounds
     for (const node of nodes) {
       const x = node.posX.value ?? 0;
       const y = node.posY.value ?? 0;
@@ -156,6 +157,15 @@ export class ProductFinderController {
       minY = Math.min(minY, y);
       maxX = Math.max(maxX, x + w);
       maxY = Math.max(maxY, y + h);
+    }
+
+    // Also include group headers in bounds (bucket buttons)
+    const headers = this.layoutService.getGroupHeaders();
+    for (const header of headers) {
+      minX = Math.min(minX, header.x);
+      minY = Math.min(minY, header.y);
+      maxX = Math.max(maxX, header.x + header.width);
+      maxY = Math.max(maxY, header.y + header.height);
     }
 
     // Set content bounds on viewport

@@ -27,6 +27,7 @@ export default function AnnotationTester(): JSX.Element {
   const [contextRole, setContextRole] = useState<'product' | 'lifestyle' | 'doc' | 'other'>('product');
   const [aiMetadata, setAiMetadata] = useState<string>('');
   const [imgUrl, setImgUrl] = useState<string>('');
+  const SAMPLE_PLACEHOLDER = "{\"brand\":\"O'Neal\",\"features\":[\"knee protector\",\"zipper\"]}";
   const [loading, setLoading] = useState<boolean>(false);
   const [taskId, setTaskId] = useState<string>('');
   const [taskStatus, setTaskStatus] = useState<any>(null);
@@ -129,7 +130,7 @@ export default function AnnotationTester(): JSX.Element {
         </select>
 
         <label>AI Metadata (JSON)</label>
-        <textarea value={aiMetadata} onChange={e => setAiMetadata(e.target.value)} rows={4} placeholder='{"brand":"O\'Neal","features":["knee protector","zipper"]}' style={{ padding: 8 }} />
+        <textarea value={aiMetadata} onChange={e => setAiMetadata(e.target.value)} rows={4} placeholder={SAMPLE_PLACEHOLDER} style={{ padding: 8 }} />
       </div>
 
       <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
