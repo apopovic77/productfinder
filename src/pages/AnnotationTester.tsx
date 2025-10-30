@@ -18,7 +18,8 @@ type AnnotationsResponse = {
 };
 
 const STORAGE_API_BASE = import.meta.env.VITE_STORAGE_API_URL || 'https://api-storage.arkturian.com';
-const DEFAULT_API_KEY = import.meta.env.VITE_STORAGE_API_KEY || '';
+// Fallback to well-known demo key if env not provided
+const DEFAULT_API_KEY = import.meta.env.VITE_STORAGE_API_KEY || 'oneal_demo_token';
 
 export default function AnnotationTester(): JSX.Element {
   const [objectId, setObjectId] = useState<string>('');
@@ -113,6 +114,9 @@ export default function AnnotationTester(): JSX.Element {
 
         <label>API Key</label>
         <input value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="X-API-Key" style={{ padding: 8 }} />
+        <div style={{ gridColumn: '2 / span 1', fontSize: 12, opacity: 0.7, marginTop: -6, marginBottom: 6 }}>
+          Using: {DEFAULT_API_KEY ? 'default key from env or demo'} : 'set manually'
+        </div>
 
         <label>Vision Mode</label>
         <select value={visionMode} onChange={e => setVisionMode(e.target.value as any)} style={{ padding: 8 }}>
@@ -134,11 +138,11 @@ export default function AnnotationTester(): JSX.Element {
       </div>
 
       <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-        <button onClick={handleLoadImage} disabled={!objectId} style={{ padding: '8px 12px' }}>Load Image</button>
-        <button onClick={startAnalysis} disabled={!objectId || !apiKey || loading} style={{ padding: '8px 12px' }}>
+        <button type="button" onClick={handleLoadImage} disabled={!objectId} style={{ padding: '10px 14px', background: '#ffffff', color: '#0b1a33', border: '1px solid rgba(0,0,0,0.15)', borderRadius: 8, cursor: !objectId ? 'not-allowed' : 'pointer' }}>Load Image</button>
+        <button type="button" onClick={startAnalysis} disabled={!objectId || !apiKey || loading} style={{ padding: '10px 14px', background: '#ffffff', color: '#0b1a33', border: '1px solid rgba(0,0,0,0.15)', borderRadius: 8, cursor: (!objectId || !apiKey || loading) ? 'not-allowed' : 'pointer' }}>
           {loading ? 'Analyzing…' : 'Start Analysis'}
         </button>
-        <button onClick={fetchAnnotations} disabled={!objectId} style={{ padding: '8px 12px' }}>Fetch Annotations</button>
+        <button type="button" onClick={fetchAnnotations} disabled={!objectId} style={{ padding: '10px 14px', background: '#ffffff', color: '#0b1a33', border: '1px solid rgba(0,0,0,0.15)', borderRadius: 8, cursor: !objectId ? 'not-allowed' : 'pointer' }}>Fetch Annotations</button>
       </div>
 
       {taskId && (

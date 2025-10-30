@@ -86,8 +86,8 @@ export class ViewportTransform {
    * Get minimum allowed scale (can't zoom out further than fit-to-content)
    */
   get minScale(): number {
-    // Allow zooming out to 80% of fit-to-content for some breathing room
-    return this.fitToContentScale * 0.8;
+    // Allow zooming out to 90% of fit-to-content for some breathing room
+    return this.fitToContentScale * 0.9;
   }
 
   /**
