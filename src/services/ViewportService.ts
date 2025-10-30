@@ -23,6 +23,13 @@ export class ViewportService {
   }
 
   /**
+   * Reset viewport to fit all content
+   */
+  resetToFitContent(): void {
+    this.transform?.reset();
+  }
+
+  /**
    * Update viewport interpolation - call this every frame!
    */
   update(): void {

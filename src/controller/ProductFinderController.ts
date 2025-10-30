@@ -167,6 +167,10 @@ export class ProductFinderController {
       maxX,
       maxY,
     });
+
+    // Reset viewport to fit all content (only on first load or significant changes)
+    // This ensures the user sees all content initially
+    this.viewportService.resetToFitContent();
   }
 
   getFilteredProducts(): Product[] {
