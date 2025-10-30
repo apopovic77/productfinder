@@ -15,7 +15,7 @@ export const LOD_CONFIG = {
   highResolution: 1300,      // High quality image size (px)
 
   // Transition point (screen space size in pixels)
-  transitionThreshold: 10000,  // Switch to high-res when image > 400px on screen
+  transitionThreshold: 400,  // Switch to high-res when image > 400px on screen
 
   // Load rate limiting
   maxLoadsPerCycle: 1,       // Max images to load per process cycle (30 images/sec at 10 FPS)

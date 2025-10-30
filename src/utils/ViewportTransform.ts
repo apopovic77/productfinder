@@ -50,9 +50,11 @@ export class ViewportTransform {
    * This should be called whenever the layout changes.
    */
   setContentBounds(bounds: ContentBounds): void {
+    console.log('[ViewportTransform] setContentBounds called:', bounds);
     this.contentBounds = bounds;
     this.updateViewportSize();
     this.calculateFitToContentScale();
+    console.log('[ViewportTransform] fitToContentScale:', this.fitToContentScale, 'minScale:', this.minScale);
   }
 
   /**
@@ -86,6 +88,13 @@ export class ViewportTransform {
   get minScale(): number {
     // Allow zooming out to 80% of fit-to-content for some breathing room
     return this.fitToContentScale * 0.8;
+  }
+
+  /**
+   * Get current content bounds for debugging
+   */
+  getContentBounds(): ContentBounds | null {
+    return this.contentBounds;
   }
 
   /**

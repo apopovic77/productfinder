@@ -429,8 +429,50 @@ export class CanvasRenderer<T> {
         );
       }
     }
-    
+
     // Restore viewport transform
     this.ctx.restore();
+
+    // DEBUG: Draw content bounds visualization
+    if (this.viewport) {
+      const bounds = this.viewport.getContentBounds();
+      if (bounds) {
+        this.ctx.save();
+
+        // Draw content bounding box in world space
+        this.viewport.applyTransform(this.ctx);
+
+        this.ctx.strokeStyle = '#ff00ff'; // Magenta for visibility
+        this.ctx.lineWidth = 4 / this.viewport.scale; // Scale-invariant line width
+        this.ctx.setLineDash([20 / this.viewport.scale, 10 / this.viewport.scale]);
+        this.ctx.strokeRect(bounds.minX, bounds.minY, bounds.width, bounds.height);
+        this.ctx.setLineDash([]);
+
+        // Draw corner markers
+        const markerSize = 30 / this.viewport.scale;
+        this.ctx.fillStyle = '#ff00ff';
+        this.ctx.fillRect(bounds.minX, bounds.minY, markerSize, markerSize);
+        this.ctx.fillRect(bounds.maxX - markerSize, bounds.minY, markerSize, markerSize);
+        this.ctx.fillRect(bounds.minX, bounds.maxY - markerSize, markerSize, markerSize);
+        this.ctx.fillRect(bounds.maxX - markerSize, bounds.maxY - markerSize, markerSize, markerSize);
+
+        this.ctx.restore();
+
+        // Draw info text in screen space
+        this.ctx.fillStyle = '#ff00ff';
+        this.ctx.font = 'bold 14px monospace';
+        this.ctx.textAlign = 'left';
+        this.ctx.textBaseline = 'top';
+        this.ctx.fillText(`Content Bounds: ${bounds.width.toFixed(0)} × ${bounds.height.toFixed(0)}`, 10, 10);
+        this.ctx.fillText(`Scale: ${this.viewport.scale.toFixed(2)} (min: ${this.viewport.minScale.toFixed(2)})`, 10, 30);
+      } else {
+        // No bounds set warning
+        this.ctx.fillStyle = '#ff0000';
+        this.ctx.font = 'bold 16px monospace';
+        this.ctx.textAlign = 'left';
+        this.ctx.textBaseline = 'top';
+        this.ctx.fillText('⚠️ NO CONTENT BOUNDS SET!', 10, 10);
+      }
+    }
   }
 }

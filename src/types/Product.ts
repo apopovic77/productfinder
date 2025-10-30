@@ -1,4 +1,10 @@
 
+import { ProductAttribute } from '../domain/ProductAttribute';
+import type { PrimitiveAttributeValue } from '../domain/ProductAttribute';
+export { ProductAttribute } from '../domain/ProductAttribute';
+export type { PrimitiveAttributeValue } from '../domain/ProductAttribute';
+export { ProductValue } from '../domain/ProductValue';
+
 export type Price = {
   currency?: string;
   value: number;
@@ -23,10 +29,10 @@ export type ProductSpecifications = {
 
 export type AttributeType = 'string' | 'number' | 'boolean' | 'enum' | 'date' | 'unknown';
 
-export type ProductAttribute = {
+export type ProductAttributeInit = {
   label: string;
   type: AttributeType;
-  value: string | number | boolean | null;
+  value: PrimitiveAttributeValue;
   unit?: string;
   normalizedValue?: number;
   sourcePath?: string;
@@ -63,7 +69,7 @@ export type ProductData = {
   meta?: Record<string, any>;
   description?: string;
   displayName?: string;
-  attributes?: Record<string, ProductAttribute>;
+  attributes?: Record<string, ProductAttribute | ProductAttributeInit | undefined>;
   aiTags?: string[];
   aiAnalysis?: ProductAIAnalysis;
   raw?: Record<string, unknown>;
@@ -110,7 +116,24 @@ export class Product {
     this.meta = data.meta;
     this.description = data.description;
     this.displayName = data.displayName ?? data.name;
-    this.attributes = data.attributes ?? {};
+    this.attributes = {};
+    if (data.attributes) {
+      for (const [key, attrLike] of Object.entries(data.attributes)) {
+        const attr = attrLike;
+        if (!attr) continue;
+        this.attributes[key] = attr instanceof ProductAttribute
+          ? attr
+          : new ProductAttribute({
+              key,
+              label: attr.label,
+              type: attr.type,
+              value: attr.value,
+              unit: attr.unit,
+              normalizedValue: attr.normalizedValue,
+              sourcePath: attr.sourcePath,
+            });
+      }
+    }
     this.aiTags = data.aiTags ?? [];
     this.aiAnalysis = data.aiAnalysis;
     this.raw = data.raw ?? {};

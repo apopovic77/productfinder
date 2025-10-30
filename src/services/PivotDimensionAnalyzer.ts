@@ -1,41 +1,16 @@
 import type { AttributeType, Product, ProductAttribute } from '../types/Product';
+import { PivotDimension } from '../domain/PivotDimension';
+import type {
+  PivotDimensionKind,
+  PivotDimensionSource,
+  PivotNumericBucket,
+  PivotNumericSummary,
+} from '../domain/PivotDimension';
 
-export type PivotDimensionKind = 'category' | 'class' | 'variation' | 'metadata';
-
-export type PivotDimensionSource =
-  | { type: 'category'; level: number }
-  | { type: 'attribute'; key: string }
-  | { type: 'property'; key: string };
-
-export type NumericBucket = {
-  label: string;
-  min: number;
-  max: number;
-  inclusiveMax: boolean;
-};
-
-export type NumericSummary = {
-  min: number;
-  max: number;
-  mean: number;
-  unit?: string;
-  sampleCount: number;
-  buckets: NumericBucket[];
-};
-
-export interface PivotDimensionDefinition {
-  key: string;
-  label: string;
-  role: PivotDimensionKind;
-  priority: number;
-  type: AttributeType;
-  source: PivotDimensionSource;
-  coverage: number;
-  cardinality: number;
-  entropy: number;
-  parentKey?: string;
-  numeric?: NumericSummary;
-}
+export type PivotDimensionDefinition = PivotDimension;
+export type NumericBucket = PivotNumericBucket;
+export type NumericSummary = PivotNumericSummary;
+export type { PivotDimensionKind, PivotDimensionSource };
 
 export type PivotAnalysisResult = {
   dimensions: PivotDimensionDefinition[];
@@ -138,7 +113,7 @@ export class PivotDimensionAnalyzer {
     const definitions: PivotDimensionDefinition[] = filtered.map(candidate => {
       dimensionModel[candidate.role].push(candidate.key);
       priorityMap[candidate.key] = candidate.priority;
-      return {
+      return new PivotDimension({
         key: candidate.key,
         label: candidate.label,
         role: candidate.role,
@@ -159,7 +134,7 @@ export class PivotDimensionAnalyzer {
               buckets: candidate.numericBuckets ?? [],
             }
           : undefined,
-      };
+      });
     });
 
     // Limit metadata dimensions to keep UI manageable

@@ -1,5 +1,5 @@
 import { DefaultApi, Configuration, type Product as OnealProduct } from 'arkturian-oneal-sdk';
-import { Product, type ProductData, type ProductAttribute } from '../types/Product';
+import { Product, type ProductData, ProductAttribute } from '../types/Product';
 
 const API_BASE = import.meta.env.VITE_ONEAL_API_BASE || 'https://oneal-api.arkturian.com/v1';
 const API_KEY = import.meta.env.VITE_ONEAL_API_KEY || 'oneal_demo_token';
@@ -28,9 +28,9 @@ export type Query = {
 /**
  * Map SDK Product to our OOP Product class instance
  */
-function addAttribute(store: Record<string, ProductAttribute>, key: string, attr?: ProductAttribute | null) {
-  if (!attr) return;
-  store[key] = attr;
+function addAttribute(store: Record<string, ProductAttribute>, attribute?: ProductAttribute | null) {
+  if (!attribute) return;
+  store[attribute.key] = attribute;
 }
 
 function toStringArray(value: unknown): string[] | undefined {
@@ -58,27 +58,46 @@ function toString(value: unknown): string | undefined {
 function mapProduct(p: OnealProduct): Product {
   const attributes: Record<string, ProductAttribute> = {};
 
-  addAttribute(attributes, 'category', p.category?.[0]
-    ? { label: 'Category', type: 'enum', value: p.category[0], sourcePath: 'category[0]' }
+  addAttribute(attributes, p.category?.[0]
+    ? new ProductAttribute({
+        key: 'category',
+        label: 'Category',
+        type: 'enum',
+        value: p.category[0],
+        sourcePath: 'category[0]'
+      })
     : undefined);
 
-  addAttribute(attributes, 'brand', p.brand
-    ? { label: 'Brand', type: 'string', value: p.brand, sourcePath: 'brand' }
+  addAttribute(attributes, p.brand
+    ? new ProductAttribute({
+        key: 'brand',
+        label: 'Brand',
+        type: 'string',
+        value: p.brand,
+        sourcePath: 'brand'
+      })
     : undefined);
 
-  addAttribute(attributes, 'season', typeof p.season === 'number'
-    ? { label: 'Season', type: 'number', value: p.season, sourcePath: 'season' }
+  addAttribute(attributes, typeof p.season === 'number'
+    ? new ProductAttribute({
+        key: 'season',
+        label: 'Season',
+        type: 'number',
+        value: p.season,
+        sourcePath: 'season'
+      })
     : undefined);
 
-  addAttribute(attributes, 'price', p.price
-    ? {
+  addAttribute(attributes, p.price
+    ? new ProductAttribute({
+        key: 'price',
         label: 'Price',
         type: 'number',
         value: p.price.value,
         unit: p.price.currency,
         normalizedValue: p.price.value,
         sourcePath: 'price.value'
-      }
+      })
     : undefined);
 
   const apiAny = p as any;
