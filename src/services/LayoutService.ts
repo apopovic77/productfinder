@@ -193,8 +193,12 @@ export class LayoutService {
   }
 
   setPivotModel(model: PivotAnalysisResult | null): void {
+    const previousState = this.drillDownService.getState();
     this.pivotModel = model;
     this.drillDownService.setModel(model);
+    if (model) {
+      this.drillDownService.setState(previousState);
+    }
     this.pivotGroups = [];
   }
 
@@ -377,7 +381,16 @@ export class LayoutService {
     if (this.mode !== 'pivot' || !(this.layouter instanceof PivotLayouter)) {
       return [];
     }
-    return this.layouter.getGroupHeaders();
+    const headers = this.layouter.getGroupHeaders();
+    if (!this.pivotGroups.length) {
+      return headers;
+    }
+    const labelMap = new Map(this.pivotGroups.map(group => [group.key, group.label] as const));
+    return headers.map(header => (
+      labelMap.has(header.key)
+        ? { ...header, label: labelMap.get(header.key)! }
+        : header
+    ));
   }
   
   /**

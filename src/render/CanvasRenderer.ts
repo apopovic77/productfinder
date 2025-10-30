@@ -2,6 +2,7 @@ import { LayoutNode } from '../layout/LayoutNode';
 import { ViewportTransform } from '../utils/ViewportTransform';
 import type { Product } from '../types/Product';
 import type { GroupHeaderInfo } from '../layout/PivotLayouter';
+import { LOD_CONFIG } from '../config/LODConfig';
 
 type LoadTask = {
   nodeId: string;
@@ -13,7 +14,6 @@ type LoadTask = {
 export class CanvasRenderer<T> {
   private rafId: number | null = null;
   private lodUpdateInterval: number | null = null;
-  private queueProcessInterval: number | null = null;
   public hoveredItem: T | null = null;
   public focusedItem: T | null = null;
   public hoveredGroupKey: string | null = null;
@@ -23,7 +23,9 @@ export class CanvasRenderer<T> {
 
   // Queue for pending image loads with re-check
   private loadQueue: LoadTask[] = [];
-  private isProcessingQueue = false;
+
+  // Queue processing timing (non-blocking)
+  private lastQueueProcessTime = 0;
 
   constructor(
     private ctx: CanvasRenderingContext2D,
@@ -36,26 +38,29 @@ export class CanvasRenderer<T> {
   start() {
     this.stop();
 
-    // Render loop (60 FPS)
-    const loop = () => {
+    // Render loop (60 FPS) with integrated queue processing
+    const loop = (timestamp: number) => {
       this.draw();
+
+      // Process queue in RAF loop (non-blocking, time-based rate limiting)
+      if (LOD_CONFIG.enabled) {
+        const timeSinceLastProcess = timestamp - this.lastQueueProcessTime;
+        if (timeSinceLastProcess >= LOD_CONFIG.processInterval) {
+          this.processQueue();
+          this.lastQueueProcessTime = timestamp;
+        }
+      }
+
       this.rafId = requestAnimationFrame(loop);
     };
     this.rafId = requestAnimationFrame(loop);
 
-    // LOD update loop (1 FPS = 1000ms interval)
-    // Scans visible nodes and adds load tasks to queue
-    // TEMPORARILY DISABLED FOR TESTING
-    // this.lodUpdateInterval = window.setInterval(() => {
-    //   this.updateImageLOD();
-    // }, 1000);
-
-    // Queue processing loop (10 FPS = 100ms interval)
-    // Processes queue with re-check for visibility
-    // TEMPORARILY DISABLED FOR TESTING
-    // this.queueProcessInterval = window.setInterval(() => {
-    //   this.processQueue();
-    // }, 100);
+    // LOD scan loop - only start if enabled
+    if (LOD_CONFIG.enabled) {
+      this.lodUpdateInterval = window.setInterval(() => {
+        this.updateImageLOD();
+      }, LOD_CONFIG.scanInterval);
+    }
   }
 
   stop() {
@@ -64,9 +69,6 @@ export class CanvasRenderer<T> {
 
     if (this.lodUpdateInterval) clearInterval(this.lodUpdateInterval);
     this.lodUpdateInterval = null;
-
-    if (this.queueProcessInterval) clearInterval(this.queueProcessInterval);
-    this.queueProcessInterval = null;
   }
 
   /**
@@ -110,8 +112,10 @@ export class CanvasRenderer<T> {
       const screenHeight = h * scale;
       const screenSize = Math.max(screenWidth, screenHeight);
 
-      // Determine required image size: 150px or 1300px
-      const requiredSize = screenSize > 400 ? 1300 : 150;
+      // Determine required image size based on config
+      const requiredSize = screenSize > LOD_CONFIG.transitionThreshold
+        ? LOD_CONFIG.highResolution
+        : LOD_CONFIG.lowResolution;
 
       // Check if we need to load a different size
       const currentSize = this.loadedImageSizes.get(node.id);
@@ -155,14 +159,14 @@ export class CanvasRenderer<T> {
   }
 
   /**
-   * Process image load queue (10 FPS)
+   * Process image load queue (integrated in RAF loop)
    * Re-checks visibility before loading, cancels stale requests
-   * Loads max 3 images per cycle to prevent blocking
+   * Loads limited images per cycle to prevent blocking
+   *
+   * Called from requestAnimationFrame loop with time-based rate limiting
    */
   private processQueue() {
-    if (!this.viewport || this.loadQueue.length === 0 || this.isProcessingQueue) return;
-
-    this.isProcessingQueue = true;
+    if (!this.viewport || this.loadQueue.length === 0) return;
 
     const nodes = this.getNodes();
     const scale = this.viewport.scale;
@@ -174,11 +178,10 @@ export class CanvasRenderer<T> {
     const viewportRight = viewportLeft + (canvas.width / scale);
     const viewportBottom = viewportTop + (canvas.height / scale);
 
-    const MAX_LOADS_PER_CYCLE = 3; // Load 3 images per 100ms = 30 images/second
     let loadedThisCycle = 0;
 
     // Process queue from highest priority (front) to lowest priority (back)
-    while (this.loadQueue.length > 0 && loadedThisCycle < MAX_LOADS_PER_CYCLE) {
+    while (this.loadQueue.length > 0 && loadedThisCycle < LOD_CONFIG.maxLoadsPerCycle) {
       const task = this.loadQueue.shift()!;
 
       // Find the node
@@ -207,7 +210,9 @@ export class CanvasRenderer<T> {
       const screenWidth = w * scale;
       const screenHeight = h * scale;
       const screenSize = Math.max(screenWidth, screenHeight);
-      const requiredSize = screenSize > 400 ? 1300 : 150;
+      const requiredSize = screenSize > LOD_CONFIG.transitionThreshold
+        ? LOD_CONFIG.highResolution
+        : LOD_CONFIG.lowResolution;
 
       if (requiredSize !== task.size) {
         // Required size changed, skip this task (new task will be queued on next update)
@@ -230,8 +235,6 @@ export class CanvasRenderer<T> {
 
       loadedThisCycle++;
     }
-
-    this.isProcessingQueue = false;
   }
 
   /**
@@ -247,7 +250,8 @@ export class CanvasRenderer<T> {
     }
 
     const storageId = product.primaryImage.storage_id;
-    const imageUrl = `https://api-storage.arkturian.com/storage/media/${storageId}?width=${size}&format=webp&quality=85`;
+    const quality = size === LOD_CONFIG.highResolution ? LOD_CONFIG.highQuality : LOD_CONFIG.lowQuality;
+    const imageUrl = `https://api-storage.arkturian.com/storage/media/${storageId}?width=${size}&format=webp&quality=${quality}`;
 
     // Trigger async image load
     // Product.loadImageFromUrl will:
@@ -259,8 +263,6 @@ export class CanvasRenderer<T> {
   private clear() { 
     const c = this.ctx.canvas; 
     this.ctx.clearRect(0,0,c.width,c.height); 
-    this.ctx.fillStyle = '#fff'; 
-    this.ctx.fillRect(0,0,c.width,c.height); 
   }
 
   private drawRoundedRect(x: number, y: number, width: number, height: number, radius: number) {
@@ -314,6 +316,26 @@ export class CanvasRenderer<T> {
       if (!product.isImageReady) {
         // Trigger async load (non-blocking)
         product.loadImage();
+
+        // Draw placeholder tile while image loads
+        const radius = Math.min(18, Math.min(w, h) / 4);
+        this.drawRoundedRect(x, y, w, h, radius);
+        this.ctx.fillStyle = 'rgba(22, 32, 62, 0.85)';
+        this.ctx.fill();
+
+        this.ctx.lineWidth = 1.5;
+        this.ctx.strokeStyle = 'rgba(102, 132, 255, 0.45)';
+        this.ctx.setLineDash([8, 6]);
+        this.ctx.stroke();
+        this.ctx.setLineDash([]);
+
+        this.ctx.fillStyle = 'rgba(180, 195, 255, 0.82)';
+        this.ctx.font = '600 12px "Inter", system-ui';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        const label = this.renderAccessors.label(product as any);
+        this.ctx.fillText(label, x + w / 2, y + h / 2, Math.max(24, w - 16));
+
         continue;
       }
       
@@ -412,5 +434,3 @@ export class CanvasRenderer<T> {
     this.ctx.restore();
   }
 }
-
-

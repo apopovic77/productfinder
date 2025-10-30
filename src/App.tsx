@@ -264,8 +264,30 @@ export default class App extends React.Component<{}, State> {
     const availableDims = this.controller.getAvailablePivotDimensions();
     const definitions = this.controller.getPivotDimensionDefinitions();
     const preferredOrder = definitions.map(def => def.key);
-    const dims = preferredOrder.filter(key => key === currentDim || availableDims.includes(key));
-    if (!dims.includes(currentDim)) dims.unshift(currentDim);
+    const dims: GroupDimension[] = [];
+    const seen = new Set<GroupDimension>();
+    const pushIfNew = (key: GroupDimension) => {
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        dims.push(key);
+      }
+    };
+
+    for (const key of preferredOrder) {
+      if (key === currentDim || availableDims.includes(key)) {
+        pushIfNew(key);
+      }
+    }
+    if (seen.has(currentDim)) {
+      const idx = dims.indexOf(currentDim);
+      if (idx > 0) {
+        dims.splice(idx, 1);
+        dims.unshift(currentDim);
+      }
+    } else {
+      dims.unshift(currentDim);
+      seen.add(currentDim);
+    }
     const sequence = this.controller.getDisplayOrder().map(p => p.id);
     this.setState({
       pivotBreadcrumbs: this.controller.getPivotBreadcrumbs(),
@@ -475,7 +497,6 @@ export default class App extends React.Component<{}, State> {
       pivotBreadcrumbs,
       pivotDimensions,
       pivotDefinitions,
-      pivotGroups,
       isPivotHeroMode
     } = this.state;
 
@@ -537,23 +558,6 @@ export default class App extends React.Component<{}, State> {
                         {getDimensionLabel(dim)}
                       </button>
                     ))}
-                  </div>
-                  <div className="pf-bottom-groups">
-                    {pivotGroups.length > 0 ? (
-                      pivotGroups.map(group => (
-                        <button
-                          type="button"
-                          key={group.key}
-                          className="pf-pivot-group-chip"
-                          onClick={() => this.handleGroupSelect(group.key)}
-                        >
-                          {group.label}
-                          <span className="pf-pivot-group-count">{this.controller.getDisplayOrderForGroup(group.key).length}</span>
-                        </button>
-                      ))
-                    ) : (
-                      <span className="pf-bottom-placeholder">No groups available</span>
-                    )}
                   </div>
                 </>
               ) : (

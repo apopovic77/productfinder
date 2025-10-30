@@ -124,9 +124,12 @@ export class Product {
     const media = this.primaryImage;
     if (!media?.src) return 'https://via.placeholder.com/256?text=No+Image';
 
-    // Prefer Storage API for optimized images (150px WebP)
+    // Prefer Storage API for optimized images
     if (media.storage_id) {
-      return `https://api-storage.arkturian.com/storage/media/${media.storage_id}?width=150&format=webp&quality=75`;
+      // Use low resolution from config (150px by default)
+      const width = 150;
+      const quality = 75;
+      return `https://api-storage.arkturian.com/storage/media/${media.storage_id}?width=${width}&format=webp&quality=${quality}`;
     }
 
     // Fallback to Shopify CDN

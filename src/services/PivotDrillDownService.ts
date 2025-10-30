@@ -241,12 +241,25 @@ export class PivotDrillDownService {
       this.rootDimensionIndex = idx;
       this.currentDimensionIndex = idx;
       this.currentDimensionKey = this.hierarchy[idx] ?? null;
+    } else {
+      this.rootDimensionIndex = 0;
+      this.currentDimensionIndex = 0;
+      this.currentDimensionKey = this.hierarchy[0] ?? null;
     }
-    this.filterStack = state.filters.map(f => ({
-      dimension: f.dimension,
-      value: f.value,
-      range: f.range ? { ...f.range } : undefined,
-    }));
+
+    const validFilters: DrillDownFilter[] = [];
+    for (const filter of state.filters) {
+      if (!this.dimensionByKey.has(filter.dimension)) {
+        continue;
+      }
+      validFilters.push({
+        dimension: filter.dimension,
+        value: filter.value,
+        range: filter.range ? { ...filter.range } : undefined,
+      });
+    }
+
+    this.filterStack = validFilters;
     this.numericStates.clear();
     this.syncDimensionWithStack();
   }

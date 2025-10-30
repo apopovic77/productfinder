@@ -2,9 +2,9 @@
   color-scheme: dark;
   --pf-bg: radial-gradient(circle at 20% 20%, rgba(93, 123, 255, 0.24), transparent 55%),
     radial-gradient(circle at 80% 10%, rgba(137, 73, 255, 0.18), transparent 45%),
-    #080d1e;
-  --pf-panel: rgba(17, 24, 48, 0.86);
-  --pf-panel-strong: rgba(21, 30, 61, 0.92);
+    #8095db;
+  --pf-panel: rgba(181, 233, 77, 0.86);
+  --pf-panel-strong: rgba(236, 183, 37, 0.92);
   --pf-border: rgba(124, 148, 255, 0.28);
   --pf-border-strong: rgba(160, 176, 255, 0.45);
   --pf-text: #f2f5ff;
@@ -22,7 +22,7 @@ html, body, #root {
 body {
   width: 100%;
   height: 100%;
-  background: var(--pf-bg);
+  background: linear-gradient(140deg, #1386e5 0%, #34aff1 50%, #08d6e0 100%);
   color: var(--pf-text);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
@@ -36,7 +36,7 @@ body {
   font-family: inherit;
   color: var(--pf-text);
   overflow: hidden;
-  background: linear-gradient(145deg, rgba(17, 25, 52, 0.92), rgba(8, 12, 32, 0.98));
+  background: transparent;
 }
 
 .pf-toolbar { display: none; }
@@ -147,7 +147,7 @@ body {
   width: 100%;
   min-height: 0;
   z-index: 0;
-  border-bottom: 1px solid rgba(20, 28, 63, 0.6);
+  border-bottom: none;
 }
 
 .pf-canvas {
@@ -157,17 +157,18 @@ body {
   width: 100%;
   height: 100%;
   z-index: 1;
+  background: transparent;
 }
 
 .pf-bottom-bar {
   flex: 0 0 auto;
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
   gap: 24px;
   padding: 18px 28px;
-  border-top: 1px solid rgba(43, 54, 104, 0.4);
-  background: transparent;
+  border-top: none;
+  background: none;
   box-shadow: none;
 }
 
@@ -181,16 +182,21 @@ body {
 
 .pf-bottom-left {
   flex: 1 1 30%;
+  justify-self: flex-start;
 }
 
 .pf-bottom-center {
   flex: 1 1 40%;
   align-items: center;
   text-align: center;
+  justify-self: center;
 }
 
 .pf-bottom-right {
   flex: 0 0 auto;
+  align-items: flex-end;
+  text-align: right;
+  justify-self: flex-end;
 }
 
 .pf-bottom-label {
@@ -232,7 +238,13 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  justify-content: center;
 }
+
+.pf-bottom-dimensions {
+  justify-content: center;
+}
+
 
 .pf-bottom-groups {
   display: flex;
@@ -246,23 +258,12 @@ body {
   color: rgba(198, 208, 255, 0.45);
 }
 
-.pf-pivot-group-chip {
-  border: 1px solid rgba(210, 220, 255, 0.4);
-  border-radius: 14px;
-  background: rgba(30, 42, 80, 0.7);
-  color: var(--pf-text);
-  padding: 6px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.15s ease;
+.pf-pivot-group-label {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-}
-
-.pf-pivot-group-chip:hover {
-  background: rgba(102, 132, 255, 0.35);
-  border-color: rgba(150, 170, 255, 0.6);
+  font-size: 12px;
+  color: rgba(212, 226, 255, 0.85);
 }
 
 .pf-pivot-group-count {
@@ -279,8 +280,8 @@ body {
 }
 
 .pf-bottom-section select {
-  background: rgba(25, 34, 68, 0.85);
-  border: 1px solid rgba(129, 146, 255, 0.3);
+  background: rgba(12, 18, 42, 0.25);
+  border: 1px solid rgba(129, 146, 255, 0.22);
   color: var(--pf-text);
   border-radius: 10px;
   padding: 6px 14px;
