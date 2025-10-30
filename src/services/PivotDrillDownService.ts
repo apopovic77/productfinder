@@ -451,7 +451,10 @@ export class PivotDrillDownService {
         for (const filter of this.filterStack) {
           const filterDef = this.dimensionByKey.get(filter.dimension);
           if (filterDef?.source.type === 'category') {
-            disallowed.add(filter.value);
+            const level = filterDef.source.level ?? 0;
+            if (level < requestedLevel) {
+              disallowed.add(filter.value);
+            }
           }
         }
 
