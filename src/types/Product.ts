@@ -147,12 +147,12 @@ export class Product {
     const media = this.primaryImage;
     if (!media?.src) return 'https://via.placeholder.com/256?text=No+Image';
 
-    // Prefer Storage API for optimized images
+    // Prefer Storage API for optimized images (via proxy for authentication)
     if (media.storage_id) {
       // Use low resolution from config (150px by default)
       const width = 150;
       const quality = 75;
-      return `https://api-storage.arkturian.com/storage/media/${media.storage_id}?width=${width}&format=webp&quality=${quality}`;
+      return `https://share.arkturian.com/proxy.php?id=${media.storage_id}&width=${width}&format=webp&quality=${quality}`;
     }
 
     // Fallback to Shopify CDN
@@ -163,9 +163,9 @@ export class Product {
     const media = this.primaryImage;
     if (!media?.src) return 'https://via.placeholder.com/800?text=No+Image';
 
-    // Prefer Storage API for optimized images (800px WebP)
+    // Prefer Storage API for optimized images (800px WebP, via proxy for authentication)
     if (media.storage_id) {
-      return `https://api-storage.arkturian.com/storage/media/${media.storage_id}?width=800&format=webp&quality=85`;
+      return `https://share.arkturian.com/proxy.php?id=${media.storage_id}&width=800&format=webp&quality=85`;
     }
 
     // Fallback to Shopify CDN

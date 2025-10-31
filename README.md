@@ -11,6 +11,65 @@ A React TypeScript application for browsing and filtering O'Neal products with a
 - 🔄 **Smooth Animations** - Interpolated properties for position, size, and opacity
 - 📱 **Responsive Design** - Adapts to different viewport sizes
 
+## Annotation Tester (`/annot`)
+
+Die Annotation-Testseite validiert die KI-gestützte Produktanalyse, die aus dem `storage-api` stammt. Sie dient dazu, Vision-Analysen end-to-end auszulösen, Prompts/Antworten einzusehen und die erzeugten Anchor-Anmerkungen im Canvas zu prüfen.
+
+### Funktionsumfang
+
+- 🔑 **Tenant-Aware Auth** – Eingabe eines `Storage Object ID` + API-Key (Standard: `oneal_demo_token`).
+- 🖼 **Bildvorschau** – Holt das passende Derivat (`/storage/media/{id}`) oder `webview_url` vom Storage-Service.
+- 🤖 **Analyse-Trigger** – Startet `POST /storage/analyze-async/{id}` mit konfigurierbaren Parametern:
+  - `mode=quality`
+  - `ai_tasks=vision,embedding,kg`
+  - `ai_vision_mode` (`product` | `generic` | `auto`)
+  - `ai_context_role` (`product` | `lifestyle` | …)
+  - optional `ai_metadata` (JSON prompt context)
+- 🔁 **Task Polling** – Überwacht den Async-Task via `/storage/tasks/{task_id}` bis `completed/failed`.
+- 🧠 **Transparenz** – Zeigt Prompt, rohe KI-Antwort, Annotation-JSON und vollständige Objekt-Metadaten (`ai_context_metadata`) inline.
+- 📍 **Canvas Overlay** – Visualisiert `annotations[].anchor` als relative x/y-Marker inklusive Tooltip und optionale Bounding Boxes.
+
+### Bedienung
+
+1. Seite öffnen: `http://localhost:5173/annot`
+2. `Storage Object ID` (z. B. `4642`) eintragen
+3. API-Key prüfen/ersetzen
+4. Optional Metadaten-JSON ergänzen (z. B. Produktfeatures)
+5. **Load Image** → lädt Objekt + Bild
+6. **Start Analysis** → triggert Async-Pipeline und pollt Status
+7. Nach Abschluss erscheinen Prompt, Antwort, Annotationen & Metadaten sowie Overlays im Bild
+8. **Fetch Annotations** (falls nur Annotationen aktualisiert werden sollen)
+
+### Pipeline-Überblick
+
+```
+AnnotationTester → POST /storage/analyze-async/{id}
+  → storage-api AsyncPipelineManager
+    → ai_analysis.service.analyze_content (Gemini Vision Prompting)
+    → Speichert Ergebnisse in storage_objects.ai_context_metadata
+    → Knowledge-Graph Schritt (optional embeddings/relations)
+AnnotationTester ← GET /storage/tasks/{task_id}
+AnnotationTester ← GET /storage/objects/{id} (Prompt/Response)
+AnnotationTester ← GET /storage/objects/{id}/annotations
+```
+
+### Testing & Automation
+
+- Playwright Test: `tests/annotation.spec.ts`
+  ```bash
+  ANNOT_OBJECT_ID=4642 ANNOT_API_KEY=oneal_demo_token npx playwright test --project=chromium tests/annotation.spec.ts
+  ```
+- Interaktiver UI-Test: `npm run test:ui` → Projekt `Annotation Tester` auswählen
+- Reporter: `npx playwright show-report`
+
+### Offene Arbeiten / Roadmap
+
+- 🔄 **Annotation Refinement** – Prompting weiter schärfen (z. B. confidence-thresholding, Label-Harmonisierung).
+- 📦 **ProductFinder-Integration** – Überführung der Annotationen in reguläre Produkt-Detail-Overlays und Pivot-Dimensionen.
+- 🧪 **E2E Upload Tests** – Automatisierte Szenarien: Upload → Analyse → Annotation-Visualisierung.
+- 📊 **Insights Export** – Optionale Speicherung der KI-Prompt/Responses für Auditing & Training.
+- 🔐 **Key Management** – UI-Option für alternative Tenant-Keys und sichere Speicherung.
+
 ## Tech Stack
 
 - **React 18** + **TypeScript**

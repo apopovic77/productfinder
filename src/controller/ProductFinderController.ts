@@ -47,16 +47,23 @@ export class ProductFinderController {
   private canvas: HTMLCanvasElement | null = null;
   private ctx: CanvasRenderingContext2D | null = null;
 
+  // History integration
+  private historyPopStateHandler: ((e: PopStateEvent) => void) | null = null;
+  private ignoreNextHistoryPush = false;
+
   async initialize(canvas: HTMLCanvasElement): Promise<void> {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
-    
+
     if (!this.ctx) {
       throw new Error('Failed to get 2D context');
     }
 
     // Initialize viewport
     this.viewportService.initialize(canvas);
+
+    // Setup browser history integration for pivot drill-down
+    this.setupHistoryIntegration();
 
     // Initialize skeleton renderer
     this.skeletonRenderer = new SkeletonRenderer(this.ctx);
@@ -103,6 +110,12 @@ export class ProductFinderController {
     if (this.renderer) this.renderer.stop();
     this.stopSkeletonAnimation();
     this.viewportService.destroy();
+
+    // Remove history listener
+    if (this.historyPopStateHandler) {
+      window.removeEventListener('popstate', this.historyPopStateHandler);
+      this.historyPopStateHandler = null;
+    }
   }
 
   // Data Management
@@ -401,16 +414,34 @@ export class ProductFinderController {
   drillDownPivot(value: string): void {
     this.layoutService.drillDownPivot(value);
     this.onDataChanged();
+
+    // Push history state for browser back button
+    if (!this.ignoreNextHistoryPush) {
+      const state = this.layoutService.getPivotBreadcrumbs();
+      window.history.pushState({ pivotDepth: state.length - 1, breadcrumbs: state }, '');
+    }
+    this.ignoreNextHistoryPush = false;
   }
-  
+
   drillUpPivot(): void {
     this.layoutService.drillUpPivot();
     this.onDataChanged();
+
+    // Push history state for browser back button
+    if (!this.ignoreNextHistoryPush) {
+      const state = this.layoutService.getPivotBreadcrumbs();
+      window.history.pushState({ pivotDepth: state.length - 1, breadcrumbs: state }, '');
+    }
+    this.ignoreNextHistoryPush = false;
   }
-  
+
   resetPivot(): void {
     this.layoutService.resetPivot();
     this.onDataChanged();
+
+    // Replace history state (don't push)
+    const state = this.layoutService.getPivotBreadcrumbs();
+    window.history.replaceState({ pivotDepth: state.length - 1, breadcrumbs: state }, '');
   }
   
   getPivotBreadcrumbs(): string[] {
@@ -448,6 +479,56 @@ export class ProductFinderController {
   drillDownGroup(groupKey: string): void {
     this.layoutService.drillDownPivot(groupKey);
     this.onDataChanged();
+
+    // Push history state for browser back button
+    if (!this.ignoreNextHistoryPush) {
+      const state = this.layoutService.getPivotBreadcrumbs();
+      window.history.pushState({ pivotDepth: state.length - 1, breadcrumbs: state }, '');
+    }
+    this.ignoreNextHistoryPush = false;
+  }
+
+  /**
+   * Setup browser history integration for pivot drill-down
+   * Back button = drill up, Forward button = restore state
+   */
+  private setupHistoryIntegration(): void {
+    // Initialize history with current state
+    const initialState = this.layoutService.getPivotBreadcrumbs();
+    window.history.replaceState({ pivotDepth: initialState.length - 1, breadcrumbs: initialState }, '');
+
+    // Handle browser back/forward
+    this.historyPopStateHandler = (e: PopStateEvent) => {
+      if (!e.state || e.state.pivotDepth === undefined) {
+        // No pivot state, ignore
+        return;
+      }
+
+      const targetDepth = e.state.pivotDepth;
+      const currentDepth = this.layoutService.getPivotBreadcrumbs().length - 1;
+
+      // Prevent pushing new history during restoration
+      this.ignoreNextHistoryPush = true;
+
+      if (targetDepth < currentDepth) {
+        // Going back - drill up
+        const steps = currentDepth - targetDepth;
+        for (let i = 0; i < steps; i++) {
+          if (this.layoutService.canDrillUpPivot()) {
+            this.layoutService.drillUpPivot();
+          }
+        }
+        this.onDataChanged();
+      } else if (targetDepth > currentDepth) {
+        // Going forward - would need to store drill path, for now just ignore
+        // This is a limitation - we can't restore forward navigation
+        console.warn('[ProductFinderController] Forward navigation not fully supported');
+      }
+
+      this.ignoreNextHistoryPush = false;
+    };
+
+    window.addEventListener('popstate', this.historyPopStateHandler);
   }
   
   /**

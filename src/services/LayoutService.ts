@@ -222,6 +222,11 @@ export class LayoutService {
         }
       } else {
         if (!(this.layouter instanceof PivotLayouter)) {
+          // Update pivot config with hero mode state for 'auto' scale resolution
+          this.pivotConfig = {
+            ...this.pivotConfig,
+            isHeroMode: false
+          };
           this.layouter = new PivotLayouter<Product>(this.pivotConfig);
           this.engine.setLayouter(this.layouter);
           this.applyAnimationDuration();

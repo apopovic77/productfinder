@@ -11,6 +11,12 @@ import type { GroupDimension } from './services/PivotDrillDownService';
 import type { Orientation } from './layout/PivotLayouter';
 import type { PivotGroup } from './layout/PivotGroup';
 import type { PivotDimensionDefinition } from './services/PivotDimensionAnalyzer';
+import {
+  createDefaultDeveloperSettings,
+  createDefaultFilterState,
+  createDefaultPivotState,
+  createDefaultUiState,
+} from './config/AppConfig';
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -58,38 +64,36 @@ type State = {
   zoom: number;
 };
 
-export default class App extends React.Component<{}, State> {
-  private canvasRef = React.createRef<HTMLCanvasElement>();
-  private controller = new ProductFinderController();
-  private fpsRaf: number | null = null;
-  private fpsLastSample = 0;
-  private fpsFrameCount = 0;
+const createInitialState = (): State => {
+  const filters = createDefaultFilterState();
+  const ui = createDefaultUiState();
+  const pivot = createDefaultPivotState();
 
-  state: State = {
+  return {
     loading: true,
     error: null,
     filteredProducts: [],
-    
-    search: '',
-    category: '',
-    season: '',
-    priceMin: '',
-    priceMax: '',
-    weightMin: '',
-    weightMax: '',
-    sortMode: 'none',
-    layoutMode: 'pivot',
-    showOnlyFavorites: false,
-    showFilters: true,
-    
-    pivotDimension: 'category',
-    pivotBreadcrumbs: ['All'],
+
+    search: filters.search,
+    category: filters.category,
+    season: filters.season,
+    priceMin: filters.priceMin,
+    priceMax: filters.priceMax,
+    weightMin: filters.weightMin,
+    weightMax: filters.weightMax,
+    sortMode: ui.sortMode,
+    layoutMode: ui.layoutMode,
+    showOnlyFavorites: ui.showOnlyFavorites,
+    showFilters: ui.showFilters,
+
+    pivotDimension: pivot.dimension,
+    pivotBreadcrumbs: [pivot.rootBreadcrumb],
     pivotDimensions: [],
     pivotOrientation: 'columns',
     pivotGroups: [],
     pivotDefinitions: [],
     isPivotHeroMode: false,
-    
+
     selectedProduct: null,
     selectedIndex: -1,
     modalDirection: 0,
@@ -97,23 +101,21 @@ export default class App extends React.Component<{}, State> {
     hoveredProduct: null,
     mousePos: null,
     focusedIndex: -1,
-    
-    devSettings: {
-      gridConfig: {
-        spacing: 1,
-        margin: 50,
-        minCellSize: 120,
-        maxCellSize: 250
-      },
-      showDebugInfo: false,
-      showBoundingBoxes: false,
-      animationDuration: 0.4,
-      priceBucketMode: 'static',
-      priceBucketCount: 5
-    },
+
+    devSettings: createDefaultDeveloperSettings(),
     fps: 60,
     zoom: 1,
   };
+};
+
+export default class App extends React.Component<{}, State> {
+  private canvasRef = React.createRef<HTMLCanvasElement>();
+  private controller = new ProductFinderController();
+  private fpsRaf: number | null = null;
+  private fpsLastSample = 0;
+  private fpsFrameCount = 0;
+
+  state: State = createInitialState();
 
   async componentDidMount() {
     const canvas = this.canvasRef.current;

@@ -2,7 +2,7 @@ import { LayoutNode } from './LayoutNode';
 import { GridLayoutStrategy } from './GridLayoutStrategy';
 import { ShelfLayoutStrategy } from './ShelfLayoutStrategy';
 import { WeightScalePolicy, type ScaleContext } from './ScalePolicy';
-import { SCALE_CONFIG } from '../config/ScaleConfig';
+import { SCALE_CONFIG, resolveScaleEnabled } from '../config/ScaleConfig';
 import { PivotGroup } from './PivotGroup';
 import { Vector2 } from 'arkturian-typescript-utils';
 
@@ -29,6 +29,7 @@ export type PivotConfig<T> = {
   innerLayoutType?: InnerLayoutType;
   innerFactory?: () => GridLayoutStrategy<T>;
   onGroupLayout?: (groupKey: string, nodes: LayoutNode<T>[]) => void;
+  isHeroMode?: boolean; // Whether we're in hero mode (for 'auto' scale config)
 }
 
 /**
@@ -81,7 +82,13 @@ export class PivotLayouter<T> {
       const w = this.config.access.weight(n.data);
       if (typeof w === 'number') weights.push(w);
     });
-    const scaleEnabled = SCALE_CONFIG.enabled && (SCALE_CONFIG.weight?.enabled ?? true);
+
+    // Resolve 'auto' mode based on isHeroMode
+    const isHeroMode = this.config.isHeroMode ?? false;
+    const masterEnabled = resolveScaleEnabled(SCALE_CONFIG.enabled, isHeroMode);
+    const weightEnabled = resolveScaleEnabled(SCALE_CONFIG.weight?.enabled ?? true, isHeroMode);
+    const scaleEnabled = masterEnabled && weightEnabled;
+
     const ctx: ScaleContext = {
       weightMin: scaleEnabled && weights.length ? Math.min(...weights) : undefined,
       weightMax: scaleEnabled && weights.length ? Math.max(...weights) : undefined,

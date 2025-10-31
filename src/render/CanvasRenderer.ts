@@ -251,7 +251,7 @@ export class CanvasRenderer<T> {
 
     const storageId = product.primaryImage.storage_id;
     const quality = size === LOD_CONFIG.highResolution ? LOD_CONFIG.highQuality : LOD_CONFIG.lowQuality;
-    const imageUrl = `https://api-storage.arkturian.com/storage/media/${storageId}?width=${size}&format=webp&quality=${quality}`;
+    const imageUrl = `https://share.arkturian.com/proxy.php?id=${storageId}&width=${size}&format=webp&quality=${quality}`;
 
     // Trigger async image load
     // Product.loadImageFromUrl will:
