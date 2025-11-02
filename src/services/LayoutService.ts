@@ -521,13 +521,38 @@ export class LayoutService {
   /**
    * Calculate content bounds from all layout nodes
    * Used for viewport bounds checking and fit-to-content scale
+   *
+   * @param viewportWidth - Viewport width (optional, for fixed bounds mode)
+   * @param viewportHeight - Viewport height (optional, for fixed bounds mode)
    */
-  getContentBounds(): { width: number; height: number; minX: number; minY: number; maxX: number; maxY: number } | null {
+  getContentBounds(viewportWidth?: number, viewportHeight?: number): { width: number; height: number; minX: number; minY: number; maxX: number; maxY: number } | null {
     const nodes = this.engine.all();
     if (nodes.length === 0) {
       return null;
     }
 
+    // Hero Mode: Dynamic bounds based on actual content (allows vertical centering)
+    const isHeroMode = this.isPivotHeroMode();
+    if (isHeroMode) {
+      return this.calculateDynamicBounds(nodes);
+    }
+
+    // Pivot Mode: Fixed bounds based on viewport (prevents unwanted centering)
+    // This ensures the rubberband system always works with the same bounds,
+    // regardless of how much content is currently visible
+    if (this.mode === 'pivot' && viewportWidth && viewportHeight) {
+      return this.calculateFixedBounds(nodes, viewportWidth, viewportHeight);
+    }
+
+    // Fallback: Dynamic bounds for other modes
+    return this.calculateDynamicBounds(nodes);
+  }
+
+  /**
+   * Calculate dynamic bounds based on actual content
+   * Used in Hero Mode to allow vertical centering
+   */
+  private calculateDynamicBounds(nodes: any[]): { width: number; height: number; minX: number; minY: number; maxX: number; maxY: number } {
     let minX = Infinity;
     let minY = Infinity;
     let maxX = -Infinity;
@@ -562,6 +587,52 @@ export class LayoutService {
       maxY,
       width: maxX - minX,
       height: maxY - minY
+    };
+  }
+
+  /**
+   * Calculate fixed bounds based on viewport size
+   * Used in Pivot Mode to prevent vertical centering when few products are visible
+   *
+   * The bounds are always as large as the viewport, which prevents the rubberband
+   * system from centering content vertically (since content < viewport = centering)
+   */
+  private calculateFixedBounds(nodes: any[], viewportWidth: number, viewportHeight: number): { width: number; height: number; minX: number; minY: number; maxX: number; maxY: number } {
+    // First, get actual content bounds to determine horizontal extent
+    let minX = Infinity;
+    let maxX = -Infinity;
+
+    for (const node of nodes) {
+      const x = node.posX.targetValue ?? node.posX.value ?? 0;
+      const w = node.width.targetValue ?? node.width.value ?? 0;
+
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x + w);
+    }
+
+    // Include group headers in horizontal bounds
+    const headers = this.getGroupHeaders();
+    for (const header of headers) {
+      minX = Math.min(minX, header.x);
+      maxX = Math.max(maxX, header.x + header.width);
+    }
+
+    const actualWidth = maxX - minX;
+
+    // Force bounds to be at least viewport size
+    // This prevents vertical centering in pivot mode
+    const width = Math.max(actualWidth, viewportWidth);
+
+    // Vertical bounds: ALWAYS use viewport size (0 to viewportHeight)
+    // This ensures content stays at its layout position (top or bottom aligned)
+    // without being centered by the rubberband system
+    return {
+      minX,
+      minY: 0,  // Always start at top
+      maxX: minX + width,
+      maxY: viewportHeight,  // Always end at viewport height
+      width,
+      height: viewportHeight  // Height is always viewport height
     };
   }
 }

@@ -55,7 +55,7 @@ const DEVELOPER_SETTINGS_DEFAULTS: DeveloperSettings = {
   },
   showDebugInfo: false,
   showBoundingBoxes: false,
-  animationDuration: 0.4,
+  animationDuration: 1.0,
   priceBucketMode: 'static',
   priceBucketCount: 5,
 };

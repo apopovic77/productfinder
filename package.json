@@ -13,6 +13,7 @@
     "test:report": "playwright show-report"
   },
   "dependencies": {
+    "@arkturian/react-force-labels": "file:../react-force-labels",
     "arkturian-oneal-sdk": "^1.0.0",
     "arkturian-typescript-utils": "^1.0.0",
     "axios": "^1.12.2",

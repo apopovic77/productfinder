@@ -375,10 +375,15 @@ export default class App extends React.Component<{}, State> {
     // Otherwise check for product click
     const product = this.controller.hitTest(x, y);
     if (product) {
-      const groupKey = this.controller.getGroupKeyForProduct(product);
-      const sequence = this.controller.getDisplayOrderForGroup(groupKey).map(p => p.id);
-      const idx = sequence.indexOf(product.id);
-      this.setState({ selectedProduct: product, selectedIndex: idx, modalDirection: 0, modalSequence: sequence });
+      // Center the clicked product smoothly (if zoomed in)
+      // Rubberband system will automatically prevent bounds violations
+      this.controller.centerOnProduct(product);
+
+      // TODO: Modal dialog deaktiviert - User möchte kein Modal
+      // const groupKey = this.controller.getGroupKeyForProduct(product);
+      // const sequence = this.controller.getDisplayOrderForGroup(groupKey).map(p => p.id);
+      // const idx = sequence.indexOf(product.id);
+      // this.setState({ selectedProduct: product, selectedIndex: idx, modalDirection: 0, modalSequence: sequence });
     }
   };
 

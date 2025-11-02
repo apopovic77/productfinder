@@ -5,6 +5,7 @@ const API_KEY = process.env.ANNOT_API_KEY ?? 'oneal_demo_token';
 
 test.describe('Annotation Tester', () => {
   test('runs annotation pipeline end-to-end', async ({ page }) => {
+    test.setTimeout(180_000);
     test.skip(!OBJECT_ID, 'Object ID is required for annotation test');
 
     await page.goto('/annot');

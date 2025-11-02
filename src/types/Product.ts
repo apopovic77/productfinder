@@ -80,7 +80,10 @@ export type ProductData = {
  */
 export class Product {
   private static imageCache = new Map<string, HTMLImageElement>();
-  private static loadingPromises = new Map<string, Promise<HTMLImageElement>>();
+  private static loadingPromises = new Map<string, Promise<HTMLImageElement | null>>();
+  private static failedUrlAttempts = new Map<string, { count: number; lastFailed: number }>();
+  private static readonly MAX_IMAGE_RETRIES = 2;
+  private static readonly RETRY_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
 
   public readonly id: string;
   public readonly sku?: string;
@@ -212,6 +215,17 @@ export class Product {
    * Load image from a specific URL (for LOD system)
    */
   async loadImageFromUrl(url: string): Promise<HTMLImageElement | null> {
+    const failureMeta = Product.failedUrlAttempts.get(url);
+    if (failureMeta) {
+      const elapsed = Date.now() - failureMeta.lastFailed;
+      if (elapsed > Product.RETRY_COOLDOWN_MS) {
+        Product.failedUrlAttempts.delete(url);
+      } else if (failureMeta.count >= Product.MAX_IMAGE_RETRIES) {
+        // Too many recent failures – keep existing image and skip retry for now
+        return this._image ?? null;
+      }
+    }
+
     if (Product.imageCache.has(url)) {
       const cachedImg = Product.imageCache.get(url)!;
       // Only update if we don't have an image or if cached image is better
@@ -228,7 +242,7 @@ export class Product {
     this._imageLoading = true;
     this._imageError = false;
 
-    const loadPromise = new Promise<HTMLImageElement>((resolve, reject) => {
+    const loadPromise = new Promise<HTMLImageElement | null>((resolve) => {
       const img = new Image();
       // Don't set crossOrigin - not needed unless we're using Canvas
       // img.crossOrigin = 'anonymous';
@@ -239,6 +253,7 @@ export class Product {
         this._imageLoading = false;
         Product.imageCache.set(url, img);
         Product.loadingPromises.delete(url);
+        Product.failedUrlAttempts.delete(url);
         resolve(img);
       };
 
@@ -248,10 +263,18 @@ export class Product {
         Product.loadingPromises.delete(url);
         console.warn(`Failed to load image for product ${this.id}: ${url} (keeping existing image)`);
 
+        const now = Date.now();
+        const info = Product.failedUrlAttempts.get(url);
+        if (info && now - info.lastFailed < Product.RETRY_COOLDOWN_MS) {
+          Product.failedUrlAttempts.set(url, { count: info.count + 1, lastFailed: now });
+        } else {
+          Product.failedUrlAttempts.set(url, { count: 1, lastFailed: now });
+        }
+
         // IMPORTANT: Keep existing image on error, don't replace with null!
         // this._image stays unchanged
 
-        reject(new Error(`Image load failed: ${url}`));
+        resolve(this._image ?? null);
       };
 
       img.src = url;
@@ -259,12 +282,8 @@ export class Product {
 
     Product.loadingPromises.set(url, loadPromise);
 
-    try {
-      return await loadPromise;
-    } catch {
-      // On error, return current image (might be lower res, but better than nothing)
-      return this._image;
-    }
+    const result = await loadPromise;
+    return result ?? this._image;
   }
 
   get image(): HTMLImageElement | null {

@@ -73,5 +73,13 @@ export class ViewportService {
   getOffset(): Vector2 {
     return this.transform?.offset ?? new Vector2(0, 0);
   }
+
+  /**
+   * Smoothly center viewport on a specific world position
+   * Used in Hero Mode to center clicked products
+   */
+  centerOn(worldX: number, worldY: number, targetScale?: number): void {
+    this.transform?.centerOn(worldX, worldY, targetScale);
+  }
 }
 

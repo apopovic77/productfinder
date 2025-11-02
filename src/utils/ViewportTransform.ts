@@ -389,16 +389,70 @@ export class ViewportTransform {
   
   /**
    * Reset to fit-to-content view
+   * Calculates correct offset based on content bounds and viewport size
+   * If content is smaller than viewport, center it immediately (no rubberband animation)
    */
   reset() {
     this.targetScale = this.fitToContentScale;
-    this.targetOffset.x = 0;
-    this.targetOffset.y = 0;
 
-    // Also reset current values for instant reset
+    let offsetX = 0;
+    let offsetY = 0;
+
+    if (this.contentBounds) {
+      const scaledWidth = this.contentBounds.width * this.fitToContentScale;
+      const scaledHeight = this.contentBounds.height * this.fitToContentScale;
+
+      // Check if content is smaller than viewport (would be centered by rubberband)
+      const shouldCenterX = scaledWidth < this.viewportWidth;
+      const shouldCenterY = scaledHeight < this.viewportHeight;
+
+      if (shouldCenterX) {
+        // Center horizontally immediately
+        offsetX = (this.viewportWidth - scaledWidth) / 2 - this.contentBounds.minX * this.fitToContentScale;
+      } else {
+        // Align to left edge
+        offsetX = -this.contentBounds.minX * this.fitToContentScale;
+      }
+
+      if (shouldCenterY) {
+        // Center vertically immediately
+        offsetY = (this.viewportHeight - scaledHeight) / 2 - this.contentBounds.minY * this.fitToContentScale;
+      } else {
+        // Align to top edge
+        offsetY = -this.contentBounds.minY * this.fitToContentScale;
+      }
+    }
+
+    this.targetOffset.x = offsetX;
+    this.targetOffset.y = offsetY;
+
+    // Also reset current values for instant reset (no interpolation/animation)
     this.scale = this.fitToContentScale;
-    this.offset.x = 0;
-    this.offset.y = 0;
+    this.offset.x = offsetX;
+    this.offset.y = offsetY;
+  }
+
+  /**
+   * Smoothly center viewport on a specific world position
+   * Used in Hero Mode to center clicked products
+   *
+   * @param worldX - X coordinate in world space (e.g., product center)
+   * @param worldY - Y coordinate in world space (e.g., product center)
+   * @param targetScale - Optional scale to animate to (defaults to current scale)
+   */
+  centerOn(worldX: number, worldY: number, targetScale?: number): void {
+    // Use provided scale or keep current
+    const scale = targetScale ?? this.targetScale;
+
+    // Calculate offset needed to center world position in viewport
+    // Formula: offset = viewportCenter - (worldPos * scale)
+    const offsetX = this.viewportWidth / 2 - worldX * scale;
+    const offsetY = this.viewportHeight / 2 - worldY * scale;
+
+    // Set targets (smooth interpolation will handle the animation)
+    this.targetScale = scale;
+    this.targetOffset.x = offsetX;
+    this.targetOffset.y = offsetY;
   }
 
   /**

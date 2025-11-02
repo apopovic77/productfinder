@@ -146,13 +146,20 @@ export class ProductFinderController {
    * Should be called after layout changes.
    */
   private updateContentBounds(): void {
-    // Use LayoutService's method which correctly uses targetValue for bounds
-    const bounds = this.layoutService.getContentBounds();
+    if (!this.canvas) {
+      console.warn('[ProductFinderController] No canvas available for updateContentBounds');
+      return;
+    }
+
+    // Pass viewport size to LayoutService for fixed bounds calculation in Pivot Mode
+    const bounds = this.layoutService.getContentBounds(this.canvas.width, this.canvas.height);
 
     if (!bounds) {
       console.warn('[ProductFinderController] No content bounds available');
       return;
     }
+
+    console.log('[ProductFinderController] Content bounds:', bounds, 'Viewport:', this.canvas.width, 'x', this.canvas.height);
 
     // Set content bounds on viewport
     this.viewportService.setContentBounds(bounds);
@@ -238,6 +245,47 @@ export class ProductFinderController {
   // Viewport API
   resetViewport(): void {
     this.viewportService.reset();
+  }
+
+  /**
+   * Center viewport on a product (smooth animation)
+   * Works in all modes, but only centers if zoomed in enough
+   * Rubberband system automatically prevents bounds violations
+   */
+  centerOnProduct(product: Product): void {
+    const viewport = this.viewportService.getTransform();
+    if (!viewport) return;
+
+    // Only center if significantly zoomed in (10% more than fit-to-content)
+    // When at fit-to-content scale, everything is already visible, so centering makes no sense
+    const isZoomedIn = viewport.scale > viewport.minScale * 1.1;
+    if (!isZoomedIn) {
+      console.log('[ProductFinderController] Not zoomed in enough for centering (scale:', viewport.scale, 'minScale:', viewport.minScale, ')');
+      return;
+    }
+
+    // Find the node for this product
+    const nodes = this.layoutService.getEngine().all();
+    const node = nodes.find(n => n.data.id === product.id);
+
+    if (!node) {
+      console.warn('[ProductFinderController] Product node not found for centering');
+      return;
+    }
+
+    // Get product center in world coordinates
+    const x = node.posX.value ?? 0;
+    const y = node.posY.value ?? 0;
+    const w = node.width.value ?? 0;
+    const h = node.height.value ?? 0;
+
+    const centerX = x + w / 2;
+    const centerY = y + h / 2;
+
+    // Center viewport on product (keep current scale)
+    // Rubberband system will automatically handle bounds violations
+    this.viewportService.centerOn(centerX, centerY);
+    console.log('[ProductFinderController] Centering on product:', product.name, 'at', centerX, centerY);
   }
 
   // Hit Testing

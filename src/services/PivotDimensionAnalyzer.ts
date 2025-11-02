@@ -200,7 +200,14 @@ export class PivotDimensionAnalyzer {
       categories.forEach((value, index) => {
         if (!value) return;
         const key = `category:${index}`;
-        const label = index === 0 ? 'Produktkategorie' : index === 1 ? 'Unterkategorie' : `Kategorie ${index + 1}`;
+        const isLast = index === categories.length - 1;
+        const label = index === 0
+          ? 'Produktkategorie'
+          : index === 1
+            ? 'Unterkategorie'
+            : isLast
+              ? 'Produktwelt'
+              : `Kategorie ${index + 1}`;
         const candidate = ensureCandidate(
           key,
           label,
