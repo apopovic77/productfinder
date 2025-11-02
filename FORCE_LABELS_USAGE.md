@@ -2,10 +2,13 @@
 
 ## Installation ✅
 
-Das Package ist bereits installiert:
-```json
-"@arkturian/react-force-labels": "file:../react-force-labels"
+Das Package ist von NPM installiert:
+```bash
+npm install react-force-labels
 ```
+
+NPM Package: https://www.npmjs.com/package/react-force-labels
+GitHub Repo: https://github.com/apopovic77/react-force-labels
 
 ## Usage im ProductFinder
 

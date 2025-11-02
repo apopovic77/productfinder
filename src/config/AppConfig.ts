@@ -53,6 +53,14 @@ const DEVELOPER_SETTINGS_DEFAULTS: DeveloperSettings = {
     minCellSize: 120,
     maxCellSize: 250,
   },
+  forceLabelsConfig: {
+    anchorStrength: 0.15,
+    repulsionStrength: 100,
+    repulsionRadius: 120,
+    minDistance: 50,
+    maxDistance: 180,
+    friction: 0.88,
+  },
   showDebugInfo: false,
   showBoundingBoxes: false,
   animationDuration: 1.0,
@@ -84,6 +92,7 @@ export function createDefaultDeveloperSettings(): DeveloperSettings {
   return {
     ...defaults,
     gridConfig: { ...defaults.gridConfig },
+    forceLabelsConfig: { ...defaults.forceLabelsConfig },
   };
 }
 

@@ -524,6 +524,21 @@ export class ProductFinderController {
     return this.layoutService.getGroupKeyForProduct(product);
   }
 
+  /**
+   * Get layout node for a product
+   */
+  getProductNode(productId: string) {
+    const nodes = this.layoutService.getEngine().all();
+    return nodes.find(n => n.data.id === productId);
+  }
+
+  /**
+   * Get viewport transform (scale, offset, etc.)
+   */
+  getViewportTransform() {
+    return this.viewportService.getTransform();
+  }
+
   drillDownGroup(groupKey: string): void {
     this.layoutService.drillDownPivot(groupKey);
     this.onDataChanged();

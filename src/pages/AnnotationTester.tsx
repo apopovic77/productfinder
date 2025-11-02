@@ -75,6 +75,9 @@ export default function AnnotationTester(): React.JSX.Element {
     const metaAnnotations = embedMeta.annotations || [];
     if (Array.isArray(metaAnnotations)) {
       setAnnotationsJson(stringifySafe(metaAnnotations));
+      if (metaAnnotations.length > 0) {
+        setAnnotations(metaAnnotations);
+      }
     } else {
       setAnnotationsJson('');
     }
@@ -334,19 +337,19 @@ function ImageWithOverlay({ objectId, src, annotations }: { objectId: string; sr
         style={{ display: 'block', maxWidth: '100%', borderRadius: 8 }}
       />
       {dims.w > 0 && dims.h > 0 && annotations.map((a, i) => {
-        const anchorX = clamp(a.anchor?.x ?? 0);
-        const anchorY = clamp(a.anchor?.y ?? 0);
-        const left = anchorX * dims.w;
-        const top = anchorY * dims.h;
-
-        const side: 'left' | 'right' = anchorX > 0.55 ? 'left' : 'right';
-        const calloutShift = side === 'right' ? 180 : -180;
-        const calloutX = clamp((left + calloutShift) / dims.w) * dims.w;
-        const calloutY = top;
-        const connectorLength = Math.max(30, Math.abs(calloutX - left) - 20);
-
         const rawBox = a.box ?? null;
-        let box: { left: number; top: number; width: number; height: number } | null = null;
+        let box: {
+          left: number;
+          top: number;
+          width: number;
+          height: number;
+          extendHorizontal: boolean;
+          extendVertical: boolean;
+        } | null = null;
+
+        let anchorXNorm = clamp(a.anchor?.x ?? 0);
+        let anchorYNorm = clamp(a.anchor?.y ?? 0);
+
         if (rawBox && rawBox.length === 4) {
           const bx0 = clamp(rawBox[0]);
           const by0 = clamp(rawBox[1]);
@@ -354,32 +357,44 @@ function ImageWithOverlay({ objectId, src, annotations }: { objectId: string; sr
           const by2 = clamp(rawBox[3]);
 
           const treatAsWidthHeight = bx2 <= bx0 || by2 <= by0;
+
           const widthNorm = treatAsWidthHeight
-            ? Math.max(0, bx2)
-            : Math.max(0, bx2 - bx0);
+            ? Math.min(1, Math.max(0, rawBox[2]))
+            : Math.min(1, Math.max(0, bx2 - bx0));
           const heightNorm = treatAsWidthHeight
-            ? Math.max(0, by2)
-            : Math.max(0, by2 - by0);
+            ? Math.min(1, Math.max(0, rawBox[3]))
+            : Math.min(1, Math.max(0, by2 - by0));
 
           const actualWidth = Math.max(0, widthNorm * dims.w);
           const actualHeight = Math.max(0, heightNorm * dims.h);
 
-          const maxDim = Math.max(dims.w, dims.h);
-          const tolerance = maxDim > 0 ? 0.01 : 0;
-
-          const normalizedWidth = actualWidth / dims.w;
-          const normalizedHeight = actualHeight / dims.h;
-
-          const shouldExtend = normalizedWidth < tolerance || normalizedHeight < tolerance;
+          const extendHorizontal = widthNorm >= 0.999 || widthNorm <= 0.001;
+          const extendVertical = heightNorm >= 0.999 || heightNorm <= 0.001;
 
           box = {
-            left: bx0 * dims.w,
-            top: by0 * dims.h,
-            width: shouldExtend ? dims.w : actualWidth,
-            height: shouldExtend ? dims.h : actualHeight,
-            extendToEdges: shouldExtend,
+            left: extendHorizontal ? 0 : bx0 * dims.w,
+            top: extendVertical ? 0 : by0 * dims.h,
+            width: extendHorizontal ? dims.w : actualWidth,
+            height: extendVertical ? dims.h : actualHeight,
+            extendHorizontal,
+            extendVertical,
           };
+
+          if (!extendHorizontal && widthNorm > 0) {
+            anchorXNorm = clamp(bx0 + anchorXNorm * widthNorm);
+          }
+          if (!extendVertical && heightNorm > 0) {
+            anchorYNorm = clamp(by0 + anchorYNorm * heightNorm);
+          }
         }
+
+        const left = anchorXNorm * dims.w;
+        const top = anchorYNorm * dims.h;
+
+        const side: 'left' | 'right' = anchorXNorm > 0.55 ? 'left' : 'right';
+        const calloutShift = side === 'right' ? 180 : -180;
+        const calloutX = clamp((left + calloutShift) / dims.w) * dims.w;
+        const calloutY = top;
 
         return (
           <React.Fragment key={`${a.label}-${i}`}>
@@ -459,8 +474,8 @@ function ImageWithOverlay({ objectId, src, annotations }: { objectId: string; sr
               <div
                 style={{
                   position: 'absolute',
-                  left: box.extendToEdges ? 0 : box.left,
-                  top: box.extendToEdges ? 0 : box.top,
+                  left: box.left,
+                  top: box.top,
                   width: box.width,
                   height: box.height,
                   border: '2px dashed rgba(59,130,246,0.85)',
@@ -506,32 +521,43 @@ function CanvasAnnotationDebug({ objectId, src, annotations }: { objectId: strin
       const clamp = (value: number) => Math.min(1, Math.max(0, value));
 
       annotations.forEach((annotation) => {
-        const anchorX = clamp(annotation.anchor?.x ?? 0) * width;
-        const anchorY = clamp(annotation.anchor?.y ?? 0) * height;
-
-        ctx.fillStyle = '#12b981';
-        ctx.strokeStyle = '#064e3b';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(anchorX, anchorY, 6, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
+        let anchorXNorm = clamp(annotation.anchor?.x ?? 0);
+        let anchorYNorm = clamp(annotation.anchor?.y ?? 0);
 
         const box = annotation.box;
+        let rectLeft = 0;
+        let rectTop = 0;
+        let rectWidth = width;
+        let rectHeight = height;
+
         if (box && box.length === 4) {
           const bx0 = clamp(box[0]);
           const by0 = clamp(box[1]);
           const bx2 = clamp(box[2]);
           const by2 = clamp(box[3]);
-
           const treatAsWidthHeight = bx2 <= bx0 || by2 <= by0;
-          const widthNorm = treatAsWidthHeight ? Math.max(0, bx2) : Math.max(0, bx2 - bx0);
-          const heightNorm = treatAsWidthHeight ? Math.max(0, by2) : Math.max(0, by2 - by0);
 
-          const rectWidth = widthNorm * width;
-          const rectHeight = heightNorm * height;
-          const rectLeft = bx0 * width;
-          const rectTop = by0 * height;
+          const widthNorm = treatAsWidthHeight
+            ? Math.min(1, Math.max(0, box[2]))
+            : Math.min(1, Math.max(0, bx2 - bx0));
+          const heightNorm = treatAsWidthHeight
+            ? Math.min(1, Math.max(0, box[3]))
+            : Math.min(1, Math.max(0, by2 - by0));
+
+          const extendHorizontal = widthNorm >= 0.999 || widthNorm <= 0.001;
+          const extendVertical = heightNorm >= 0.999 || heightNorm <= 0.001;
+
+          rectLeft = extendHorizontal ? 0 : bx0 * width;
+          rectTop = extendVertical ? 0 : by0 * height;
+          rectWidth = extendHorizontal ? width : widthNorm * width;
+          rectHeight = extendVertical ? height : heightNorm * height;
+
+          if (!extendHorizontal && widthNorm > 0) {
+            anchorXNorm = clamp(bx0 + anchorXNorm * widthNorm);
+          }
+          if (!extendVertical && heightNorm > 0) {
+            anchorYNorm = clamp(by0 + anchorYNorm * heightNorm);
+          }
 
           if (rectWidth > 0 && rectHeight > 0) {
             ctx.strokeStyle = 'rgba(59,130,246,0.95)';
@@ -541,6 +567,17 @@ function CanvasAnnotationDebug({ objectId, src, annotations }: { objectId: strin
             ctx.setLineDash([]);
           }
         }
+
+        const anchorX = anchorXNorm * width;
+        const anchorY = anchorYNorm * height;
+
+        ctx.fillStyle = '#12b981';
+        ctx.strokeStyle = '#064e3b';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(anchorX, anchorY, 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
 
         ctx.fillStyle = 'rgba(15,23,42,0.85)';
         ctx.fillRect(anchorX + 12, anchorY - 22, 180, 44);

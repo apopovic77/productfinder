@@ -3,6 +3,7 @@ import './App.css';
 import type { Product } from './types/Product';
 import { ProductFinderController } from './controller/ProductFinderController';
 import ProductModal from './components/ProductModal';
+import { ProductAnnotations } from './components/ProductAnnotations';
 import { AnimatePresence } from 'framer-motion';
 import { DeveloperOverlay, type DeveloperSettings } from './components/DeveloperOverlay';
 import type { SortMode } from './services/FilterService';
@@ -379,11 +380,17 @@ export default class App extends React.Component<{}, State> {
       // Rubberband system will automatically prevent bounds violations
       this.controller.centerOnProduct(product);
 
+      // Set selected product to show annotations (in Hero Mode)
+      this.setState({ selectedProduct: product });
+
       // TODO: Modal dialog deaktiviert - User möchte kein Modal
       // const groupKey = this.controller.getGroupKeyForProduct(product);
       // const sequence = this.controller.getDisplayOrderForGroup(groupKey).map(p => p.id);
       // const idx = sequence.indexOf(product.id);
       // this.setState({ selectedProduct: product, selectedIndex: idx, modalDirection: 0, modalSequence: sequence });
+    } else {
+      // Clicked on empty space - deselect product
+      this.setState({ selectedProduct: null });
     }
   };
 
@@ -500,6 +507,35 @@ export default class App extends React.Component<{}, State> {
         {/* Primary toolbar intentionally hidden to maximize canvas area. Developer overlay remains accessible via F1. */}
         <div className="pf-stage">
           <canvas ref={this.canvasRef} className="pf-canvas" />
+
+          {/* Product Annotations - Show in Hero Mode when product is selected */}
+          {isPivotHeroMode && selectedProduct && this.canvasRef.current && (() => {
+            const canvas = this.canvasRef.current!;
+            const node = this.controller.getProductNode(selectedProduct.id);
+            if (!node) return null;
+
+            const viewport = this.controller.getViewportTransform();
+            if (!viewport) return null;
+
+            // Use target values (final position) instead of current animated values
+            // to prevent re-rendering during animation
+            const productCenterX = (node.posX.targetValue ?? node.posX.value ?? 0) + (node.width.targetValue ?? node.width.value ?? 0) / 2;
+            const productCenterY = (node.posY.targetValue ?? node.posY.value ?? 0) + (node.height.targetValue ?? node.height.value ?? 0) / 2;
+
+            return (
+              <ProductAnnotations
+                product={selectedProduct}
+                anchorX={productCenterX}
+                anchorY={productCenterY}
+                canvasWidth={canvas.width}
+                canvasHeight={canvas.height}
+                viewportScale={viewport.getTargetScale()}
+                viewportOffsetX={viewport.getTargetOffset().x}
+                viewportOffsetY={viewport.getTargetOffset().y}
+                forceConfig={this.state.devSettings.forceLabelsConfig}
+              />
+            );
+          })()}
         </div>
 
         <div className="pf-bottom-bar">
@@ -574,7 +610,8 @@ export default class App extends React.Component<{}, State> {
           </div>
         </div>
 
-        <AnimatePresence>
+        {/* Modal Dialog deaktiviert - User möchte Force Labels statt Modal */}
+        {/* <AnimatePresence>
           {selectedProduct && (
             <ProductModal
               product={selectedProduct}
@@ -586,7 +623,7 @@ export default class App extends React.Component<{}, State> {
               onClose={() => this.setState({ selectedProduct: null, selectedIndex: -1, modalDirection: 0 })}
             />
           )}
-        </AnimatePresence>
+        </AnimatePresence> */}
         
         {hoveredProduct && mousePos && (
           <div 

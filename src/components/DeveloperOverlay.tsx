@@ -9,8 +9,18 @@ export type GridConfig = {
   maxCellSize: number;
 };
 
+export type ForceLabelsConfig = {
+  anchorStrength: number;
+  repulsionStrength: number;
+  repulsionRadius: number;
+  minDistance: number;
+  maxDistance: number;
+  friction: number;
+};
+
 export type DeveloperSettings = {
   gridConfig: GridConfig;
+  forceLabelsConfig: ForceLabelsConfig;
   showDebugInfo: boolean;
   showBoundingBoxes: boolean;
   animationDuration: number;
@@ -68,6 +78,16 @@ export const DeveloperOverlay: React.FC<DeveloperOverlayProps> = ({
     });
   };
 
+  const updateForceLabelsConfig = (key: keyof ForceLabelsConfig, value: number) => {
+    onSettingsChange({
+      ...settings,
+      forceLabelsConfig: {
+        ...settings.forceLabelsConfig,
+        [key]: value
+      }
+    });
+  };
+
   const updateSetting = (key: keyof DeveloperSettings, value: any) => {
     onSettingsChange({
       ...settings,
@@ -78,14 +98,22 @@ export const DeveloperOverlay: React.FC<DeveloperOverlayProps> = ({
   const resetToDefaults = () => {
     onSettingsChange({
       gridConfig: {
-        spacing: 12,
-        margin: 20,
+        spacing: 1,
+        margin: 50,
         minCellSize: 120,
         maxCellSize: 250
       },
+      forceLabelsConfig: {
+        anchorStrength: 0.15,
+        repulsionStrength: 100,
+        repulsionRadius: 120,
+        minDistance: 50,
+        maxDistance: 180,
+        friction: 0.88,
+      },
       showDebugInfo: false,
       showBoundingBoxes: false,
-      animationDuration: 0.4,
+      animationDuration: 1.0,
       priceBucketMode: 'static',
       priceBucketCount: 5
     });
@@ -288,6 +316,101 @@ export const DeveloperOverlay: React.FC<DeveloperOverlayProps> = ({
           </div>
 
           {/* Actions */}
+          {/* Force Labels Configuration */}
+          <div className="dev-section">
+            <h4>🏷️ Force Labels (Hero Mode)</h4>
+
+            <div className="dev-control">
+              <label>
+                Anchor Strength: <strong>{settings.forceLabelsConfig.anchorStrength.toFixed(2)}</strong>
+              </label>
+              <input
+                type="range"
+                min="0.05"
+                max="0.5"
+                step="0.01"
+                value={settings.forceLabelsConfig.anchorStrength}
+                onChange={(e) => updateForceLabelsConfig('anchorStrength', Number(e.target.value))}
+              />
+              <span className="dev-hint">How strongly labels are pulled to their anchor point</span>
+            </div>
+
+            <div className="dev-control">
+              <label>
+                Repulsion Strength: <strong>{settings.forceLabelsConfig.repulsionStrength}</strong>
+              </label>
+              <input
+                type="range"
+                min="20"
+                max="300"
+                step="10"
+                value={settings.forceLabelsConfig.repulsionStrength}
+                onChange={(e) => updateForceLabelsConfig('repulsionStrength', Number(e.target.value))}
+              />
+              <span className="dev-hint">How strongly labels push each other apart</span>
+            </div>
+
+            <div className="dev-control">
+              <label>
+                Repulsion Radius: <strong>{settings.forceLabelsConfig.repulsionRadius}px</strong>
+              </label>
+              <input
+                type="range"
+                min="50"
+                max="250"
+                step="10"
+                value={settings.forceLabelsConfig.repulsionRadius}
+                onChange={(e) => updateForceLabelsConfig('repulsionRadius', Number(e.target.value))}
+              />
+              <span className="dev-hint">Distance at which labels repel each other</span>
+            </div>
+
+            <div className="dev-control">
+              <label>
+                Min Distance: <strong>{settings.forceLabelsConfig.minDistance}px</strong>
+              </label>
+              <input
+                type="range"
+                min="20"
+                max="150"
+                step="5"
+                value={settings.forceLabelsConfig.minDistance}
+                onChange={(e) => updateForceLabelsConfig('minDistance', Number(e.target.value))}
+              />
+              <span className="dev-hint">Minimum distance from anchor point</span>
+            </div>
+
+            <div className="dev-control">
+              <label>
+                Max Distance: <strong>{settings.forceLabelsConfig.maxDistance}px</strong>
+              </label>
+              <input
+                type="range"
+                min="100"
+                max="400"
+                step="10"
+                value={settings.forceLabelsConfig.maxDistance}
+                onChange={(e) => updateForceLabelsConfig('maxDistance', Number(e.target.value))}
+              />
+              <span className="dev-hint">Maximum distance from anchor point</span>
+            </div>
+
+            <div className="dev-control">
+              <label>
+                Friction: <strong>{settings.forceLabelsConfig.friction.toFixed(2)}</strong>
+              </label>
+              <input
+                type="range"
+                min="0.7"
+                max="0.98"
+                step="0.01"
+                value={settings.forceLabelsConfig.friction}
+                onChange={(e) => updateForceLabelsConfig('friction', Number(e.target.value))}
+              />
+              <span className="dev-hint">Damping factor (higher = slower convergence)</span>
+            </div>
+          </div>
+
           <div className="dev-section">
             <div className="dev-buttons">
               <button onClick={resetToDefaults} className="dev-button">

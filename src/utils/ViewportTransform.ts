@@ -123,6 +123,14 @@ export class ViewportTransform {
     this.offset.y += (this.targetOffset.y - this.offset.y) * this.speedFactor;
   }
 
+  getTargetScale(): number {
+    return this.targetScale;
+  }
+
+  getTargetOffset(): { x: number; y: number } {
+    return { x: this.targetOffset.x, y: this.targetOffset.y };
+  }
+
   /**
    * Calculate valid bounds for current scale
    */
