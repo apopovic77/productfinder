@@ -1,0 +1,188 @@
+.product-overlay-backdrop {
+  cursor: pointer;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.product-overlay-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 16px;
+  padding: 0;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  animation: slideIn 0.3s ease-out;
+  overflow: hidden;
+  max-height: 600px;
+  display: flex;
+  flex-direction: column;
+}
+
+.product-overlay-header {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.product-overlay-title {
+  color: white;
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.3;
+  flex: 1;
+  padding-right: 12px;
+}
+
+.product-overlay-close {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.product-overlay-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.05);
+}
+
+.product-overlay-price {
+  color: white;
+  font-size: 32px;
+  font-weight: 800;
+  padding: 16px 20px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.product-overlay-details {
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  flex: 1;
+  overflow-y: auto;
+}
+
+.product-overlay-detail {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.product-overlay-detail:last-child {
+  border-bottom: none;
+}
+
+.product-overlay-label {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.product-overlay-value {
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.product-overlay-features {
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.product-overlay-features h4 {
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.product-overlay-features ul {
+  margin: 0;
+  padding-left: 20px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.product-overlay-features li {
+  margin-bottom: 6px;
+}
+
+.product-overlay-actions {
+  padding: 16px 20px;
+  background: rgba(0, 0, 0, 0.2);
+  display: flex;
+  gap: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.product-overlay-button {
+  flex: 1;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.product-overlay-button-primary {
+  background: white;
+  color: #667eea;
+}
+
+.product-overlay-button-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.3);
+}
+
+.product-overlay-button-secondary {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  backdrop-filter: blur(10px);
+}
+
+.product-overlay-button-secondary:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-2px);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

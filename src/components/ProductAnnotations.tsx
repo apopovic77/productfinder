@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { ForceLabels } from 'react-force-labels';
 import type { Label } from 'react-force-labels';
 import { Vector2 } from 'arkturian-typescript-utils';
@@ -35,23 +35,20 @@ const ProductAnnotationsComponent: React.FC<ProductAnnotationsProps> = ({
   viewportOffsetY,
   forceConfig,
 }) => {
-  // Transform world coordinates to screen coordinates
-  const screenX = anchorX * viewportScale + viewportOffsetX;
-  const screenY = anchorY * viewportScale + viewportOffsetY;
-
   // Store STABLE label objects in ref to prevent recreation
-  // This is the key fix: Vector2 instances must be the SAME objects, not recreated
+  // Labels use WORLD COORDINATES (anchorX, anchorY) - the parent div handles viewport transform
   const labelsRef = useRef<{ labels: Label[]; productId: string } | null>(null);
 
   // Only recreate labels when product changes
   if (!labelsRef.current || labelsRef.current.productId !== product.id) {
+    console.log('🔄 ProductAnnotations: Creating NEW labels for product', product.id);
     const result: Label[] = [];
 
     // Price (highest priority - stays closest)
     if (product.price?.value) {
       result.push({
         id: 'price',
-        anchor: new Vector2(screenX, screenY - 80),
+        anchor: new Vector2(anchorX, anchorY - 80),
         content: `€ ${product.price.value.toFixed(2)}`,
         priority: 5,
       });
@@ -60,7 +57,7 @@ const ProductAnnotationsComponent: React.FC<ProductAnnotationsProps> = ({
     // Product name
     result.push({
       id: 'name',
-      anchor: new Vector2(screenX - 120, screenY),
+      anchor: new Vector2(anchorX - 120, anchorY),
       content: product.name,
       priority: 4,
     });
@@ -69,7 +66,7 @@ const ProductAnnotationsComponent: React.FC<ProductAnnotationsProps> = ({
     if (product.category?.[0]) {
       result.push({
         id: 'category',
-        anchor: new Vector2(screenX + 100, screenY + 60),
+        anchor: new Vector2(anchorX + 100, anchorY + 60),
         content: product.category[0],
         priority: 2,
       });
@@ -79,7 +76,7 @@ const ProductAnnotationsComponent: React.FC<ProductAnnotationsProps> = ({
     if (product.weight) {
       result.push({
         id: 'weight',
-        anchor: new Vector2(screenX - 100, screenY + 80),
+        anchor: new Vector2(anchorX - 100, anchorY + 80),
         content: `${product.weight}g`,
         priority: 2,
       });
@@ -89,7 +86,7 @@ const ProductAnnotationsComponent: React.FC<ProductAnnotationsProps> = ({
     if (product.season) {
       result.push({
         id: 'season',
-        anchor: new Vector2(screenX + 90, screenY - 60),
+        anchor: new Vector2(anchorX + 90, anchorY - 60),
         content: `Season ${product.season}`,
         priority: 1,
       });
@@ -99,7 +96,7 @@ const ProductAnnotationsComponent: React.FC<ProductAnnotationsProps> = ({
     if (product.brand) {
       result.push({
         id: 'brand',
-        anchor: new Vector2(screenX - 80, screenY - 70),
+        anchor: new Vector2(anchorX - 80, anchorY - 70),
         content: product.brand,
         priority: 3,
       });
@@ -111,6 +108,25 @@ const ProductAnnotationsComponent: React.FC<ProductAnnotationsProps> = ({
   // Use the STABLE labels array from ref
   const labels = labelsRef.current.labels;
 
+  // Memoize forceConfig object to prevent recreation on every render
+  const memoizedForceConfig = useMemo(() => ({
+    anchorStrength: forceConfig.anchorStrength,
+    repulsionStrength: forceConfig.repulsionStrength,
+    repulsionRadius: forceConfig.repulsionRadius,
+    minDistance: forceConfig.minDistance,
+    maxDistance: forceConfig.maxDistance,
+    enableCollision: true,
+    collisionPadding: 12,
+    friction: forceConfig.friction,
+  }), [
+    forceConfig.anchorStrength,
+    forceConfig.repulsionStrength,
+    forceConfig.repulsionRadius,
+    forceConfig.minDistance,
+    forceConfig.maxDistance,
+    forceConfig.friction,
+  ]);
+
   return (
     <div
       style={{
@@ -121,34 +137,27 @@ const ProductAnnotationsComponent: React.FC<ProductAnnotationsProps> = ({
         height: canvasHeight,
         pointerEvents: 'none', // Let clicks pass through to canvas
         zIndex: 10, // Above canvas
+        transform: `translate(${viewportOffsetX}px, ${viewportOffsetY}px) scale(${viewportScale})`,
+        transformOrigin: '0 0',
       }}
     >
       <ForceLabels
         key={product.id}
         labels={labels}
-        width={canvasWidth}
-        height={canvasHeight}
+        width={canvasWidth / viewportScale}
+        height={canvasHeight / viewportScale}
         showConnectors={true}
-        forceConfig={{
-          anchorStrength: forceConfig.anchorStrength,
-          repulsionStrength: forceConfig.repulsionStrength,
-          repulsionRadius: forceConfig.repulsionRadius,
-          minDistance: forceConfig.minDistance,
-          maxDistance: forceConfig.maxDistance,
-          enableCollision: true,
-          collisionPadding: 12,
-          friction: forceConfig.friction,
-        }}
+        forceConfig={memoizedForceConfig}
         style={{
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           textColor: '#1a1a1a',
           borderColor: '#3b82f6',
           borderWidth: 2,
           borderRadius: 8,
-          fontSize: 14,
+          fontSize: 14 / viewportScale,
           fontFamily: 'system-ui, -apple-system, sans-serif',
           fontWeight: 600,
-          padding: 10,
+          padding: 10 / viewportScale,
           shadow: true,
           opacity: 1,
         }}
@@ -157,16 +166,23 @@ const ProductAnnotationsComponent: React.FC<ProductAnnotationsProps> = ({
   );
 };
 
-// Memoize component to prevent re-rendering when viewport changes
+// Memoize component - viewport changes handled by CSS transform, no re-render needed!
 // Only re-render when product or force config actually changes
 export const ProductAnnotations = React.memo(ProductAnnotationsComponent, (prev, next) => {
-  // Only re-render if product ID or force config changes
+  // Re-render only if product ID or force config changes
+  // Viewport scale/offset changes are handled by CSS transform
   return (
     prev.product.id === next.product.id &&
+    prev.anchorX === next.anchorX &&
+    prev.anchorY === next.anchorY &&
     prev.forceConfig.anchorStrength === next.forceConfig.anchorStrength &&
     prev.forceConfig.repulsionStrength === next.forceConfig.repulsionStrength &&
+    prev.forceConfig.repulsionRadius === next.forceConfig.repulsionRadius &&
+    prev.forceConfig.minDistance === next.forceConfig.minDistance &&
+    prev.forceConfig.maxDistance === next.forceConfig.maxDistance &&
     prev.forceConfig.friction === next.forceConfig.friction &&
     prev.canvasWidth === next.canvasWidth &&
     prev.canvasHeight === next.canvasHeight
+    // Note: viewportScale and viewportOffset NOT compared - handled by CSS transform!
   );
 });

@@ -4,6 +4,7 @@ import type { Product } from './types/Product';
 import { ProductFinderController } from './controller/ProductFinderController';
 import ProductModal from './components/ProductModal';
 import { ProductAnnotations } from './components/ProductAnnotations';
+import { ProductOverlay } from './components/ProductOverlay';
 import { AnimatePresence } from 'framer-motion';
 import { DeveloperOverlay, type DeveloperSettings } from './components/DeveloperOverlay';
 import type { SortMode } from './services/FilterService';
@@ -243,6 +244,33 @@ export default class App extends React.Component<{}, State> {
         : null;
       this.controller.setFocusedProduct(focusedProduct);
     }
+
+    // Update selected product overlay (Canvas-based rendering)
+    if (
+      prevState.selectedProduct !== this.state.selectedProduct ||
+      prevState.devSettings.heroDisplayMode !== this.state.devSettings.heroDisplayMode ||
+      prevState.devSettings.overlayScaleMode !== this.state.devSettings.overlayScaleMode
+    ) {
+      const renderer = this.controller.getRenderer();
+      if (renderer) {
+        renderer.heroDisplayMode = this.state.devSettings.heroDisplayMode;
+        renderer.overlayScaleMode = this.state.devSettings.overlayScaleMode;
+
+        if (this.state.selectedProduct && this.state.devSettings.heroDisplayMode === 'overlay') {
+          const node = this.controller.getProductNode(this.state.selectedProduct.id);
+          if (node) {
+            const productCenterX = (node.posX.targetValue ?? node.posX.value ?? 0) + (node.width.targetValue ?? node.width.value ?? 0) / 2;
+            const productCenterY = (node.posY.targetValue ?? node.posY.value ?? 0) + (node.height.targetValue ?? node.height.value ?? 0) / 2;
+
+            renderer.selectedProduct = this.state.selectedProduct;
+            renderer.selectedProductAnchor = { x: productCenterX, y: productCenterY };
+          }
+        } else {
+          renderer.selectedProduct = null;
+          renderer.selectedProductAnchor = null;
+        }
+      }
+    }
   }
 
   private handleResize = () => {
@@ -366,7 +394,33 @@ export default class App extends React.Component<{}, State> {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    // Check for group header click first (in pivot mode)
+    // Check for overlay clicks first (if overlay is visible)
+    if (this.state.selectedProduct && this.state.devSettings.heroDisplayMode === 'overlay') {
+      const renderer = this.controller.getRenderer();
+      const overlayClick = renderer?.checkOverlayClick(x, y);
+
+      if (overlayClick === 'close') {
+        // Close the overlay
+        this.setState({ selectedProduct: null });
+        return;
+      } else if (overlayClick === 'view') {
+        // Handle 360° view button
+        console.log('360° View clicked for product:', this.state.selectedProduct.name);
+        // TODO: Implement 360° view
+        return;
+      } else if (overlayClick === 'cart') {
+        // Handle add to cart button
+        console.log('Add to Cart clicked for product:', this.state.selectedProduct.name);
+        // TODO: Implement add to cart
+        return;
+      } else if (overlayClick === 'background') {
+        // Clicked on overlay background - consume the click (do nothing)
+        return;
+      }
+      // If overlayClick is null, continue with normal click handling
+    }
+
+    // Check for group header click (in pivot mode)
     const groupHeaderClicked = this.controller.handleGroupHeaderClick(x, y);
     if (groupHeaderClicked) {
       this.syncPivotUI();
@@ -508,8 +562,8 @@ export default class App extends React.Component<{}, State> {
         <div className="pf-stage">
           <canvas ref={this.canvasRef} className="pf-canvas" />
 
-          {/* Product Annotations - Show in Hero Mode when product is selected */}
-          {isPivotHeroMode && selectedProduct && this.canvasRef.current && (() => {
+          {/* Force labels overlay (only for force-labels mode) - rendered as HTML */}
+          {isPivotHeroMode && selectedProduct && this.state.devSettings.heroDisplayMode === 'force-labels' && this.canvasRef.current && (() => {
             const canvas = this.canvasRef.current!;
             const node = this.controller.getProductNode(selectedProduct.id);
             if (!node) return null;
@@ -517,8 +571,6 @@ export default class App extends React.Component<{}, State> {
             const viewport = this.controller.getViewportTransform();
             if (!viewport) return null;
 
-            // Use target values (final position) instead of current animated values
-            // to prevent re-rendering during animation
             const productCenterX = (node.posX.targetValue ?? node.posX.value ?? 0) + (node.width.targetValue ?? node.width.value ?? 0) / 2;
             const productCenterY = (node.posY.targetValue ?? node.posY.value ?? 0) + (node.height.targetValue ?? node.height.value ?? 0) / 2;
 

@@ -18,6 +18,9 @@ export type ForceLabelsConfig = {
   friction: number;
 };
 
+export type HeroDisplayMode = 'overlay' | 'force-labels';
+export type OverlayScaleMode = 'scale-invariant' | 'scale-with-content';
+
 export type DeveloperSettings = {
   gridConfig: GridConfig;
   forceLabelsConfig: ForceLabelsConfig;
@@ -26,6 +29,8 @@ export type DeveloperSettings = {
   animationDuration: number;
   priceBucketMode: PriceBucketMode;
   priceBucketCount: number;
+  heroDisplayMode: HeroDisplayMode;
+  overlayScaleMode: OverlayScaleMode;
 };
 
 type DeveloperOverlayProps = {
@@ -104,18 +109,20 @@ export const DeveloperOverlay: React.FC<DeveloperOverlayProps> = ({
         maxCellSize: 250
       },
       forceLabelsConfig: {
-        anchorStrength: 0.15,
-        repulsionStrength: 100,
-        repulsionRadius: 120,
-        minDistance: 50,
-        maxDistance: 180,
-        friction: 0.88,
+        anchorStrength: 0.2,
+        repulsionStrength: 200,
+        repulsionRadius: 200,
+        minDistance: 80,
+        maxDistance: 250,
+        friction: 0.85,
       },
       showDebugInfo: false,
       showBoundingBoxes: false,
       animationDuration: 1.0,
       priceBucketMode: 'static',
-      priceBucketCount: 5
+      priceBucketCount: 5,
+      heroDisplayMode: 'overlay',
+      overlayScaleMode: 'scale-invariant',
     });
   };
 
@@ -288,10 +295,41 @@ export const DeveloperOverlay: React.FC<DeveloperOverlayProps> = ({
             </div>
           </div>
 
+          {/* Hero Mode Display */}
+          <div className="dev-section">
+            <h4>🎯 Hero Mode Display</h4>
+
+            <div className="dev-control">
+              <label>
+                Display Mode: <strong>{settings.heroDisplayMode === 'overlay' ? 'Overlay Card' : 'Force Labels'}</strong>
+              </label>
+              <select
+                value={settings.heroDisplayMode}
+                onChange={(e) => updateSetting('heroDisplayMode', e.target.value as HeroDisplayMode)}
+              >
+                <option value="overlay">Overlay Card</option>
+                <option value="force-labels">Force Labels (Anchors)</option>
+              </select>
+            </div>
+
+            <div className="dev-control">
+              <label>
+                Overlay Scaling: <strong>{settings.overlayScaleMode === 'scale-invariant' ? 'Fixed Size' : 'Scale with Zoom'}</strong>
+              </label>
+              <select
+                value={settings.overlayScaleMode}
+                onChange={(e) => updateSetting('overlayScaleMode', e.target.value as OverlayScaleMode)}
+              >
+                <option value="scale-invariant">Fixed Size (always readable)</option>
+                <option value="scale-with-content">Scale with Zoom (like products)</option>
+              </select>
+            </div>
+          </div>
+
           {/* Debug Options */}
           <div className="dev-section">
             <h4>🐛 Debug</h4>
-            
+
             <div className="dev-checkbox">
               <label>
                 <input
@@ -322,17 +360,17 @@ export const DeveloperOverlay: React.FC<DeveloperOverlayProps> = ({
 
             <div className="dev-control">
               <label>
-                Anchor Strength: <strong>{settings.forceLabelsConfig.anchorStrength.toFixed(2)}</strong>
+                Anchor Strength: <strong>{settings.forceLabelsConfig.anchorStrength.toFixed(3)}</strong>
               </label>
               <input
                 type="range"
-                min="0.05"
-                max="0.5"
+                min="0"
+                max="2.0"
                 step="0.01"
                 value={settings.forceLabelsConfig.anchorStrength}
                 onChange={(e) => updateForceLabelsConfig('anchorStrength', Number(e.target.value))}
               />
-              <span className="dev-hint">How strongly labels are pulled to their anchor point</span>
+              <span className="dev-hint">How strongly labels are pulled to their anchor point (0-2.0)</span>
             </div>
 
             <div className="dev-control">
@@ -341,13 +379,13 @@ export const DeveloperOverlay: React.FC<DeveloperOverlayProps> = ({
               </label>
               <input
                 type="range"
-                min="20"
-                max="300"
+                min="0"
+                max="1000"
                 step="10"
                 value={settings.forceLabelsConfig.repulsionStrength}
                 onChange={(e) => updateForceLabelsConfig('repulsionStrength', Number(e.target.value))}
               />
-              <span className="dev-hint">How strongly labels push each other apart</span>
+              <span className="dev-hint">How strongly labels push each other apart (0-1000)</span>
             </div>
 
             <div className="dev-control">
@@ -356,13 +394,13 @@ export const DeveloperOverlay: React.FC<DeveloperOverlayProps> = ({
               </label>
               <input
                 type="range"
-                min="50"
-                max="250"
+                min="0"
+                max="800"
                 step="10"
                 value={settings.forceLabelsConfig.repulsionRadius}
                 onChange={(e) => updateForceLabelsConfig('repulsionRadius', Number(e.target.value))}
               />
-              <span className="dev-hint">Distance at which labels repel each other</span>
+              <span className="dev-hint">Distance at which labels repel each other (0-800px)</span>
             </div>
 
             <div className="dev-control">
@@ -371,13 +409,13 @@ export const DeveloperOverlay: React.FC<DeveloperOverlayProps> = ({
               </label>
               <input
                 type="range"
-                min="20"
-                max="150"
+                min="0"
+                max="400"
                 step="5"
                 value={settings.forceLabelsConfig.minDistance}
                 onChange={(e) => updateForceLabelsConfig('minDistance', Number(e.target.value))}
               />
-              <span className="dev-hint">Minimum distance from anchor point</span>
+              <span className="dev-hint">Minimum distance from anchor point (0-400px)</span>
             </div>
 
             <div className="dev-control">
@@ -386,28 +424,28 @@ export const DeveloperOverlay: React.FC<DeveloperOverlayProps> = ({
               </label>
               <input
                 type="range"
-                min="100"
-                max="400"
+                min="50"
+                max="1000"
                 step="10"
                 value={settings.forceLabelsConfig.maxDistance}
                 onChange={(e) => updateForceLabelsConfig('maxDistance', Number(e.target.value))}
               />
-              <span className="dev-hint">Maximum distance from anchor point</span>
+              <span className="dev-hint">Maximum distance from anchor point (50-1000px)</span>
             </div>
 
             <div className="dev-control">
               <label>
-                Friction: <strong>{settings.forceLabelsConfig.friction.toFixed(2)}</strong>
+                Friction: <strong>{settings.forceLabelsConfig.friction.toFixed(3)}</strong>
               </label>
               <input
                 type="range"
-                min="0.7"
-                max="0.98"
+                min="0.1"
+                max="0.99"
                 step="0.01"
                 value={settings.forceLabelsConfig.friction}
                 onChange={(e) => updateForceLabelsConfig('friction', Number(e.target.value))}
               />
-              <span className="dev-hint">Damping factor (higher = slower convergence)</span>
+              <span className="dev-hint">Damping factor - higher = slower convergence (0.1-0.99)</span>
             </div>
           </div>
 

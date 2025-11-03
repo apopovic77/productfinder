@@ -18,6 +18,18 @@ export class CanvasRenderer<T> {
   public focusedItem: T | null = null;
   public hoveredGroupKey: string | null = null;
 
+  // Selected product for overlay rendering
+  public selectedProduct: Product | null = null;
+  public selectedProductAnchor: { x: number; y: number } | null = null;
+  public heroDisplayMode: 'overlay' | 'force-labels' = 'overlay';
+  public overlayScaleMode: 'scale-invariant' | 'scale-with-content' = 'scale-invariant';
+
+  // Overlay bounds for click detection (in world space)
+  private overlayBounds: { left: number; top: number; width: number; height: number } | null = null;
+  private closeButtonBounds: { left: number; top: number; width: number; height: number } | null = null;
+  private viewButtonBounds: { left: number; top: number; width: number; height: number } | null = null;
+  private cartButtonBounds: { left: number; top: number; width: number; height: number } | null = null;
+
   // Image LOD tracking: nodeId -> current loaded size
   private loadedImageSizes = new Map<string, number>();
 
@@ -433,8 +445,8 @@ export class CanvasRenderer<T> {
     // Restore viewport transform
     this.ctx.restore();
 
-    // DEBUG: Draw content bounds visualization
-    if (this.viewport) {
+    // DEBUG: Draw content bounds visualization (DISABLED - use Developer Overlay F1 to enable)
+    if (false && this.viewport) {
       const bounds = this.viewport.getContentBounds();
       if (bounds) {
         this.ctx.save();
@@ -474,5 +486,295 @@ export class CanvasRenderer<T> {
         this.ctx.fillText('⚠️ NO CONTENT BOUNDS SET!', 10, 10);
       }
     }
+
+    // Draw selected product overlay (in world space)
+    if (this.selectedProduct && this.selectedProductAnchor && this.viewport && this.heroDisplayMode === 'overlay') {
+      this.drawProductOverlay(this.selectedProduct, this.selectedProductAnchor.x, this.selectedProductAnchor.y);
+    }
+  }
+
+  /**
+   * Wrap text to fit within a maximum width
+   */
+  private wrapText(text: string, maxWidth: number, fontSize: number, fontWeight: string = ''): string[] {
+    const lines: string[] = [];
+    this.ctx.font = `${fontWeight} ${fontSize}px system-ui`;
+
+    const words = text.split(' ');
+    let currentLine = '';
+
+    for (const word of words) {
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+      const metrics = this.ctx.measureText(testLine);
+
+      if (metrics.width > maxWidth && currentLine) {
+        lines.push(currentLine);
+        currentLine = word;
+      } else {
+        currentLine = testLine;
+      }
+    }
+
+    if (currentLine) {
+      lines.push(currentLine);
+    }
+
+    return lines;
+  }
+
+  /**
+   * Draw product overlay directly on canvas in world space
+   */
+  private drawProductOverlay(product: Product, anchorX: number, anchorY: number) {
+    if (!this.viewport) return;
+
+    this.ctx.save();
+    this.viewport.applyTransform(this.ctx);
+
+    const scale = this.viewport.scale;
+
+    // Scale factor - depends on mode
+    const scaleFactor = this.overlayScaleMode === 'scale-invariant' ? (1 / scale) : 1;
+
+    // Find product node to get its dimensions
+    const nodes = this.getNodes();
+    const productNode = nodes.find(n => n.data.id === product.id);
+    const productHeight = productNode ? (productNode.height.value ?? 200) : 200;
+
+    // Overlay should be 80% of product height
+    const overlayHeight = productHeight * 0.4;
+    const overlayWidth = overlayHeight * 0.86; // Maintain aspect ratio (360/420 = 0.86)
+    const padding = overlayHeight * 0.067; // Scale padding proportionally
+    const offset = 50 * scaleFactor;
+
+    // Position to the right of product
+    const left = anchorX + offset;
+    const top = anchorY - overlayHeight / 2;
+
+    // Store overlay bounds for click detection
+    this.overlayBounds = { left, top, width: overlayWidth, height: overlayHeight };
+
+    // Less transparent background for better readability
+    const gradient = this.ctx.createLinearGradient(left, top, left, top + overlayHeight);
+    gradient.addColorStop(0, 'rgba(102, 126, 234, 0.65)'); // Much less transparent
+    gradient.addColorStop(0.5, 'rgba(110, 100, 200, 0.60)');
+    gradient.addColorStop(1, 'rgba(118, 75, 162, 0.65)');
+
+    // Border radius proportional to overlay height (~24px for 420px overlay)
+    const borderRadius = overlayHeight * 0.057;
+
+    this.drawRoundedRect(left, top, overlayWidth, overlayHeight, borderRadius);
+    this.ctx.fillStyle = gradient;
+    this.ctx.fill();
+
+    // Stronger glass effect layers
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.25)'; // Less transparent
+    this.ctx.fill();
+
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.15)'; // Less transparent
+    this.ctx.fill();
+
+    // Stronger border
+    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; // More visible
+    this.ctx.lineWidth = overlayHeight * 0.0036; // ~1.5px proportional
+    this.ctx.stroke();
+
+    // Close button (X) in top-right corner - proportional to overlay
+    const closeButtonSize = overlayHeight * 0.076; // ~32px for 420px overlay
+    const closeButtonX = left + overlayWidth - closeButtonSize - padding * 0.43;
+    const closeButtonY = top + padding * 0.43;
+
+    this.closeButtonBounds = {
+      left: closeButtonX,
+      top: closeButtonY,
+      width: closeButtonSize,
+      height: closeButtonSize
+    };
+
+    // Close button background
+    this.ctx.beginPath();
+    this.ctx.arc(
+      closeButtonX + closeButtonSize / 2,
+      closeButtonY + closeButtonSize / 2,
+      closeButtonSize / 2,
+      0,
+      Math.PI * 2
+    );
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+    this.ctx.fill();
+
+    // X symbol
+    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+    this.ctx.lineWidth = overlayHeight * 0.0048; // ~2px for 420px overlay
+    this.ctx.lineCap = 'round';
+    const xOffset = closeButtonSize * 0.25;
+    this.ctx.beginPath();
+    this.ctx.moveTo(closeButtonX + xOffset, closeButtonY + xOffset);
+    this.ctx.lineTo(closeButtonX + closeButtonSize - xOffset, closeButtonY + closeButtonSize - xOffset);
+    this.ctx.moveTo(closeButtonX + closeButtonSize - xOffset, closeButtonY + xOffset);
+    this.ctx.lineTo(closeButtonX + xOffset, closeButtonY + closeButtonSize - xOffset);
+    this.ctx.stroke();
+
+    // Product name with text wrapping - proportional font sizes
+    const nameFontSize = overlayHeight * 0.043; // ~18px for 420px overlay
+    const maxTextWidth = overlayWidth - padding * 2 - closeButtonSize - padding * 0.29;
+    const nameLines = this.wrapText(product.name, maxTextWidth, nameFontSize, 'bold');
+
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 1)'; // Fully opaque for better readability
+    this.ctx.font = `bold ${nameFontSize}px system-ui`;
+    this.ctx.textAlign = 'left';
+    this.ctx.textBaseline = 'top';
+
+    let textY = top + padding;
+    const lineHeight = overlayHeight * 0.057; // ~24px for 420px
+
+    for (const line of nameLines.slice(0, 2)) { // Max 2 lines
+      this.ctx.fillText(line, left + padding, textY);
+      textY += lineHeight;
+    }
+
+    // Price - with better spacing
+    if (product.price?.value) {
+      textY += overlayHeight * 0.029; // ~12px spacing
+      const priceFontSize = overlayHeight * 0.067; // ~28px for 420px
+      this.ctx.font = `bold ${priceFontSize}px system-ui`;
+      this.ctx.fillStyle = 'rgba(255, 255, 255, 1)';
+      this.ctx.fillText(`€ ${product.price.value.toFixed(2)}`, left + padding, textY);
+      textY += overlayHeight * 0.095; // ~40px
+    } else {
+      textY += overlayHeight * 0.048;
+    }
+
+    // Feature bullets with improved spacing
+    textY += overlayHeight * 0.038; // Extra spacing before features
+    const bulletLineHeight = overlayHeight * 0.076; // ~32px
+    const bulletSize = overlayHeight * 0.0095; // ~4px
+    const bulletOffset = overlayHeight * 0.043; // ~18px
+    const featureFontSize = overlayHeight * 0.033; // ~14px
+    this.ctx.font = `${featureFontSize}px system-ui`;
+
+    const features: string[] = [];
+    if (product.category?.[0]) features.push(product.category[0]);
+    if (product.brand) features.push(`${product.brand} brand`);
+    if (product.weight) features.push(`${product.weight}g weight`);
+    if (product.season) features.push(`Season ${product.season}`);
+
+    for (const feature of features.slice(0, 3)) {
+      // Bullet point
+      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+      this.ctx.beginPath();
+      this.ctx.arc(left + padding + bulletSize + overlayHeight * 0.0048, textY + overlayHeight * 0.019, bulletSize, 0, Math.PI * 2);
+      this.ctx.fill();
+
+      // Feature text
+      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+      this.ctx.fillText(feature, left + padding + bulletOffset, textY);
+      textY += bulletLineHeight;
+    }
+
+    // Buttons with improved spacing
+    const buttonY = top + overlayHeight - overlayHeight * 0.286; // ~120px from bottom
+    const buttonHeight = overlayHeight * 0.114; // ~48px
+    const buttonRadius = overlayHeight * 0.029; // ~12px
+    const buttonSpacing = overlayHeight * 0.024; // ~10px
+
+    // 360° View button - more subtle
+    const viewButtonY = buttonY;
+    const viewButtonWidth = overlayWidth - padding * 2;
+    const buttonFontSize = overlayHeight * 0.033; // ~14px for 420px
+
+    this.viewButtonBounds = {
+      left: left + padding,
+      top: viewButtonY,
+      width: viewButtonWidth,
+      height: buttonHeight
+    };
+
+    this.drawRoundedRect(left + padding, viewButtonY, viewButtonWidth, buttonHeight, buttonRadius);
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.15)'; // Less transparent
+    this.ctx.fill();
+    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; // More visible
+    this.ctx.lineWidth = overlayHeight * 0.0036; // ~1.5px
+    this.ctx.stroke();
+
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 1)'; // Fully opaque
+    this.ctx.font = `500 ${buttonFontSize}px system-ui`;
+    this.ctx.textAlign = 'center';
+    this.ctx.textBaseline = 'middle';
+    this.ctx.fillText('🔄 360° View', left + overlayWidth / 2, viewButtonY + buttonHeight / 2);
+
+    // Add to Cart button - cleaner design
+    const cartButtonY = viewButtonY + buttonHeight + buttonSpacing;
+    const cartButtonFontSize = overlayHeight * 0.036; // ~15px for 420px
+
+    this.cartButtonBounds = {
+      left: left + padding,
+      top: cartButtonY,
+      width: viewButtonWidth,
+      height: buttonHeight
+    };
+
+    this.drawRoundedRect(left + padding, cartButtonY, viewButtonWidth, buttonHeight, buttonRadius);
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.95)'; // Slightly transparent white background
+    this.ctx.fill();
+
+    this.ctx.fillStyle = 'rgba(102, 126, 234, 1)'; // Solid color for better contrast
+    this.ctx.font = `600 ${cartButtonFontSize}px system-ui`;
+    this.ctx.fillText('Add to Cart', left + overlayWidth / 2, cartButtonY + buttonHeight / 2);
+
+    this.ctx.restore();
+  }
+
+  /**
+   * Check if a click (in screen coordinates) hits the overlay or its buttons
+   * Returns: 'close' | 'view' | 'cart' | 'background' | null
+   * - null: clicked outside overlay (should continue with normal click handling)
+   * - 'background': clicked on overlay but not a button (consume click, do nothing)
+   * - 'close'/'view'/'cart': clicked a specific button
+   */
+  public checkOverlayClick(screenX: number, screenY: number): 'close' | 'view' | 'cart' | 'background' | null {
+    if (!this.overlayBounds || !this.viewport) return null;
+
+    // Convert screen coordinates to world coordinates
+    const worldX = (screenX - this.viewport.x) / this.viewport.scale;
+    const worldY = (screenY - this.viewport.y) / this.viewport.scale;
+
+    // Check if click is within overlay bounds
+    const inOverlay = worldX >= this.overlayBounds.left &&
+                      worldX <= this.overlayBounds.left + this.overlayBounds.width &&
+                      worldY >= this.overlayBounds.top &&
+                      worldY <= this.overlayBounds.top + this.overlayBounds.height;
+
+    if (!inOverlay) return null; // Click is outside overlay
+
+    // Check close button
+    if (this.closeButtonBounds) {
+      const inClose = worldX >= this.closeButtonBounds.left &&
+                      worldX <= this.closeButtonBounds.left + this.closeButtonBounds.width &&
+                      worldY >= this.closeButtonBounds.top &&
+                      worldY <= this.closeButtonBounds.top + this.closeButtonBounds.height;
+      if (inClose) return 'close';
+    }
+
+    // Check view button
+    if (this.viewButtonBounds) {
+      const inView = worldX >= this.viewButtonBounds.left &&
+                     worldX <= this.viewButtonBounds.left + this.viewButtonBounds.width &&
+                     worldY >= this.viewButtonBounds.top &&
+                     worldY <= this.viewButtonBounds.top + this.viewButtonBounds.height;
+      if (inView) return 'view';
+    }
+
+    // Check cart button
+    if (this.cartButtonBounds) {
+      const inCart = worldX >= this.cartButtonBounds.left &&
+                     worldX <= this.cartButtonBounds.left + this.cartButtonBounds.width &&
+                     worldY >= this.cartButtonBounds.top &&
+                     worldY <= this.cartButtonBounds.top + this.cartButtonBounds.height;
+      if (inCart) return 'cart';
+    }
+
+    // Clicked on overlay background (not a button)
+    return 'background';
   }
 }

@@ -248,21 +248,13 @@ export class ProductFinderController {
   }
 
   /**
-   * Center viewport on a product (smooth animation)
-   * Works in all modes, but only centers if zoomed in enough
+   * Center viewport on a product (smooth animation) with hero zoom
+   * Zooms in so product takes 80% of screen height
    * Rubberband system automatically prevents bounds violations
    */
   centerOnProduct(product: Product): void {
     const viewport = this.viewportService.getTransform();
     if (!viewport) return;
-
-    // Only center if significantly zoomed in (10% more than fit-to-content)
-    // When at fit-to-content scale, everything is already visible, so centering makes no sense
-    const isZoomedIn = viewport.scale > viewport.minScale * 1.1;
-    if (!isZoomedIn) {
-      console.log('[ProductFinderController] Not zoomed in enough for centering (scale:', viewport.scale, 'minScale:', viewport.minScale, ')');
-      return;
-    }
 
     // Find the node for this product
     const nodes = this.layoutService.getEngine().all();
@@ -273,7 +265,7 @@ export class ProductFinderController {
       return;
     }
 
-    // Get product center in world coordinates
+    // Get product center and dimensions in world coordinates
     const x = node.posX.value ?? 0;
     const y = node.posY.value ?? 0;
     const w = node.width.value ?? 0;
@@ -282,10 +274,16 @@ export class ProductFinderController {
     const centerX = x + w / 2;
     const centerY = y + h / 2;
 
-    // Center viewport on product (keep current scale)
-    // Rubberband system will automatically handle bounds violations
-    this.viewportService.centerOn(centerX, centerY);
-    console.log('[ProductFinderController] Centering on product:', product.name, 'at', centerX, centerY);
+    // Calculate hero zoom: product should take 80% of screen height
+    const screenHeight = viewport.viewportHeight;
+    const targetScale = (screenHeight * 0.8) / h;
+
+    // Clamp scale to max allowed zoom (products max 2× their fit-to-content size)
+    const clampedScale = Math.min(targetScale, viewport.maxScale);
+
+    // Center and zoom to product in hero mode
+    this.viewportService.centerOn(centerX, centerY, clampedScale);
+    console.log('[ProductFinderController] Hero zoom on product:', product.name, 'at', centerX, centerY, 'scale:', clampedScale.toFixed(2), '(max:', viewport.maxScale.toFixed(2) + ')');
   }
 
   // Hit Testing
@@ -537,6 +535,13 @@ export class ProductFinderController {
    */
   getViewportTransform() {
     return this.viewportService.getTransform();
+  }
+
+  /**
+   * Get canvas renderer for direct manipulation (e.g., product overlay)
+   */
+  getRenderer() {
+    return this.renderer;
   }
 
   drillDownGroup(groupKey: string): void {

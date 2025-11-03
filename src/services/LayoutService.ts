@@ -525,7 +525,7 @@ export class LayoutService {
    * @param viewportWidth - Viewport width (optional, for fixed bounds mode)
    * @param viewportHeight - Viewport height (optional, for fixed bounds mode)
    */
-  getContentBounds(viewportWidth?: number, viewportHeight?: number): { width: number; height: number; minX: number; minY: number; maxX: number; maxY: number } | null {
+  getContentBounds(viewportWidth?: number, viewportHeight?: number): { width: number; height: number; minX: number; minY: number; maxX: number; maxY: number; maxItemHeight?: number } | null {
     const nodes = this.engine.all();
     if (nodes.length === 0) {
       return null;
@@ -552,11 +552,12 @@ export class LayoutService {
    * Calculate dynamic bounds based on actual content
    * Used in Hero Mode to allow vertical centering
    */
-  private calculateDynamicBounds(nodes: any[]): { width: number; height: number; minX: number; minY: number; maxX: number; maxY: number } {
+  private calculateDynamicBounds(nodes: any[]): { width: number; height: number; minX: number; minY: number; maxX: number; maxY: number; maxItemHeight: number } {
     let minX = Infinity;
     let minY = Infinity;
     let maxX = -Infinity;
     let maxY = -Infinity;
+    let maxItemHeight = 0;
 
     // Include product nodes in bounds
     for (const node of nodes) {
@@ -569,6 +570,9 @@ export class LayoutService {
       minY = Math.min(minY, y);
       maxX = Math.max(maxX, x + w);
       maxY = Math.max(maxY, y + h);
+
+      // Track maximum item height for zoom limit calculation
+      maxItemHeight = Math.max(maxItemHeight, h);
     }
 
     // Also include group headers in bounds (bucket buttons in pivot mode)
@@ -586,7 +590,8 @@ export class LayoutService {
       maxX,
       maxY,
       width: maxX - minX,
-      height: maxY - minY
+      height: maxY - minY,
+      maxItemHeight
     };
   }
 
@@ -597,17 +602,22 @@ export class LayoutService {
    * The bounds are always as large as the viewport, which prevents the rubberband
    * system from centering content vertically (since content < viewport = centering)
    */
-  private calculateFixedBounds(nodes: any[], viewportWidth: number, viewportHeight: number): { width: number; height: number; minX: number; minY: number; maxX: number; maxY: number } {
+  private calculateFixedBounds(nodes: any[], viewportWidth: number, viewportHeight: number): { width: number; height: number; minX: number; minY: number; maxX: number; maxY: number; maxItemHeight: number } {
     // First, get actual content bounds to determine horizontal extent
     let minX = Infinity;
     let maxX = -Infinity;
+    let maxItemHeight = 0;
 
     for (const node of nodes) {
       const x = node.posX.targetValue ?? node.posX.value ?? 0;
       const w = node.width.targetValue ?? node.width.value ?? 0;
+      const h = node.height.targetValue ?? node.height.value ?? 0;
 
       minX = Math.min(minX, x);
       maxX = Math.max(maxX, x + w);
+
+      // Track maximum item height for zoom limit calculation
+      maxItemHeight = Math.max(maxItemHeight, h);
     }
 
     // Include group headers in horizontal bounds
@@ -632,7 +642,8 @@ export class LayoutService {
       maxX: minX + width,
       maxY: viewportHeight,  // Always end at viewport height
       width,
-      height: viewportHeight  // Height is always viewport height
+      height: viewportHeight,  // Height is always viewport height
+      maxItemHeight
     };
   }
 }

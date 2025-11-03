@@ -7,6 +7,7 @@ export interface ContentBounds {
   minY: number;
   maxX: number;
   maxY: number;
+  maxItemHeight?: number; // Maximum height of a single item (for zoom limit calculation)
 }
 
 export class ViewportTransform {
@@ -23,7 +24,7 @@ export class ViewportTransform {
 
   // Scale limits
   private fitToContentScale = 1; // Calculated from content bounds
-  public maxScale = 10; // Allow 10x zoom for quality inspection
+  public maxScale = 2; // Dynamically calculated: fitToContentScale × 2
 
   // Rubber banding config (iOS-style)
   private enableRubberBanding = true;
@@ -55,7 +56,7 @@ export class ViewportTransform {
     this.contentBounds = bounds;
     this.updateViewportSize();
     this.calculateFitToContentScale();
-    console.log('[ViewportTransform] fitToContentScale:', this.fitToContentScale, 'minScale:', this.minScale);
+    console.log('[ViewportTransform] fitToContentScale:', this.fitToContentScale, 'minScale:', this.minScale, 'maxScale:', this.maxScale);
   }
 
   /**
@@ -76,10 +77,12 @@ export class ViewportTransform {
 
   /**
    * Calculate the scale needed to fit all content in viewport
+   * Also sets maxScale so a product can be at most 2× screen height
    */
   private calculateFitToContentScale(): void {
     if (!this.contentBounds || this.viewportWidth === 0 || this.viewportHeight === 0) {
       this.fitToContentScale = 1;
+      this.maxScale = 2; // Fallback
       return;
     }
 
@@ -88,6 +91,16 @@ export class ViewportTransform {
 
     // Use the smaller scale to ensure everything fits
     this.fitToContentScale = Math.min(scaleX, scaleY) * 0.95; // 95% to add some padding
+
+    // Max zoom: largest product can be at most 2× the screen height
+    // Formula: maxProductHeight * maxScale = screenHeight * 2
+    // So: maxScale = (screenHeight * 2) / maxProductHeight
+    if (this.contentBounds.maxItemHeight && this.contentBounds.maxItemHeight > 0) {
+      this.maxScale = (this.viewportHeight * 2) / this.contentBounds.maxItemHeight;
+    } else {
+      // Fallback if no maxItemHeight provided
+      this.maxScale = this.fitToContentScale * 4;
+    }
   }
 
   /**

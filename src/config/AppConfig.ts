@@ -54,18 +54,20 @@ const DEVELOPER_SETTINGS_DEFAULTS: DeveloperSettings = {
     maxCellSize: 250,
   },
   forceLabelsConfig: {
-    anchorStrength: 0.15,
-    repulsionStrength: 100,
-    repulsionRadius: 120,
-    minDistance: 50,
-    maxDistance: 180,
-    friction: 0.88,
+    anchorStrength: 0.2,
+    repulsionStrength: 200,
+    repulsionRadius: 200,
+    minDistance: 80,
+    maxDistance: 250,
+    friction: 0.85,
   },
   showDebugInfo: false,
   showBoundingBoxes: false,
   animationDuration: 1.0,
   priceBucketMode: 'static',
   priceBucketCount: 5,
+  heroDisplayMode: 'overlay',
+  overlayScaleMode: 'scale-with-content', // Skaliert mit Zoom wie die Produkte
 };
 
 export const APP_CONFIG = {
