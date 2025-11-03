@@ -40,7 +40,7 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
   };
 
   // Extract unique colors from all variants
-  const allColors = [...new Set(variants.map(getColor).filter(Boolean))];
+  const allColors = [...new Set(variants.map(getColor).filter(Boolean))] as string[];
 
   // State for selected color and size
   const [selectedColor, setSelectedColor] = useState<string>(allColors[0] || '');
@@ -52,7 +52,7 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
       .filter((v: any) => getColor(v) === selectedColor)
       .map(getSize)
       .filter(Boolean)
-  )];
+  )] as string[];
 
   // Initialize size when color changes or on mount
   useEffect(() => {
@@ -179,16 +179,26 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
         className="pom-info-panel pom-panel-standalone"
         style={{
           position: 'fixed',
-          left: position!.x,
-          top: position!.y,
           width: '480px',
           maxHeight: '90vh',
         }}
-        onClick={(e) => e.stopPropagation()}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
+        animate={{
+          left: position!.x,
+          top: position!.y,
+          opacity: 1,
+        }}
+        initial={{
+          left: position!.x,
+          top: position!.y,
+          opacity: 0,
+        }}
         exit={{ opacity: 0 }}
-        transition={{ duration: 0.2 }}
+        transition={{
+          opacity: { duration: 0.3 },
+          left: { type: 'spring', stiffness: 300, damping: 30 },
+          top: { type: 'spring', stiffness: 300, damping: 30 }
+        }}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Close button */}
         <button className="pom-close" onClick={onClose} aria-label="Close" style={{ position: 'absolute', top: '12px', right: '12px' }}>

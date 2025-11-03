@@ -65,6 +65,7 @@ type State = {
 
   // Overlay Mode
   overlayMode: 'canvas' | 'react'; // Toggle between canvas and React overlay
+  showReactDialog: boolean; // Delayed state for smooth fadeout
 
   // Developer Settings
   devSettings: DeveloperSettings;
@@ -111,6 +112,7 @@ const createInitialState = (): State => {
     focusedIndex: -1,
 
     overlayMode: 'react', // Default to React overlay
+    showReactDialog: false,
 
     devSettings: createDefaultDeveloperSettings(),
     fps: 60,
@@ -125,6 +127,7 @@ export default class App extends React.Component<{}, State> {
   private fpsRaf: number | null = null;
   private fpsLastSample = 0;
   private fpsFrameCount = 0;
+  private dialogFadeoutTimer: number | null = null;
 
   state: State = createInitialState();
 
@@ -192,6 +195,10 @@ export default class App extends React.Component<{}, State> {
   componentWillUnmount(): void {
     this.controller.destroy();
     this.stopFPSCounter();
+    if (this.dialogFadeoutTimer) {
+      clearTimeout(this.dialogFadeoutTimer);
+      this.dialogFadeoutTimer = null;
+    }
     window.removeEventListener('resize', this.handleResize);
     document.removeEventListener('keydown', this.handleKeyDown);
     const canvas = this.canvasRef.current;
@@ -292,6 +299,35 @@ export default class App extends React.Component<{}, State> {
           renderer.selectedProductAnchor = null;
           renderer.selectedProductBounds = null;
         }
+      }
+    }
+
+    // Update showReactDialog with delay for smooth fadeout
+    if (
+      prevState.selectedProduct !== this.state.selectedProduct ||
+      prevState.zoom !== this.state.zoom ||
+      prevState.overlayMode !== this.state.overlayMode
+    ) {
+      const shouldShow = this.state.overlayMode === 'react' &&
+                         this.state.selectedProduct !== null &&
+                         this.state.zoom > 1.5;
+
+      if (shouldShow && !this.state.showReactDialog) {
+        // Show immediately when zoom in
+        if (this.dialogFadeoutTimer) {
+          clearTimeout(this.dialogFadeoutTimer);
+          this.dialogFadeoutTimer = null;
+        }
+        this.setState({ showReactDialog: true });
+      } else if (!shouldShow && this.state.showReactDialog) {
+        // Hide with delay for fadeout animation
+        if (this.dialogFadeoutTimer) {
+          clearTimeout(this.dialogFadeoutTimer);
+        }
+        this.dialogFadeoutTimer = window.setTimeout(() => {
+          this.setState({ showReactDialog: false });
+          this.dialogFadeoutTimer = null;
+        }, 300); // Match fadeout duration
       }
     }
   }
@@ -820,8 +856,8 @@ export default class App extends React.Component<{}, State> {
 
         {/* React Product Info Panel (positioned next to product in canvas) */}
         <AnimatePresence>
-          {this.state.overlayMode === 'react' && selectedProduct && this.state.zoom > 1.5 && (() => {
-            // Only show dialog when zoomed in (zoom > 1.5)
+          {this.state.showReactDialog && selectedProduct && (() => {
+            // Show dialog with smooth fadeout
             const node = this.controller.getProductNode(selectedProduct.id);
             if (!node) return null;
 
