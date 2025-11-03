@@ -60,9 +60,9 @@
   width: 42px;
   height: 42px;
   border-radius: 12px;
-  border: 1px solid rgba(148, 163, 255, 0.45);
-  background: rgba(15, 23, 42, 0.65);
-  color: #f5f7ff;
+  border: 1px solid rgba(42, 168, 239, 0.3);
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
   font-size: 24px;
   font-weight: 600;
   cursor: pointer;
@@ -74,8 +74,10 @@
 }
 
 .pf-modal-close:hover {
-  background: rgba(125, 150, 255, 0.35);
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(42, 168, 239, 0.5);
   transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(42, 168, 239, 0.2);
 }
 
 .pf-modal-layout {
@@ -334,16 +336,18 @@
 .pf-modal-cycle-btn {
   padding: 10px 16px;
   border-radius: 12px;
-  background: rgba(15, 23, 42, 0.55);
-  border: 1px solid rgba(148, 163, 255, 0.3);
-  color: rgba(226, 232, 255, 0.85);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(42, 168, 239, 0.3);
+  color: white;
   cursor: pointer;
-  transition: transform 0.2s ease, border-color 0.2s ease;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .pf-modal-cycle-btn:hover:not(:disabled) {
-  border-color: rgba(148, 163, 255, 0.55);
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(42, 168, 239, 0.5);
   transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(42, 168, 239, 0.2);
 }
 
 .pf-modal-cycle-btn:disabled {
@@ -370,26 +374,28 @@
 }
 
 .pf-modal-button.primary {
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.9), rgba(59, 130, 246, 0.9));
-  border-color: rgba(129, 140, 248, 0.6);
-  color: #f9fafb;
-  box-shadow: 0 18px 38px -18px rgba(59, 130, 246, 0.7);
+  background: linear-gradient(145deg, #2aa8ef 0%, #12d4de 100%);
+  border: none;
+  color: white;
+  box-shadow: none;
 }
 
 .pf-modal-button.primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 25px 48px -20px rgba(59, 130, 246, 0.85);
+  box-shadow: 0 4px 12px rgba(42, 168, 239, 0.3);
 }
 
 .pf-modal-button.ghost {
-  background: rgba(15, 23, 42, 0.55);
-  border-color: rgba(148, 163, 255, 0.3);
-  color: rgba(226, 232, 255, 0.85);
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(42, 168, 239, 0.3);
+  color: white;
 }
 
 .pf-modal-button.ghost:hover {
-  border-color: rgba(148, 163, 255, 0.55);
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(42, 168, 239, 0.5);
   transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(42, 168, 239, 0.2);
 }
 
 @media (max-width: 640px) {

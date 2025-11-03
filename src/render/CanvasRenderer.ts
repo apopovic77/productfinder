@@ -3,6 +3,8 @@ import { ViewportTransform } from '../utils/ViewportTransform';
 import type { Product } from '../types/Product';
 import type { GroupHeaderInfo } from '../layout/PivotLayouter';
 import { LOD_CONFIG } from '../config/LODConfig';
+import { ProductOverlayCanvas, DEFAULT_OVERLAY_STYLE } from './ProductOverlayCanvas';
+import { ProductOverlayCanvasV2, MODERN_OVERLAY_STYLE } from './ProductOverlayCanvasV2';
 
 type LoadTask = {
   nodeId: string;
@@ -25,11 +27,12 @@ export class CanvasRenderer<T> {
   public heroDisplayMode: 'overlay' | 'force-labels' = 'overlay';
   public overlayScaleMode: 'scale-invariant' | 'scale-with-content' = 'scale-invariant';
 
-  // Overlay bounds for click detection (in world space)
-  private overlayBounds: { left: number; top: number; width: number; height: number } | null = null;
-  private closeButtonBounds: { left: number; top: number; width: number; height: number } | null = null;
-  private viewButtonBounds: { left: number; top: number; width: number; height: number } | null = null;
-  private cartButtonBounds: { left: number; top: number; width: number; height: number } | null = null;
+  // Product overlay renderer (OOP class)
+  private productOverlay: ProductOverlayCanvas;
+  private productOverlayV2: ProductOverlayCanvasV2;
+
+  // Toggle between V1 and V2 overlay
+  public overlayVersion: 'v1' | 'v2' = 'v2'; // Default to V2
 
   // Image LOD tracking: nodeId -> current loaded size
   private loadedImageSizes = new Map<string, number>();
@@ -49,7 +52,10 @@ export class CanvasRenderer<T> {
     private renderAccessors: { label(item: T): string; priceText(item: T): string },
     private viewport: ViewportTransform | null = null,
     private getGroupHeaders: () => GroupHeaderInfo[] = () => []
-  ) {}
+  ) {
+    this.productOverlay = new ProductOverlayCanvas(ctx, DEFAULT_OVERLAY_STYLE);
+    this.productOverlayV2 = new ProductOverlayCanvasV2(ctx, MODERN_OVERLAY_STYLE);
+  }
   
   start() {
     this.stop();
@@ -489,264 +495,47 @@ export class CanvasRenderer<T> {
   /**
    * Draw product overlay directly on canvas in world space
    */
+  /**
+   * Draw product detail overlay (Hero Mode)
+   * Uses the ProductOverlayCanvas OOP class for clean separation of concerns
+   */
   private drawProductOverlay(product: Product, anchorX: number, anchorY: number) {
     if (!this.viewport) return;
-
-    this.ctx.save();
-    this.viewport.applyTransform(this.ctx);
-
-    const scale = this.viewport.scale;
-
-    // Scale factor - depends on mode
-    const scaleFactor = this.overlayScaleMode === 'scale-invariant' ? (1 / scale) : 1;
-
-    // Use pre-calculated product bounds (passed from App.tsx)
-    // This ensures we use the EXACT same node data as for the anchor position
     if (!this.selectedProductBounds) {
       console.warn('[CanvasRenderer] No product bounds available for overlay');
-      this.ctx.restore();
       return;
     }
 
-    const productWidth = this.selectedProductBounds.width;
-    const productHeight = this.selectedProductBounds.height;
-    const productX = this.selectedProductBounds.x;
-    const productY = this.selectedProductBounds.y;
+    this.ctx.save();
 
-    // Overlay should be 65% of product height (increased for more info)
-    const overlayHeight = productHeight * 0.45;
-    const overlayWidth = overlayHeight * 0.86; // Maintain aspect ratio (360/420 = 0.86)
-    const padding = overlayHeight * 0.055; // Scale padding proportionally
+    if (this.overlayVersion === 'v2') {
+      // V2: Centered overlay, no viewport transform
+      // Preload image if not loaded yet
+      if (!this.productOverlayV2['currentProductImage']) {
+        this.productOverlayV2.preloadImage(product).catch(err => {
+          console.warn('[CanvasRenderer] Failed to preload V2 image:', err);
+        });
+      }
 
-    // Position overlay within the product's grid cell
-    // Place it on the right side of the cell with some margin
-    const cellMargin = productWidth * 0.0; // 5% margin from cell edge
-    const left = productX + productWidth - overlayWidth - cellMargin;
-    const top = anchorY - overlayHeight*0.3; // Vertically centered on product
-
-    // Store overlay bounds for click detection
-    this.overlayBounds = { left, top, width: overlayWidth, height: overlayHeight };
-
-    // Less transparent background for better readability - gray gradient
-    const gradient = this.ctx.createLinearGradient(left, top, left, top + overlayHeight);
-    gradient.addColorStop(0, 'rgba(80, 80, 90, 0.65)'); // Dark gray
-    gradient.addColorStop(0.5, 'rgba(202, 202, 202, 0.6)'); // Medium gray
-    gradient.addColorStop(1, 'rgba(60, 60, 70, 0.65)'); // Darker gray
-
-    // Border radius proportional to overlay height (~24px for 420px overlay)
-    const borderRadius = overlayHeight * 0.057;
-
-    this.drawRoundedRect(left, top, overlayWidth, overlayHeight, borderRadius);
-    this.ctx.fillStyle = gradient;
-    this.ctx.fill();
-
-    // Stronger glass effect layers
-    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.25)'; // Less transparent
-    this.ctx.fill();
-
-    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.15)'; // Less transparent
-    this.ctx.fill();
-
-    // Stronger border
-    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; // More visible
-    this.ctx.lineWidth = overlayHeight * 0.0036; // ~1.5px proportional
-    this.ctx.stroke();
-
-    // Close button (X) in top-right corner - proportional to overlay
-    const closeButtonSize = overlayHeight * 0.076; // ~32px for 420px overlay
-    const closeButtonX = left + overlayWidth - closeButtonSize - padding * 0.43;
-    const closeButtonY = top + padding * 0.43;
-
-    this.closeButtonBounds = {
-      left: closeButtonX,
-      top: closeButtonY,
-      width: closeButtonSize,
-      height: closeButtonSize
-    };
-
-    // Close button background
-    this.ctx.beginPath();
-    this.ctx.arc(
-      closeButtonX + closeButtonSize / 2,
-      closeButtonY + closeButtonSize / 2,
-      closeButtonSize / 2,
-      0,
-      Math.PI * 2
-    );
-    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-    this.ctx.fill();
-
-    // X symbol
-    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-    this.ctx.lineWidth = overlayHeight * 0.0048; // ~2px for 420px overlay
-    this.ctx.lineCap = 'round';
-    const xOffset = closeButtonSize * 0.25;
-    this.ctx.beginPath();
-    this.ctx.moveTo(closeButtonX + xOffset, closeButtonY + xOffset);
-    this.ctx.lineTo(closeButtonX + closeButtonSize - xOffset, closeButtonY + closeButtonSize - xOffset);
-    this.ctx.moveTo(closeButtonX + closeButtonSize - xOffset, closeButtonY + xOffset);
-    this.ctx.lineTo(closeButtonX + xOffset, closeButtonY + closeButtonSize - xOffset);
-    this.ctx.stroke();
-
-    // Product name with text wrapping - proportional font sizes
-    const nameFontSize = overlayHeight * 0.043; // ~18px for 420px overlay
-    const maxTextWidth = overlayWidth - padding * 2 - closeButtonSize - padding * 0.29;
-    const nameLines = this.wrapText(product.name, maxTextWidth, nameFontSize, 'bold');
-
-    this.ctx.fillStyle = 'rgba(255, 255, 255, 1)'; // Fully opaque for better readability
-    this.ctx.font = `bold ${nameFontSize}px system-ui`;
-    this.ctx.textAlign = 'left';
-    this.ctx.textBaseline = 'top';
-
-    let textY = top + padding;
-    const lineHeight = overlayHeight * 0.057; // ~24px for 420px
-
-    for (const line of nameLines.slice(0, 2)) { // Max 2 lines
-      this.ctx.fillText(line, left + padding, textY);
-      textY += lineHeight;
-    }
-
-    // Price - with better spacing
-    if (product.price?.value) {
-      textY += overlayHeight * 0.029; // ~12px spacing
-      const priceFontSize = overlayHeight * 0.067; // ~28px for 420px
-      this.ctx.font = `bold ${priceFontSize}px system-ui`;
-      this.ctx.fillStyle = 'rgba(255, 255, 255, 1)';
-      this.ctx.fillText(`€ ${product.price.value.toFixed(2)}`, left + padding, textY);
-      textY += overlayHeight * 0.095; // ~40px
+      this.productOverlayV2.render(product, this.ctx.canvas.width, this.ctx.canvas.height);
     } else {
-      textY += overlayHeight * 0.048;
+      // V1: World-space overlay
+      this.viewport.applyTransform(this.ctx);
+
+      // Convert bounds format (x,y -> left,top)
+      const bounds = {
+        left: this.selectedProductBounds.x,
+        top: this.selectedProductBounds.y,
+        width: this.selectedProductBounds.width,
+        height: this.selectedProductBounds.height
+      };
+
+      this.productOverlay.render(product, bounds, anchorY);
     }
-
-    // Feature bullets with more information
-    textY += overlayHeight * 0.03; // Spacing before features
-    const bulletLineHeight = overlayHeight * 0.065; // Line height
-    const bulletSize = overlayHeight * 0.008; // Bullet size
-    const bulletOffset = overlayHeight * 0.035; // Bullet text offset
-    const featureFontSize = overlayHeight * 0.029; // Font size
-    this.ctx.font = `${featureFontSize}px system-ui`;
-
-    const features: string[] = [];
-
-    // Category
-    const presentationCategory = product.getAttributeDisplayValue('presentation_category');
-    if (presentationCategory) features.push(`Category: ${presentationCategory}`);
-
-    // SKU if available
-    if (product.sku) features.push(`SKU: ${product.sku}`);
-
-    // Style from AI analysis
-    if (product.aiAnalysis?.style) {
-      features.push(`Style: ${product.aiAnalysis.style}`);
-    }
-
-    // Colors from AI analysis
-    if (product.aiAnalysis?.dominantColors && product.aiAnalysis.dominantColors.length > 0) {
-      const colors = product.aiAnalysis.dominantColors.slice(0, 2).join(', ');
-      features.push(`Colors: ${colors}`);
-    }
-
-    // Materials
-    if (product.aiAnalysis?.materials && product.aiAnalysis.materials.length > 0) {
-      const materials = product.aiAnalysis.materials.slice(0, 2).join(', ');
-      features.push(`Materials: ${materials}`);
-    }
-
-    // Dimensions from specifications
-    if (product.specifications?.dimensions) {
-      features.push(`Dimensions: ${product.specifications.dimensions}`);
-    }
-
-    // Weight
-    if (product.weight) features.push(`Weight: ${product.weight}g`);
-
-    // Season
-    if (product.season) features.push(`Season: ${product.season}`);
-
-    // Top 2 features from AI analysis
-    if (product.aiAnalysis?.features && product.aiAnalysis.features.length > 0) {
-      const topFeatures = product.aiAnalysis.features.slice(0, 2);
-      topFeatures.forEach(f => features.push(f));
-    }
-
-    // Top 2 use cases from AI analysis
-    if (product.aiAnalysis?.useCases && product.aiAnalysis.useCases.length > 0) {
-      const useCases = product.aiAnalysis.useCases.slice(0, 2);
-      useCases.forEach(uc => features.push(`Use: ${uc}`));
-    }
-
-    // Target audience
-    if (product.aiAnalysis?.targetAudience && product.aiAnalysis.targetAudience.length > 0) {
-      const audience = product.aiAnalysis.targetAudience.slice(0, 1).join(', ');
-      features.push(`Target: ${audience}`);
-    }
-
-    // Show up to 8 features (increased from 5)
-    for (const feature of features.slice(0, 8)) {
-      // Bullet point
-      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-      this.ctx.beginPath();
-      this.ctx.arc(left + padding + bulletSize + overlayHeight * 0.004, textY + overlayHeight * 0.015, bulletSize, 0, Math.PI * 2);
-      this.ctx.fill();
-
-      // Feature text
-      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-      this.ctx.fillText(feature, left + padding + bulletOffset, textY);
-      textY += bulletLineHeight;
-    }
-
-    // Buttons with improved spacing
-    const buttonY = top + overlayHeight - overlayHeight * 0.286; // ~120px from bottom
-    const buttonHeight = overlayHeight * 0.114; // ~48px
-    const buttonRadius = overlayHeight * 0.029; // ~12px
-    const buttonSpacing = overlayHeight * 0.024; // ~10px
-
-    // View on Website button
-    const viewButtonY = buttonY;
-    const viewButtonWidth = overlayWidth - padding * 2;
-    const buttonFontSize = overlayHeight * 0.033; // ~14px for 420px
-
-    this.viewButtonBounds = {
-      left: left + padding,
-      top: viewButtonY,
-      width: viewButtonWidth,
-      height: buttonHeight
-    };
-
-    this.drawRoundedRect(left + padding, viewButtonY, viewButtonWidth, buttonHeight, buttonRadius);
-    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.15)'; // Less transparent
-    this.ctx.fill();
-    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)'; // More visible
-    this.ctx.lineWidth = overlayHeight * 0.0036; // ~1.5px
-    this.ctx.stroke();
-
-    this.ctx.fillStyle = 'rgba(255, 255, 255, 1)'; // Fully opaque
-    this.ctx.font = `500 ${buttonFontSize}px system-ui`;
-    this.ctx.textAlign = 'center';
-    this.ctx.textBaseline = 'middle';
-    this.ctx.fillText('🌐 View on Website', left + overlayWidth / 2, viewButtonY + buttonHeight / 2);
-
-    // Add to Cart button - cleaner design
-    const cartButtonY = viewButtonY + buttonHeight + buttonSpacing;
-    const cartButtonFontSize = overlayHeight * 0.036; // ~15px for 420px
-
-    this.cartButtonBounds = {
-      left: left + padding,
-      top: cartButtonY,
-      width: viewButtonWidth,
-      height: buttonHeight
-    };
-
-    this.drawRoundedRect(left + padding, cartButtonY, viewButtonWidth, buttonHeight, buttonRadius);
-    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.95)'; // Slightly transparent white background
-    this.ctx.fill();
-
-    this.ctx.fillStyle = 'rgba(102, 126, 234, 1)'; // Solid color for better contrast
-    this.ctx.font = `600 ${cartButtonFontSize}px system-ui`;
-    this.ctx.fillText('Add to Cart', left + overlayWidth / 2, cartButtonY + buttonHeight / 2);
 
     this.ctx.restore();
   }
+
 
   /**
    * Check if a click (in screen coordinates) hits the overlay or its buttons
@@ -755,49 +544,22 @@ export class CanvasRenderer<T> {
    * - 'background': clicked on overlay but not a button (consume click, do nothing)
    * - 'close'/'view'/'cart': clicked a specific button
    */
-  public checkOverlayClick(screenX: number, screenY: number): 'close' | 'view' | 'cart' | 'background' | null {
-    if (!this.overlayBounds || !this.viewport) return null;
+  /**
+   * Check if a click hits the overlay or its buttons
+   * Delegates to the ProductOverlayCanvas OOP class
+   */
+  public checkOverlayClick(screenX: number, screenY: number): 'close' | 'view' | 'cart' | 'add-to-cart' | 'view-website' | 'background' | null {
+    if (!this.viewport) return null;
 
-    // Convert screen coordinates to world coordinates
-    const worldX = (screenX - this.viewport.offset.x) / this.viewport.scale;
-    const worldY = (screenY - this.viewport.offset.y) / this.viewport.scale;
-
-    // Check if click is within overlay bounds
-    const inOverlay = worldX >= this.overlayBounds.left &&
-                      worldX <= this.overlayBounds.left + this.overlayBounds.width &&
-                      worldY >= this.overlayBounds.top &&
-                      worldY <= this.overlayBounds.top + this.overlayBounds.height;
-
-    if (!inOverlay) return null; // Click is outside overlay
-
-    // Check close button
-    if (this.closeButtonBounds) {
-      const inClose = worldX >= this.closeButtonBounds.left &&
-                      worldX <= this.closeButtonBounds.left + this.closeButtonBounds.width &&
-                      worldY >= this.closeButtonBounds.top &&
-                      worldY <= this.closeButtonBounds.top + this.closeButtonBounds.height;
-      if (inClose) return 'close';
+    if (this.overlayVersion === 'v2') {
+      // V2: Screen coordinates directly
+      return this.productOverlayV2.checkClick(screenX, screenY);
+    } else {
+      // V1: World space coordinates
+      return this.productOverlay.checkClick(screenX, screenY, {
+        scale: this.viewport.scale,
+        offset: this.viewport.offset
+      });
     }
-
-    // Check view button
-    if (this.viewButtonBounds) {
-      const inView = worldX >= this.viewButtonBounds.left &&
-                     worldX <= this.viewButtonBounds.left + this.viewButtonBounds.width &&
-                     worldY >= this.viewButtonBounds.top &&
-                     worldY <= this.viewButtonBounds.top + this.viewButtonBounds.height;
-      if (inView) return 'view';
-    }
-
-    // Check cart button
-    if (this.cartButtonBounds) {
-      const inCart = worldX >= this.cartButtonBounds.left &&
-                     worldX <= this.cartButtonBounds.left + this.cartButtonBounds.width &&
-                     worldY >= this.cartButtonBounds.top &&
-                     worldY <= this.cartButtonBounds.top + this.cartButtonBounds.height;
-      if (inCart) return 'cart';
-    }
-
-    // Clicked on overlay background (not a button)
-    return 'background';
   }
 }
