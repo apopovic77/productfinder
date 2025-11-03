@@ -259,15 +259,27 @@ export default class App extends React.Component<{}, State> {
         if (this.state.selectedProduct && this.state.devSettings.heroDisplayMode === 'overlay') {
           const node = this.controller.getProductNode(this.state.selectedProduct.id);
           if (node) {
-            const productCenterX = (node.posX.targetValue ?? node.posX.value ?? 0) + (node.width.targetValue ?? node.width.value ?? 0) / 2;
-            const productCenterY = (node.posY.targetValue ?? node.posY.value ?? 0) + (node.height.targetValue ?? node.height.value ?? 0) / 2;
+            const nodeX = node.posX.targetValue ?? node.posX.value ?? 0;
+            const nodeY = node.posY.targetValue ?? node.posY.value ?? 0;
+            const nodeW = node.width.targetValue ?? node.width.value ?? 0;
+            const nodeH = node.height.targetValue ?? node.height.value ?? 0;
+
+            const productCenterX = nodeX + nodeW / 2;
+            const productCenterY = nodeY + nodeH / 2;
 
             renderer.selectedProduct = this.state.selectedProduct;
             renderer.selectedProductAnchor = { x: productCenterX, y: productCenterY };
+            // Pass the same node bounds to ensure consistency
+            renderer.selectedProductBounds = { x: nodeX, y: nodeY, width: nodeW, height: nodeH };
+
+            console.log('[App] Setting overlay for product:', this.state.selectedProduct.name, 'bounds:', { x: nodeX, y: nodeY, width: nodeW, height: nodeH });
+          } else {
+            console.warn('[App] Node not found for selected product:', this.state.selectedProduct.id);
           }
         } else {
           renderer.selectedProduct = null;
           renderer.selectedProductAnchor = null;
+          renderer.selectedProductBounds = null;
         }
       }
     }
@@ -404,13 +416,26 @@ export default class App extends React.Component<{}, State> {
         this.setState({ selectedProduct: null });
         return;
       } else if (overlayClick === 'view') {
-        // Handle 360° view button
-        console.log('360° View clicked for product:', this.state.selectedProduct.name);
-        // TODO: Implement 360° view
+        // Open product on O'Neal website
+        const product = this.state.selectedProduct;
+
+        // Use product_url from meta if available (direct link from API)
+        const productUrl = product.meta?.product_url;
+
+        if (productUrl && typeof productUrl === 'string') {
+          window.open(productUrl, '_blank');
+          console.log('[App] Opening product on website:', product.name, 'url:', productUrl);
+        } else {
+          // Fallback: construct URL from SKU or ID
+          const identifier = product.sku || product.id;
+          const url = `https://www.oneal.eu/de-de/product/${encodeURIComponent(identifier)}`;
+          window.open(url, '_blank');
+          console.log('[App] Opening product on website (fallback):', product.name, 'identifier:', identifier, 'url:', url);
+        }
         return;
       } else if (overlayClick === 'cart') {
         // Handle add to cart button
-        console.log('Add to Cart clicked for product:', this.state.selectedProduct.name);
+        console.log('[App] Add to Cart clicked for product:', this.state.selectedProduct.name);
         // TODO: Implement add to cart
         return;
       } else if (overlayClick === 'background') {
@@ -430,6 +455,8 @@ export default class App extends React.Component<{}, State> {
     // Otherwise check for product click
     const product = this.controller.hitTest(x, y);
     if (product) {
+      console.log('[App] Product clicked:', product.name, 'id:', product.id);
+
       // Center the clicked product smoothly (if zoomed in)
       // Rubberband system will automatically prevent bounds violations
       this.controller.centerOnProduct(product);

@@ -21,6 +21,7 @@ export class CanvasRenderer<T> {
   // Selected product for overlay rendering
   public selectedProduct: Product | null = null;
   public selectedProductAnchor: { x: number; y: number } | null = null;
+  public selectedProductBounds: { x: number; y: number; width: number; height: number } | null = null; // Cell dimensions
   public heroDisplayMode: 'overlay' | 'force-labels' = 'overlay';
   public overlayScaleMode: 'scale-invariant' | 'scale-with-content' = 'scale-invariant';
 
@@ -38,6 +39,9 @@ export class CanvasRenderer<T> {
 
   // Queue processing timing (non-blocking)
   private lastQueueProcessTime = 0;
+
+  // Hit detection: Path2D objects for each rendered product
+  private productPaths = new Map<string, { path: Path2D; product: T }>();
 
   constructor(
     private ctx: CanvasRenderingContext2D,
@@ -445,47 +449,7 @@ export class CanvasRenderer<T> {
     // Restore viewport transform
     this.ctx.restore();
 
-    // DEBUG: Draw content bounds visualization (DISABLED - use Developer Overlay F1 to enable)
-    if (false && this.viewport) {
-      const bounds = this.viewport.getContentBounds();
-      if (bounds) {
-        this.ctx.save();
-
-        // Draw content bounding box in world space
-        this.viewport.applyTransform(this.ctx);
-
-        this.ctx.strokeStyle = '#ff00ff'; // Magenta for visibility
-        this.ctx.lineWidth = 4 / this.viewport.scale; // Scale-invariant line width
-        this.ctx.setLineDash([20 / this.viewport.scale, 10 / this.viewport.scale]);
-        this.ctx.strokeRect(bounds.minX, bounds.minY, bounds.width, bounds.height);
-        this.ctx.setLineDash([]);
-
-        // Draw corner markers
-        const markerSize = 30 / this.viewport.scale;
-        this.ctx.fillStyle = '#ff00ff';
-        this.ctx.fillRect(bounds.minX, bounds.minY, markerSize, markerSize);
-        this.ctx.fillRect(bounds.maxX - markerSize, bounds.minY, markerSize, markerSize);
-        this.ctx.fillRect(bounds.minX, bounds.maxY - markerSize, markerSize, markerSize);
-        this.ctx.fillRect(bounds.maxX - markerSize, bounds.maxY - markerSize, markerSize, markerSize);
-
-        this.ctx.restore();
-
-        // Draw info text in screen space
-        this.ctx.fillStyle = '#ff00ff';
-        this.ctx.font = 'bold 14px monospace';
-        this.ctx.textAlign = 'left';
-        this.ctx.textBaseline = 'top';
-        this.ctx.fillText(`Content Bounds: ${bounds.width.toFixed(0)} × ${bounds.height.toFixed(0)}`, 10, 10);
-        this.ctx.fillText(`Scale: ${this.viewport.scale.toFixed(2)} (min: ${this.viewport.minScale.toFixed(2)})`, 10, 30);
-      } else {
-        // No bounds set warning
-        this.ctx.fillStyle = '#ff0000';
-        this.ctx.font = 'bold 16px monospace';
-        this.ctx.textAlign = 'left';
-        this.ctx.textBaseline = 'top';
-        this.ctx.fillText('⚠️ NO CONTENT BOUNDS SET!', 10, 10);
-      }
-    }
+    // DEBUG content-bounds visualization intentionally removed for TypeScript strict mode.
 
     // Draw selected product overlay (in world space)
     if (this.selectedProduct && this.selectedProductAnchor && this.viewport && this.heroDisplayMode === 'overlay') {
@@ -536,29 +500,38 @@ export class CanvasRenderer<T> {
     // Scale factor - depends on mode
     const scaleFactor = this.overlayScaleMode === 'scale-invariant' ? (1 / scale) : 1;
 
-    // Find product node to get its dimensions
-    const nodes = this.getNodes();
-    const productNode = nodes.find(n => n.data.id === product.id);
-    const productHeight = productNode ? (productNode.height.value ?? 200) : 200;
+    // Use pre-calculated product bounds (passed from App.tsx)
+    // This ensures we use the EXACT same node data as for the anchor position
+    if (!this.selectedProductBounds) {
+      console.warn('[CanvasRenderer] No product bounds available for overlay');
+      this.ctx.restore();
+      return;
+    }
 
-    // Overlay should be 80% of product height
-    const overlayHeight = productHeight * 0.4;
+    const productWidth = this.selectedProductBounds.width;
+    const productHeight = this.selectedProductBounds.height;
+    const productX = this.selectedProductBounds.x;
+    const productY = this.selectedProductBounds.y;
+
+    // Overlay should be 65% of product height (increased for more info)
+    const overlayHeight = productHeight * 0.45;
     const overlayWidth = overlayHeight * 0.86; // Maintain aspect ratio (360/420 = 0.86)
-    const padding = overlayHeight * 0.067; // Scale padding proportionally
-    const offset = 50 * scaleFactor;
+    const padding = overlayHeight * 0.055; // Scale padding proportionally
 
-    // Position to the right of product
-    const left = anchorX + offset;
-    const top = anchorY - overlayHeight / 2;
+    // Position overlay within the product's grid cell
+    // Place it on the right side of the cell with some margin
+    const cellMargin = productWidth * 0.0; // 5% margin from cell edge
+    const left = productX + productWidth - overlayWidth - cellMargin;
+    const top = anchorY - overlayHeight*0.3; // Vertically centered on product
 
     // Store overlay bounds for click detection
     this.overlayBounds = { left, top, width: overlayWidth, height: overlayHeight };
 
-    // Less transparent background for better readability
+    // Less transparent background for better readability - gray gradient
     const gradient = this.ctx.createLinearGradient(left, top, left, top + overlayHeight);
-    gradient.addColorStop(0, 'rgba(102, 126, 234, 0.65)'); // Much less transparent
-    gradient.addColorStop(0.5, 'rgba(110, 100, 200, 0.60)');
-    gradient.addColorStop(1, 'rgba(118, 75, 162, 0.65)');
+    gradient.addColorStop(0, 'rgba(80, 80, 90, 0.65)'); // Dark gray
+    gradient.addColorStop(0.5, 'rgba(202, 202, 202, 0.6)'); // Medium gray
+    gradient.addColorStop(1, 'rgba(60, 60, 70, 0.65)'); // Darker gray
 
     // Border radius proportional to overlay height (~24px for 420px overlay)
     const borderRadius = overlayHeight * 0.057;
@@ -645,25 +618,75 @@ export class CanvasRenderer<T> {
       textY += overlayHeight * 0.048;
     }
 
-    // Feature bullets with improved spacing
-    textY += overlayHeight * 0.038; // Extra spacing before features
-    const bulletLineHeight = overlayHeight * 0.076; // ~32px
-    const bulletSize = overlayHeight * 0.0095; // ~4px
-    const bulletOffset = overlayHeight * 0.043; // ~18px
-    const featureFontSize = overlayHeight * 0.033; // ~14px
+    // Feature bullets with more information
+    textY += overlayHeight * 0.03; // Spacing before features
+    const bulletLineHeight = overlayHeight * 0.065; // Line height
+    const bulletSize = overlayHeight * 0.008; // Bullet size
+    const bulletOffset = overlayHeight * 0.035; // Bullet text offset
+    const featureFontSize = overlayHeight * 0.029; // Font size
     this.ctx.font = `${featureFontSize}px system-ui`;
 
     const features: string[] = [];
-    if (product.category?.[0]) features.push(product.category[0]);
-    if (product.brand) features.push(`${product.brand} brand`);
-    if (product.weight) features.push(`${product.weight}g weight`);
-    if (product.season) features.push(`Season ${product.season}`);
 
-    for (const feature of features.slice(0, 3)) {
+    // Category
+    const presentationCategory = product.getAttributeDisplayValue('presentation_category');
+    if (presentationCategory) features.push(`Category: ${presentationCategory}`);
+
+    // SKU if available
+    if (product.sku) features.push(`SKU: ${product.sku}`);
+
+    // Style from AI analysis
+    if (product.aiAnalysis?.style) {
+      features.push(`Style: ${product.aiAnalysis.style}`);
+    }
+
+    // Colors from AI analysis
+    if (product.aiAnalysis?.dominantColors && product.aiAnalysis.dominantColors.length > 0) {
+      const colors = product.aiAnalysis.dominantColors.slice(0, 2).join(', ');
+      features.push(`Colors: ${colors}`);
+    }
+
+    // Materials
+    if (product.aiAnalysis?.materials && product.aiAnalysis.materials.length > 0) {
+      const materials = product.aiAnalysis.materials.slice(0, 2).join(', ');
+      features.push(`Materials: ${materials}`);
+    }
+
+    // Dimensions from specifications
+    if (product.specifications?.dimensions) {
+      features.push(`Dimensions: ${product.specifications.dimensions}`);
+    }
+
+    // Weight
+    if (product.weight) features.push(`Weight: ${product.weight}g`);
+
+    // Season
+    if (product.season) features.push(`Season: ${product.season}`);
+
+    // Top 2 features from AI analysis
+    if (product.aiAnalysis?.features && product.aiAnalysis.features.length > 0) {
+      const topFeatures = product.aiAnalysis.features.slice(0, 2);
+      topFeatures.forEach(f => features.push(f));
+    }
+
+    // Top 2 use cases from AI analysis
+    if (product.aiAnalysis?.useCases && product.aiAnalysis.useCases.length > 0) {
+      const useCases = product.aiAnalysis.useCases.slice(0, 2);
+      useCases.forEach(uc => features.push(`Use: ${uc}`));
+    }
+
+    // Target audience
+    if (product.aiAnalysis?.targetAudience && product.aiAnalysis.targetAudience.length > 0) {
+      const audience = product.aiAnalysis.targetAudience.slice(0, 1).join(', ');
+      features.push(`Target: ${audience}`);
+    }
+
+    // Show up to 8 features (increased from 5)
+    for (const feature of features.slice(0, 8)) {
       // Bullet point
       this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
       this.ctx.beginPath();
-      this.ctx.arc(left + padding + bulletSize + overlayHeight * 0.0048, textY + overlayHeight * 0.019, bulletSize, 0, Math.PI * 2);
+      this.ctx.arc(left + padding + bulletSize + overlayHeight * 0.004, textY + overlayHeight * 0.015, bulletSize, 0, Math.PI * 2);
       this.ctx.fill();
 
       // Feature text
@@ -678,7 +701,7 @@ export class CanvasRenderer<T> {
     const buttonRadius = overlayHeight * 0.029; // ~12px
     const buttonSpacing = overlayHeight * 0.024; // ~10px
 
-    // 360° View button - more subtle
+    // View on Website button
     const viewButtonY = buttonY;
     const viewButtonWidth = overlayWidth - padding * 2;
     const buttonFontSize = overlayHeight * 0.033; // ~14px for 420px
@@ -701,7 +724,7 @@ export class CanvasRenderer<T> {
     this.ctx.font = `500 ${buttonFontSize}px system-ui`;
     this.ctx.textAlign = 'center';
     this.ctx.textBaseline = 'middle';
-    this.ctx.fillText('🔄 360° View', left + overlayWidth / 2, viewButtonY + buttonHeight / 2);
+    this.ctx.fillText('🌐 View on Website', left + overlayWidth / 2, viewButtonY + buttonHeight / 2);
 
     // Add to Cart button - cleaner design
     const cartButtonY = viewButtonY + buttonHeight + buttonSpacing;
@@ -736,8 +759,8 @@ export class CanvasRenderer<T> {
     if (!this.overlayBounds || !this.viewport) return null;
 
     // Convert screen coordinates to world coordinates
-    const worldX = (screenX - this.viewport.x) / this.viewport.scale;
-    const worldY = (screenY - this.viewport.y) / this.viewport.scale;
+    const worldX = (screenX - this.viewport.offset.x) / this.viewport.scale;
+    const worldY = (screenY - this.viewport.offset.y) / this.viewport.scale;
 
     // Check if click is within overlay bounds
     const inOverlay = worldX >= this.overlayBounds.left &&

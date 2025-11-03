@@ -28,6 +28,9 @@ type Candidate = {
   source: PivotDimensionSource;
   type: AttributeType;
   requiredParent?: string;
+  rawAttributeKey?: string;
+  hintRole?: PivotDimensionKind;
+  priorityBoost?: number;
   valueStats: Map<string, ValueStat>;
   numericValues: number[];
   unit?: string;
@@ -58,6 +61,84 @@ const ROLE_PRIORITIES: Record<PivotDimensionKind, number> = {
   class: 0.7,
   variation: 0.4,
   metadata: 0.1,
+};
+
+type AttributeHint = {
+  candidateKey?: string;
+  label?: string;
+  role?: PivotDimensionKind;
+  parentKey?: string;
+  priorityBoost?: number;
+  delimiter?: string | RegExp;
+  source?: PivotDimensionSource;
+};
+
+const ATTRIBUTE_HINTS: Record<string, AttributeHint> = {
+  presentation_category: {
+    candidateKey: 'category:presentation',
+    label: 'Produktkategorie',
+    role: 'category',
+    priorityBoost: 0.2,
+    source: { type: 'attribute', key: 'presentation_category' },
+  },
+  sport: {
+    label: 'Sport',
+    role: 'category',
+    priorityBoost: 0.05,
+  },
+  category_primary: {
+    candidateKey: 'category:primary',
+    label: 'Primäre Kategorie',
+    role: 'class',
+    parentKey: undefined,
+    source: { type: 'category', level: 0 },
+  },
+  category_secondary: {
+    candidateKey: 'category:secondary',
+    label: 'Unterkategorie',
+    role: 'class',
+    parentKey: 'category:presentation',
+    source: { type: 'category', level: 1 },
+  },
+  product_family: {
+    label: 'Produktfamilie',
+    role: 'class',
+    parentKey: 'category:presentation',
+  },
+  taxonomy_path: {
+    label: 'Taxonomie',
+    role: 'class',
+  },
+  brand: {
+    label: 'Brand',
+    role: 'class',
+  },
+  season: {
+    label: 'Season',
+    role: 'class',
+  },
+  price: {
+    label: 'Price',
+    role: 'variation',
+  },
+  weight: {
+    label: 'Weight',
+    role: 'variation',
+  },
+  variant_colors: {
+    label: 'Farben',
+    role: 'metadata',
+    delimiter: '|',
+  },
+  variant_sizes: {
+    label: 'Größen',
+    role: 'metadata',
+    delimiter: '|',
+  },
+  variant_count: {
+    label: 'Variantenanzahl',
+    role: 'metadata',
+  },
 };
 
 /**
@@ -124,6 +205,7 @@ export class PivotDimensionAnalyzer {
         cardinality: candidate.cardinality,
         entropy: candidate.entropy,
         parentKey: candidate.requiredParent,
+        attributeKey: candidate.rawAttributeKey,
         numeric: candidate.numericValues.length
           ? {
               min: Math.min(...candidate.numericValues),
@@ -163,14 +245,24 @@ export class PivotDimensionAnalyzer {
   private collectCandidates(products: Product[]): Candidate[] {
     const map = new Map<string, Candidate>();
 
-    const ensureCandidate = (key: string, label: string, source: PivotDimensionSource, type: AttributeType, unit?: string, requiredParent?: string) => {
+    const ensureCandidate = (
+      key: string,
+      label: string,
+      source: PivotDimensionSource,
+      type: AttributeType,
+      unit?: string,
+      options?: { requiredParent?: string; rawAttributeKey?: string; hintRole?: PivotDimensionKind; priorityBoost?: number },
+    ) => {
       if (!map.has(key)) {
         map.set(key, {
           key,
           label,
           source,
           type,
-          requiredParent,
+          requiredParent: options?.requiredParent,
+          rawAttributeKey: options?.rawAttributeKey,
+          hintRole: options?.hintRole,
+          priorityBoost: options?.priorityBoost,
           valueStats: new Map(),
           numericValues: [],
           unit,
@@ -183,7 +275,23 @@ export class PivotDimensionAnalyzer {
           priority: ROLE_PRIORITIES.metadata,
         });
       }
-      return map.get(key)!;
+      const candidate = map.get(key)!;
+      if (options?.requiredParent && !candidate.requiredParent) {
+        candidate.requiredParent = options.requiredParent;
+      }
+      if (options?.rawAttributeKey) {
+        candidate.rawAttributeKey = options.rawAttributeKey;
+      }
+      if (options?.hintRole) {
+        candidate.hintRole = options.hintRole;
+      }
+      if (options?.priorityBoost) {
+        candidate.priorityBoost = (candidate.priorityBoost ?? 0) + options.priorityBoost;
+      }
+      if (unit && !candidate.unit) {
+        candidate.unit = unit;
+      }
+      return candidate;
     };
 
     const toLabel = (raw: string): string => {
@@ -195,103 +303,72 @@ export class PivotDimensionAnalyzer {
     };
 
     for (const product of products) {
-      // Category hierarchy
+      const attributeEntries = Object.entries(product.attributes ?? {});
+
       const categories = Array.isArray(product.category) ? product.category.filter(Boolean) : [];
-      categories.forEach((value, index) => {
-        if (!value) return;
-        const key = `category:${index}`;
-        const isLast = index === categories.length - 1;
-        const label = index === 0
-          ? 'Produktkategorie'
-          : index === 1
-            ? 'Unterkategorie'
-            : isLast
-              ? 'Produktwelt'
+      if (categories.length && !product.hasAttribute('category_primary')) {
+        categories.forEach((value, index) => {
+          if (!value) return;
+          const key = index === 0 ? 'category:primary' : `category:${index}`;
+          const label = index === 0
+            ? 'Produktkategorie'
+            : index === 1
+              ? 'Unterkategorie'
               : `Kategorie ${index + 1}`;
-        const candidate = ensureCandidate(
-          key,
-          label,
-          { type: 'category', level: index },
-          'enum',
-          undefined,
-          index > 0 ? `category:${index - 1}` : undefined
-        );
-        this.recordValue(candidate, value, product.id);
-      });
-
-      // Brand
-      if (product.brand) {
-        const candidate = ensureCandidate(
-          'property:brand',
-          'Brand',
-          { type: 'property', key: 'brand' },
-          'string'
-        );
-        this.recordValue(candidate, product.brand, product.id);
+          const candidate = ensureCandidate(
+            key,
+            label,
+            { type: 'category', level: index },
+            'enum',
+            undefined,
+            {
+              requiredParent: index > 0 ? (index === 1 ? 'category:primary' : `category:${index - 1}`) : undefined,
+              rawAttributeKey: `legacy_category_${index}`,
+              hintRole: index === 0 ? 'category' : 'class',
+            }
+          );
+          this.recordValue(candidate, value, product.id);
+        });
       }
 
-      // Season
-      if (product.season !== undefined && product.season !== null) {
-        const candidate = ensureCandidate(
-          'property:season',
-          'Season',
-          { type: 'property', key: 'season' },
-          'number'
-        );
-        this.recordValue(candidate, String(product.season), product.id);
-        candidate.numericValues.push(product.season);
-      }
-
-      // Price
-      if (product.price?.value !== undefined && product.price?.value !== null) {
-        const candidate = ensureCandidate(
-          'property:price',
-          'Price',
-          { type: 'property', key: 'price' },
-          'number',
-          product.price.currency
-        );
-        this.recordValue(candidate, this.formatNumeric(product.price.value), product.id);
-        candidate.numericValues.push(product.price.value);
-      }
-
-      // Weight (specifications or attribute)
-      const weight = typeof product.weight === 'number' ? product.weight : undefined;
-      if (weight !== undefined) {
-        const candidate = ensureCandidate(
-          'property:weight',
-          'Weight',
-          { type: 'property', key: 'weight' },
-          'number',
-          'g'
-        );
-        this.recordValue(candidate, this.formatNumeric(weight), product.id);
-        candidate.numericValues.push(weight);
-      }
-
-      // Attributes
-      for (const [attrKey, attr] of Object.entries(product.attributes ?? {})) {
-        // Avoid duplicating canonical properties as attribute-based dimensions
-        // These are already handled above (category hierarchy, brand/season/price/weight)
-        if (attrKey === 'category' || attrKey === 'brand' || attrKey === 'season' || attrKey === 'price' || attrKey === 'weight') {
-          continue;
-        }
+      for (const [attrKey, attr] of attributeEntries) {
         if (!attr) continue;
-        const attrType = this.normalizeAttributeType(attr);
-        const label = attr.label?.trim() || toLabel(attrKey);
-        const key = `attribute:${attrKey}`;
-        const candidate = ensureCandidate(
-          key,
-          label,
-          { type: 'attribute', key: attrKey },
-          attrType,
-          attr.unit
-        );
         const rawValue = attr.value ?? attr.normalizedValue;
         if (rawValue === undefined || rawValue === null || rawValue === '') continue;
+
+        const hint = ATTRIBUTE_HINTS[attrKey] ?? {};
+        const attrType = this.normalizeAttributeType(attr);
+        const candidateKey = hint.candidateKey ?? `attribute:${attrKey}`;
+        const label = hint.label ?? attr.label?.trim() ?? toLabel(attrKey);
+        const source = hint.source ?? { type: 'attribute', key: attrKey };
+        const candidate = ensureCandidate(
+          candidateKey,
+          label,
+          source,
+          attrType,
+          attr.unit,
+          {
+            requiredParent: hint.parentKey,
+            rawAttributeKey: attrKey,
+            hintRole: hint.role,
+            priorityBoost: hint.priorityBoost,
+          }
+        );
+
         if (attrType === 'number' && typeof rawValue === 'number') {
           candidate.numericValues.push(rawValue);
           this.recordValue(candidate, this.formatNumeric(rawValue), product.id);
+          continue;
+        }
+
+        if (hint.delimiter && typeof rawValue === 'string') {
+          const parts = rawValue
+            .split(hint.delimiter)
+            .map(part => part.trim())
+            .filter(Boolean);
+          for (const part of parts) {
+            this.recordValue(candidate, part, product.id);
+          }
         } else {
           this.recordValue(candidate, String(rawValue), product.id);
         }
@@ -440,7 +517,12 @@ export class PivotDimensionAnalyzer {
 
       // Ensure at least one category exists: highest coverage string candidate
       candidate.role = role;
-      candidate.priority = ROLE_PRIORITIES[role];
+      if (candidate.hintRole) {
+        role = candidate.hintRole;
+      }
+
+      candidate.role = role;
+      candidate.priority = ROLE_PRIORITIES[role] + (candidate.priorityBoost ?? 0);
 
       // Improve label readability for attr/property values
       if (!candidate.label) {

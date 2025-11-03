@@ -101,6 +101,7 @@ export class Product {
   public readonly aiTags: string[];
   public readonly aiAnalysis?: ProductAIAnalysis;
   public readonly raw: Record<string, unknown>;
+  private readonly attributeKeys: string[];
 
   private _image: HTMLImageElement | null = null;
   private _imageLoading = false;
@@ -119,12 +120,13 @@ export class Product {
     this.meta = data.meta;
     this.description = data.description;
     this.displayName = data.displayName ?? data.name;
-    this.attributes = {};
+    const attributeMap: Record<string, ProductAttribute> = {};
+    const attributeKeys: string[] = [];
     if (data.attributes) {
       for (const [key, attrLike] of Object.entries(data.attributes)) {
         const attr = attrLike;
         if (!attr) continue;
-        this.attributes[key] = attr instanceof ProductAttribute
+        const attributeInstance = attr instanceof ProductAttribute
           ? attr
           : new ProductAttribute({
               key,
@@ -135,8 +137,12 @@ export class Product {
               normalizedValue: attr.normalizedValue,
               sourcePath: attr.sourcePath,
             });
+        attributeMap[key] = attributeInstance;
+        attributeKeys.push(key);
       }
     }
+    this.attributes = attributeMap;
+    this.attributeKeys = attributeKeys;
     this.aiTags = data.aiTags ?? [];
     this.aiAnalysis = data.aiAnalysis;
     this.raw = data.raw ?? {};
@@ -198,12 +204,31 @@ export class Product {
     return '';
   }
 
+  hasAttribute(key: string): boolean {
+    return Object.prototype.hasOwnProperty.call(this.attributes, key);
+  }
+
   getAttribute(key: string): ProductAttribute | undefined {
     return this.attributes[key];
   }
 
-  getAttributeValue<T = string | number | boolean | null>(key: string): T | undefined {
-    return this.attributes[key]?.value as T | undefined;
+  getAttributeValue<T extends PrimitiveAttributeValue = PrimitiveAttributeValue>(key: string): T | undefined {
+    const attr = this.attributes[key];
+    if (!attr) return undefined;
+    return attr.value as T;
+  }
+
+  getAttributeDisplayValue(key: string): string | undefined {
+    const attr = this.attributes[key];
+    if (!attr) return undefined;
+    return attr.displayValue;
+  }
+
+  listAttributeKeys(): string[] {
+    if (this.attributeKeys.length === 0) {
+      return Object.keys(this.attributes);
+    }
+    return [...this.attributeKeys];
   }
 
   async loadImage(): Promise<HTMLImageElement | null> {

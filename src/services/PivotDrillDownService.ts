@@ -438,6 +438,12 @@ export class PivotDrillDownService {
   private extractRawValue(product: Product, def: PivotDimensionDefinition): unknown {
     switch (def.source.type) {
       case 'category': {
+        if (def.attributeKey) {
+          const attrValue = product.getAttributeValue(def.attributeKey);
+          if (attrValue !== undefined && attrValue !== null && attrValue !== '') {
+            return attrValue;
+          }
+        }
         const list = Array.isArray(product.category) ? product.category.filter(Boolean) : [];
         if (!list.length) return null;
         const requestedLevel = def.source.level;
@@ -445,7 +451,7 @@ export class PivotDrillDownService {
           return list[0];
         }
 
-        const topCategories = this.dimensionOrder.get('category:0');
+        const topCategories = this.dimensionOrder.get('category:primary');
         const disallowed = new Set<string>();
         disallowed.add(list[0]);
         for (const filter of this.filterStack) {
@@ -497,7 +503,10 @@ export class PivotDrillDownService {
       const parsed = Number(raw.replace(/[^\d.-]/g, ''));
       if (Number.isFinite(parsed)) return parsed;
     }
-    const attr = product.attributes?.[def.source.type === 'attribute' ? def.source.key : ''];
+    const attrKey = def.source.type === 'attribute'
+      ? def.source.key
+      : def.attributeKey;
+    const attr = attrKey ? product.attributes?.[attrKey] : undefined;
     if (attr && typeof attr.normalizedValue === 'number') return attr.normalizedValue;
     return undefined;
   }

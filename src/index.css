@@ -28,6 +28,24 @@ body {
   place-items: center;
   min-width: 320px;
   min-height: 100vh;
+  /* Mobile-friendly: prevent text selection and context menus */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  /* Prevent overscroll bounce on iOS */
+  overscroll-behavior: none;
+}
+
+/* Canvas touch optimization for iOS */
+canvas {
+  /* Disable native touch behaviors (pinch-zoom, double-tap zoom, etc.) */
+  touch-action: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  /* Prevent image context menu on long-press */
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 h1 {

@@ -42,7 +42,7 @@ const UI_DEFAULTS: UiDefaults = {
 };
 
 const PIVOT_DEFAULTS: PivotDefaults = {
-  dimension: 'category:0',
+  dimension: 'category:presentation',
   rootBreadcrumb: 'All',
 };
 
@@ -97,4 +97,3 @@ export function createDefaultDeveloperSettings(): DeveloperSettings {
     forceLabelsConfig: { ...defaults.forceLabelsConfig },
   };
 }
-

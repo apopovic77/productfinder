@@ -290,18 +290,25 @@ export class ProductFinderController {
   hitTest(screenX: number, screenY: number): Product | null {
     const worldPos = this.viewportService.screenToWorld(screenX, screenY);
     const nodes = this.layoutService.getEngine().all();
-    
-    for (const node of nodes) {
-      const nx = node.posX.value ?? 0;
-      const ny = node.posY.value ?? 0;
-      const nw = node.width.value ?? 0;
-      const nh = node.height.value ?? 0;
-      
+
+    console.log('[ProductFinderController] Hit test at screen:', { screenX, screenY }, 'world:', worldPos, 'checking', nodes.length, 'nodes');
+
+    // REVERSE iteration: last rendered = on top = should be found first
+    // This ensures we hit the visually topmost product
+    for (let i = nodes.length - 1; i >= 0; i--) {
+      const node = nodes[i];
+      const nx = node.posX.targetValue ?? node.posX.value ?? 0;
+      const ny = node.posY.targetValue ?? node.posY.value ?? 0;
+      const nw = node.width.targetValue ?? node.width.value ?? 0;
+      const nh = node.height.targetValue ?? node.height.value ?? 0;
+
       if (worldPos.x >= nx && worldPos.x <= nx + nw && worldPos.y >= ny && worldPos.y <= ny + nh) {
+        console.log('[ProductFinderController] ✓ Hit test found product:', node.data.name, 'id:', node.data.id, 'at', { x: nx, y: ny, w: nw, h: nh });
         return node.data;
       }
     }
-    
+
+    console.log('[ProductFinderController] ✗ Hit test found nothing');
     return null;
   }
 
@@ -527,7 +534,13 @@ export class ProductFinderController {
    */
   getProductNode(productId: string) {
     const nodes = this.layoutService.getEngine().all();
-    return nodes.find(n => n.data.id === productId);
+    const node = nodes.find(n => n.data.id === productId);
+    if (node) {
+      console.log('[ProductFinderController] getProductNode found:', node.data.name, 'id:', node.data.id, 'position:', { x: node.posX.value, y: node.posY.value });
+    } else {
+      console.warn('[ProductFinderController] getProductNode NOT FOUND for id:', productId);
+    }
+    return node;
   }
 
   /**

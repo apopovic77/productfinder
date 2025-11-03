@@ -35,6 +35,7 @@ export class PivotDimension {
   readonly entropy: number;
   readonly parentKey?: string;
   readonly numeric?: PivotNumericSummary;
+  readonly attributeKey?: string;
 
   constructor(params: {
     key: string;
@@ -47,6 +48,7 @@ export class PivotDimension {
     cardinality: number;
     entropy: number;
     parentKey?: string;
+    attributeKey?: string;
     numeric?: PivotNumericSummary;
   }) {
     this.key = params.key;
@@ -60,6 +62,7 @@ export class PivotDimension {
     this.entropy = params.entropy;
     this.parentKey = params.parentKey;
     this.numeric = params.numeric;
+    this.attributeKey = params.attributeKey;
   }
 
   get isNumeric(): boolean {

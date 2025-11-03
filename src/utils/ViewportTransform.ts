@@ -34,8 +34,8 @@ export class ViewportTransform {
 
   // Content bounds for bounds checking
   private contentBounds: ContentBounds | null = null;
-  private viewportWidth = 0;
-  private viewportHeight = 0;
+  public viewportWidth = 0;
+  public viewportHeight = 0;
 
   private isDragging = false;
   private dragStart = new Vector2(0, 0);
@@ -285,10 +285,11 @@ export class ViewportTransform {
     this.canvas.addEventListener('mouseup', this.handleMouseUp);
     this.canvas.addEventListener('mouseleave', this.handleMouseUp);
     
-    // Touch support
+    // Touch support (passive: false to enable preventDefault for iOS)
     this.canvas.addEventListener('touchstart', this.handleTouchStart, { passive: false });
     this.canvas.addEventListener('touchmove', this.handleTouchMove, { passive: false });
     this.canvas.addEventListener('touchend', this.handleTouchEnd);
+    this.canvas.addEventListener('touchcancel', this.handleTouchEnd); // Handle interrupted touches
   }
   
   destroy() {
@@ -300,6 +301,7 @@ export class ViewportTransform {
     this.canvas.removeEventListener('touchstart', this.handleTouchStart);
     this.canvas.removeEventListener('touchmove', this.handleTouchMove);
     this.canvas.removeEventListener('touchend', this.handleTouchEnd);
+    this.canvas.removeEventListener('touchcancel', this.handleTouchEnd);
   }
   
   private handleWheel = (e: WheelEvent) => {
@@ -358,7 +360,8 @@ export class ViewportTransform {
   // Touch support
   private touchStartDistance = 0;
   private touchStartScale = 1;
-  
+  private touchStartCenter = new Vector2(0, 0); // Midpoint between two fingers
+
   private handleTouchStart = (e: TouchEvent) => {
     if (e.touches.length === 2) {
       e.preventDefault();
@@ -369,7 +372,14 @@ export class ViewportTransform {
         touch2.clientY - touch1.clientY
       );
       this.touchStartScale = this.targetScale;
+
+      // Store midpoint between fingers (relative to canvas)
+      const rect = this.canvas.getBoundingClientRect();
+      this.touchStartCenter.x = ((touch1.clientX + touch2.clientX) / 2) - rect.left;
+      this.touchStartCenter.y = ((touch1.clientY + touch2.clientY) / 2) - rect.top;
     } else if (e.touches.length === 1) {
+      // Prevent default to avoid iOS Safari scroll/bounce behavior
+      e.preventDefault();
       const touch = e.touches[0];
       this.isDragging = true;
       this.dragStart.x = touch.clientX;
@@ -389,8 +399,16 @@ export class ViewportTransform {
         touch2.clientY - touch1.clientY
       );
       const scaleFactor = distance / this.touchStartDistance;
-      this.targetScale = Math.max(this.minScale, Math.min(this.maxScale, this.touchStartScale * scaleFactor));
+      const newScale = Math.max(this.minScale, Math.min(this.maxScale, this.touchStartScale * scaleFactor));
+
+      // Zoom towards the midpoint between fingers (iOS-style pinch-to-zoom)
+      const scaleRatio = newScale / this.targetScale;
+      this.targetOffset.x = this.touchStartCenter.x - (this.touchStartCenter.x - this.targetOffset.x) * scaleRatio;
+      this.targetOffset.y = this.touchStartCenter.y - (this.touchStartCenter.y - this.targetOffset.y) * scaleRatio;
+
+      this.targetScale = newScale;
     } else if (e.touches.length === 1 && this.isDragging) {
+      e.preventDefault();
       const touch = e.touches[0];
       const dx = touch.clientX - this.dragStart.x;
       const dy = touch.clientY - this.dragStart.y;

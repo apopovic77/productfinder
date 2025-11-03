@@ -33,6 +33,15 @@ export class LayoutService {
   private nodeToGroup = new Map<string, string>();
   private pivotModel: PivotAnalysisResult | null = null;
 
+  private static readonly PRESENTATION_ORDER = new Map<string, number>([
+    ['Helme', 0],
+    ['Brillen', 1],
+    ['Kleidung', 2],
+    ['Protektoren', 3],
+    ['Schuhe & Stiefel', 4],
+    ['Accessoires', 5],
+  ]);
+
   constructor() {
     this.pivotConfig = this.createDefaultPivotConfig();
     this.layouter = this.createLayouter(this.mode);
@@ -451,11 +460,21 @@ export class LayoutService {
       if (!key) return;
       let map = this.dimensionOrders.get(dimension);
       if (!map) {
-        map = new Map<string, number>();
+        if (dimension === 'category:presentation') {
+          map = new Map<string, number>(LayoutService.PRESENTATION_ORDER);
+        } else {
+          map = new Map<string, number>();
+        }
         this.dimensionOrders.set(dimension, map);
+        this.drillDownService.setDimensionOrder(dimension, map);
       }
       if (!map.has(key)) {
-        map.set(key, map.size);
+        let index = map.size;
+        if (dimension === 'category:presentation') {
+          index = LayoutService.PRESENTATION_ORDER.get(key) ?? index;
+        }
+        map.set(key, index);
+        this.dimensionOrders.set(dimension, map);
         this.drillDownService.setDimensionOrder(dimension, map);
       }
     };

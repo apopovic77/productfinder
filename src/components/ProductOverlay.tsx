@@ -87,10 +87,10 @@ export const ProductOverlay: React.FC<ProductOverlayProps> = ({
 
         {/* Details */}
         <div className="product-overlay-details">
-          {product.category?.[0] && (
+          {product.getAttributeDisplayValue('presentation_category') && (
             <div className="product-overlay-detail">
               <span className="product-overlay-label">Category:</span>
-              <span className="product-overlay-value">{product.category[0]}</span>
+              <span className="product-overlay-value">{product.getAttributeDisplayValue('presentation_category')}</span>
             </div>
           )}
 
