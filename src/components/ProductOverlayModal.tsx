@@ -105,9 +105,11 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
     });
 
     variantImageIds.forEach((storageId) => {
+      // Build proxy URL for variant images
+      const proxyUrl = `https://share.arkturian.com/proxy.php?id=${storageId}&width=150&format=webp&quality=75`;
       images.push({
         storageId,
-        src: '',
+        src: proxyUrl,
         label: 'Variant'
       });
     });

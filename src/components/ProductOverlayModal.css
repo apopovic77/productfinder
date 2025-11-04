@@ -28,6 +28,8 @@
   right: 20px;
   width: 44px;
   height: 44px;
+  min-width: 44px;
+  min-height: 44px;
   border-radius: 50%;
   border: none;
   background: rgba(0, 0, 0, 0.3);
@@ -41,6 +43,7 @@
   align-items: center;
   justify-content: center;
   line-height: 1;
+  padding: 0;
 }
 
 .pom-close:hover {
@@ -410,6 +413,8 @@
     right: 12px;
     width: 40px;
     height: 40px;
+    min-width: 40px;
+    min-height: 40px;
     font-size: 24px;
   }
 }
