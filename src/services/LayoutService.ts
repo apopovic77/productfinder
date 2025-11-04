@@ -56,6 +56,15 @@ export class LayoutService {
     this.layouter = this.createLayouter(this.mode);
     this.engine = new LayoutEngine<Product>(this.layouter);
     this.drillDownService.setPriceBucketConfig(this.priceBucketConfig);
+
+    const presentationOrder = new Map<string, number>(LayoutService.PRESENTATION_ORDER ?? []);
+    this.dimensionOrders.set('category:presentation', presentationOrder);
+    this.drillDownService.setDimensionOrder('category:presentation', presentationOrder);
+
+    const familyOrder = new Map<string, number>(LayoutService.CLOTHING_FAMILY_ORDER ?? []);
+    this.dimensionOrders.set('attribute:product_family', familyOrder);
+    this.drillDownService.setDimensionOrder('attribute:product_family', familyOrder);
+
     this.applyAnimationDuration();
   }
 
@@ -470,9 +479,9 @@ export class LayoutService {
       let map = this.dimensionOrders.get(dimension);
       if (!map) {
         if (dimension === 'category:presentation') {
-          map = new Map<string, number>(LayoutService.PRESENTATION_ORDER);
+          map = new Map<string, number>(LayoutService.PRESENTATION_ORDER ?? []);
         } else if (dimension === 'attribute:product_family') {
-          map = new Map<string, number>(LayoutService.CLOTHING_FAMILY_ORDER);
+          map = new Map<string, number>(LayoutService.CLOTHING_FAMILY_ORDER ?? []);
         } else {
           map = new Map<string, number>();
         }
@@ -481,9 +490,9 @@ export class LayoutService {
       }
       if (!map.has(key)) {
         let index = map.size;
-        if (dimension === 'category:presentation') {
+        if (dimension === 'category:presentation' && LayoutService.PRESENTATION_ORDER) {
           index = LayoutService.PRESENTATION_ORDER.get(key) ?? index;
-        } else if (dimension === 'attribute:product_family') {
+        } else if (dimension === 'attribute:product_family' && LayoutService.CLOTHING_FAMILY_ORDER) {
           index = LayoutService.CLOTHING_FAMILY_ORDER.get(key) ?? index;
         }
         map.set(key, index);

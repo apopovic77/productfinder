@@ -38,6 +38,9 @@ const NONE_LABEL = 'None';
 
 const DEFAULT_HERO_THRESHOLD = 10;
 const PRICE_REFINE_THRESHOLD = 8;
+const PRESENTATION_DIMENSION = 'category:presentation';
+
+
 
 /**
  * Service for managing pivot drill-down state using dynamically analysed dimensions.
@@ -74,7 +77,10 @@ export class PivotDrillDownService {
     this.numericStates.clear();
     this.heroModeActive = false;
 
-    const preferred = this.dimensions.find(d => d.role === 'category') ?? this.dimensions[0];
+    const presentation = this.dimensions.find(d => d.key === PRESENTATION_DIMENSION);
+    const preferred = presentation
+      ?? this.dimensions.find(d => d.role === 'category')
+      ?? this.dimensions[0];
     if (preferred) {
       const index = this.hierarchy.indexOf(preferred.key);
       this.rootDimensionIndex = index >= 0 ? index : 0;
