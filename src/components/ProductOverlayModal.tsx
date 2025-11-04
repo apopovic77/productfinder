@@ -147,6 +147,20 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
     return heroMedia?.src || '';
   };
 
+  // Get small image URL (canvas version - 150px)
+  const getSmallImageUrl = (): string => {
+    const storageId = getCurrentStorageId();
+
+    if (storageId) {
+      return `https://share.arkturian.com/proxy.php?id=${storageId}&width=150&format=webp&quality=75`;
+    }
+
+    // Fallback to src if no storage_id
+    const media = product.media || [];
+    const heroMedia = media.find(m => m.type === 'hero') || media[0];
+    return heroMedia?.src || '';
+  };
+
   // Parse features
   const parseFeatures = (): ParsedFeature[] => {
     return keyFeatures.map((featureStr: string) => {
@@ -434,9 +448,30 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
             )}
           </div>
 
-          {/* Image URL */}
+          {/* Image URLs */}
           <div style={{ marginTop: '8px', fontSize: '11px', fontFamily: 'monospace' }}>
-            <div style={{ marginBottom: '4px', fontWeight: '600', fontSize: '12px' }}>Bild-URL:</div>
+            <div style={{ marginBottom: '4px', fontWeight: '600', fontSize: '12px' }}>Canvas Bild (150px):</div>
+            <a
+              href={getSmallImageUrl()}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                color: '#ff6b00',
+                wordBreak: 'break-all',
+                textDecoration: 'none',
+                display: 'block',
+                padding: '6px',
+                background: 'rgba(0, 0, 0, 0.2)',
+                borderRadius: '4px',
+                marginBottom: '8px'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+              onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+            >
+              {getSmallImageUrl()}
+            </a>
+
+            <div style={{ marginBottom: '4px', fontWeight: '600', fontSize: '12px' }}>Dialog Bild (800px):</div>
             <a
               href={getCurrentImage()}
               target="_blank"
@@ -754,9 +789,30 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
                 )}
               </div>
 
-              {/* Image URL */}
+              {/* Image URLs */}
               <div style={{ marginTop: '8px', fontSize: '11px', fontFamily: 'monospace' }}>
-                <div style={{ marginBottom: '4px', fontWeight: '600', fontSize: '12px' }}>Bild-URL:</div>
+                <div style={{ marginBottom: '4px', fontWeight: '600', fontSize: '12px' }}>Canvas Bild (150px):</div>
+                <a
+                  href={getSmallImageUrl()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    color: '#ff6b00',
+                    wordBreak: 'break-all',
+                    textDecoration: 'none',
+                    display: 'block',
+                    padding: '6px',
+                    background: 'rgba(0, 0, 0, 0.2)',
+                    borderRadius: '4px',
+                    marginBottom: '8px'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                  onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+                >
+                  {getSmallImageUrl()}
+                </a>
+
+                <div style={{ marginBottom: '4px', fontWeight: '600', fontSize: '12px' }}>Dialog Bild (800px):</div>
                 <a
                   href={getCurrentImage()}
                   target="_blank"
