@@ -10,8 +10,14 @@ import { Vector2 } from 'arkturian-typescript-utils';
 import { PivotDrillDownService, type GroupDimension, type PriceBucketConfig, type PriceBucketMode } from './PivotDrillDownService';
 import { HeroLayouter } from '../layout/HeroLayouter';
 import type { PivotAnalysisResult, PivotDimensionDefinition } from './PivotDimensionAnalyzer';
+import { ACTIVE_PIVOT_PROFILE } from '../config/pivot';
 
 export type LayoutMode = 'grid' | 'masonry' | 'compact' | 'large' | 'pivot';
+
+const PIVOT_PROFILE = ACTIVE_PIVOT_PROFILE;
+
+const createOrderMap = (items: readonly string[] = []): Map<string, number> =>
+  new Map(items.map((label, index) => [label, index] as [string, number]));
 
 export class LayoutService {
   private mode: LayoutMode = 'pivot'; // Start with pivot layout!
@@ -33,23 +39,8 @@ export class LayoutService {
   private nodeToGroup = new Map<string, string>();
   private pivotModel: PivotAnalysisResult | null = null;
 
-  private static readonly PRESENTATION_ORDER = new Map<string, number>([
-    ['Helme', 0],
-    ['Brillen', 1],
-    ['Kleidung', 2],
-    ['Protektoren', 3],
-    ['Schuhe & Stiefel', 4],
-    ['Accessoires', 5],
-  ]);
-
-  private static readonly CLOTHING_FAMILY_ORDER = new Map<string, number>([
-    ['JERSEYS', 0],
-    ['SHORTS', 1],
-    ['HOSEN', 2],
-    ['JACKEN', 3],
-    ['REGENKLEIDUNG', 4],
-    ['HANDSCHUHE', 5],
-  ]);
+  private static readonly PRESENTATION_ORDER = createOrderMap(PIVOT_PROFILE.presentationCategoryOrder);
+  private static readonly CLOTHING_FAMILY_ORDER = createOrderMap(PIVOT_PROFILE.productFamilyOrder ?? []);
 
   constructor() {
     this.pivotConfig = this.createDefaultPivotConfig();

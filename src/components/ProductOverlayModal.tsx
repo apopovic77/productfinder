@@ -8,6 +8,7 @@ type Props = {
   onClose: () => void;
   position?: { x: number; y: number }; // Optional position for panel mode
   onPositionChange?: (position: { x: number; y: number }) => void; // Callback for position updates
+  onVariantChange?: (variant: any) => void; // Callback when active variant changes
 };
 
 interface ParsedFeature {
@@ -21,7 +22,7 @@ interface ParsedFeature {
  * Full interactivity with real dropdowns, better accessibility
  * Can be used as full modal (centered) or positioned panel (next to product)
  */
-export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, position, onPositionChange }) => {
+export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange }) => {
   // No position = fixed right panel (new simple behavior)
   const isPanelMode = true; // Always use panel mode now (no more full modal)
 
@@ -69,6 +70,14 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
   // State for selected color and size
   const [selectedColor, setSelectedColor] = useState<string>(allColors[0] || '');
   const [selectedSize, setSelectedSize] = useState<string>('');
+
+  // Debug once on mount
+  useEffect(() => {
+    console.log('[ProductOverlayModal] Product loaded - Variants:', variants.length, 'Colors:', allColors.length);
+    if (variants.length > 0) {
+      console.log('[ProductOverlayModal] First variant RAW:', JSON.stringify(variants[0], null, 2));
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // State for selected image
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
@@ -144,6 +153,15 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
       }
     }
   }, [activeVariant?.image_storage_id, allImages, selectedImageIndex]);
+
+  // Notify parent when variant changes (only when activeVariant ID changes)
+  const activeVariantId = activeVariant?.sku || activeVariant?.name || '';
+  useEffect(() => {
+    if (onVariantChange && activeVariant) {
+      onVariantChange(activeVariant);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeVariantId]); // Only trigger when variant ID changes, not onVariantChange
 
   // Drag handlers
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -492,6 +510,17 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
           <div className="pom-dropdowns">
             {allColors.length > 0 && (
               <div className="pom-dropdown-wrapper">
+                <label style={{
+                  display: 'block',
+                  fontSize: '11px',
+                  fontWeight: '600',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  opacity: 0.8,
+                  marginBottom: '6px'
+                }}>
+                  Color
+                </label>
                 <select
                   className="pom-dropdown"
                   value={selectedColor}
@@ -508,6 +537,17 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
 
             {availableSizes.length > 0 && (
               <div className="pom-dropdown-wrapper">
+                <label style={{
+                  display: 'block',
+                  fontSize: '11px',
+                  fontWeight: '600',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  opacity: 0.8,
+                  marginBottom: '6px'
+                }}>
+                  Size
+                </label>
                 <select
                   className="pom-dropdown"
                   value={selectedSize}

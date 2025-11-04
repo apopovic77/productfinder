@@ -1,5 +1,6 @@
 import { DefaultApi, Configuration, type Product as OnealProduct } from 'arkturian-oneal-sdk';
 import { Product, type ProductData, ProductAttribute, type PrimitiveAttributeValue, type AttributeType } from '../types/Product';
+import { ACTIVE_PIVOT_PROFILE } from '../config/pivot';
 
 const API_BASE = import.meta.env.VITE_ONEAL_API_BASE || 'https://oneal-api.arkturian.com/v1';
 const API_KEY = import.meta.env.VITE_ONEAL_API_KEY || 'oneal_demo_token';
@@ -11,129 +12,20 @@ const config = new Configuration({
 });
 const api = new DefaultApi(config);
 
-const PRESENTATION_CATEGORY_ORDER = [
-  'Helme',
-  'Brillen',
-  'Kleidung',
-  'Protektoren',
-  'Schuhe & Stiefel',
-  'Accessoires',
-] as const;
+const MEDIA_PLACEHOLDER_TOKENS = ['no-image', 'placeholder', 'shopifycloud/storefront/assets'];
 
-const CLOTHING_FAMILY_LABELS: Array<{ label: string; keywords: string[] }> = [
-  { label: 'JERSEYS', keywords: ['jersey'] },
-  { label: 'SHORTS', keywords: ['short'] },
-  { label: 'HOSEN', keywords: ['pant', 'hose'] },
-  { label: 'JACKEN', keywords: ['jacket', 'jacke'] },
-  { label: 'REGENKLEIDUNG', keywords: ['rain', 'regen'] },
-  { label: 'HANDSCHUHE', keywords: ['glove', 'handschuh'] },
-];
+const PIVOT_PROFILE = ACTIVE_PIVOT_PROFILE;
 
-function normalizeProductFamily(
-  presentationCategory: string | null | undefined,
-  rawFamily: string | null | undefined,
-  path: string[] | undefined,
-  productName: string,
-): string | undefined {
-  if (!rawFamily && !path?.length) return undefined;
-  const lowerName = productName.toLowerCase();
-  const lowerPath = (path ?? []).map(token => token.toLowerCase());
-  const lowerFamily = (rawFamily ?? '').toLowerCase();
-
-  const isClothing = presentationCategory === 'Kleidung';
-  if (isClothing) {
-    for (const { label, keywords } of CLOTHING_FAMILY_LABELS) {
-      const matchKeyword = keywords.some(keyword =>
-        lowerName.includes(keyword) || lowerPath.includes(keyword) || lowerFamily.includes(keyword)
-      );
-      if (matchKeyword) {
-        return label;
-      }
-    }
+function isRealMedia(item: any): boolean {
+  if (!item) return false;
+  const src = String(item.src ?? '').toLowerCase();
+  if (src && MEDIA_PLACEHOLDER_TOKENS.some(token => src.includes(token))) {
+    return false;
   }
-
-  if (!rawFamily) return undefined;
-  return rawFamily
-    .replace(/[_-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/(^|\s)\w/g, match => match.toUpperCase());
-}
-
-type PresentationCategory = (typeof PRESENTATION_CATEGORY_ORDER)[number];
-
-const PROTECTOR_KEYWORDS = [
-  'protector',
-  'protektor',
-  'schutz',
-  'guard',
-  'elbow',
-  'knee',
-  'shoulder',
-  'armour',
-  'armor',
-  'brace',
-  'pad',
-];
-
-function derivePresentationCategory(
-  primary: string | null | undefined,
-  secondary: string | null | undefined,
-  productName: string,
-  productUrl: string | null | undefined,
-  taxonomy?: { path?: string[]; product_family?: string },
-): PresentationCategory {
-  const prim = primary?.toLowerCase().trim() ?? '';
-  const sec = secondary?.toLowerCase().trim() ?? '';
-  const name = productName.toLowerCase();
-  const url = productUrl?.toLowerCase() ?? '';
-  const family = taxonomy?.product_family?.toLowerCase() ?? '';
-  const taxonomyTokens = taxonomy?.path?.map(token => token.toLowerCase()) ?? [];
-
-  const combinedProtectorText = `${prim} ${sec} ${name} ${url} ${family} ${taxonomyTokens.join(' ')}`;
-  const looksLikeProtector = PROTECTOR_KEYWORDS.some(keyword => combinedProtectorText.includes(keyword));
-
-  if (looksLikeProtector) {
-    return 'Protektoren';
+  if (!src && typeof item.storage_id !== 'number') {
+    return false;
   }
-
-  if (name.includes('goggle') || name.includes('brille') || url.includes('goggle')) {
-    return 'Brillen';
-  }
-
-  switch (prim) {
-    case 'helmets':
-      return 'Helme';
-    case 'protectors':
-      return 'Protektoren';
-    case 'shoes':
-      return 'Schuhe & Stiefel';
-    case 'accessories':
-      return 'Accessoires';
-    case 'clothing':
-    case 'gloves':
-      return 'Kleidung';
-    case 'other':
-      if (sec === 'protectors') return 'Protektoren';
-      if (sec === 'shoes') return 'Schuhe & Stiefel';
-      break;
-  }
-
-  if (name.includes('helmet') || name.includes('helm')) return 'Helme';
-  if (name.includes('protector') || name.includes('protektor')) return 'Protektoren';
-  if (name.includes('boot') || name.includes('stiefel') || name.includes('shoe')) return 'Schuhe & Stiefel';
-  if (
-    name.includes('glove') ||
-    name.includes('handschuh') ||
-    name.includes('jersey') ||
-    name.includes('hose') ||
-    name.includes('pant') ||
-    name.includes('shirt')
-  ) {
-    return 'Kleidung';
-  }
-
-  return 'Accessoires';
+  return true;
 }
 
 export type Query = {
@@ -190,7 +82,7 @@ function toString(value: unknown): string | undefined {
   return str.length ? str : undefined;
 }
 
-function mapProduct(p: OnealProduct): Product {
+function mapProduct(p: OnealProduct): Product | null {
   const attributes: Record<string, ProductAttribute> = {};
   const originalCategories = Array.isArray(p.category) ? p.category.filter(Boolean) : [];
   const originalPrimary = originalCategories[0];
@@ -200,14 +92,26 @@ function mapProduct(p: OnealProduct): Product {
   const source = (p.meta as any)?.source ?? taxonomy?.sport ?? null;
   const path = Array.isArray(taxonomy?.path) ? taxonomy.path : undefined;
   const variants = Array.isArray((p as any)?.variants) ? (p as any).variants : [];
+
+  // DEBUG: Log raw variant data (only for Legacy Hose)
+  if (variants.length > 0 && p.name.includes('Legacy Hose')) {
+    console.log('[ProductRepository] Raw variant data for product:', p.name);
+    console.log('[ProductRepository] First variant:', JSON.stringify(variants[0], null, 2));
+    console.log('[ProductRepository] Total variants:', variants.length);
+    console.log('[ProductRepository] Product media:', JSON.stringify(p.media, null, 2));
+  }
+
   const productUrl = typeof (p.meta as any)?.product_url === 'string' ? (p.meta as any).product_url : null;
-  const presentationCategory = derivePresentationCategory(
-    originalPrimary,
-    originalSecondary,
-    p.name,
+  const presentationCategory = PIVOT_PROFILE.derivePresentationCategory({
+    primaryCategory: originalPrimary,
+    secondaryCategory: originalSecondary,
+    productName: p.name,
     productUrl,
     taxonomy,
-  );
+  });
+  const sportLabel = PIVOT_PROFILE.formatTokenLabel(source);
+  const taxonomySportLabel = taxonomy?.sport ? PIVOT_PROFILE.formatTokenLabel(taxonomy.sport) : undefined;
+  const formattedTaxonomyPath = PIVOT_PROFILE.formatTokenPath(path);
 
   const categories = [...originalCategories];
   if (presentationCategory) {
@@ -273,7 +177,7 @@ function mapProduct(p: OnealProduct): Product {
         key: 'sport',
         label: 'Sport',
         type: 'enum',
-        value: source,
+        value: sportLabel ?? source,
         sourcePath: 'meta.source',
       }
     : undefined);
@@ -283,17 +187,17 @@ function mapProduct(p: OnealProduct): Product {
         key: 'taxonomy_sport',
         label: 'Taxonomy Sport',
         type: 'enum',
-        value: taxonomy.sport,
+        value: taxonomySportLabel ?? taxonomy.sport,
         sourcePath: 'derived_taxonomy.sport',
       }
     : undefined);
 
-  const normalizedFamily = normalizeProductFamily(
+  const normalizedFamily = PIVOT_PROFILE.normalizeProductFamily({
     presentationCategory,
-    taxonomy?.product_family ?? null,
-    path,
-    p.name,
-  );
+    rawFamily: taxonomy?.product_family ?? null,
+    taxonomyPath: path,
+    productName: p.name,
+  });
 
   addAttribute(attributes, normalizedFamily ?? taxonomy?.product_family
     ? {
@@ -310,7 +214,7 @@ function mapProduct(p: OnealProduct): Product {
         key: 'taxonomy_path',
         label: 'Taxonomy Path',
         type: 'enum',
-        value: path.join('>'),
+        value: formattedTaxonomyPath ?? path.join('>'),
         sourcePath: 'derived_taxonomy.path',
       }
     : undefined);
@@ -424,6 +328,11 @@ function mapProduct(p: OnealProduct): Product {
       }
     : undefined;
 
+  const filteredMedia = (p.media ?? []).filter(isRealMedia);
+  if (!filteredMedia.length) {
+    return null;
+  }
+
   const data: ProductData = {
     id: p.id,
     sku: p.sku,
@@ -432,7 +341,7 @@ function mapProduct(p: OnealProduct): Product {
     category: categories.length ? categories : originalCategories,
     season: p.season,
     price: p.price,
-    media: p.media?.map(item => {
+    media: filteredMedia.map(item => {
       const anyItem = item as any;
       return {
         src: item.src,
@@ -449,6 +358,18 @@ function mapProduct(p: OnealProduct): Product {
     attributes,
     aiTags,
     aiAnalysis,
+    variants: variants.map((v: any) => ({
+      name: v.name || '',
+      sku: v.sku,
+      gtin13: v.gtin13,
+      price: v.price,
+      currency: v.currency,
+      availability: v.availability,
+      url: v.url,
+      image_storage_id: v.image_storage_id,
+      option1: v.option1,
+      option2: v.option2,
+    })),
     raw: p as any
   };
 
@@ -469,7 +390,9 @@ export async function fetchProducts(query: Query = {}): Promise<Product[]> {
   });
   
   const results = (response.data as any).results || [];
-  const products = results.map(mapProduct);
+  const products = results
+    .map(mapProduct)
+    .filter((product: Product | null): product is Product => Boolean(product));
   
   // Preload images for better UX (non-blocking)
   Product.preloadImages(products);

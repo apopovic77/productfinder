@@ -56,6 +56,19 @@ export type ProductAIAnalysis = {
   collections?: string[];
 };
 
+export type ProductVariant = {
+  name: string;
+  sku?: string;
+  gtin13?: string;
+  price?: number;
+  currency?: string;
+  availability?: string;
+  url?: string;
+  image_storage_id?: number;
+  option1?: string;
+  option2?: string;
+};
+
 export type ProductData = {
   id: string;
   sku?: string;
@@ -72,6 +85,7 @@ export type ProductData = {
   attributes?: Record<string, ProductAttribute | ProductAttributeInit | undefined>;
   aiTags?: string[];
   aiAnalysis?: ProductAIAnalysis;
+  variants?: ProductVariant[];
   raw?: Record<string, unknown>;
 };
 
@@ -100,6 +114,7 @@ export class Product {
   public readonly attributes: Record<string, ProductAttribute>;
   public readonly aiTags: string[];
   public readonly aiAnalysis?: ProductAIAnalysis;
+  public readonly variants?: ProductVariant[];
   public readonly raw: Record<string, unknown>;
   private readonly attributeKeys: string[];
 
@@ -145,6 +160,7 @@ export class Product {
     this.attributeKeys = attributeKeys;
     this.aiTags = data.aiTags ?? [];
     this.aiAnalysis = data.aiAnalysis;
+    this.variants = data.variants ?? [];
     this.raw = data.raw ?? {};
   }
 

@@ -21,6 +21,7 @@ import {
   createDefaultPivotState,
   createDefaultUiState,
 } from './config/AppConfig';
+import { getImagesForVariant, getPrimaryVariant } from './utils/variantImageHelpers';
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -55,6 +56,7 @@ type State = {
   
   // Interaction State
   selectedProduct: Product | null;
+  selectedVariant: any | null; // Currently selected variant for the selected product
   selectedIndex: number;
   modalDirection: number;
   modalSequence: string[];
@@ -106,6 +108,7 @@ const createInitialState = (): State => {
     isPivotHeroMode: false,
 
     selectedProduct: null,
+    selectedVariant: null,
     selectedIndex: -1,
     modalDirection: 0,
     modalSequence: [],
@@ -261,6 +264,7 @@ export default class App extends React.Component<{}, State> {
     // Update selected product overlay (Canvas-based rendering)
     if (
       prevState.selectedProduct !== this.state.selectedProduct ||
+      prevState.selectedVariant !== this.state.selectedVariant ||
       prevState.devSettings.heroDisplayMode !== this.state.devSettings.heroDisplayMode ||
       prevState.devSettings.overlayScaleMode !== this.state.devSettings.overlayScaleMode ||
       prevState.overlayMode !== this.state.overlayMode ||
@@ -293,18 +297,31 @@ export default class App extends React.Component<{}, State> {
             renderer.selectedProduct = this.state.selectedProduct;
 
             // Collect alternative images for stacked display
+            // Only load images for the currently selected variant
             const product = this.state.selectedProduct as any;
-            const alternativeImages: Array<{ storageId: number; src: string; loadedImage?: HTMLImageElement }> = [];
+            const alternativeImages: Array<{
+              storageId: number;
+              src: string;
+              loadedImage?: HTMLImageElement;
+              orientation?: 'portrait' | 'landscape';
+            }> = [];
 
-            // Get images from product.media (skip the first one as it's the main image)
-            const media = product.media || [];
-            console.log('[App] Product media array:', media.length, 'images');
+            // Get the current variant (or primary variant if none selected)
+            const currentVariant = this.state.selectedVariant || getPrimaryVariant(product);
 
-            for (let i = 1; i < Math.min(4, media.length); i++) {
-              const m = media[i];
-              const storageId = m.storage_id;
-              if (storageId) {
-                const src = `https://share.arkturian.com/proxy.php?id=${storageId}&width=130&format=webp&quality=80`;
+            if (currentVariant) {
+              // Get all images for this variant (hero + gallery)
+              const variantImages = getImagesForVariant(product, currentVariant);
+
+              console.log('[App] Loading images for variant:', currentVariant.name, '- found', variantImages.length, 'images');
+
+              // Load images (skip first one as it's the main/hero image)
+              for (let i = 1; i < variantImages.length; i++) {
+                const variantImg = variantImages[i];
+                const storageId = variantImg.storageId;
+
+                // Use high-res images (1300px @ 85% quality) - same as LOD system
+                const src = `https://share.arkturian.com/proxy.php?id=${storageId}&width=1300&format=webp&quality=85`;
                 const imgObj: any = { storageId, src };
 
                 // Try to load the image (no crossOrigin to avoid CORS issues)
@@ -312,18 +329,17 @@ export default class App extends React.Component<{}, State> {
                 img.src = src;
                 img.onload = () => {
                   imgObj.loadedImage = img;
-                  console.log('[App] Alternative image loaded:', storageId);
-                  // Trigger a redraw (renderer runs at 60fps so it will pick up the loaded image)
+                  // Detect orientation
+                  imgObj.orientation = img.height > img.width ? 'portrait' : 'landscape';
                 };
                 img.onerror = (err) => {
-                  console.error('[App] Failed to load alternative image:', storageId, err);
+                  console.warn('[App] Failed to load alternative image:', storageId);
                 };
 
                 alternativeImages.push(imgObj);
               }
             }
 
-            console.log('[App] Setting alternativeImages on renderer:', alternativeImages.length, 'images');
             renderer.alternativeImages = alternativeImages.length > 0 ? alternativeImages : null;
           }
         } else {
@@ -449,7 +465,7 @@ export default class App extends React.Component<{}, State> {
     if (index === pivotBreadcrumbs.length - 1) return; // current level
 
     // Close dialog immediately on pivot navigation
-    this.setState({ selectedProduct: null, dialogPosition: null });
+    this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null });
 
     if (index === 0) {
       this.controller.resetPivot();
@@ -470,7 +486,7 @@ export default class App extends React.Component<{}, State> {
     if (dimension === this.state.pivotDimension) return;
 
     // Close dialog immediately on dimension change
-    this.setState({ selectedProduct: null, dialogPosition: null });
+    this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null });
 
     this.controller.setPivotDimension(dimension);
     this.syncPivotUI();
@@ -478,7 +494,7 @@ export default class App extends React.Component<{}, State> {
 
   private handleGroupSelect = (groupKey: string) => {
     // Close dialog immediately on group drill down
-    this.setState({ selectedProduct: null, dialogPosition: null });
+    this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null });
 
     this.controller.drillDownGroup(groupKey);
     this.syncPivotUI();
@@ -510,7 +526,7 @@ export default class App extends React.Component<{}, State> {
 
       if (overlayClick === 'close') {
         // Close the overlay
-        this.setState({ selectedProduct: null });
+        this.setState({ selectedProduct: null, selectedVariant: null });
         return;
       } else if (overlayClick === 'view') {
         // Open product on O'Neal website
@@ -559,7 +575,9 @@ export default class App extends React.Component<{}, State> {
       this.controller.centerOnProduct(product);
 
       // Set selected product to show annotations (in Hero Mode)
-      this.setState({ selectedProduct: product });
+      // Also set the primary variant
+      const primaryVariant = getPrimaryVariant(product);
+      this.setState({ selectedProduct: product, selectedVariant: primaryVariant });
 
       // TODO: Modal dialog deaktiviert - User möchte kein Modal
       // const groupKey = this.controller.getGroupKeyForProduct(product);
@@ -568,7 +586,7 @@ export default class App extends React.Component<{}, State> {
       // this.setState({ selectedProduct: product, selectedIndex: idx, modalDirection: 0, modalSequence: sequence });
     } else {
       // Clicked on empty space - deselect product
-      this.setState({ selectedProduct: null });
+      this.setState({ selectedProduct: null, selectedVariant: null });
     }
   };
 
@@ -772,7 +790,7 @@ export default class App extends React.Component<{}, State> {
             <label className="pf-bottom-label" htmlFor="pf-bottom-sort">Sort</label>
             <CustomSelect
               value={sortMode}
-              onChange={(value) => this.setState({ sortMode: value as SortMode, selectedProduct: null, dialogPosition: null })}
+              onChange={(value) => this.setState({ sortMode: value as SortMode, selectedProduct: null, selectedVariant: null, dialogPosition: null })}
               options={[
                 { value: 'none', label: 'None' },
                 { value: 'name-asc', label: 'Name (A-Z)' },
@@ -838,7 +856,7 @@ export default class App extends React.Component<{}, State> {
                 <label className="pf-bottom-label" htmlFor="pf-bottom-sort-mobile">SORT</label>
                 <CustomSelect
                   value={sortMode}
-                  onChange={(value) => this.setState({ sortMode: value as SortMode, selectedProduct: null, dialogPosition: null })}
+                  onChange={(value) => this.setState({ sortMode: value as SortMode, selectedProduct: null, selectedVariant: null, dialogPosition: null })}
                   options={[
                     { value: 'none', label: 'None' },
                     { value: 'name-asc', label: 'Name (A-Z)' },
@@ -909,8 +927,9 @@ export default class App extends React.Component<{}, State> {
           {this.state.overlayMode === 'react' && selectedProduct && (
             <ProductOverlayModal
               product={selectedProduct}
-              onClose={() => this.setState({ selectedProduct: null, dialogPosition: null })}
+              onClose={() => this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null })}
               onPositionChange={(pos) => this.setState({ dialogPosition: pos })}
+              onVariantChange={(variant) => this.setState({ selectedVariant: variant })}
             />
           )}
         </AnimatePresence>

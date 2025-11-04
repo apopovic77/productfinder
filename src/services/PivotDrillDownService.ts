@@ -6,6 +6,7 @@ import type {
   PivotDimensionDefinition,
   PivotDimensionKind,
 } from './PivotDimensionAnalyzer';
+import { ACTIVE_PIVOT_PROFILE } from '../config/pivot';
 
 export type GroupDimension = string;
 
@@ -36,10 +37,7 @@ export type DrillDownState = {
 const UNKNOWN_LABEL = 'Unknown';
 const NONE_LABEL = 'None';
 
-const DEFAULT_HERO_THRESHOLD = 10;
-const PRICE_REFINE_THRESHOLD = 8;
-const CLOTHING_FAMILY_KEYS = new Set(['jersey','pants','shorts','jackets','jacken','regen','glove','handschuh']);
-const PROTECTOR_FAMILY_KEYS = new Set(['protector','protektor','schutz','guard','brace','armor','armour','elbow','knee','shoulder','pad']);
+const PIVOT_PROFILE = ACTIVE_PIVOT_PROFILE;
 const PRESENTATION_DIMENSION = 'category:presentation';
 
 
@@ -63,8 +61,10 @@ export class PivotDrillDownService {
   private numericStates = new Map<GroupDimension, NumericDimensionState>();
   private dimensionOrder = new Map<GroupDimension, Map<string, number>>();
 
-  private heroThreshold = DEFAULT_HERO_THRESHOLD;
+  private readonly profile = PIVOT_PROFILE;
+  private heroThreshold = Math.max(1, Math.floor(PIVOT_PROFILE.heroThreshold));
   private heroModeActive = false;
+  private readonly priceRefineThreshold = Math.max(1, Math.floor(PIVOT_PROFILE.priceRefineThreshold));
 
   setModel(analysis: PivotAnalysisResult | null): void {
     this.analysis = analysis;
@@ -397,6 +397,15 @@ export class PivotDrillDownService {
       this.currentDimensionIndex = this.rootDimensionIndex;
     } else {
       const last = this.filterStack[this.filterStack.length - 1];
+      const preferred = this.profile.getPreferredChildDimension?.(last.dimension, last.value);
+      if (preferred) {
+        const preferredIndex = this.hierarchy.indexOf(preferred);
+        if (preferredIndex !== -1) {
+          this.currentDimensionIndex = preferredIndex;
+          this.currentDimensionKey = this.hierarchy[this.currentDimensionIndex] ?? null;
+          return;
+        }
+      }
       const lastIndex = this.hierarchy.indexOf(last.dimension);
       this.currentDimensionIndex = Math.min(
         lastIndex >= 0 ? lastIndex + 1 : this.rootDimensionIndex,
@@ -451,10 +460,9 @@ export class PivotDrillDownService {
       const taxonomyPath = (product.getAttributeValue<string>('taxonomy_path') || '').toLowerCase();
       const name = product.displayName.toLowerCase();
       const haystack = `${name} ${family} ${taxonomyPath}`;
-      const isClothing = Array.from(CLOTHING_FAMILY_KEYS).some(token => haystack.includes(token));
-      if (isClothing) {
+      if (this.profile.isClothingContext(haystack)) {
         value = 'Kleidung';
-      } else if (Array.from(PROTECTOR_FAMILY_KEYS).some(token => haystack.includes(token))) {
+      } else if (this.profile.isProtectorContext(haystack)) {
         value = 'Protektoren';
       }
     }
@@ -586,6 +594,27 @@ export class PivotDrillDownService {
           .map(key => [key, groups.get(key)!] as [string, Product[]])
       );
     }
+    if (this.profile.productFamilyOrder && this.profile.productFamilyOrder.length) {
+      const familyOrder = new Map(
+        this.profile.productFamilyOrder.map((label, index) => [label, index] as [string, number])
+      );
+      const dimensionMatchesFamily =
+        dimension.includes('product_family') ||
+        def?.attributeKey === 'product_family' ||
+        def?.label?.toLowerCase().includes('familie');
+      if (dimensionMatchesFamily) {
+        return new Map(
+          keys
+            .sort((a, b) => {
+              const idxA = familyOrder.get(a) ?? Number.MAX_SAFE_INTEGER;
+              const idxB = familyOrder.get(b) ?? Number.MAX_SAFE_INTEGER;
+              if (idxA !== idxB) return idxA - idxB;
+              return a.localeCompare(b);
+            })
+            .map(key => [key, groups.get(key)!] as [string, Product[]])
+        );
+      }
+    }
     if (def?.role === 'category' || def?.role === 'class') {
       return new Map(keys.sort().map(key => [key, groups.get(key)!] as [string, Product[]]));
     }
@@ -610,8 +639,11 @@ export class PivotDrillDownService {
     }
 
     let bucketCount = this.priceBucketCount;
-    if (values.length > PRICE_REFINE_THRESHOLD && this.hasFilterFor(dimension)) {
-      bucketCount = Math.min(this.priceBucketCount * 2, Math.max(2, Math.ceil(values.length / PRICE_REFINE_THRESHOLD)));
+    if (values.length > this.priceRefineThreshold && this.hasFilterFor(dimension)) {
+      bucketCount = Math.min(
+        this.priceBucketCount * 2,
+        Math.max(2, Math.ceil(values.length / this.priceRefineThreshold))
+      );
     }
 
     const buckets = this.buildNumericBuckets(values, def, bucketCount);
