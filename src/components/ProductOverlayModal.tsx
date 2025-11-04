@@ -25,6 +25,12 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
 
   // Extract variants
   const variants = (product as any).variants || [];
+  const rawProduct = (product as any).raw || {};
+  const derivedTaxonomy = (product as any).derived_taxonomy || rawProduct?.derived_taxonomy;
+  const metaInfo = (product.meta && Object.keys(product.meta).length ? product.meta : rawProduct?.meta) || {};
+  const taxonomyPath = Array.isArray(derivedTaxonomy?.path) ? derivedTaxonomy.path : [];
+  const taxonomySport = derivedTaxonomy?.sport;
+  const taxonomyFamily = derivedTaxonomy?.product_family;
 
   // Helper functions to parse variant name (e.g., "Black / Size S")
   const getColor = (variant: any): string => {
@@ -133,22 +139,8 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
     return (heroMedia as any)?.storage_id || null;
   };
 
-  // Get current image from active variant or fallback to hero
-  const getCurrentImage = (): string => {
-    const storageId = getCurrentStorageId();
-
-    if (storageId) {
-      return `https://share.arkturian.com/proxy.php?id=${storageId}&width=800&format=webp&quality=85`;
-    }
-
-    // Fallback to src if no storage_id
-    const media = product.media || [];
-    const heroMedia = media.find(m => m.type === 'hero') || media[0];
-    return heroMedia?.src || '';
-  };
-
-  // Get small image URL (canvas version - 150px)
-  const getSmallImageUrl = (): string => {
+  // Get low resolution image URL (150px - canvas low LOD)
+  const getLowResImageUrl = (): string => {
     const storageId = getCurrentStorageId();
 
     if (storageId) {
@@ -159,6 +151,25 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
     const media = product.media || [];
     const heroMedia = media.find(m => m.type === 'hero') || media[0];
     return heroMedia?.src || '';
+  };
+
+  // Get high resolution image URL (1300px - canvas high LOD)
+  const getHighResImageUrl = (): string => {
+    const storageId = getCurrentStorageId();
+
+    if (storageId) {
+      return `https://share.arkturian.com/proxy.php?id=${storageId}&width=1300&format=webp&quality=85`;
+    }
+
+    // Fallback to src if no storage_id
+    const media = product.media || [];
+    const heroMedia = media.find(m => m.type === 'hero') || media[0];
+    return heroMedia?.src || '';
+  };
+
+  // Get current image for dialog display (use high res)
+  const getCurrentImage = (): string => {
+    return getHighResImageUrl();
   };
 
   // Parse features
@@ -194,6 +205,68 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
 
   // Get variant URL or fallback to product URL
   const productUrl = activeVariant?.url || (product as any).meta?.product_url;
+
+  const renderStructuredInfo = () => (
+    <>
+      {product.category && product.category.length > 0 && (
+        <div className="pom-section">
+          <div className="pom-section-title">Kategorien</div>
+          <div className="pom-chip-row">
+            {product.category.map((cat, idx) => (
+              <span key={idx} className="pom-chip">{cat}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {(taxonomySport || taxonomyFamily || taxonomyPath.length > 0) && (
+        <div className="pom-section">
+          <div className="pom-section-title">Derived Taxonomy</div>
+          <div className="pom-chip-row">
+            {taxonomySport && <span className="pom-chip">Sport: {taxonomySport}</span>}
+            {taxonomyFamily && <span className="pom-chip">Family: {taxonomyFamily}</span>}
+          </div>
+          {taxonomyPath.length > 0 && (
+            <div className="pom-chip-row pom-chip-row-path">
+              {taxonomyPath.map((node: string, idx: number) => (
+                <span key={idx} className="pom-chip pom-chip-muted">{node}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {metaInfo && Object.keys(metaInfo).length > 0 && (
+        <div className="pom-section">
+          <div className="pom-section-title">Meta</div>
+          <div className="pom-meta-grid">
+            {Object.entries(metaInfo).map(([key, value]) => {
+              const displayValue = Array.isArray(value) || typeof value === 'object'
+                ? JSON.stringify(value, null, 2)
+                : String(value ?? '');
+
+              if (!displayValue) return null;
+
+              const isUrl = key.toLowerCase().includes('url') && typeof value === 'string';
+
+              return (
+                <div key={key} className="pom-meta-item">
+                  <div className="pom-meta-label">{key}</div>
+                  {isUrl ? (
+                    <a href={value as string} target="_blank" rel="noopener noreferrer" className="pom-meta-link">
+                      {value as string}
+                    </a>
+                  ) : (
+                    <div className="pom-meta-value">{displayValue}</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </>
+  );
 
   const handleViewWebsite = () => {
     if (productUrl) {
@@ -428,6 +501,8 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
           )}
         </div>
 
+        {renderStructuredInfo()}
+
         {/* Debug Info */}
         <div style={{ marginTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '16px' }}>
           <div style={{ fontSize: '12px', marginBottom: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -450,9 +525,9 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
 
           {/* Image URLs */}
           <div style={{ marginTop: '8px', fontSize: '11px', fontFamily: 'monospace' }}>
-            <div style={{ marginBottom: '4px', fontWeight: '600', fontSize: '12px' }}>Canvas Bild (150px):</div>
+            <div style={{ marginBottom: '4px', fontWeight: '600', fontSize: '12px' }}>Canvas Low LOD (150px):</div>
             <a
-              href={getSmallImageUrl()}
+              href={getLowResImageUrl()}
               target="_blank"
               rel="noopener noreferrer"
               style={{
@@ -468,12 +543,12 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
               onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
               onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
             >
-              {getSmallImageUrl()}
+              {getLowResImageUrl()}
             </a>
 
-            <div style={{ marginBottom: '4px', fontWeight: '600', fontSize: '12px' }}>Dialog Bild (800px):</div>
+            <div style={{ marginBottom: '4px', fontWeight: '600', fontSize: '12px' }}>Canvas High LOD (1300px):</div>
             <a
-              href={getCurrentImage()}
+              href={getHighResImageUrl()}
               target="_blank"
               rel="noopener noreferrer"
               style={{
@@ -488,7 +563,7 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
               onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
               onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
             >
-              {getCurrentImage()}
+              {getHighResImageUrl()}
             </a>
           </div>
 
@@ -765,14 +840,16 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
               {availableSizes.length > 0 && (
                 <div className="pom-material-item">
                   Available Sizes: {availableSizes.join(', ')}
-                </div>
-              )}
             </div>
+          )}
+        </div>
 
-            {/* Debug Info */}
-            <div style={{ marginTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '16px' }}>
-              <div style={{ fontSize: '12px', marginBottom: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                {getCurrentStorageId() && (
+        {renderStructuredInfo()}
+
+        {/* Debug Info */}
+        <div style={{ marginTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '16px' }}>
+          <div style={{ fontSize: '12px', marginBottom: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {getCurrentStorageId() && (
                   <span style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '4px 8px', borderRadius: '12px', fontSize: '11px' }}>
                     Storage-ID: {getCurrentStorageId()}
                   </span>
@@ -791,9 +868,9 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
 
               {/* Image URLs */}
               <div style={{ marginTop: '8px', fontSize: '11px', fontFamily: 'monospace' }}>
-                <div style={{ marginBottom: '4px', fontWeight: '600', fontSize: '12px' }}>Canvas Bild (150px):</div>
+                <div style={{ marginBottom: '4px', fontWeight: '600', fontSize: '12px' }}>Canvas Low LOD (150px):</div>
                 <a
-                  href={getSmallImageUrl()}
+                  href={getLowResImageUrl()}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{
@@ -809,12 +886,12 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
                   onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
                   onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
                 >
-                  {getSmallImageUrl()}
+                  {getLowResImageUrl()}
                 </a>
 
-                <div style={{ marginBottom: '4px', fontWeight: '600', fontSize: '12px' }}>Dialog Bild (800px):</div>
+                <div style={{ marginBottom: '4px', fontWeight: '600', fontSize: '12px' }}>Canvas High LOD (1300px):</div>
                 <a
-                  href={getCurrentImage()}
+                  href={getHighResImageUrl()}
                   target="_blank"
                   rel="noopener noreferrer"
                   style={{
@@ -829,7 +906,7 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
                   onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
                   onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
                 >
-                  {getCurrentImage()}
+                  {getHighResImageUrl()}
                 </a>
               </div>
 
