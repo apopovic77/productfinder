@@ -38,6 +38,7 @@ const NONE_LABEL = 'None';
 
 const DEFAULT_HERO_THRESHOLD = 10;
 const PRICE_REFINE_THRESHOLD = 8;
+const CLOTHING_FAMILY_KEYS = new Set(['jersey','pants','shorts','jackets','jacken','regen','glove','handschuh']);
 const PRESENTATION_DIMENSION = 'category:presentation';
 
 
@@ -439,7 +440,23 @@ export class PivotDrillDownService {
       return UNKNOWN_LABEL;
     }
 
-    return String(raw);
+    let value = String(raw);
+
+    if (
+      (dimension === 'category:presentation' || dimension === 'category:primary') &&
+      value === 'Accessoires'
+    ) {
+      const family = (product.getAttributeValue<string>('product_family') || '').toLowerCase();
+      const taxonomyPath = (product.getAttributeValue<string>('taxonomy_path') || '').toLowerCase();
+      const name = product.displayName.toLowerCase();
+      const haystack = `${name} ${family} ${taxonomyPath}`;
+      const isClothing = Array.from(CLOTHING_FAMILY_KEYS).some(token => haystack.includes(token));
+      if (isClothing) {
+        value = 'Kleidung';
+      }
+    }
+
+    return value;
   }
 
   private extractRawValue(product: Product, def: PivotDimensionDefinition): unknown {

@@ -288,10 +288,45 @@ export default class App extends React.Component<{}, State> {
               x: this.state.dialogPosition.x,
               y: this.state.dialogPosition.y + 150 // Approximate middle of dialog
             };
+
+            // Collect alternative images for stacked display
+            const product = this.state.selectedProduct as any;
+            const alternativeImages: Array<{ storageId: number; src: string; loadedImage?: HTMLImageElement }> = [];
+
+            // Get images from product.media (skip the first one as it's the main image)
+            const media = product.media || [];
+            console.log('[App] Product media array:', media.length, 'images');
+
+            for (let i = 1; i < Math.min(4, media.length); i++) {
+              const m = media[i];
+              const storageId = m.storage_id;
+              if (storageId) {
+                const src = `https://share.arkturian.com/proxy.php?id=${storageId}&width=130&format=webp&quality=80`;
+                const imgObj: any = { storageId, src };
+
+                // Try to load the image (no crossOrigin to avoid CORS issues)
+                const img = new Image();
+                img.src = src;
+                img.onload = () => {
+                  imgObj.loadedImage = img;
+                  console.log('[App] Alternative image loaded:', storageId);
+                  // Trigger a redraw (renderer runs at 60fps so it will pick up the loaded image)
+                };
+                img.onerror = (err) => {
+                  console.error('[App] Failed to load alternative image:', storageId, err);
+                };
+
+                alternativeImages.push(imgObj);
+              }
+            }
+
+            console.log('[App] Setting alternativeImages on renderer:', alternativeImages.length, 'images');
+            renderer.alternativeImages = alternativeImages.length > 0 ? alternativeImages : null;
           }
         } else {
           renderer.dialogConnectionPoint = null;
           renderer.dialogPosition = null;
+          renderer.alternativeImages = null;
         }
 
         // Only render in Canvas if overlayMode is 'canvas'

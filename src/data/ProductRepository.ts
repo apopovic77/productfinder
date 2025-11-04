@@ -168,8 +168,9 @@ function toString(value: unknown): string | undefined {
 
 function mapProduct(p: OnealProduct): Product {
   const attributes: Record<string, ProductAttribute> = {};
-  const primaryCategory = p.category?.[0];
-  const secondaryCategory = p.category?.[1];
+  const originalCategories = Array.isArray(p.category) ? p.category.filter(Boolean) : [];
+  const originalPrimary = originalCategories[0];
+  const originalSecondary = originalCategories[1];
   const taxonomy = (p as any)?.derived_taxonomy ?? {};
   const categoryIds = Array.isArray((p as any).category_ids) ? (p as any).category_ids : [];
   const source = (p.meta as any)?.source ?? taxonomy?.sport ?? null;
@@ -177,28 +178,47 @@ function mapProduct(p: OnealProduct): Product {
   const variants = Array.isArray((p as any)?.variants) ? (p as any).variants : [];
   const productUrl = typeof (p.meta as any)?.product_url === 'string' ? (p.meta as any).product_url : null;
   const presentationCategory = derivePresentationCategory(
-    primaryCategory,
-    secondaryCategory,
+    originalPrimary,
+    originalSecondary,
     p.name,
     productUrl,
   );
 
-  addAttribute(attributes, primaryCategory
+  const categories = [...originalCategories];
+  if (presentationCategory) {
+    if (!categories.length) {
+      categories.push(presentationCategory);
+    } else {
+      categories[0] = presentationCategory;
+    }
+  }
+
+  addAttribute(attributes, categories[0]
     ? {
         key: 'category_primary',
         label: 'Category',
         type: 'enum',
-        value: primaryCategory,
+        value: categories[0],
         sourcePath: 'category[0]',
       }
     : undefined);
 
-  addAttribute(attributes, secondaryCategory
+  addAttribute(attributes, originalPrimary && originalPrimary !== categories[0]
+    ? {
+        key: 'legacy_category_primary',
+        label: 'Legacy Category',
+        type: 'enum',
+        value: originalPrimary,
+        sourcePath: 'category_original[0]',
+      }
+    : undefined);
+
+  addAttribute(attributes, categories[1]
     ? {
         key: 'category_secondary',
         label: 'Subcategory',
         type: 'enum',
-        value: secondaryCategory,
+        value: categories[1],
         sourcePath: 'category[1]',
       }
     : undefined);
@@ -384,7 +404,7 @@ function mapProduct(p: OnealProduct): Product {
     sku: p.sku,
     name: p.name,
     brand: p.brand,
-    category: p.category,
+    category: categories.length ? categories : originalCategories,
     season: p.season,
     price: p.price,
     media: p.media?.map(item => {

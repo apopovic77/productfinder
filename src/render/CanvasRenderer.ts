@@ -30,6 +30,7 @@ export class CanvasRenderer<T> {
   // Dialog connection line (for React overlay mode)
   public dialogConnectionPoint: { x: number; y: number } | null = null; // Product center in canvas space
   public dialogPosition: { x: number; y: number } | null = null; // Dialog position in screen space
+  public alternativeImages: Array<{ storageId: number; src: string }> | null = null; // Alternative product images for stacked display
 
   // Product overlay renderer (OOP class)
   private productOverlay: ProductOverlayCanvas;
@@ -367,9 +368,10 @@ export class CanvasRenderer<T> {
       
       const img = product.image;
       if (!img) continue;
-      
+
       const isFocused = this.focusedItem === n.data;
-      
+      const isSelectedProduct = this.selectedProduct && (product as any).id === this.selectedProduct.id;
+
       // Apply scale transform
       this.ctx.save();
       const centerX = x + w / 2;
@@ -377,8 +379,40 @@ export class CanvasRenderer<T> {
       this.ctx.translate(centerX, centerY);
       this.ctx.scale(scale, scale);
       this.ctx.translate(-centerX, -centerY);
-      
-      // Draw image (no hover effects - tooltip is enough!)
+
+      // Draw alternative images stacked behind (only for selected product with dialog open)
+      if (isSelectedProduct && this.alternativeImages && this.alternativeImages.length > 0) {
+        const maxStacked = Math.min(3, this.alternativeImages.length); // Maximum 3 stacked images
+        const offset = 8; // Pixel offset for each stacked image
+
+        // Count how many are loaded
+        const loadedCount = this.alternativeImages.filter(img => (img as any).loadedImage).length;
+        if (loadedCount > 0) {
+          console.log('[Renderer] Drawing', loadedCount, 'alternative images at position', x, y);
+        }
+
+        // Draw from back to front
+        for (let i = maxStacked - 1; i >= 0; i--) {
+          const altImg = this.alternativeImages[i];
+          if (altImg && (altImg as any).loadedImage) {
+            const stackedX = x + (i + 1) * offset;
+            const stackedY = y - (i + 1) * offset;
+
+            console.log('[Renderer] Drawing stacked image', i, 'at', stackedX, stackedY, 'size', w, h);
+
+            // Semi-transparent background card
+            this.ctx.globalAlpha = 0.6 - (i * 0.1);
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            this.ctx.fillRect(stackedX, stackedY, w, h);
+
+            // Draw the alternative image
+            this.ctx.drawImage((altImg as any).loadedImage, stackedX, stackedY, w, h);
+          }
+        }
+        this.ctx.globalAlpha = 1;
+      }
+
+      // Draw main image (no hover effects - tooltip is enough!)
       this.ctx.globalAlpha = opacity;
       this.ctx.drawImage(img, x, y, w, h);
       this.ctx.globalAlpha = 1;
