@@ -62,16 +62,40 @@ function normalizeProductFamily(
 
 type PresentationCategory = (typeof PRESENTATION_CATEGORY_ORDER)[number];
 
+const PROTECTOR_KEYWORDS = [
+  'protector',
+  'protektor',
+  'schutz',
+  'guard',
+  'elbow',
+  'knee',
+  'shoulder',
+  'armour',
+  'armor',
+  'brace',
+  'pad',
+];
+
 function derivePresentationCategory(
   primary: string | null | undefined,
   secondary: string | null | undefined,
   productName: string,
   productUrl: string | null | undefined,
+  taxonomy?: { path?: string[]; product_family?: string },
 ): PresentationCategory {
   const prim = primary?.toLowerCase().trim() ?? '';
   const sec = secondary?.toLowerCase().trim() ?? '';
   const name = productName.toLowerCase();
   const url = productUrl?.toLowerCase() ?? '';
+  const family = taxonomy?.product_family?.toLowerCase() ?? '';
+  const taxonomyTokens = taxonomy?.path?.map(token => token.toLowerCase()) ?? [];
+
+  const combinedProtectorText = `${prim} ${sec} ${name} ${url} ${family} ${taxonomyTokens.join(' ')}`;
+  const looksLikeProtector = PROTECTOR_KEYWORDS.some(keyword => combinedProtectorText.includes(keyword));
+
+  if (looksLikeProtector) {
+    return 'Protektoren';
+  }
 
   if (name.includes('goggle') || name.includes('brille') || url.includes('goggle')) {
     return 'Brillen';
@@ -182,6 +206,7 @@ function mapProduct(p: OnealProduct): Product {
     originalSecondary,
     p.name,
     productUrl,
+    taxonomy,
   );
 
   const categories = [...originalCategories];

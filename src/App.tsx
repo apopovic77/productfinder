@@ -289,6 +289,9 @@ export default class App extends React.Component<{}, State> {
               y: this.state.dialogPosition.y + 150 // Approximate middle of dialog
             };
 
+            // Set selected product so renderer knows which product to draw stacked images for
+            renderer.selectedProduct = this.state.selectedProduct;
+
             // Collect alternative images for stacked display
             const product = this.state.selectedProduct as any;
             const alternativeImages: Array<{ storageId: number; src: string; loadedImage?: HTMLImageElement }> = [];
@@ -350,7 +353,8 @@ export default class App extends React.Component<{}, State> {
           } else {
             console.warn('[App] Node not found for selected product:', this.state.selectedProduct.id);
           }
-        } else {
+        } else if (this.state.overlayMode !== 'react') {
+          // Only clear if not in React mode (React mode sets selectedProduct for stacked images)
           renderer.selectedProduct = null;
           renderer.selectedProductAnchor = null;
           renderer.selectedProductBounds = null;

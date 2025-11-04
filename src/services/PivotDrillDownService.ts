@@ -39,6 +39,7 @@ const NONE_LABEL = 'None';
 const DEFAULT_HERO_THRESHOLD = 10;
 const PRICE_REFINE_THRESHOLD = 8;
 const CLOTHING_FAMILY_KEYS = new Set(['jersey','pants','shorts','jackets','jacken','regen','glove','handschuh']);
+const PROTECTOR_FAMILY_KEYS = new Set(['protector','protektor','schutz','guard','brace','armor','armour','elbow','knee','shoulder','pad']);
 const PRESENTATION_DIMENSION = 'category:presentation';
 
 
@@ -453,6 +454,8 @@ export class PivotDrillDownService {
       const isClothing = Array.from(CLOTHING_FAMILY_KEYS).some(token => haystack.includes(token));
       if (isClothing) {
         value = 'Kleidung';
+      } else if (Array.from(PROTECTOR_FAMILY_KEYS).some(token => haystack.includes(token))) {
+        value = 'Protektoren';
       }
     }
 
