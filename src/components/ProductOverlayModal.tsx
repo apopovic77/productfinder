@@ -46,6 +46,9 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
   const [selectedColor, setSelectedColor] = useState<string>(allColors[0] || '');
   const [selectedSize, setSelectedSize] = useState<string>('');
 
+  // State for selected image
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
+
   // Filter sizes based on selected color
   const availableSizes = [...new Set(
     variants
@@ -71,14 +74,59 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
   const specs = product.specifications || {};
   const material = specs.shell_material || specs.materials || '100% Polyester';
 
+  // Collect all available images (product media + variant images)
+  const getAllImages = (): Array<{ storageId: number | null; src: string; label: string }> => {
+    const images: Array<{ storageId: number | null; src: string; label: string }> = [];
+
+    // Add product media images
+    const media = product.media || [];
+    media.forEach((m, idx) => {
+      const storageId = (m as any).storage_id || null;
+      const src = m.src || '';
+      const label = m.type || `Image ${idx + 1}`;
+      images.push({ storageId, src, label });
+    });
+
+    // Add unique variant images that aren't already in media
+    const variantImageIds = new Set<number>();
+    variants.forEach((v: any) => {
+      if (v.image_storage_id && !images.some(img => img.storageId === v.image_storage_id)) {
+        variantImageIds.add(v.image_storage_id);
+      }
+    });
+
+    variantImageIds.forEach((storageId) => {
+      images.push({
+        storageId,
+        src: '',
+        label: 'Variant'
+      });
+    });
+
+    return images;
+  };
+
+  const allImages = getAllImages();
+
+  // Update selected image when variant changes
+  useEffect(() => {
+    if (activeVariant?.image_storage_id) {
+      const imgIndex = allImages.findIndex(img => img.storageId === activeVariant.image_storage_id);
+      if (imgIndex !== -1) {
+        setSelectedImageIndex(imgIndex);
+      }
+    }
+  }, [activeVariant?.image_storage_id]);
+
   // Get current storage ID
   const getCurrentStorageId = (): number | null => {
-    // Try variant image first
+    if (selectedImageIndex >= 0 && selectedImageIndex < allImages.length) {
+      return allImages[selectedImageIndex].storageId;
+    }
+    // Fallback
     if (activeVariant?.image_storage_id) {
       return activeVariant.image_storage_id;
     }
-
-    // Fallback to hero image
     const media = product.media || [];
     const heroMedia = media.find(m => m.type === 'hero') || media[0];
     return (heroMedia as any)?.storage_id || null;
@@ -212,6 +260,66 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
 
         {/* Title */}
         <h2 className="pom-title">{product.name}</h2>
+
+        {/* Thumbnail Gallery - Panel Mode */}
+        {allImages.length > 1 && (
+          <div style={{
+            display: 'flex',
+            gap: '6px',
+            marginTop: '12px',
+            marginBottom: '12px',
+            overflowX: 'auto',
+            maxWidth: '100%'
+          }}>
+            {allImages.map((img, idx) => {
+              const thumbnailUrl = img.storageId
+                ? `https://share.arkturian.com/proxy.php?id=${img.storageId}&width=100&format=webp&quality=80`
+                : img.src;
+              const isActive = idx === selectedImageIndex;
+
+              return (
+                <button
+                  key={idx}
+                  onClick={() => setSelectedImageIndex(idx)}
+                  style={{
+                    width: '60px',
+                    height: '60px',
+                    flexShrink: 0,
+                    border: isActive ? '2px solid #ff6b00' : '2px solid rgba(255, 255, 255, 0.2)',
+                    borderRadius: '6px',
+                    overflow: 'hidden',
+                    cursor: 'pointer',
+                    padding: 0,
+                    background: 'rgba(0, 0, 0, 0.3)',
+                    transition: 'all 0.2s ease',
+                    transform: isActive ? 'scale(1.05)' : 'scale(1)',
+                    opacity: isActive ? 1 : 0.7
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.opacity = '1';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) {
+                      e.currentTarget.style.opacity = '0.7';
+                    }
+                  }}
+                >
+                  <img
+                    src={thumbnailUrl}
+                    alt={`${product.name} - ${img.label}`}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover'
+                    }}
+                  />
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Price & Availability */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -442,6 +550,67 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
               alt={product.name}
               className="pom-product-image"
             />
+
+            {/* Thumbnail Gallery */}
+            {allImages.length > 1 && (
+              <div style={{
+                display: 'flex',
+                gap: '8px',
+                marginTop: '16px',
+                flexWrap: 'wrap',
+                justifyContent: 'center',
+                maxWidth: '100%'
+              }}>
+                {allImages.map((img, idx) => {
+                  const thumbnailUrl = img.storageId
+                    ? `https://share.arkturian.com/proxy.php?id=${img.storageId}&width=100&format=webp&quality=80`
+                    : img.src;
+                  const isActive = idx === selectedImageIndex;
+
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => setSelectedImageIndex(idx)}
+                      style={{
+                        width: '80px',
+                        height: '80px',
+                        border: isActive ? '3px solid #ff6b00' : '2px solid rgba(255, 255, 255, 0.2)',
+                        borderRadius: '8px',
+                        overflow: 'hidden',
+                        cursor: 'pointer',
+                        padding: 0,
+                        background: 'rgba(0, 0, 0, 0.3)',
+                        transition: 'all 0.2s ease',
+                        transform: isActive ? 'scale(1.05)' : 'scale(1)',
+                        opacity: isActive ? 1 : 0.7
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isActive) {
+                          e.currentTarget.style.opacity = '1';
+                          e.currentTarget.style.transform = 'scale(1.05)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isActive) {
+                          e.currentTarget.style.opacity = '0.7';
+                          e.currentTarget.style.transform = 'scale(1)';
+                        }
+                      }}
+                    >
+                      <img
+                        src={thumbnailUrl}
+                        alt={`${product.name} - ${img.label}`}
+                        style={{
+                          width: '100%',
+                          height: '100%',
+                          objectFit: 'cover'
+                        }}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Right: Info Panel */}
