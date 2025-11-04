@@ -8,9 +8,11 @@ they are cached at the Storage API endpoint for faster initial page loads.
 
 import sys
 import os
-import requests
+from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Tuple
+
+import requests
 
 # API Configuration
 API_BASE = os.getenv('API_BASE', 'https://oneal-api.arkturian.com/v1')
@@ -36,29 +38,47 @@ def fetch_products() -> List[Dict]:
         print(f"❌ Failed to fetch products: {e}")
         sys.exit(1)
 
-def get_storage_id(product: Dict) -> int | None:
-    """Extract storage_id from product."""
-    media = product.get('media', [])
-    if not media:
-        return None
+def collect_media_entries(products: List[Dict]) -> Dict[int, Dict[str, str]]:
+    """
+    Collect unique storage-backed media entries.
 
-    primary_image = media[0]
-    return primary_image.get('storage_id')
+    Returns:
+        Ordered dict keyed by storage_id with product metadata.
+    """
+    media_map: Dict[int, Dict[str, str]] = OrderedDict()
+    for product in products:
+        product_id = product.get('id', 'unknown')
+        for media_item in product.get('media') or []:
+            storage_id = media_item.get('storage_id')
+            if not storage_id or storage_id in media_map:
+                continue
+            media_map[storage_id] = {
+                'product_id': product_id,
+                'media_role': media_item.get('role', 'unknown'),
+            }
+    return media_map
 
-def warmup_image(product_id: str, storage_id: int, size: int) -> Tuple[bool, str, int]:
+def warmup_image(product_id: str, storage_id: int, size: int, refresh: bool = False) -> Tuple[bool, str, int]:
     """
     Load a single image to cache it.
 
     Returns:
         (success, product_id, size)
     """
-    url = f"https://api-storage.arkturian.com/storage/media/{storage_id}?width={size}&format=webp&quality=85"
+    base_url = f"https://api-storage.arkturian.com/storage/media/{storage_id}"
+    params = {
+        'width': size,
+        'format': 'webp',
+        'quality': 85,
+    }
+    if refresh:
+        params['refresh'] = 'true'
 
     # Retry logic for 502/504 errors
     max_retries = 2
     for attempt in range(max_retries):
         try:
-            response = requests.get(url, timeout=60)  # Increased timeout
+            response = requests.get(base_url, params=params, timeout=60)  # Increased timeout
             response.raise_for_status()
             return (True, product_id, size)
         except requests.exceptions.HTTPError as e:
@@ -83,18 +103,20 @@ def main():
     products = fetch_products()
     print(f"✅ Loaded {len(products)} products")
 
-    # Collect all image tasks
-    tasks = []
-    for product in products:
-        storage_id = get_storage_id(product)
-        if storage_id:
-            product_id = product.get('id', 'unknown')
-            for size in SIZES:
-                tasks.append((product_id, storage_id, size))
-        else:
-            print(f"⚠️  Product {product.get('id', 'unknown')} has no storage_id, skipping")
+    media_entries = collect_media_entries(products)
+    if not media_entries:
+        print("⚠️  No storage-backed media found. Nothing to warm up.")
+        return
 
-    print(f"\n🔥 Warming up cache for {len(tasks)} images ({len(products)} products × {len(SIZES)} sizes)")
+    # Collect all image tasks (first size triggers refresh)
+    tasks = []
+    for storage_id, meta in media_entries.items():
+        product_id = meta['product_id']
+        for index, size in enumerate(SIZES):
+            tasks.append((product_id, storage_id, size, index == 0))
+
+    print(f"\n🔥 Warming up cache for {len(tasks)} requests "
+          f"({len(media_entries)} media assets × {len(SIZES)} sizes)")
     print(f"📊 Settings: 3 parallel workers, 60s timeout, retry on 502/504 errors")
     print(f"📊 Progress:\n")
 
@@ -105,8 +127,8 @@ def main():
     with ThreadPoolExecutor(max_workers=3) as executor:
         # Submit all tasks
         futures = [
-            executor.submit(warmup_image, product_id, storage_id, size)
-            for product_id, storage_id, size in tasks
+            executor.submit(warmup_image, product_id, storage_id, size, refresh)
+            for product_id, storage_id, size, refresh in tasks
         ]
 
         # Process results as they complete

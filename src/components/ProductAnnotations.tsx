@@ -41,7 +41,6 @@ const ProductAnnotationsComponent: React.FC<ProductAnnotationsProps> = ({
 
   // Only recreate labels when product changes
   if (!labelsRef.current || labelsRef.current.productId !== product.id) {
-    console.log('🔄 ProductAnnotations: Creating NEW labels for product', product.id);
     const result: Label[] = [];
 
     // Price (highest priority - stays closest)

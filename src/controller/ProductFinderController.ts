@@ -159,7 +159,7 @@ export class ProductFinderController {
       return;
     }
 
-    console.log('[ProductFinderController] Content bounds:', bounds, 'Viewport:', this.canvas.width, 'x', this.canvas.height);
+    // Content bounds set
 
     // Set content bounds on viewport
     this.viewportService.setContentBounds(bounds);
@@ -283,15 +283,13 @@ export class ProductFinderController {
 
     // Center and zoom to product in hero mode
     this.viewportService.centerOn(centerX, centerY, clampedScale);
-    console.log('[ProductFinderController] Hero zoom on product:', product.name, 'at', centerX, centerY, 'scale:', clampedScale.toFixed(2), '(max:', viewport.maxScale.toFixed(2) + ')');
+    // Hero zoom applied
   }
 
   // Hit Testing
   hitTest(screenX: number, screenY: number): Product | null {
     const worldPos = this.viewportService.screenToWorld(screenX, screenY);
     const nodes = this.layoutService.getEngine().all();
-
-    console.log('[ProductFinderController] Hit test at screen:', { screenX, screenY }, 'world:', worldPos, 'checking', nodes.length, 'nodes');
 
     // REVERSE iteration: last rendered = on top = should be found first
     // This ensures we hit the visually topmost product
@@ -303,12 +301,10 @@ export class ProductFinderController {
       const nh = node.height.targetValue ?? node.height.value ?? 0;
 
       if (worldPos.x >= nx && worldPos.x <= nx + nw && worldPos.y >= ny && worldPos.y <= ny + nh) {
-        console.log('[ProductFinderController] ✓ Hit test found product:', node.data.name, 'id:', node.data.id, 'at', { x: nx, y: ny, w: nw, h: nh });
         return node.data;
       }
     }
 
-    console.log('[ProductFinderController] ✗ Hit test found nothing');
     return null;
   }
 
@@ -348,7 +344,7 @@ export class ProductFinderController {
            this.canvas.width = viewportWidth;
            this.canvas.height = viewportHeight;
 
-           console.log(`Canvas resized to: ${viewportWidth}x${viewportHeight}`);
+           // Canvas resized
 
            // Layout uses viewport size
            this.layoutService.layout(viewportWidth, viewportHeight);
@@ -536,7 +532,7 @@ export class ProductFinderController {
     const nodes = this.layoutService.getEngine().all();
     const node = nodes.find(n => n.data.id === productId);
     if (node) {
-      console.log('[ProductFinderController] getProductNode found:', node.data.name, 'id:', node.data.id, 'position:', { x: node.posX.value, y: node.posY.value });
+      // Product node found
     } else {
       console.warn('[ProductFinderController] getProductNode NOT FOUND for id:', productId);
     }

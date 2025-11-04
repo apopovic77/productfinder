@@ -52,11 +52,9 @@ export class ViewportTransform {
    * This should be called whenever the layout changes.
    */
   setContentBounds(bounds: ContentBounds): void {
-    console.log('[ViewportTransform] setContentBounds called:', bounds);
     this.contentBounds = bounds;
     this.updateViewportSize();
     this.calculateFitToContentScale();
-    console.log('[ViewportTransform] fitToContentScale:', this.fitToContentScale, 'minScale:', this.minScale, 'maxScale:', this.maxScale);
   }
 
   /**

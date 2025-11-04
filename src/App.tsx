@@ -290,7 +290,7 @@ export default class App extends React.Component<{}, State> {
             // Pass the same node bounds to ensure consistency
             renderer.selectedProductBounds = { x: nodeX, y: nodeY, width: nodeW, height: nodeH };
 
-            console.log('[App] Setting overlay for product:', this.state.selectedProduct.name, 'bounds:', { x: nodeX, y: nodeY, width: nodeW, height: nodeH });
+            // Setting overlay for product
           } else {
             console.warn('[App] Node not found for selected product:', this.state.selectedProduct.id);
           }
@@ -471,18 +471,18 @@ export default class App extends React.Component<{}, State> {
 
         if (productUrl && typeof productUrl === 'string') {
           window.open(productUrl, '_blank');
-          console.log('[App] Opening product on website:', product.name, 'url:', productUrl);
+          // Opening product on website
         } else {
           // Fallback: construct URL from SKU or ID
           const identifier = product.sku || product.id;
           const url = `https://www.oneal.eu/de-de/product/${encodeURIComponent(identifier)}`;
           window.open(url, '_blank');
-          console.log('[App] Opening product on website (fallback):', product.name, 'identifier:', identifier, 'url:', url);
+          // Opening product on website (fallback)
         }
         return;
       } else if (overlayClick === 'cart') {
         // Handle add to cart button
-        console.log('[App] Add to Cart clicked for product:', this.state.selectedProduct.name);
+        // Add to Cart clicked
         // TODO: Implement add to cart
         return;
       } else if (overlayClick === 'background') {
@@ -502,7 +502,7 @@ export default class App extends React.Component<{}, State> {
     // Otherwise check for product click
     const product = this.controller.hitTest(x, y);
     if (product) {
-      console.log('[App] Product clicked:', product.name, 'id:', product.id);
+      // Product clicked
 
       // Center the clicked product smoothly (if zoomed in)
       // Rubberband system will automatically prevent bounds violations

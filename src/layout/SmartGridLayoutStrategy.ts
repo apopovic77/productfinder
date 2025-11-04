@@ -122,8 +122,6 @@ export class SmartGridLayoutStrategy<T> {
     const startX = this.config.margin + (availableWidth - totalGridWidth) / 2;
     const startY = this.config.margin + (availableHeight - totalGridHeight) / 2;
 
-    console.log(`Grid: ${cols}x${rows}, Cell: ${cellSize.toFixed(1)}px, Total: ${nodes.length} products`);
-
     // Place products in grid
     nodes.forEach((node, index) => {
       const col = index % cols;
