@@ -594,15 +594,39 @@ export class PivotDrillDownService {
           .map(key => [key, groups.get(key)!] as [string, Product[]])
       );
     }
-    if (this.profile.productFamilyOrder && this.profile.productFamilyOrder.length) {
-      const familyOrder = new Map(
-        this.profile.productFamilyOrder.map((label, index) => [label, index] as [string, number])
-      );
-      const dimensionMatchesFamily =
-        dimension.includes('product_family') ||
-        def?.attributeKey === 'product_family' ||
-        def?.label?.toLowerCase().includes('familie');
-      if (dimensionMatchesFamily) {
+    const dimensionMatchesFamily =
+      dimension.includes('product_family') ||
+      def?.attributeKey === 'product_family' ||
+      def?.label?.toLowerCase().includes('familie');
+    if (dimensionMatchesFamily) {
+      let familyList: readonly string[] | undefined;
+      const getOrderFor = (category: string): readonly string[] | undefined =>
+        this.profile.getProductFamilyOrderForCategory?.(category) ??
+        this.profile.productFamilyOrders?.[category];
+
+      for (let i = this.filterStack.length - 1; i >= 0; i--) {
+        const filter = this.filterStack[i];
+        if (filter.dimension === 'category:presentation') {
+          familyList = getOrderFor(filter.value);
+          if (familyList?.length) break;
+        }
+      }
+
+      if (!familyList || !familyList.length) {
+        const orders = this.profile.productFamilyOrders
+          ? Array.from(
+              new Set(
+                Object.values(this.profile.productFamilyOrders)
+                  .flat()
+                  .filter(Boolean)
+              )
+            )
+          : [];
+        familyList = orders.length ? orders : undefined;
+      }
+
+      if (familyList && familyList.length) {
+        const familyOrder = new Map(familyList.map((label, index) => [label, index] as [string, number]));
         return new Map(
           keys
             .sort((a, b) => {

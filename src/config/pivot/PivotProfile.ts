@@ -22,7 +22,7 @@ export type NormalizeProductFamilyArgs = {
 export interface PivotProfile {
   readonly name: string;
   readonly presentationCategoryOrder: readonly PresentationCategory[];
-  readonly productFamilyOrder?: readonly string[];
+  readonly productFamilyOrders?: Record<string, readonly string[]>;
   readonly heroThreshold: number;
   readonly priceRefineThreshold: number;
 
@@ -40,4 +40,6 @@ export interface PivotProfile {
    * Return the desired dimension key (must exist in the hierarchy) or undefined to keep default behaviour.
    */
   getPreferredChildDimension?(parentDimension: string, parentValue: string): string | undefined;
+
+  getProductFamilyOrderForCategory?(category: string): readonly string[] | undefined;
 }

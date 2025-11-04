@@ -19,6 +19,11 @@ const PIVOT_PROFILE = ACTIVE_PIVOT_PROFILE;
 const createOrderMap = (items: readonly string[] = []): Map<string, number> =>
   new Map(items.map((label, index) => [label, index] as [string, number]));
 
+const DEFAULT_FAMILY_ORDER =
+  PIVOT_PROFILE.getProductFamilyOrderForCategory?.('Kleidung') ??
+  PIVOT_PROFILE.productFamilyOrders?.['Kleidung'] ??
+  [];
+
 export class LayoutService {
   private mode: LayoutMode = 'pivot'; // Start with pivot layout!
   private engine: LayoutEngine<Product>;
@@ -40,7 +45,7 @@ export class LayoutService {
   private pivotModel: PivotAnalysisResult | null = null;
 
   private static readonly PRESENTATION_ORDER = createOrderMap(PIVOT_PROFILE.presentationCategoryOrder);
-  private static readonly CLOTHING_FAMILY_ORDER = createOrderMap(PIVOT_PROFILE.productFamilyOrder ?? []);
+  private static readonly CLOTHING_FAMILY_ORDER = createOrderMap(DEFAULT_FAMILY_ORDER);
 
   constructor() {
     this.pivotConfig = this.createDefaultPivotConfig();

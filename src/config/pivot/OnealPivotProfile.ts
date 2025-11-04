@@ -23,6 +23,52 @@ const CLOTHING_FAMILY_LABELS: Array<{ label: string; keywords: string[] }> = [
   { label: 'HANDSCHUHE', keywords: ['glove', 'handschuh'] },
 ];
 
+const PROTECTOR_FAMILY_LABELS: Array<{ label: string; keywords: string[] }> = [
+  { label: 'OBERKÖRPER', keywords: ['chest', 'oberkörper', 'upper', 'body', 'torso', 'roost', 'brust', 'back', 'shoulder', 'vest', 'shirt', 'protector jacke', 'armour', 'armor'] },
+  { label: 'KNIE', keywords: ['knee', 'knie', 'shin', 'schienbein', 'leg', 'schoner'] },
+  { label: 'ELLENBOGEN', keywords: ['elbow', 'ellenbogen', 'arm'] },
+  { label: 'NACKENSCHUTZ', keywords: ['neck', 'nacken', 'brace', 'collar'] },
+];
+
+const HELMET_FAMILY_LABELS: Array<{ label: string; keywords: string[] }> = [
+  { label: 'FULL FACE HELME', keywords: ['fullface', 'full-face', 'integral', 'integralhelm', 'full face', 'closed face'] },
+  { label: 'OPEN FACE HELME', keywords: ['open face', 'jethelm', 'jet-helm', 'half shell', 'half-shell', 'mx', 'motocross', 'bmx', 'dirt', 'trail'] },
+];
+
+const GOGGLE_FAMILY_LABELS: Array<{ label: string; keywords: string[] }> = [
+  { label: 'B-10', keywords: ['b10', 'b-10'] },
+  { label: 'B-22', keywords: ['b22', 'b-22'] },
+  { label: 'B-33', keywords: ['b33', 'b-33'] },
+  { label: 'B-55', keywords: ['b55', 'b-55'] },
+  { label: 'VAULT', keywords: ['vault'] },
+  { label: 'ZUBEHÖR', keywords: ['accessory', 'zubehör', 'tear off', 'tearo', 'roll-off', 'roll off', 'lens', 'scheibe'] },
+  { label: 'GOGGLE-GUIDE', keywords: ['guide', 'fitting', 'kompatibilität', 'kompatibel'] },
+];
+
+const PRODUCT_FAMILY_ORDERS: Record<string, readonly string[]> = {
+  Kleidung: CLOTHING_FAMILY_LABELS.map(item => item.label),
+  Protektoren: [
+    'OBERKÖRPER',
+    'KNIE',
+    'ELLENBOGEN',
+    'NACKENSCHUTZ',
+    'WEITERE',
+  ],
+  Helme: [
+    'FULL FACE HELME',
+    'OPEN FACE HELME',
+  ],
+  Brillen: [
+    'B-10',
+    'B-22',
+    'B-33',
+    'B-55',
+    'VAULT',
+    'ZUBEHÖR',
+    'GOGGLE-GUIDE',
+  ],
+};
+
 const PROTECTOR_KEYWORDS = [
   'protector',
   'protektor',
@@ -249,14 +295,13 @@ function derivePresentationCategory(args: DerivePresentationCategoryArgs): Prese
 
 function normalizeProductFamily(args: NormalizeProductFamilyArgs): string | undefined {
   const { presentationCategory, rawFamily, taxonomyPath, productName } = args;
-  if (!rawFamily && !taxonomyPath?.length) return undefined;
   const lowerName = productName.toLowerCase();
   const lowerPath = (taxonomyPath ?? []).map(token => token.toLowerCase());
-  const lowerFamily = (rawFamily ?? '').toLowerCase();
+  const trimmedFamily = rawFamily?.trim() ?? '';
+  const lowerFamily = trimmedFamily.toLowerCase();
 
-  const isClothing = presentationCategory === 'Kleidung';
-  if (isClothing) {
-    for (const { label, keywords } of CLOTHING_FAMILY_LABELS) {
+  const matchByKeywords = (labels: Array<{ label: string; keywords: string[] }>): string | undefined => {
+    for (const { label, keywords } of labels) {
       const matchKeyword = keywords.some(keyword =>
         lowerName.includes(keyword) || lowerPath.includes(keyword) || lowerFamily.includes(keyword)
       );
@@ -264,14 +309,87 @@ function normalizeProductFamily(args: NormalizeProductFamilyArgs): string | unde
         return label;
       }
     }
+    return undefined;
+  };
+
+  if (presentationCategory === 'Kleidung') {
+    const match = matchByKeywords(CLOTHING_FAMILY_LABELS);
+    if (match) return match;
   }
 
-  if (!rawFamily) return undefined;
-  return rawFamily
+  if (presentationCategory === 'Protektoren') {
+    const match = matchByKeywords(PROTECTOR_FAMILY_LABELS);
+    if (match) return match;
+  }
+
+  if (presentationCategory === 'Helme') {
+    const match = matchByKeywords(HELMET_FAMILY_LABELS);
+    if (match) return match;
+  }
+
+  if (presentationCategory === 'Brillen') {
+    const match = matchByKeywords(GOGGLE_FAMILY_LABELS);
+    if (match) return match;
+  }
+
+  if (!trimmedFamily) {
+    if (presentationCategory === 'Protektoren') return 'WEITERE';
+    if (presentationCategory === 'Helme') return 'OPEN FACE HELME';
+    if (presentationCategory === 'Brillen') return 'ZUBEHÖR';
+    return undefined;
+  }
+
+  const formatted = trimmedFamily
     .replace(/[_-]+/g, ' ')
     .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/(^|\s)\w/g, match => match.toUpperCase());
+    .trim();
+
+  if (!formatted) {
+    if (presentationCategory === 'Protektoren') return 'WEITERE';
+    if (presentationCategory === 'Helme') return 'OPEN FACE HELME';
+    if (presentationCategory === 'Brillen') return 'ZUBEHÖR';
+    return undefined;
+  }
+
+  if (presentationCategory === 'Protektoren') {
+    const upper = formatted.toUpperCase();
+    if (upper.includes('OBER') || upper.includes('CHEST') || upper.includes('BODY') || upper.includes('TORSO')) {
+      return 'OBERKÖRPER';
+    }
+    if (upper.includes('KNEE') || upper.includes('KNIE') || upper.includes('SHIN') || upper.includes('SCHIEN')) {
+      return 'KNIE';
+    }
+    if (upper.includes('ELBOW') || upper.includes('ELLEN')) {
+      return 'ELLENBOGEN';
+    }
+    if (upper.includes('NECK') || upper.includes('NACKEN') || upper.includes('BRACE') || upper.includes('COLLAR')) {
+      return 'NACKENSCHUTZ';
+    }
+    return 'WEITERE';
+  }
+
+  if (presentationCategory === 'Helme') {
+    const lower = formatted.toLowerCase();
+    if (lower.includes('full')) return 'FULL FACE HELME';
+    return 'OPEN FACE HELME';
+  }
+
+  if (presentationCategory === 'Brillen') {
+    const upper = formatted.toUpperCase();
+    if (upper.includes('B-10') || upper.includes('B10')) return 'B-10';
+    if (upper.includes('B-22') || upper.includes('B22')) return 'B-22';
+    if (upper.includes('B-33') || upper.includes('B33')) return 'B-33';
+    if (upper.includes('B-55') || upper.includes('B55')) return 'B-55';
+    if (upper.includes('VAULT')) return 'VAULT';
+    if (upper.includes('GUIDE')) return 'GOGGLE-GUIDE';
+    return 'ZUBEHÖR';
+  }
+
+  return formatted.replace(/(^|\s)\w/g, match => match.toUpperCase());
+}
+
+function getProductFamilyOrderForCategory(category: string): readonly string[] | undefined {
+  return PRODUCT_FAMILY_ORDERS[category];
 }
 
 function isClothingContext(text: string): boolean {
@@ -297,7 +415,7 @@ function isProtectorContext(text: string): boolean {
 export const ONEAL_PIVOT_PROFILE: PivotProfile = {
   name: 'oneal',
   presentationCategoryOrder: PRESENTATION_CATEGORY_ORDER,
-  productFamilyOrder: CLOTHING_FAMILY_LABELS.map(item => item.label),
+  productFamilyOrders: PRODUCT_FAMILY_ORDERS,
   heroThreshold: 10,
   priceRefineThreshold: 8,
   derivePresentationCategory,
@@ -310,6 +428,16 @@ export const ONEAL_PIVOT_PROFILE: PivotProfile = {
     if (parentDimension === 'category:presentation' && parentValue === 'Kleidung') {
       return 'attribute:product_family';
     }
+    if (parentDimension === 'category:presentation' && parentValue === 'Protektoren') {
+      return 'attribute:product_family';
+    }
+    if (parentDimension === 'category:presentation' && parentValue === 'Helme') {
+      return 'attribute:product_family';
+    }
+    if (parentDimension === 'category:presentation' && parentValue === 'Brillen') {
+      return 'attribute:product_family';
+    }
     return undefined;
   },
+  getProductFamilyOrderForCategory: getProductFamilyOrderForCategory,
 };
