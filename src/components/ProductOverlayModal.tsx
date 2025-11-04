@@ -434,6 +434,29 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
             )}
           </div>
 
+          {/* Image URL */}
+          <div style={{ marginTop: '8px', fontSize: '11px', fontFamily: 'monospace' }}>
+            <div style={{ marginBottom: '4px', fontWeight: '600', fontSize: '12px' }}>Bild-URL:</div>
+            <a
+              href={getCurrentImage()}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                color: '#ff6b00',
+                wordBreak: 'break-all',
+                textDecoration: 'none',
+                display: 'block',
+                padding: '6px',
+                background: 'rgba(0, 0, 0, 0.2)',
+                borderRadius: '4px'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+              onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+            >
+              {getCurrentImage()}
+            </a>
+          </div>
+
           {(product as any).derived_taxonomy && (
             <div style={{ marginTop: '12px' }}>
               <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>Derived Taxonomy</div>
@@ -729,6 +752,29 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
                     Varianten: {variants.length}
                   </span>
                 )}
+              </div>
+
+              {/* Image URL */}
+              <div style={{ marginTop: '8px', fontSize: '11px', fontFamily: 'monospace' }}>
+                <div style={{ marginBottom: '4px', fontWeight: '600', fontSize: '12px' }}>Bild-URL:</div>
+                <a
+                  href={getCurrentImage()}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    color: '#ff6b00',
+                    wordBreak: 'break-all',
+                    textDecoration: 'none',
+                    display: 'block',
+                    padding: '6px',
+                    background: 'rgba(0, 0, 0, 0.2)',
+                    borderRadius: '4px'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                  onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+                >
+                  {getCurrentImage()}
+                </a>
               </div>
 
               {(product as any).derived_taxonomy && (
