@@ -93,14 +93,6 @@ function mapProduct(p: OnealProduct): Product | null {
   const path = Array.isArray(taxonomy?.path) ? taxonomy.path : undefined;
   const variants = Array.isArray((p as any)?.variants) ? (p as any).variants : [];
 
-  // DEBUG: Log raw variant data (only for Legacy Hose)
-  if (variants.length > 0 && p.name.includes('Legacy Hose')) {
-    console.log('[ProductRepository] Raw variant data for product:', p.name);
-    console.log('[ProductRepository] First variant:', JSON.stringify(variants[0], null, 2));
-    console.log('[ProductRepository] Total variants:', variants.length);
-    console.log('[ProductRepository] Product media:', JSON.stringify(p.media, null, 2));
-  }
-
   const productUrl = typeof (p.meta as any)?.product_url === 'string' ? (p.meta as any).product_url : null;
   const presentationCategory = PIVOT_PROFILE.derivePresentationCategory({
     primaryCategory: originalPrimary,

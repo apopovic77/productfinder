@@ -10,18 +10,14 @@ export function getImagesForVariant(
   const images: Array<{ storageId: number; role: string; src: string }> = [];
 
   if (!variant?.name) {
-    console.log('[variantImageHelpers] No variant name found');
     return images;
   }
 
   // Extract color from variant name (e.g., "Gray / 28" → "gray")
   const variantColor = variant.name.split('/')[0]?.trim().toLowerCase();
   if (!variantColor) {
-    console.log('[variantImageHelpers] Could not extract color from variant name:', variant.name);
     return images;
   }
-
-  console.log('[variantImageHelpers] Looking for images with color:', variantColor);
 
   const media = product.media || [];
 
@@ -36,7 +32,6 @@ export function getImagesForVariant(
     // Check if filename contains the variant color
     // e.g., "2022_ONeal_LEGACY_20V.22_gray_front.png" matches "gray"
     if (srcLower.includes(`_${variantColor}_`) || srcLower.includes(`-${variantColor}-`)) {
-      console.log('[variantImageHelpers] ✓ Matched image:', m.role, '- storage_id:', storageId, '- src:', src);
       images.push({
         storageId,
         role: m.role || 'gallery',
@@ -52,7 +47,6 @@ export function getImagesForVariant(
     return a.storageId - b.storageId;
   });
 
-  console.log('[variantImageHelpers] Found', images.length, 'images for variant', variant.name);
   return images;
 }
 

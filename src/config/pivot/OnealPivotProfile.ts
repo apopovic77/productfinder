@@ -247,7 +247,8 @@ function derivePresentationCategory(args: DerivePresentationCategoryArgs): Prese
   const family = taxonomy?.product_family?.toLowerCase() ?? '';
   const taxonomyTokens = taxonomy?.path?.map(token => token.toLowerCase()) ?? [];
 
-  const combinedProtectorText = `${primary} ${secondary} ${name} ${url} ${family} ${taxonomyTokens.join(' ')}`;
+  const combinedText = `${primary} ${secondary} ${name} ${url} ${family} ${taxonomyTokens.join(' ')}`;
+  const combinedProtectorText = combinedText;
   const looksLikeProtector = PROTECTOR_KEYWORDS.some(keyword => combinedProtectorText.includes(keyword));
 
   if (looksLikeProtector) {
@@ -256,6 +257,13 @@ function derivePresentationCategory(args: DerivePresentationCategoryArgs): Prese
 
   if (name.includes('goggle') || name.includes('brille') || url.includes('goggle')) {
     return 'Brillen';
+  }
+
+  const SHOE_REGEX = /(?:^|[^a-z])(boot|boots|stiefel|shoe|shoes|schuh|schuhe|sneaker)(?:[^a-z]|$)/;
+  const GLOVE_REGEX = /(handschuh|handschuhe|glove|gloves)/;
+  const shoeLike = SHOE_REGEX.test(combinedText) && !GLOVE_REGEX.test(combinedText);
+  if (shoeLike) {
+    return 'Schuhe & Stiefel';
   }
 
   switch (primary) {
@@ -278,7 +286,6 @@ function derivePresentationCategory(args: DerivePresentationCategoryArgs): Prese
 
   if (name.includes('helmet') || name.includes('helm')) return 'Helme';
   if (name.includes('protector') || name.includes('protektor')) return 'Protektoren';
-  if (name.includes('boot') || name.includes('stiefel') || name.includes('shoe')) return 'Schuhe & Stiefel';
   if (
     name.includes('glove') ||
     name.includes('handschuh') ||

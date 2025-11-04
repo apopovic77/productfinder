@@ -27,6 +27,9 @@ export class CanvasRenderer<T> {
   public heroDisplayMode: 'overlay' | 'force-labels' = 'overlay';
   public overlayScaleMode: 'scale-invariant' | 'scale-with-content' = 'scale-invariant';
 
+  // Variant-specific hero image (overrides product's primary image)
+  public selectedVariantHeroImage: HTMLImageElement | null = null;
+
   // Dialog connection line (for React overlay mode)
   public dialogConnectionPoint: { x: number; y: number } | null = null; // Product center in canvas space
   public dialogPosition: { x: number; y: number } | null = null; // Dialog position in screen space
@@ -375,12 +378,16 @@ export class CanvasRenderer<T> {
 
         continue;
       }
-      
-      const img = product.image;
-      if (!img) continue;
 
       const isFocused = this.focusedItem === n.data;
       const isSelectedProduct = this.selectedProduct && (product as any).id === this.selectedProduct.id;
+
+      // Use variant-specific hero image if available (for selected product)
+      let img = product.image;
+      if (isSelectedProduct && this.selectedVariantHeroImage) {
+        img = this.selectedVariantHeroImage;
+      }
+      if (!img) continue;
 
       // Apply scale transform
       this.ctx.save();

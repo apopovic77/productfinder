@@ -19,11 +19,6 @@ const PIVOT_PROFILE = ACTIVE_PIVOT_PROFILE;
 const createOrderMap = (items: readonly string[] = []): Map<string, number> =>
   new Map(items.map((label, index) => [label, index] as [string, number]));
 
-const DEFAULT_FAMILY_ORDER =
-  PIVOT_PROFILE.getProductFamilyOrderForCategory?.('Kleidung') ??
-  PIVOT_PROFILE.productFamilyOrders?.['Kleidung'] ??
-  [];
-
 export class LayoutService {
   private mode: LayoutMode = 'pivot'; // Start with pivot layout!
   private engine: LayoutEngine<Product>;
@@ -45,7 +40,6 @@ export class LayoutService {
   private pivotModel: PivotAnalysisResult | null = null;
 
   private static readonly PRESENTATION_ORDER = createOrderMap(PIVOT_PROFILE.presentationCategoryOrder);
-  private static readonly CLOTHING_FAMILY_ORDER = createOrderMap(DEFAULT_FAMILY_ORDER);
 
   constructor() {
     this.pivotConfig = this.createDefaultPivotConfig();
@@ -57,7 +51,7 @@ export class LayoutService {
     this.dimensionOrders.set('category:presentation', presentationOrder);
     this.drillDownService.setDimensionOrder('category:presentation', presentationOrder);
 
-    const familyOrder = new Map<string, number>(LayoutService.CLOTHING_FAMILY_ORDER ?? []);
+    const familyOrder = new Map<string, number>();
     this.dimensionOrders.set('attribute:product_family', familyOrder);
     this.drillDownService.setDimensionOrder('attribute:product_family', familyOrder);
 
@@ -470,14 +464,12 @@ export class LayoutService {
     );
     if (!orderedDims.size) return;
 
-    const ensureOrder = (dimension: GroupDimension, key: string) => {
+    const ensureOrder = (dimension: GroupDimension, key: string, product: Product) => {
       if (!key) return;
       let map = this.dimensionOrders.get(dimension);
       if (!map) {
         if (dimension === 'category:presentation') {
           map = new Map<string, number>(LayoutService.PRESENTATION_ORDER ?? []);
-        } else if (dimension === 'attribute:product_family') {
-          map = new Map<string, number>(LayoutService.CLOTHING_FAMILY_ORDER ?? []);
         } else {
           map = new Map<string, number>();
         }
@@ -488,8 +480,19 @@ export class LayoutService {
         let index = map.size;
         if (dimension === 'category:presentation' && LayoutService.PRESENTATION_ORDER) {
           index = LayoutService.PRESENTATION_ORDER.get(key) ?? index;
-        } else if (dimension === 'attribute:product_family' && LayoutService.CLOTHING_FAMILY_ORDER) {
-          index = LayoutService.CLOTHING_FAMILY_ORDER.get(key) ?? index;
+        } else if (dimension === 'attribute:product_family') {
+          const category =
+            product.getAttributeValue<string>('presentation_category') ??
+            product.category?.[0] ??
+            '';
+          const orderList =
+            PIVOT_PROFILE.getProductFamilyOrderForCategory?.(category) ??
+            PIVOT_PROFILE.productFamilyOrders?.[category] ??
+            [];
+          const preferredIndex = orderList.indexOf(key);
+          if (preferredIndex >= 0) {
+            index = preferredIndex;
+          }
         }
         map.set(key, index);
         this.dimensionOrders.set(dimension, map);
@@ -500,7 +503,7 @@ export class LayoutService {
     for (const product of source) {
       for (const dimension of orderedDims) {
         const value = this.drillDownService.resolveValue(product, dimension);
-        ensureOrder(dimension, value);
+        ensureOrder(dimension, value, product);
       }
     }
   }

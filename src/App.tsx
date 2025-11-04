@@ -187,6 +187,11 @@ export default class App extends React.Component<{}, State> {
     canvas.addEventListener('click', this.handleCanvasClick);
     canvas.addEventListener('mousemove', this.handleCanvasMouseMove);
     canvas.addEventListener('mouseleave', this.handleCanvasMouseLeave);
+
+    // Touch events for mobile
+    canvas.addEventListener('touchend', this.handleCanvasTouchEnd);
+    canvas.addEventListener('touchmove', this.handleCanvasTouchMove);
+
     document.addEventListener('keydown', this.handleKeyDown);
 
     // Start FPS counter
@@ -206,6 +211,8 @@ export default class App extends React.Component<{}, State> {
       canvas.removeEventListener('click', this.handleCanvasClick);
       canvas.removeEventListener('mousemove', this.handleCanvasMouseMove);
       canvas.removeEventListener('mouseleave', this.handleCanvasMouseLeave);
+      canvas.removeEventListener('touchend', this.handleCanvasTouchEnd);
+      canvas.removeEventListener('touchmove', this.handleCanvasTouchMove);
     }
     window.removeEventListener('resize', this.handleOrientationChange);
   }
@@ -313,7 +320,21 @@ export default class App extends React.Component<{}, State> {
               // Get all images for this variant (hero + gallery)
               const variantImages = getImagesForVariant(product, currentVariant);
 
-              console.log('[App] Loading images for variant:', currentVariant.name, '- found', variantImages.length, 'images');
+              // Load hero image (first image) for the variant
+              if (variantImages.length > 0) {
+                const heroImg = variantImages[0];
+                const heroSrc = `https://share.arkturian.com/proxy.php?id=${heroImg.storageId}&width=1300&format=webp&quality=85`;
+                const heroImage = new Image();
+                heroImage.src = heroSrc;
+                heroImage.onload = () => {
+                  renderer.selectedVariantHeroImage = heroImage;
+                };
+                heroImage.onerror = () => {
+                  console.warn('[App] Failed to load variant hero image:', heroImg.storageId);
+                };
+              } else {
+                renderer.selectedVariantHeroImage = null;
+              }
 
               // Load images (skip first one as it's the main/hero image)
               for (let i = 1; i < variantImages.length; i++) {
@@ -338,6 +359,8 @@ export default class App extends React.Component<{}, State> {
 
                 alternativeImages.push(imgObj);
               }
+            } else {
+              renderer.selectedVariantHeroImage = null;
             }
 
             renderer.alternativeImages = alternativeImages.length > 0 ? alternativeImages : null;
@@ -346,6 +369,7 @@ export default class App extends React.Component<{}, State> {
           renderer.dialogConnectionPoint = null;
           renderer.dialogPosition = null;
           renderer.alternativeImages = null;
+          renderer.selectedVariantHeroImage = null;
         }
 
         // Only render in Canvas if overlayMode is 'canvas'
@@ -615,6 +639,86 @@ export default class App extends React.Component<{}, State> {
     const canvas = this.canvasRef.current;
     if (canvas) canvas.style.cursor = 'default';
     this.setState({ hoveredProduct: null, mousePos: null });
+  };
+
+  private handleCanvasTouchEnd = (e: TouchEvent) => {
+    e.preventDefault(); // Prevent default touch behavior (scroll, zoom, etc.)
+
+    const canvas = this.canvasRef.current;
+    if (!canvas) return;
+
+    // Use the first touch point
+    const touch = e.changedTouches[0];
+    if (!touch) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+
+    // Check for overlay clicks first (if overlay is visible and in canvas mode)
+    if (this.state.overlayMode === 'canvas' && this.state.selectedProduct && this.state.devSettings.heroDisplayMode === 'overlay') {
+      const renderer = this.controller.getRenderer();
+      const overlayClick = renderer?.checkOverlayClick(x, y);
+
+      if (overlayClick === 'close') {
+        this.setState({ selectedProduct: null, selectedVariant: null });
+        return;
+      } else if (overlayClick === 'view') {
+        const product = this.state.selectedProduct;
+        const productUrl = product.meta?.product_url;
+        if (productUrl && typeof productUrl === 'string') {
+          window.open(productUrl, '_blank');
+        } else {
+          const identifier = product.sku || product.id;
+          const url = `https://www.oneal.eu/de-de/product/${encodeURIComponent(identifier)}`;
+          window.open(url, '_blank');
+        }
+        return;
+      } else if (overlayClick === 'cart') {
+        return;
+      } else if (overlayClick === 'background') {
+        return;
+      }
+    }
+
+    // Check for group header click (in pivot mode)
+    const groupHeaderClicked = this.controller.handleGroupHeaderClick(x, y);
+    if (groupHeaderClicked) {
+      this.syncPivotUI();
+      return;
+    }
+
+    // Otherwise check for product click
+    const product = this.controller.hitTest(x, y);
+    if (product) {
+      this.controller.centerOnProduct(product);
+      const primaryVariant = getPrimaryVariant(product);
+      this.setState({ selectedProduct: product, selectedVariant: primaryVariant });
+    } else {
+      this.setState({ selectedProduct: null, selectedVariant: null });
+    }
+  };
+
+  private handleCanvasTouchMove = (e: TouchEvent) => {
+    // Don't prevent default here - allow scrolling when not over a product
+    const canvas = this.canvasRef.current;
+    if (!canvas) return;
+
+    const touch = e.touches[0];
+    if (!touch) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = touch.clientX - rect.left;
+    const y = touch.clientY - rect.top;
+
+    const product = this.controller.hitTest(x, y);
+
+    if (product !== this.state.hoveredProduct) {
+      this.setState({
+        hoveredProduct: product,
+        mousePos: product ? { x: touch.clientX, y: touch.clientY } : null
+      });
+    }
   };
 
   private handleKeyDown = (e: KeyboardEvent) => {

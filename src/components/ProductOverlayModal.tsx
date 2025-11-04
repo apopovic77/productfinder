@@ -71,13 +71,10 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
   const [selectedColor, setSelectedColor] = useState<string>(allColors[0] || '');
   const [selectedSize, setSelectedSize] = useState<string>('');
 
-  // Debug once on mount
-  useEffect(() => {
-    console.log('[ProductOverlayModal] Product loaded - Variants:', variants.length, 'Colors:', allColors.length);
-    if (variants.length > 0) {
-      console.log('[ProductOverlayModal] First variant RAW:', JSON.stringify(variants[0], null, 2));
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Debug once on mount (can be removed in production)
+  // useEffect(() => {
+  //   console.log('[ProductOverlayModal] Product loaded - Variants:', variants.length, 'Colors:', allColors.length);
+  // }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // State for selected image
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
