@@ -27,6 +27,10 @@ export class CanvasRenderer<T> {
   public heroDisplayMode: 'overlay' | 'force-labels' = 'overlay';
   public overlayScaleMode: 'scale-invariant' | 'scale-with-content' = 'scale-invariant';
 
+  // Dialog connection line (for React overlay mode)
+  public dialogConnectionPoint: { x: number; y: number } | null = null; // Product center in canvas space
+  public dialogPosition: { x: number; y: number } | null = null; // Dialog position in screen space
+
   // Product overlay renderer (OOP class)
   private productOverlay: ProductOverlayCanvas;
   private productOverlayV2: ProductOverlayCanvasV2;
@@ -452,15 +456,47 @@ export class CanvasRenderer<T> {
       }
     }
 
-    // Restore viewport transform
-    this.ctx.restore();
+    // Draw dialog connection line (React overlay mode) - IN CANVAS SPACE
+    if (this.dialogConnectionPoint && this.dialogPosition && this.viewport) {
+      // Transform dialog position from screen space back to canvas space
+      const scale = this.viewport.getTargetScale();
+      const offset = this.viewport.getTargetOffset();
+      const canvasDialogX = (this.dialogPosition.x - offset.x) / scale;
+      const canvasDialogY = (this.dialogPosition.y - offset.y) / scale;
 
-    // DEBUG content-bounds visualization intentionally removed for TypeScript strict mode.
+      // Draw dashed line from product to dialog (in canvas space)
+      this.ctx.save();
+      // Scale-invariant dash pattern
+      this.ctx.setLineDash([8 / scale, 8 / scale]);
+      this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+      this.ctx.lineWidth = 3 / scale; // Scale-invariant line width
+      this.ctx.beginPath();
+      this.ctx.moveTo(this.dialogConnectionPoint.x, this.dialogConnectionPoint.y);
+      this.ctx.lineTo(canvasDialogX, canvasDialogY);
+      this.ctx.stroke();
+      this.ctx.setLineDash([]);
+
+      // Draw white dot at product center (in canvas space)
+      this.ctx.beginPath();
+      this.ctx.arc(this.dialogConnectionPoint.x, this.dialogConnectionPoint.y, 8 / scale, 0, Math.PI * 2);
+      this.ctx.fillStyle = 'white';
+      this.ctx.fill();
+      this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+      this.ctx.lineWidth = 2 / scale;
+      this.ctx.stroke();
+
+      this.ctx.restore();
+    }
 
     // Draw selected product overlay (in world space)
     if (this.selectedProduct && this.selectedProductAnchor && this.viewport && this.heroDisplayMode === 'overlay') {
       this.drawProductOverlay(this.selectedProduct, this.selectedProductAnchor.x, this.selectedProductAnchor.y);
     }
+
+    // Restore viewport transform
+    this.ctx.restore();
+
+    // DEBUG content-bounds visualization intentionally removed for TypeScript strict mode.
   }
 
   /**

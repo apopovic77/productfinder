@@ -19,6 +19,47 @@ const PRESENTATION_CATEGORY_ORDER = [
   'Schuhe & Stiefel',
   'Accessoires',
 ] as const;
+
+const CLOTHING_FAMILY_LABELS: Array<{ label: string; keywords: string[] }> = [
+  { label: 'JERSEYS', keywords: ['jersey'] },
+  { label: 'SHORTS', keywords: ['short'] },
+  { label: 'HOSEN', keywords: ['pant', 'hose'] },
+  { label: 'JACKEN', keywords: ['jacket', 'jacke'] },
+  { label: 'REGENKLEIDUNG', keywords: ['rain', 'regen'] },
+  { label: 'HANDSCHUHE', keywords: ['glove', 'handschuh'] },
+];
+
+function normalizeProductFamily(
+  presentationCategory: string | null | undefined,
+  rawFamily: string | null | undefined,
+  path: string[] | undefined,
+  productName: string,
+): string | undefined {
+  if (!rawFamily && !path?.length) return undefined;
+  const lowerName = productName.toLowerCase();
+  const lowerPath = (path ?? []).map(token => token.toLowerCase());
+  const lowerFamily = (rawFamily ?? '').toLowerCase();
+
+  const isClothing = presentationCategory === 'Kleidung';
+  if (isClothing) {
+    for (const { label, keywords } of CLOTHING_FAMILY_LABELS) {
+      const matchKeyword = keywords.some(keyword =>
+        lowerName.includes(keyword) || lowerPath.includes(keyword) || lowerFamily.includes(keyword)
+      );
+      if (matchKeyword) {
+        return label;
+      }
+    }
+  }
+
+  if (!rawFamily) return undefined;
+  return rawFamily
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/(^|\s)\w/g, match => match.toUpperCase());
+}
+
 type PresentationCategory = (typeof PRESENTATION_CATEGORY_ORDER)[number];
 
 function derivePresentationCategory(
@@ -202,12 +243,19 @@ function mapProduct(p: OnealProduct): Product {
       }
     : undefined);
 
-  addAttribute(attributes, taxonomy?.product_family
+  const normalizedFamily = normalizeProductFamily(
+    presentationCategory,
+    taxonomy?.product_family ?? null,
+    path,
+    p.name,
+  );
+
+  addAttribute(attributes, normalizedFamily ?? taxonomy?.product_family
     ? {
         key: 'product_family',
         label: 'Product Family',
         type: 'enum',
-        value: taxonomy.product_family,
+        value: normalizedFamily ?? taxonomy?.product_family ?? undefined,
         sourcePath: 'derived_taxonomy.product_family',
       }
     : undefined);

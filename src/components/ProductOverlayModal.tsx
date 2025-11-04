@@ -7,6 +7,7 @@ type Props = {
   product: Product;
   onClose: () => void;
   position?: { x: number; y: number }; // Optional position for panel mode
+  onPositionChange?: (position: { x: number; y: number }) => void; // Callback for position updates
 };
 
 interface ParsedFeature {
@@ -20,7 +21,7 @@ interface ParsedFeature {
  * Full interactivity with real dropdowns, better accessibility
  * Can be used as full modal (centered) or positioned panel (next to product)
  */
-export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, position }) => {
+export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, position, onPositionChange }) => {
   // No position = fixed right panel (new simple behavior)
   const isPanelMode = true; // Always use panel mode now (no more full modal)
 
@@ -32,6 +33,22 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
   const taxonomyPath = Array.isArray(derivedTaxonomy?.path) ? derivedTaxonomy.path : [];
   const taxonomySport = derivedTaxonomy?.sport;
   const taxonomyFamily = derivedTaxonomy?.product_family;
+
+  // Drag state - start positioned on the right side with more margin
+  const [dragPosition, setDragPosition] = useState(() => ({
+    x: window.innerWidth - 480 - 100, // 480px width + 100px margin from right
+    y: 20
+  }));
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
+  // Notify parent of position changes
+  useEffect(() => {
+    if (onPositionChange) {
+      onPositionChange(dragPosition);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dragPosition]); // Only trigger on dragPosition changes, not onPositionChange
 
   // Helper functions to parse variant name (e.g., "Black / Size S")
   const getColor = (variant: any): string => {
@@ -106,8 +123,8 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
     });
 
     variantImageIds.forEach((storageId) => {
-      // Build proxy URL for variant images
-      const proxyUrl = `https://share.arkturian.com/proxy.php?id=${storageId}&width=150&format=webp&quality=75`;
+      // Build proxy URL for variant images (130px to match pivot cache)
+      const proxyUrl = `https://share.arkturian.com/proxy.php?id=${storageId}&width=130&format=webp&quality=80`;
       images.push({
         storageId,
         src: proxyUrl,
@@ -128,6 +145,62 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
     }
   }, [activeVariant?.image_storage_id, allImages, selectedImageIndex]);
 
+  // Drag handlers
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // Only allow dragging from the header area (title, price, dropdowns)
+    const target = e.target as HTMLElement;
+
+    // Don't allow dragging from interactive elements
+    if (target.tagName === 'BUTTON' || target.tagName === 'SELECT' || target.tagName === 'A' || target.tagName === 'INPUT') {
+      return;
+    }
+
+    // Only allow dragging from the top 200px of the panel (header area)
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const relativeY = e.clientY - rect.top;
+    if (relativeY > 200) {
+      return; // Don't drag if clicking in the content/scrollable area
+    }
+
+    setIsDragging(true);
+    setDragOffset({
+      x: e.clientX - dragPosition.x,
+      y: e.clientY - dragPosition.y,
+    });
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!isDragging) return;
+
+    const newX = e.clientX - dragOffset.x;
+    const newY = e.clientY - dragOffset.y;
+
+    // Keep dialog within viewport bounds
+    const maxX = window.innerWidth - 480; // dialog width
+    const maxY = window.innerHeight - 100; // allow some bottom margin
+
+    setDragPosition({
+      x: Math.max(0, Math.min(newX, maxX)),
+      y: Math.max(0, Math.min(newY, maxY)),
+    });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  // Setup drag listeners
+  useEffect(() => {
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, dragOffset]);
+
   // Get current storage ID
   const getCurrentStorageId = (): number | null => {
     if (selectedImageIndex >= 0 && selectedImageIndex < allImages.length) {
@@ -142,12 +215,12 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
     return (heroMedia as any)?.storage_id || null;
   };
 
-  // Get low resolution image URL (150px - canvas low LOD)
+  // Get low resolution image URL (130px - canvas low LOD)
   const getLowResImageUrl = (): string => {
     const storageId = getCurrentStorageId();
 
     if (storageId) {
-      return `https://share.arkturian.com/proxy.php?id=${storageId}&width=150&format=webp&quality=75`;
+      return `https://share.arkturian.com/proxy.php?id=${storageId}&width=130&format=webp&quality=75`;
     }
 
     // Fallback to src if no storage_id
@@ -239,35 +312,6 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
         </div>
       )}
 
-      {metaInfo && Object.keys(metaInfo).length > 0 && (
-        <div className="pom-section">
-          <div className="pom-section-title">Meta</div>
-          <div className="pom-meta-grid">
-            {Object.entries(metaInfo).map(([key, value]) => {
-              const displayValue = Array.isArray(value) || typeof value === 'object'
-                ? JSON.stringify(value, null, 2)
-                : String(value ?? '');
-
-              if (!displayValue) return null;
-
-              const isUrl = key.toLowerCase().includes('url') && typeof value === 'string';
-
-              return (
-                <div key={key} className="pom-meta-item">
-                  <div className="pom-meta-label">{key}</div>
-                  {isUrl ? (
-                    <a href={value as string} target="_blank" rel="noopener noreferrer" className="pom-meta-link">
-                      {value as string}
-                    </a>
-                  ) : (
-                    <div className="pom-meta-value">{displayValue}</div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </>
   );
 
@@ -317,17 +361,19 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
     return iconMap[icon];
   };
 
-  // Panel mode: Just the info panel, fixed right side
+  // Panel mode: Just the info panel, draggable
   if (isPanelMode) {
     return (
       <motion.div
         className="pom-info-panel pom-panel-standalone"
         style={{
           position: 'fixed',
-          right: '20px',
-          top: '20px',
+          left: `${dragPosition.x}px`,
+          top: `${dragPosition.y}px`,
           width: '480px',
-          maxHeight: '90vh',
+          maxHeight: '60vh',
+          cursor: isDragging ? 'grabbing' : 'grab',
+          userSelect: isDragging ? 'none' : 'auto',
         }}
         initial={{ opacity: 0, x: 50 }}
         animate={{ opacity: 1, x: 0 }}
@@ -337,6 +383,7 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
           ease: 'easeOut'
         }}
         onClick={(e) => e.stopPropagation()}
+        onMouseDown={handleMouseDown}
       >
         {/* Close button */}
         <button className="pom-close" onClick={onClose} aria-label="Close" style={{ position: 'absolute', top: '12px', right: '12px' }}>
@@ -347,38 +394,45 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
         <h2 className="pom-title">{product.name}</h2>
 
         {/* Thumbnail Gallery - Panel Mode */}
-        {allImages.length > 1 && (
-          <div style={{
-            display: 'flex',
-            gap: '6px',
-            marginTop: '12px',
-            marginBottom: '12px',
-            overflowX: 'auto',
-            maxWidth: '100%'
-          }}>
-            {allImages.map((img, idx) => {
-              const thumbnailUrl = img.storageId
-                ? `https://share.arkturian.com/proxy.php?id=${img.storageId}&width=100&format=webp&quality=80`
-                : img.src;
-              const isActive = idx === selectedImageIndex;
+        {allImages.length > 0 && (
+            <div style={{
+              display: 'flex',
+              gap: '6px',
+              marginTop: '12px',
+              marginBottom: '16px',
+              overflowX: 'auto',
+              overflowY: 'visible',
+              maxWidth: '100%',
+              minHeight: '75px'
+            }}>
+              {allImages.map((img, idx) => {
+                const thumbnailUrl = img.storageId
+                  ? `https://share.arkturian.com/proxy.php?id=${img.storageId}&width=130&format=webp&quality=80`
+                  : img.src;
+                const isActive = idx === selectedImageIndex;
 
               return (
                 <button
                   key={idx}
                   onClick={() => setSelectedImageIndex(idx)}
                   style={{
-                    width: '60px',
-                    height: '60px',
+                    display: 'block',
+                    width: '65px',
+                    height: '65px',
+                    minWidth: '65px',
+                    minHeight: '65px',
                     flexShrink: 0,
-                    border: isActive ? '2px solid #ff6b00' : '2px solid rgba(255, 255, 255, 0.2)',
-                    borderRadius: '6px',
+                    border: isActive ? '3px solid #ff6b00' : '2px solid rgba(255, 255, 255, 0.5)',
+                    borderRadius: '8px',
                     overflow: 'hidden',
                     cursor: 'pointer',
                     padding: 0,
-                    background: 'rgba(0, 0, 0, 0.3)',
+                    background: 'rgba(255, 255, 255, 0.25)',
+                    backdropFilter: 'blur(5px)',
                     transition: 'all 0.2s ease',
                     transform: isActive ? 'scale(1.05)' : 'scale(1)',
-                    opacity: isActive ? 1 : 0.7
+                    opacity: 1,
+                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
                   }}
                   onMouseEnter={(e) => {
                     if (!isActive) {
@@ -391,15 +445,25 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
                     }
                   }}
                 >
-                  <img
-                    src={thumbnailUrl}
-                    alt={`${product.name} - ${img.label}`}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover'
-                    }}
-                  />
+                  {thumbnailUrl ? (
+                    <img
+                      src={thumbnailUrl}
+                      alt={`${product.name} - ${img.label}`}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover'
+                      }}
+                      onError={(e) => {
+                        console.error('[Thumbnail Error]', thumbnailUrl);
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: 'white' }}>
+                      No URL
+                    </div>
+                  )}
                 </button>
               );
             })}
@@ -584,25 +648,6 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
             </div>
           )}
 
-          {(product as any).meta && (
-            <div style={{ marginTop: '12px' }}>
-              <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>Meta</div>
-              <div style={{
-                padding: '8px',
-                background: 'rgba(0, 0, 0, 0.2)',
-                borderRadius: '6px',
-                fontSize: '11px',
-                maxHeight: '150px',
-                overflowY: 'auto',
-                fontFamily: 'monospace',
-                lineHeight: '1.5'
-              }}>
-                <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-                  {JSON.stringify((product as any).meta, null, 2)}
-                </pre>
-              </div>
-            </div>
-          )}
 
           {variants.length > 0 && (
             <details style={{ marginTop: '12px' }}>
@@ -683,7 +728,7 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
             />
 
             {/* Thumbnail Gallery */}
-            {allImages.length > 1 && (
+            {allImages.length > 0 && (
               <div style={{
                 display: 'flex',
                 gap: '8px',
@@ -694,7 +739,7 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
               }}>
                 {allImages.map((img, idx) => {
                   const thumbnailUrl = img.storageId
-                    ? `https://share.arkturian.com/proxy.php?id=${img.storageId}&width=100&format=webp&quality=80`
+                    ? `https://share.arkturian.com/proxy.php?id=${img.storageId}&width=130&format=webp&quality=80`
                     : img.src;
                   const isActive = idx === selectedImageIndex;
 
@@ -922,26 +967,6 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
                   }}>
                     <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
                       {JSON.stringify((product as any).derived_taxonomy, null, 2)}
-                    </pre>
-                  </div>
-                </div>
-              )}
-
-              {(product as any).meta && (
-                <div style={{ marginTop: '12px' }}>
-                  <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>Meta</div>
-                  <div style={{
-                    padding: '8px',
-                    background: 'rgba(0, 0, 0, 0.2)',
-                    borderRadius: '6px',
-                    fontSize: '11px',
-                    maxHeight: '150px',
-                    overflowY: 'auto',
-                    fontFamily: 'monospace',
-                    lineHeight: '1.5'
-                  }}>
-                    <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-                      {JSON.stringify((product as any).meta, null, 2)}
                     </pre>
                   </div>
                 </div>

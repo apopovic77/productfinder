@@ -31,7 +31,7 @@ API_KEY = (
 )
 
 # Image size presets
-BASE_SIZES = [150]  # always warm low-res for canvas/product grid
+BASE_SIZES = [130]  # always warm low-res for canvas/product grid
 HIGH_RES_SIZE = 1300  # optional high-res (modal hero)
 
 def fetch_products() -> List[Dict]:
@@ -88,7 +88,7 @@ def warmup_image(product_id: str, storage_id: int, size: int, refresh: bool = Fa
     }
     if refresh:
         params['refresh'] = 'true'
-
+    
     # Retry logic for transient errors
     max_retries = 3
     for attempt in range(max_retries):

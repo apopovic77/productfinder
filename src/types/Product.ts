@@ -158,8 +158,7 @@ export class Product {
 
     // Prefer Storage API for optimized images (via proxy for authentication)
     if (media.storage_id) {
-      // Use low resolution from config (150px by default)
-      const width = 150;
+      const width = 130;
       const quality = 75;
       return `https://share.arkturian.com/proxy.php?id=${media.storage_id}&width=${width}&format=webp&quality=${quality}`;
     }

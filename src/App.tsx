@@ -70,6 +70,9 @@ type State = {
   devSettings: DeveloperSettings;
   fps: number;
   zoom: number;
+
+  // Dialog position for connection line
+  dialogPosition: { x: number; y: number } | null;
 };
 
 const createInitialState = (): State => {
@@ -116,6 +119,7 @@ const createInitialState = (): State => {
     fps: 60,
     zoom: 1,
     mobileFooterExpanded: false,
+    dialogPosition: null,
   };
 };
 
@@ -259,12 +263,36 @@ export default class App extends React.Component<{}, State> {
       prevState.selectedProduct !== this.state.selectedProduct ||
       prevState.devSettings.heroDisplayMode !== this.state.devSettings.heroDisplayMode ||
       prevState.devSettings.overlayScaleMode !== this.state.devSettings.overlayScaleMode ||
-      prevState.overlayMode !== this.state.overlayMode
+      prevState.overlayMode !== this.state.overlayMode ||
+      prevState.dialogPosition !== this.state.dialogPosition
     ) {
       const renderer = this.controller.getRenderer();
       if (renderer) {
         renderer.heroDisplayMode = this.state.devSettings.heroDisplayMode;
         renderer.overlayScaleMode = this.state.devSettings.overlayScaleMode;
+
+        // Set dialog position for connection line rendering (React mode)
+        if (this.state.overlayMode === 'react' && this.state.selectedProduct && this.state.dialogPosition) {
+          const node = this.controller.getProductNode(this.state.selectedProduct.id);
+          if (node) {
+            const nodeX = node.posX.targetValue ?? node.posX.value ?? 0;
+            const nodeY = node.posY.targetValue ?? node.posY.value ?? 0;
+            const nodeW = node.width.targetValue ?? node.width.value ?? 0;
+            const nodeH = node.height.targetValue ?? node.height.value ?? 0;
+
+            const productCenterX = nodeX + nodeW / 2;
+            const productCenterY = nodeY + nodeH / 2;
+
+            renderer.dialogConnectionPoint = { x: productCenterX, y: productCenterY };
+            renderer.dialogPosition = {
+              x: this.state.dialogPosition.x,
+              y: this.state.dialogPosition.y + 150 // Approximate middle of dialog
+            };
+          }
+        } else {
+          renderer.dialogConnectionPoint = null;
+          renderer.dialogPosition = null;
+        }
 
         // Only render in Canvas if overlayMode is 'canvas'
         if (this.state.overlayMode === 'canvas' && this.state.selectedProduct && this.state.devSettings.heroDisplayMode === 'overlay') {
@@ -380,6 +408,10 @@ export default class App extends React.Component<{}, State> {
     const { pivotBreadcrumbs } = this.state;
     if (index < 0 || index >= pivotBreadcrumbs.length) return;
     if (index === pivotBreadcrumbs.length - 1) return; // current level
+
+    // Close dialog immediately on pivot navigation
+    this.setState({ selectedProduct: null, dialogPosition: null });
+
     if (index === 0) {
       this.controller.resetPivot();
       const defaultDim = this.controller.getPivotDimensionDefinitions()[0]?.key;
@@ -397,11 +429,18 @@ export default class App extends React.Component<{}, State> {
 
   private handleDimensionClick = (dimension: GroupDimension) => {
     if (dimension === this.state.pivotDimension) return;
+
+    // Close dialog immediately on dimension change
+    this.setState({ selectedProduct: null, dialogPosition: null });
+
     this.controller.setPivotDimension(dimension);
     this.syncPivotUI();
   };
 
   private handleGroupSelect = (groupKey: string) => {
+    // Close dialog immediately on group drill down
+    this.setState({ selectedProduct: null, dialogPosition: null });
+
     this.controller.drillDownGroup(groupKey);
     this.syncPivotUI();
   };
@@ -694,7 +733,7 @@ export default class App extends React.Component<{}, State> {
             <label className="pf-bottom-label" htmlFor="pf-bottom-sort">Sort</label>
             <CustomSelect
               value={sortMode}
-              onChange={(value) => this.setState({ sortMode: value as SortMode })}
+              onChange={(value) => this.setState({ sortMode: value as SortMode, selectedProduct: null, dialogPosition: null })}
               options={[
                 { value: 'none', label: 'None' },
                 { value: 'name-asc', label: 'Name (A-Z)' },
@@ -760,7 +799,7 @@ export default class App extends React.Component<{}, State> {
                 <label className="pf-bottom-label" htmlFor="pf-bottom-sort-mobile">SORT</label>
                 <CustomSelect
                   value={sortMode}
-                  onChange={(value) => this.setState({ sortMode: value as SortMode })}
+                  onChange={(value) => this.setState({ sortMode: value as SortMode, selectedProduct: null, dialogPosition: null })}
                   options={[
                     { value: 'none', label: 'None' },
                     { value: 'name-asc', label: 'Name (A-Z)' },
@@ -831,7 +870,8 @@ export default class App extends React.Component<{}, State> {
           {this.state.overlayMode === 'react' && selectedProduct && (
             <ProductOverlayModal
               product={selectedProduct}
-              onClose={() => this.setState({ selectedProduct: null })}
+              onClose={() => this.setState({ selectedProduct: null, dialogPosition: null })}
+              onPositionChange={(pos) => this.setState({ dialogPosition: pos })}
             />
           )}
         </AnimatePresence>

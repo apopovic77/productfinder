@@ -432,6 +432,7 @@ export class PivotDrillDownService {
     if (raw === undefined || raw === null || raw === '') {
       return UNKNOWN_LABEL;
     }
+
     return String(raw);
   }
 

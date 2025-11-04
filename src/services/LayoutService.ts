@@ -42,6 +42,15 @@ export class LayoutService {
     ['Accessoires', 5],
   ]);
 
+  private static readonly CLOTHING_FAMILY_ORDER = new Map<string, number>([
+    ['JERSEYS', 0],
+    ['SHORTS', 1],
+    ['HOSEN', 2],
+    ['JACKEN', 3],
+    ['REGENKLEIDUNG', 4],
+    ['HANDSCHUHE', 5],
+  ]);
+
   constructor() {
     this.pivotConfig = this.createDefaultPivotConfig();
     this.layouter = this.createLayouter(this.mode);
@@ -462,6 +471,8 @@ export class LayoutService {
       if (!map) {
         if (dimension === 'category:presentation') {
           map = new Map<string, number>(LayoutService.PRESENTATION_ORDER);
+        } else if (dimension === 'attribute:product_family') {
+          map = new Map<string, number>(LayoutService.CLOTHING_FAMILY_ORDER);
         } else {
           map = new Map<string, number>();
         }
@@ -472,6 +483,8 @@ export class LayoutService {
         let index = map.size;
         if (dimension === 'category:presentation') {
           index = LayoutService.PRESENTATION_ORDER.get(key) ?? index;
+        } else if (dimension === 'attribute:product_family') {
+          index = LayoutService.CLOTHING_FAMILY_ORDER.get(key) ?? index;
         }
         map.set(key, index);
         this.dimensionOrders.set(dimension, map);
