@@ -79,6 +79,16 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
   // State for selected image
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
 
+  // Reset all state when product changes
+  useEffect(() => {
+    // Extract unique colors from all variants
+    const colors = [...new Set(variants.map(getColor).filter(Boolean))] as string[];
+    setSelectedColor(colors[0] || '');
+    setSelectedSize('');
+    setSelectedImageIndex(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product.id]); // Only trigger on product ID change
+
   // Filter sizes based on selected color
   const availableSizes = [...new Set(
     variants
@@ -107,39 +117,58 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
   const specs = product.specifications || {};
   const material = specs.shell_material || specs.materials || '100% Polyester';
 
-  // Collect all available images (product media + variant images) - Memoized to prevent re-computation
-  const allImages = useMemo(() => {
-    const images: Array<{ storageId: number | null; src: string; label: string }> = [];
+  // State for thumbnail images - cleared immediately on product change
+  const [thumbnailImages, setThumbnailImages] = useState<Array<{ storageId: number | null; src: string; label: string }>>([]);
+  const [thumbnailsLoading, setThumbnailsLoading] = useState(true);
 
-    // Add product media images
-    const media = product.media || [];
-    media.forEach((m, idx) => {
-      const storageId = (m as any).storage_id || null;
-      const src = m.src || '';
-      const label = m.type || `Image ${idx + 1}`;
-      images.push({ storageId, src, label });
-    });
+  // Clear thumbnails immediately when product changes (runs first)
+  useEffect(() => {
+    setThumbnailsLoading(true);
+    setThumbnailImages([]);
+  }, [product.id]);
 
-    // Add unique variant images that aren't already in media
-    const variantImageIds = new Set<number>();
-    variants.forEach((v: any) => {
-      if (v.image_storage_id && !images.some(img => img.storageId === v.image_storage_id)) {
-        variantImageIds.add(v.image_storage_id);
-      }
-    });
+  // Load new thumbnails after clearing (runs after)
+  useEffect(() => {
+    // Small delay to ensure clear happens first
+    const timer = setTimeout(() => {
+      const images: Array<{ storageId: number | null; src: string; label: string }> = [];
 
-    variantImageIds.forEach((storageId) => {
-      // Build proxy URL for variant images (130px to match pivot cache)
-      const proxyUrl = `https://share.arkturian.com/proxy.php?id=${storageId}&width=130&format=webp&quality=80`;
-      images.push({
-        storageId,
-        src: proxyUrl,
-        label: 'Variant'
+      // Add product media images
+      const media = product.media || [];
+      media.forEach((m, idx) => {
+        const storageId = (m as any).storage_id || null;
+        const src = m.src || '';
+        const label = m.type || `Image ${idx + 1}`;
+        images.push({ storageId, src, label });
       });
-    });
 
-    return images;
-  }, [product.media, variants]);
+      // Add unique variant images that aren't already in media
+      const variantImageIds = new Set<number>();
+      variants.forEach((v: any) => {
+        if (v.image_storage_id && !images.some(img => img.storageId === v.image_storage_id)) {
+          variantImageIds.add(v.image_storage_id);
+        }
+      });
+
+      variantImageIds.forEach((storageId) => {
+        // Build proxy URL for variant images (130px to match pivot cache)
+        const proxyUrl = `https://share.arkturian.com/proxy.php?id=${storageId}&width=130&format=webp&quality=80`;
+        images.push({
+          storageId,
+          src: proxyUrl,
+          label: 'Variant'
+        });
+      });
+
+      setThumbnailImages(images);
+      setThumbnailsLoading(false);
+    }, 10); // 10ms delay to ensure clearing happens first
+
+    return () => clearTimeout(timer);
+  }, [product.id, product.media, variants]);
+
+  // For backwards compatibility, expose as allImages (empty when loading)
+  const allImages = thumbnailsLoading ? [] : thumbnailImages;
 
   // Update selected image when variant changes
   useEffect(() => {
