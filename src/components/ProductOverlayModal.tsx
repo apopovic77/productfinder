@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Product } from '../types/Product';
 import './ProductOverlayModal.css';
@@ -60,9 +60,12 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
   // Initialize size when color changes or on mount
   useEffect(() => {
     if (availableSizes.length > 0 && (!selectedSize || !availableSizes.includes(selectedSize))) {
-      setSelectedSize(availableSizes[0]);
+      const newSize = availableSizes[0];
+      if (newSize !== selectedSize) {
+        setSelectedSize(newSize);
+      }
     }
-  }, [selectedColor, availableSizes.length]);
+  }, [selectedColor, availableSizes.length, availableSizes, selectedSize]);
 
   // Find active variant
   const activeVariant = variants.find((v: any) =>
@@ -74,8 +77,8 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
   const specs = product.specifications || {};
   const material = specs.shell_material || specs.materials || '100% Polyester';
 
-  // Collect all available images (product media + variant images)
-  const getAllImages = (): Array<{ storageId: number | null; src: string; label: string }> => {
+  // Collect all available images (product media + variant images) - Memoized to prevent re-computation
+  const allImages = useMemo(() => {
     const images: Array<{ storageId: number | null; src: string; label: string }> = [];
 
     // Add product media images
@@ -104,19 +107,17 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
     });
 
     return images;
-  };
-
-  const allImages = getAllImages();
+  }, [product.media, variants]);
 
   // Update selected image when variant changes
   useEffect(() => {
     if (activeVariant?.image_storage_id) {
       const imgIndex = allImages.findIndex(img => img.storageId === activeVariant.image_storage_id);
-      if (imgIndex !== -1) {
+      if (imgIndex !== -1 && imgIndex !== selectedImageIndex) {
         setSelectedImageIndex(imgIndex);
       }
     }
-  }, [activeVariant?.image_storage_id]);
+  }, [activeVariant?.image_storage_id, allImages, selectedImageIndex]);
 
   // Get current storage ID
   const getCurrentStorageId = (): number | null => {
