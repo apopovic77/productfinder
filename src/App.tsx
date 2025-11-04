@@ -65,8 +65,6 @@ type State = {
 
   // Overlay Mode
   overlayMode: 'canvas' | 'react'; // Toggle between canvas and React overlay
-  showReactDialog: boolean; // Show dialog when zoom is stable
-  isZoomAnimating: boolean; // Track if zoom is currently animating
 
   // Developer Settings
   devSettings: DeveloperSettings;
@@ -113,8 +111,6 @@ const createInitialState = (): State => {
     focusedIndex: -1,
 
     overlayMode: 'react', // Default to React overlay
-    showReactDialog: false,
-    isZoomAnimating: false,
 
     devSettings: createDefaultDeveloperSettings(),
     fps: 60,
@@ -129,7 +125,6 @@ export default class App extends React.Component<{}, State> {
   private fpsRaf: number | null = null;
   private fpsLastSample = 0;
   private fpsFrameCount = 0;
-  private zoomStabilityTimer: number | null = null;
 
   state: State = createInitialState();
 
@@ -197,10 +192,6 @@ export default class App extends React.Component<{}, State> {
   componentWillUnmount(): void {
     this.controller.destroy();
     this.stopFPSCounter();
-    if (this.zoomStabilityTimer) {
-      clearTimeout(this.zoomStabilityTimer);
-      this.zoomStabilityTimer = null;
-    }
     window.removeEventListener('resize', this.handleResize);
     document.removeEventListener('keydown', this.handleKeyDown);
     const canvas = this.canvasRef.current;
@@ -304,49 +295,6 @@ export default class App extends React.Component<{}, State> {
       }
     }
 
-    // Update showReactDialog based on zoom stability
-    if (
-      prevState.selectedProduct !== this.state.selectedProduct ||
-      prevState.zoom !== this.state.zoom ||
-      prevState.overlayMode !== this.state.overlayMode
-    ) {
-      // Clear existing timer
-      if (this.zoomStabilityTimer) {
-        clearTimeout(this.zoomStabilityTimer);
-        this.zoomStabilityTimer = null;
-      }
-
-      // If zoom changed, hide dialog immediately and mark as animating
-      if (prevState.zoom !== this.state.zoom) {
-        this.setState({
-          showReactDialog: false,
-          isZoomAnimating: true
-        });
-
-        // Wait for zoom to stabilize (200ms)
-        this.zoomStabilityTimer = window.setTimeout(() => {
-          this.zoomStabilityTimer = null;
-          const shouldShow = this.state.overlayMode === 'react' &&
-                           this.state.selectedProduct !== null &&
-                           this.state.zoom > 1.5;
-
-          this.setState({
-            isZoomAnimating: false,
-            showReactDialog: shouldShow
-          });
-        }, 200);
-      } else {
-        // Product or overlay mode changed, update immediately
-        const shouldShow = this.state.overlayMode === 'react' &&
-                         this.state.selectedProduct !== null &&
-                         this.state.zoom > 1.5 &&
-                         !this.state.isZoomAnimating;
-
-        if (shouldShow !== this.state.showReactDialog) {
-          this.setState({ showReactDialog: shouldShow });
-        }
-      }
-    }
   }
 
   private handleResize = () => {
@@ -878,39 +826,14 @@ export default class App extends React.Component<{}, State> {
           )}
         </div>
 
-        {/* React Product Info Panel (positioned next to product in canvas) */}
+        {/* React Product Info Panel (fixed right side) */}
         <AnimatePresence>
-          {this.state.showReactDialog && selectedProduct && (() => {
-            // Show dialog with smooth fadeout
-            const node = this.controller.getProductNode(selectedProduct.id);
-            if (!node) return null;
-
-            const viewport = this.controller.getViewportTransform();
-            if (!viewport) return null;
-
-            const nodeX = node.posX.targetValue ?? node.posX.value ?? 0;
-            const nodeY = node.posY.targetValue ?? node.posY.value ?? 0;
-            const nodeW = node.width.targetValue ?? node.width.value ?? 0;
-            const nodeH = node.height.targetValue ?? node.height.value ?? 0;
-
-            // Convert world coordinates to screen coordinates
-            const screenX = (nodeX * viewport.scale) + viewport.offset.x;
-            const screenY = (nodeY * viewport.scale) + viewport.offset.y;
-            const screenW = nodeW * viewport.scale;
-            const screenH = nodeH * viewport.scale;
-
-            // Position panel to the right of the product
-            const panelX = screenX + screenW + 20; // 20px gap
-            const panelY = screenY;
-
-            return (
-              <ProductOverlayModal
-                product={selectedProduct}
-                onClose={() => this.setState({ selectedProduct: null })}
-                position={{ x: panelX, y: panelY }}
-              />
-            );
-          })()}
+          {this.state.overlayMode === 'react' && selectedProduct && (
+            <ProductOverlayModal
+              product={selectedProduct}
+              onClose={() => this.setState({ selectedProduct: null })}
+            />
+          )}
         </AnimatePresence>
         
         {hoveredProduct && mousePos && (

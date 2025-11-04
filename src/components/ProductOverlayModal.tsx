@@ -21,7 +21,8 @@ interface ParsedFeature {
  * Can be used as full modal (centered) or positioned panel (next to product)
  */
 export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, position }) => {
-  const isPanelMode = !!position;
+  // No position = fixed right panel (new simple behavior)
+  const isPanelMode = true; // Always use panel mode now (no more full modal)
 
   // Extract variants
   const variants = (product as any).variants || [];
@@ -316,30 +317,24 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
     return iconMap[icon];
   };
 
-  // Panel mode: Just the info panel, positioned next to product
+  // Panel mode: Just the info panel, fixed right side
   if (isPanelMode) {
     return (
       <motion.div
         className="pom-info-panel pom-panel-standalone"
         style={{
           position: 'fixed',
+          right: '20px',
+          top: '20px',
           width: '480px',
           maxHeight: '90vh',
         }}
-        animate={{
-          left: position!.x,
-          top: position!.y,
-          opacity: 1,
-        }}
-        initial={{
-          left: position!.x,
-          top: position!.y,
-          opacity: 0,
-        }}
+        initial={{ opacity: 0, x: 50 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: 50 }}
         transition={{
-          opacity: { duration: 0.2 },
-          left: { type: 'spring', stiffness: 300, damping: 30 },
-          top: { type: 'spring', stiffness: 300, damping: 30 }
+          duration: 0.3,
+          ease: 'easeOut'
         }}
         onClick={(e) => e.stopPropagation()}
       >

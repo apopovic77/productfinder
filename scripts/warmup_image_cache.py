@@ -13,6 +13,7 @@ from http.client import IncompleteRead
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Tuple
 
+import argparse
 import requests
 import time
 
@@ -29,8 +30,9 @@ API_KEY = (
     or 'oneal_demo_token'
 )
 
-# Image sizes to cache
-SIZES = [150, 1300]
+# Image size presets
+BASE_SIZES = [150]  # always warm low-res for canvas/product grid
+HIGH_RES_SIZE = 1300  # optional high-res (modal hero)
 
 def fetch_products() -> List[Dict]:
     """Fetch all products from O'Neal API."""
@@ -123,6 +125,25 @@ def warmup_image(product_id: str, storage_id: int, size: int, refresh: bool = Fa
     return (False, product_id, size)
 
 def main():
+    parser = argparse.ArgumentParser(description="Warm up O'Neal product images on the Storage API.")
+    parser.add_argument(
+        "--highres",
+        action="store_true",
+        help="Additionally warm high-resolution (1300px) variants.",
+    )
+    parser.add_argument(
+        "--no-refresh",
+        action="store_true",
+        help="Do not force cache invalidation (skip refresh=true).",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=3,
+        help="Number of parallel download workers (default: 3).",
+    )
+    args = parser.parse_args()
+
     print("🔥 O'Neal Image Cache Warmup Script\n")
 
     # Fetch products from API
@@ -134,39 +155,46 @@ def main():
         print("⚠️  No storage-backed media found. Nothing to warm up.")
         return
 
+    sizes = list(BASE_SIZES)
+    if args.highres:
+        sizes.append(HIGH_RES_SIZE)
+
     # Collect all image tasks (first size triggers refresh)
     tasks = []
     for storage_id, meta in media_entries.items():
         product_id = meta['product_id']
-        for index, size in enumerate(SIZES):
+        for index, size in enumerate(sizes):
             tasks.append((product_id, storage_id, size, index == 0))
 
     print(f"\n🔥 Warming up cache for {len(tasks)} requests "
-          f"({len(media_entries)} media assets × {len(SIZES)} sizes)")
-    print(f"📊 Settings: 3 parallel workers, 60s timeout, retry on 502/504 errors")
+          f"({len(media_entries)} media assets × {len(sizes)} sizes)")
+    print(f"📊 Settings: {args.workers} parallel workers, 60s timeout, retry on transient errors")
+    print(f"   • Refresh derivatives: {'yes' if not args.no_refresh else 'no'}")
+    print(f"   • Sizes: {', '.join(f'{s}px' for s in sizes)}")
     print(f"📊 Progress:\n")
 
-    # Use ThreadPoolExecutor for parallel requests (low parallelism to avoid overload)
     success_count = 0
     failed_count = 0
 
-    with ThreadPoolExecutor(max_workers=3) as executor:
-        # Submit all tasks
+    with ThreadPoolExecutor(max_workers=max(1, args.workers)) as executor:
         futures = [
-            executor.submit(warmup_image, product_id, storage_id, size, refresh)
+            executor.submit(
+                warmup_image,
+                product_id,
+                storage_id,
+                size,
+                refresh=(refresh and not args.no_refresh)
+            )
             for product_id, storage_id, size, refresh in tasks
         ]
 
-        # Process results as they complete
         for i, future in enumerate(as_completed(futures), 1):
             success, product_id, size = future.result()
-
             if success:
                 success_count += 1
             else:
                 failed_count += 1
 
-            # Progress indicator
             if i % 10 == 0 or i == len(tasks):
                 progress_pct = (i / len(tasks)) * 100
                 print(f"\r✅ {success_count} / ❌ {failed_count} / 📦 {i}/{len(tasks)} ({progress_pct:.1f}%)", end='', flush=True)
