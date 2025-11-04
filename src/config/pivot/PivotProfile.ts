@@ -42,4 +42,15 @@ export interface PivotProfile {
   getPreferredChildDimension?(parentDimension: string, parentValue: string): string | undefined;
 
   getProductFamilyOrderForCategory?(category: string): readonly string[] | undefined;
+
+  /**
+   * Allow profile-specific overrides when stepping deeper than product family
+   * (e.g. clothing -> pants -> sport). Return desired dimension key or undefined.
+   */
+  getPreferredGrandchildDimension?(
+    parentDimension: string,
+    parentValue: string,
+    childDimension: string,
+    childValue: string
+  ): string | undefined;
 }

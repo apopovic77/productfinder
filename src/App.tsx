@@ -324,14 +324,39 @@ export default class App extends React.Component<{}, State> {
               if (variantImages.length > 0) {
                 const heroImg = variantImages[0];
                 const heroSrc = `https://share.arkturian.com/proxy.php?id=${heroImg.storageId}&width=1300&format=webp&quality=85`;
-                const heroImage = new Image();
-                heroImage.src = heroSrc;
-                heroImage.onload = () => {
-                  renderer.selectedVariantHeroImage = heroImage;
+
+                const loadHeroImage = (url: string, isRetry: boolean = false) => {
+                  const heroImage = new Image();
+                  heroImage.onload = () => {
+                    // Validate image loaded correctly
+                    if (heroImage.complete && heroImage.naturalWidth > 0 && heroImage.naturalHeight > 0) {
+                      console.log(`${isRetry ? '✅ Retry successful' : '✅ Loaded'} variant hero image:`, heroImg.storageId);
+                      renderer.selectedVariantHeroImage = heroImage;
+                    } else {
+                      console.warn(`❌ Variant hero image corrupt for ${heroImg.storageId} - using product default`);
+                      renderer.selectedVariantHeroImage = null;
+
+                      // Retry with refresh=true if this was the first attempt
+                      if (!isRetry && !url.includes('refresh=true')) {
+                        console.log(`🔄 Retrying variant hero with refresh=true: ${heroImg.storageId}`);
+                        loadHeroImage(url + '&refresh=true', true);
+                      }
+                    }
+                  };
+                  heroImage.onerror = () => {
+                    console.warn(`❌ Failed to load variant hero image: ${heroImg.storageId}`);
+                    renderer.selectedVariantHeroImage = null;
+
+                    // Retry with refresh=true if this was the first attempt
+                    if (!isRetry && !url.includes('refresh=true')) {
+                      console.log(`🔄 Retrying variant hero with refresh=true: ${heroImg.storageId}`);
+                      loadHeroImage(url + '&refresh=true', true);
+                    }
+                  };
+                  heroImage.src = url;
                 };
-                heroImage.onerror = () => {
-                  console.warn('[App] Failed to load variant hero image:', heroImg.storageId);
-                };
+
+                loadHeroImage(heroSrc);
               } else {
                 renderer.selectedVariantHeroImage = null;
               }

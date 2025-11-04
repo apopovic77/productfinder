@@ -406,6 +406,23 @@ export class PivotDrillDownService {
           return;
         }
       }
+      if (this.filterStack.length >= 2) {
+        const parent = this.filterStack[this.filterStack.length - 2];
+        const grandPreferred = this.profile.getPreferredGrandchildDimension?.(
+          parent.dimension,
+          parent.value,
+          last.dimension,
+          last.value
+        );
+        if (grandPreferred) {
+          const preferredIndex = this.hierarchy.indexOf(grandPreferred);
+          if (preferredIndex !== -1) {
+            this.currentDimensionIndex = preferredIndex;
+            this.currentDimensionKey = this.hierarchy[this.currentDimensionIndex] ?? null;
+            return;
+          }
+        }
+      }
       const lastIndex = this.hierarchy.indexOf(last.dimension);
       this.currentDimensionIndex = Math.min(
         lastIndex >= 0 ? lastIndex + 1 : this.rootDimensionIndex,

@@ -288,6 +288,58 @@ export class Product {
       // img.crossOrigin = 'anonymous';
 
       img.onload = () => {
+        // Validate that image actually loaded correctly
+        if (!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) {
+          console.warn(`Image loaded but appears corrupt: ${url} (naturalWidth: ${img.naturalWidth}, naturalHeight: ${img.naturalHeight})`);
+
+          // Treat as error - keep existing image
+          this._imageLoading = false;
+          // Only set error flag if we don't have an existing image to fall back to
+          if (!this._image) {
+            this._imageError = true;
+          }
+          Product.loadingPromises.delete(url);
+
+          const now = Date.now();
+          const info = Product.failedUrlAttempts.get(url);
+          if (info && now - info.lastFailed < Product.RETRY_COOLDOWN_MS) {
+            Product.failedUrlAttempts.set(url, { count: info.count + 1, lastFailed: now });
+          } else {
+            Product.failedUrlAttempts.set(url, { count: 1, lastFailed: now });
+          }
+
+          // Try retry with refresh=true if this was the first attempt
+          if (!url.includes('refresh=true') && (!info || info.count === 0)) {
+            console.log(`Retrying with refresh=true: ${url}`);
+            const refreshUrl = url + (url.includes('?') ? '&' : '?') + 'refresh=true';
+
+            // Retry once with refresh parameter
+            const retryImg = new Image();
+            retryImg.onload = () => {
+              if (retryImg.complete && retryImg.naturalWidth > 0 && retryImg.naturalHeight > 0) {
+                this._image = retryImg;
+                this._imageLoading = false;
+                this._imageError = false;
+                Product.imageCache.set(refreshUrl, retryImg);
+                Product.failedUrlAttempts.delete(url);
+                resolve(retryImg);
+              } else {
+                // Still corrupt - keep old image
+                resolve(this._image ?? null);
+              }
+            };
+            retryImg.onerror = () => {
+              // Retry failed - keep old image
+              resolve(this._image ?? null);
+            };
+            retryImg.src = refreshUrl;
+          } else {
+            // No retry - keep old image
+            resolve(this._image ?? null);
+          }
+          return;
+        }
+
         // SUCCESS: Update to new image
         this._image = img;
         this._imageLoading = false;
@@ -299,7 +351,10 @@ export class Product {
 
       img.onerror = () => {
         this._imageLoading = false;
-        this._imageError = true;
+        // Only set error flag if we don't have an existing image to fall back to
+        if (!this._image) {
+          this._imageError = true;
+        }
         Product.loadingPromises.delete(url);
         console.warn(`Failed to load image for product ${this.id}: ${url} (keeping existing image)`);
 
@@ -311,10 +366,39 @@ export class Product {
           Product.failedUrlAttempts.set(url, { count: 1, lastFailed: now });
         }
 
-        // IMPORTANT: Keep existing image on error, don't replace with null!
-        // this._image stays unchanged
+        // Try retry with refresh=true if this was the first attempt
+        if (!url.includes('refresh=true') && (!info || info.count <= 1)) {
+          console.log(`🔄 Retrying with refresh=true: ${url}`);
+          const refreshUrl = url + (url.includes('?') ? '&' : '?') + 'refresh=true';
 
-        resolve(this._image ?? null);
+          // Retry once with refresh parameter
+          const retryImg = new Image();
+          retryImg.onload = () => {
+            if (retryImg.complete && retryImg.naturalWidth > 0 && retryImg.naturalHeight > 0) {
+              console.log(`✅ Retry successful with refresh=true for product ${this.id}`);
+              this._image = retryImg;
+              this._imageLoading = false;
+              this._imageError = false;
+              Product.imageCache.set(refreshUrl, retryImg);
+              Product.failedUrlAttempts.delete(url);
+              resolve(retryImg);
+            } else {
+              console.warn(`❌ Retry with refresh=true still corrupt for product ${this.id} - keeping existing image`);
+              // Still corrupt - keep old image
+              resolve(this._image ?? null);
+            }
+          };
+          retryImg.onerror = () => {
+            console.warn(`❌ Retry with refresh=true failed for product ${this.id} - keeping existing image`);
+            // Retry failed - keep old image
+            resolve(this._image ?? null);
+          };
+          retryImg.src = refreshUrl;
+        } else {
+          // No retry - keep old image
+          console.log(`⏭️ Skipping retry for ${url} (already tried or has refresh=true)`);
+          resolve(this._image ?? null);
+        }
       };
 
       img.src = url;

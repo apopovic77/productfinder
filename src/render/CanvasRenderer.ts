@@ -40,11 +40,6 @@ export class CanvasRenderer<T> {
     orientation?: 'portrait' | 'landscape';
   }> | null = null; // Alternative product images for stacked display
 
-  // Animation state for stacked images
-  private stackedImageAnimationStart: number = 0;
-  private stackedImageAnimationDuration: number = 3000; // ms (3 seconds for very visible animation)
-  private lastImageCount: number = 0; // Track when new images load
-
   // Product overlay renderer (OOP class)
   private productOverlay: ProductOverlayCanvas;
   private productOverlayV2: ProductOverlayCanvasV2;
@@ -404,81 +399,57 @@ export class CanvasRenderer<T> {
         const imageCount = loadedImages.length;
 
         if (imageCount > 0) {
-          // Restart animation if image count changed (new images loaded)
-          if (imageCount !== this.lastImageCount) {
-            this.stackedImageAnimationStart = performance.now();
-            this.lastImageCount = imageCount;
-            console.log('[Renderer] (Re)starting stacked images animation with', imageCount, 'images');
+          // Detect orientation: Only clearly landscape images spread vertically
+          // Everything else (portrait, square) spreads horizontally
+          const aspectRatio = w / h;
+          const isClearlyLandscape = aspectRatio > 1.2; // Width at least 20% larger than height
+
+          // DEBUG: Check actual image dimensions
+          if (img) {
+            console.log('[Renderer] Cell:', w.toFixed(0), 'x', h.toFixed(0),
+                        '| Image:', img.naturalWidth, 'x', img.naturalHeight,
+                        '| Aspect:', aspectRatio.toFixed(2),
+                        '| Spread:', isClearlyLandscape ? 'Vertical (↓)' : 'Horizontal (→)');
           }
-
-          // Calculate animation progress (0 to 1)
-          const elapsed = performance.now() - this.stackedImageAnimationStart;
-          const progress = Math.min(1, elapsed / this.stackedImageAnimationDuration);
-
-          // Easing function (ease-out-cubic)
-          const easeProgress = 1 - Math.pow(1 - progress, 3);
-
-          // Detect orientation from main product image
-          const isPortrait = h > w;
 
           // Calculate scaling and spacing to fit all images in cell
           // Total images to draw: main image + alternative images
           const totalImages = imageCount + 1;
 
-          // Overlap factor: how much images overlap (0.3 = 30% overlap, so 70% of next image visible)
-          const overlapFactor = 0.3;
-
-          // Available space in the spread direction
-          const availableSpace = isPortrait ? w : h;
+          // Overlap factor: how much images overlap (0.7 = 70% overlap, so 30% of next image visible)
+          const overlapFactor = 0.7;
 
           // Calculate scale factor so all images fit in the cell
-          // Formula: availableSpace = imageSize * scale * (1 + (n-1) * (1 - overlap))
-          // scale = availableSpace / (imageSize * (1 + (n-1) * (1 - overlap)))
           const spreadFactor = 1 + (totalImages - 1) * (1 - overlapFactor);
-          const targetScale = 1 / spreadFactor;
+          let targetScale = 1 / spreadFactor;
 
-          // Animated scale (starts at 1.0, ends at targetScale)
-          const currentScale = 1.0 - (1.0 - targetScale) * easeProgress;
+          // Don't scale down too much - keep at least 85% of original size
+          targetScale = Math.max(targetScale, 0.85);
 
-          // Calculate scaled dimensions
-          const scaledW = w * currentScale;
-          const scaledH = h * currentScale;
+          // Calculate scaled dimensions (static, no animation)
+          const scaledW = w * targetScale;
+          const scaledH = h * targetScale;
 
-          // Calculate offset between images
-          // Use FINAL scaled size (at targetScale) for max offset
-          const finalImageSize = isPortrait ? (w * targetScale) : (h * targetScale);
+          // Calculate offset between images based on spread direction
+          const finalImageSize = isClearlyLandscape ? (h * targetScale) : (w * targetScale);
           const maxOffset = finalImageSize * (1 - overlapFactor);
-          const currentOffset = maxOffset * easeProgress;
-
-          // Always log during animation
-          if (progress < 1) {
-            console.log('[Renderer] ANIMATING:', imageCount, 'imgs -',
-              'progress:', (progress * 100).toFixed(0) + '% (' + (easeProgress * 100).toFixed(0) + '%)',
-              'scale:', currentScale.toFixed(3),
-              'offset:', currentOffset.toFixed(1) + 'px',
-              isPortrait ? 'horizontal' : 'vertical');
-          } else if (Math.random() < 0.01) {
-            console.log('[Renderer] ANIMATION DONE -', imageCount, 'imgs',
-              'scale:', currentScale.toFixed(3),
-              'offset:', currentOffset.toFixed(1) + 'px');
-          }
 
           // Draw from back to front
           for (let i = imageCount - 1; i >= 0; i--) {
             const altImg = loadedImages[i];
             if (altImg && altImg.loadedImage) {
-              // Calculate position for this image (each image offset by currentOffset)
-              const stackOffset = currentOffset * (i + 1);
+              // Calculate position for this image (each image offset by maxOffset)
+              const stackOffset = maxOffset * (i + 1);
 
               let stackedX = x;
               let stackedY = y;
 
-              if (isPortrait) {
-                // Portrait: spread horizontally (X-axis)
-                stackedX = x + stackOffset;
-              } else {
-                // Landscape: spread vertically (Y-axis)
+              if (isClearlyLandscape) {
+                // Clearly landscape: spread vertically (Y-axis)
                 stackedY = y + stackOffset;
+              } else {
+                // Portrait or square: spread horizontally (X-axis)
+                stackedX = x + stackOffset;
               }
 
               // Draw the alternative image with transparency and scaling
@@ -488,36 +459,27 @@ export class CanvasRenderer<T> {
           }
           this.ctx.globalAlpha = 1;
         }
-      } else {
-        // Reset animation timer when no alternative images
-        if (this.stackedImageAnimationStart !== 0) {
-          console.log('[Renderer] Resetting stacked images animation');
-          this.stackedImageAnimationStart = 0;
-          this.lastImageCount = 0;
-        }
       }
 
-      // Draw main image (scaled if alternative images are shown)
+      // Draw main image (scaled same as alternative images if they exist)
       this.ctx.globalAlpha = opacity;
 
-      // If we have alternative images, scale the main image too
       if (isSelectedProduct && this.alternativeImages && this.alternativeImages.length > 0) {
         const loadedImages = this.alternativeImages.filter(img => img.loadedImage);
         if (loadedImages.length > 0) {
-          // Use same scaling calculation as alternative images
-          const elapsed = performance.now() - this.stackedImageAnimationStart;
-          const progress = Math.min(1, elapsed / this.stackedImageAnimationDuration);
-          const easeProgress = 1 - Math.pow(1 - progress, 3);
-
-          const isPortrait = h > w;
+          // Use same scaling as alternative images
+          const aspectRatio = w / h;
+          const isClearlyLandscape = aspectRatio > 1.2;
           const totalImages = loadedImages.length + 1;
-          const overlapFactor = 0.3; // Same as alternative images
+          const overlapFactor = 0.7;
           const spreadFactor = 1 + (totalImages - 1) * (1 - overlapFactor);
-          const targetScale = 1 / spreadFactor;
-          const currentScale = 1.0 - (1.0 - targetScale) * easeProgress;
+          let targetScale = 1 / spreadFactor;
 
-          const scaledW = w * currentScale;
-          const scaledH = h * currentScale;
+          // Don't scale down too much - keep at least 85% of original size
+          targetScale = Math.max(targetScale, 0.85);
+
+          const scaledW = w * targetScale;
+          const scaledH = h * targetScale;
 
           this.ctx.drawImage(img, x, y, scaledW, scaledH);
         } else {
@@ -526,6 +488,7 @@ export class CanvasRenderer<T> {
       } else {
         this.ctx.drawImage(img, x, y, w, h);
       }
+
       this.ctx.globalAlpha = 1;
       
       // Only show focus indicator for keyboard navigation

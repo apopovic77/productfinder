@@ -446,5 +446,17 @@ export const ONEAL_PIVOT_PROFILE: PivotProfile = {
     }
     return undefined;
   },
+  getPreferredGrandchildDimension(parentDimension, parentValue, childDimension, childValue) {
+    if (
+      parentDimension === 'category:presentation' &&
+      parentValue === 'Kleidung' &&
+      childDimension === 'attribute:product_family'
+    ) {
+      if (childValue === 'HOSEN' || childValue === 'SHORTS') {
+        return 'attribute:taxonomy_sport';
+      }
+    }
+    return undefined;
+  },
   getProductFamilyOrderForCategory: getProductFamilyOrderForCategory,
 };
