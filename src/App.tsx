@@ -65,7 +65,8 @@ type State = {
 
   // Overlay Mode
   overlayMode: 'canvas' | 'react'; // Toggle between canvas and React overlay
-  showReactDialog: boolean; // Delayed state for smooth fadeout
+  showReactDialog: boolean; // Show dialog when zoom is stable
+  isZoomAnimating: boolean; // Track if zoom is currently animating
 
   // Developer Settings
   devSettings: DeveloperSettings;
@@ -113,6 +114,7 @@ const createInitialState = (): State => {
 
     overlayMode: 'react', // Default to React overlay
     showReactDialog: false,
+    isZoomAnimating: false,
 
     devSettings: createDefaultDeveloperSettings(),
     fps: 60,
@@ -127,7 +129,7 @@ export default class App extends React.Component<{}, State> {
   private fpsRaf: number | null = null;
   private fpsLastSample = 0;
   private fpsFrameCount = 0;
-  private dialogFadeoutTimer: number | null = null;
+  private zoomStabilityTimer: number | null = null;
 
   state: State = createInitialState();
 
@@ -195,9 +197,9 @@ export default class App extends React.Component<{}, State> {
   componentWillUnmount(): void {
     this.controller.destroy();
     this.stopFPSCounter();
-    if (this.dialogFadeoutTimer) {
-      clearTimeout(this.dialogFadeoutTimer);
-      this.dialogFadeoutTimer = null;
+    if (this.zoomStabilityTimer) {
+      clearTimeout(this.zoomStabilityTimer);
+      this.zoomStabilityTimer = null;
     }
     window.removeEventListener('resize', this.handleResize);
     document.removeEventListener('keydown', this.handleKeyDown);
@@ -302,32 +304,47 @@ export default class App extends React.Component<{}, State> {
       }
     }
 
-    // Update showReactDialog with delay for smooth fadeout
+    // Update showReactDialog based on zoom stability
     if (
       prevState.selectedProduct !== this.state.selectedProduct ||
       prevState.zoom !== this.state.zoom ||
       prevState.overlayMode !== this.state.overlayMode
     ) {
-      const shouldShow = this.state.overlayMode === 'react' &&
-                         this.state.selectedProduct !== null &&
-                         this.state.zoom > 1.5;
+      // Clear existing timer
+      if (this.zoomStabilityTimer) {
+        clearTimeout(this.zoomStabilityTimer);
+        this.zoomStabilityTimer = null;
+      }
 
-      if (shouldShow && !this.state.showReactDialog) {
-        // Show immediately when zoom in
-        if (this.dialogFadeoutTimer) {
-          clearTimeout(this.dialogFadeoutTimer);
-          this.dialogFadeoutTimer = null;
+      // If zoom changed, hide dialog immediately and mark as animating
+      if (prevState.zoom !== this.state.zoom) {
+        this.setState({
+          showReactDialog: false,
+          isZoomAnimating: true
+        });
+
+        // Wait for zoom to stabilize (200ms)
+        this.zoomStabilityTimer = window.setTimeout(() => {
+          this.zoomStabilityTimer = null;
+          const shouldShow = this.state.overlayMode === 'react' &&
+                           this.state.selectedProduct !== null &&
+                           this.state.zoom > 1.5;
+
+          this.setState({
+            isZoomAnimating: false,
+            showReactDialog: shouldShow
+          });
+        }, 200);
+      } else {
+        // Product or overlay mode changed, update immediately
+        const shouldShow = this.state.overlayMode === 'react' &&
+                         this.state.selectedProduct !== null &&
+                         this.state.zoom > 1.5 &&
+                         !this.state.isZoomAnimating;
+
+        if (shouldShow !== this.state.showReactDialog) {
+          this.setState({ showReactDialog: shouldShow });
         }
-        this.setState({ showReactDialog: true });
-      } else if (!shouldShow && this.state.showReactDialog) {
-        // Hide with delay for fadeout animation
-        if (this.dialogFadeoutTimer) {
-          clearTimeout(this.dialogFadeoutTimer);
-        }
-        this.dialogFadeoutTimer = window.setTimeout(() => {
-          this.setState({ showReactDialog: false });
-          this.dialogFadeoutTimer = null;
-        }, 300); // Match fadeout duration
       }
     }
   }

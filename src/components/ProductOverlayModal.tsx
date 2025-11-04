@@ -71,25 +71,31 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
   const specs = product.specifications || {};
   const material = specs.shell_material || specs.materials || '100% Polyester';
 
-  // Get current image from active variant or fallback to hero
-  const getCurrentImage = (): string => {
-    // Try to use variant image if available
+  // Get current storage ID
+  const getCurrentStorageId = (): number | null => {
+    // Try variant image first
     if (activeVariant?.image_storage_id) {
-      return `https://share.arkturian.com/proxy.php?id=${activeVariant.image_storage_id}&width=800&format=webp&quality=85`;
+      return activeVariant.image_storage_id;
     }
 
-    // Fallback to hero image from product media
+    // Fallback to hero image
     const media = product.media || [];
     const heroMedia = media.find(m => m.type === 'hero') || media[0];
+    return (heroMedia as any)?.storage_id || null;
+  };
 
-    if (!heroMedia) return '';
+  // Get current image from active variant or fallback to hero
+  const getCurrentImage = (): string => {
+    const storageId = getCurrentStorageId();
 
-    const storageId = (heroMedia as any).storage_id;
     if (storageId) {
       return `https://share.arkturian.com/proxy.php?id=${storageId}&width=800&format=webp&quality=85`;
     }
 
-    return heroMedia.src;
+    // Fallback to src if no storage_id
+    const media = product.media || [];
+    const heroMedia = media.find(m => m.type === 'hero') || media[0];
+    return heroMedia?.src || '';
   };
 
   // Parse features
@@ -192,9 +198,8 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
           top: position!.y,
           opacity: 0,
         }}
-        exit={{ opacity: 0 }}
         transition={{
-          opacity: { duration: 0.3 },
+          opacity: { duration: 0.2 },
           left: { type: 'spring', stiffness: 300, damping: 30 },
           top: { type: 'spring', stiffness: 300, damping: 30 }
         }}
@@ -288,10 +293,105 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
           {activeVariant?.gtin13 && (
             <div className="pom-material-item">GTIN: {activeVariant.gtin13}</div>
           )}
+          {getCurrentStorageId() && (
+            <div className="pom-material-item">
+              Storage ID: {getCurrentStorageId()}
+            </div>
+          )}
           {availableSizes.length > 0 && (
             <div className="pom-material-item">
               Available Sizes: {availableSizes.join(', ')}
             </div>
+          )}
+        </div>
+
+        {/* Debug Info */}
+        <div style={{ marginTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '16px' }}>
+          <div style={{ fontSize: '12px', marginBottom: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {getCurrentStorageId() && (
+              <span style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '4px 8px', borderRadius: '12px', fontSize: '11px' }}>
+                Storage-ID: {getCurrentStorageId()}
+              </span>
+            )}
+            {(product as any).meta?.source && (
+              <span style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '4px 8px', borderRadius: '12px', fontSize: '11px' }}>
+                Quelle: {(product as any).meta.source}
+              </span>
+            )}
+            {variants.length > 0 && (
+              <span style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '4px 8px', borderRadius: '12px', fontSize: '11px' }}>
+                Varianten: {variants.length}
+              </span>
+            )}
+          </div>
+
+          {(product as any).derived_taxonomy && (
+            <div style={{ marginTop: '12px' }}>
+              <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>Derived Taxonomy</div>
+              <div style={{
+                padding: '8px',
+                background: 'rgba(0, 0, 0, 0.2)',
+                borderRadius: '6px',
+                fontSize: '11px',
+                maxHeight: '150px',
+                overflowY: 'auto',
+                fontFamily: 'monospace',
+                lineHeight: '1.5'
+              }}>
+                <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                  {JSON.stringify((product as any).derived_taxonomy, null, 2)}
+                </pre>
+              </div>
+            </div>
+          )}
+
+          {(product as any).meta && (
+            <div style={{ marginTop: '12px' }}>
+              <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>Meta</div>
+              <div style={{
+                padding: '8px',
+                background: 'rgba(0, 0, 0, 0.2)',
+                borderRadius: '6px',
+                fontSize: '11px',
+                maxHeight: '150px',
+                overflowY: 'auto',
+                fontFamily: 'monospace',
+                lineHeight: '1.5'
+              }}>
+                <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                  {JSON.stringify((product as any).meta, null, 2)}
+                </pre>
+              </div>
+            </div>
+          )}
+
+          {variants.length > 0 && (
+            <details style={{ marginTop: '12px' }}>
+              <summary style={{
+                cursor: 'pointer',
+                fontWeight: '600',
+                fontSize: '13px',
+                padding: '4px 0',
+                userSelect: 'none'
+              }}>
+                ▶ Varianten ({variants.length})
+              </summary>
+              <div style={{
+                marginTop: '8px',
+                padding: '8px',
+                background: 'rgba(0, 0, 0, 0.2)',
+                borderRadius: '6px',
+                fontSize: '11px',
+                maxHeight: '200px',
+                overflowY: 'auto',
+                fontFamily: 'monospace',
+                lineHeight: '1.5'
+              }}>
+                <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                  {JSON.stringify(variants, null, 2)}
+                </pre>
+              </div>
+            </details>
           )}
         </div>
 
@@ -429,10 +529,105 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
               {activeVariant?.gtin13 && (
                 <div className="pom-material-item">GTIN: {activeVariant.gtin13}</div>
               )}
+              {getCurrentStorageId() && (
+                <div className="pom-material-item">
+                  Storage ID: {getCurrentStorageId()}
+                </div>
+              )}
               {availableSizes.length > 0 && (
                 <div className="pom-material-item">
                   Available Sizes: {availableSizes.join(', ')}
                 </div>
+              )}
+            </div>
+
+            {/* Debug Info */}
+            <div style={{ marginTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '16px' }}>
+              <div style={{ fontSize: '12px', marginBottom: '8px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {getCurrentStorageId() && (
+                  <span style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '4px 8px', borderRadius: '12px', fontSize: '11px' }}>
+                    Storage-ID: {getCurrentStorageId()}
+                  </span>
+                )}
+                {(product as any).meta?.source && (
+                  <span style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '4px 8px', borderRadius: '12px', fontSize: '11px' }}>
+                    Quelle: {(product as any).meta.source}
+                  </span>
+                )}
+                {variants.length > 0 && (
+                  <span style={{ background: 'rgba(255, 255, 255, 0.2)', padding: '4px 8px', borderRadius: '12px', fontSize: '11px' }}>
+                    Varianten: {variants.length}
+                  </span>
+                )}
+              </div>
+
+              {(product as any).derived_taxonomy && (
+                <div style={{ marginTop: '12px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>Derived Taxonomy</div>
+                  <div style={{
+                    padding: '8px',
+                    background: 'rgba(0, 0, 0, 0.2)',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    maxHeight: '150px',
+                    overflowY: 'auto',
+                    fontFamily: 'monospace',
+                    lineHeight: '1.5'
+                  }}>
+                    <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                      {JSON.stringify((product as any).derived_taxonomy, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
+              {(product as any).meta && (
+                <div style={{ marginTop: '12px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: '6px' }}>Meta</div>
+                  <div style={{
+                    padding: '8px',
+                    background: 'rgba(0, 0, 0, 0.2)',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    maxHeight: '150px',
+                    overflowY: 'auto',
+                    fontFamily: 'monospace',
+                    lineHeight: '1.5'
+                  }}>
+                    <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                      {JSON.stringify((product as any).meta, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
+              {variants.length > 0 && (
+                <details style={{ marginTop: '12px' }}>
+                  <summary style={{
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    fontSize: '13px',
+                    padding: '4px 0',
+                    userSelect: 'none'
+                  }}>
+                    ▶ Varianten ({variants.length})
+                  </summary>
+                  <div style={{
+                    marginTop: '8px',
+                    padding: '8px',
+                    background: 'rgba(0, 0, 0, 0.2)',
+                    borderRadius: '6px',
+                    fontSize: '11px',
+                    maxHeight: '200px',
+                    overflowY: 'auto',
+                    fontFamily: 'monospace',
+                    lineHeight: '1.5'
+                  }}>
+                    <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
+                      {JSON.stringify(variants, null, 2)}
+                    </pre>
+                  </div>
+                </details>
               )}
             </div>
 

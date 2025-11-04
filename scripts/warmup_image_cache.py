@@ -9,14 +9,25 @@ they are cached at the Storage API endpoint for faster initial page loads.
 import sys
 import os
 from collections import OrderedDict
+from http.client import IncompleteRead
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Tuple
 
 import requests
+import time
 
-# API Configuration
-API_BASE = os.getenv('API_BASE', 'https://oneal-api.arkturian.com/v1')
-API_KEY = os.getenv('API_KEY', 'oneal_demo_token')
+# API Configuration (prefer O'Neal specific env vars)
+API_BASE = (
+    os.getenv('ONEAL_API_BASE')
+    or os.getenv('VITE_ONEAL_API_BASE')
+    or 'https://oneal-api.arkturian.com/v1'
+)
+API_KEY = (
+    os.getenv('ONEAL_API_KEY')
+    or os.getenv('VITE_ONEAL_API_KEY')
+    or os.getenv('API_KEY')
+    or 'oneal_demo_token'
+)
 
 # Image sizes to cache
 SIZES = [150, 1300]
@@ -56,6 +67,8 @@ def collect_media_entries(products: List[Dict]) -> Dict[int, Dict[str, str]]:
                 'product_id': product_id,
                 'media_role': media_item.get('role', 'unknown'),
             }
+            # Only warm primary image per product
+            break
     return media_map
 
 def warmup_image(product_id: str, storage_id: int, size: int, refresh: bool = False) -> Tuple[bool, str, int]:
@@ -74,8 +87,8 @@ def warmup_image(product_id: str, storage_id: int, size: int, refresh: bool = Fa
     if refresh:
         params['refresh'] = 'true'
 
-    # Retry logic for 502/504 errors
-    max_retries = 2
+    # Retry logic for transient errors
+    max_retries = 3
     for attempt in range(max_retries):
         try:
             response = requests.get(base_url, params=params, timeout=60)  # Increased timeout
@@ -87,10 +100,23 @@ def warmup_image(product_id: str, storage_id: int, size: int, refresh: bool = Fa
                 continue
             print(f"❌ HTTP {e.response.status_code} for {product_id} (storage_id: {storage_id}, size: {size}px)")
             return (False, product_id, size)
-        except requests.exceptions.Timeout:
-            print(f"⏱️  Timeout for {product_id} (storage_id: {storage_id}, size: {size}px)")
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError,
+                requests.exceptions.ChunkedEncodingError) as e:
+            if attempt < max_retries - 1:
+                time.sleep(1.0)
+                continue
+            print(f"⏱️  Timeout/connection issue for {product_id} (storage_id: {storage_id}, size: {size}px): {e}")
+            return (False, product_id, size)
+        except IncompleteRead as e:
+            if attempt < max_retries - 1:
+                time.sleep(1.0)
+                continue
+            print(f"❌ Incomplete read for {product_id} (storage_id: {storage_id}, size: {size}px): {e}")
             return (False, product_id, size)
         except Exception as e:
+            if attempt < max_retries - 1:
+                time.sleep(1.0)
+                continue
             print(f"❌ Failed to load {product_id} (storage_id: {storage_id}, size: {size}px): {e}")
             return (False, product_id, size)
 
