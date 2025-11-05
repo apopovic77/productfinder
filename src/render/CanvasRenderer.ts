@@ -6,6 +6,7 @@ import { LOD_CONFIG } from '../config/LODConfig';
 import { ProductOverlayCanvas, DEFAULT_OVERLAY_STYLE } from './ProductOverlayCanvas';
 import { ProductOverlayCanvasV2, MODERN_OVERLAY_STYLE } from './ProductOverlayCanvasV2';
 import { ImageLoadQueue } from '../utils/ImageLoadQueue';
+import { buildMediaUrl } from '../utils/MediaUrlBuilder';
 
 type LoadTask = {
   nodeId: string;
@@ -297,7 +298,12 @@ export class CanvasRenderer<T> {
 
           const taskId = `lod-${node.id}-${requiredSize}`;
           const quality = requiredSize === LOD_CONFIG.highResolution ? LOD_CONFIG.highQuality : LOD_CONFIG.lowQuality;
-          const imageUrl = `https://share.arkturian.com/proxy.php?id=${storageId}&width=${requiredSize}&height=${requiredSize}&format=webp&quality=${quality}`;
+          const imageUrl = buildMediaUrl({
+            storageId,
+            width: requiredSize,
+            height: requiredSize,
+            quality,
+          });
 
           // Add to ImageLoadQueue (automatically handles duplicates and priority sorting)
           this.imageLoadQueue.add({
@@ -357,7 +363,12 @@ export class CanvasRenderer<T> {
           // Check if we need to load different size
           if (this.pivotHeroLoadedSize !== requiredSize) {
             const quality = requiredSize === LOD_CONFIG.highResolution ? LOD_CONFIG.highQuality : LOD_CONFIG.lowQuality;
-            const imageUrl = `https://share.arkturian.com/proxy.php?id=${storageId}&width=${requiredSize}&height=${requiredSize}&format=webp&quality=${quality}`;
+            const imageUrl = buildMediaUrl({
+              storageId,
+              width: requiredSize,
+              height: requiredSize,
+              quality,
+            });
 
             // Priority 0 = highest priority (pivot is most important)
             this.imageLoadQueue.add({

@@ -412,7 +412,7 @@ export class ImageLoadQueue<T = any> {
   private loadImage(url: string, timeout: number): Promise<HTMLImageElement> {
     return new Promise((resolve, reject) => {
       const img = new Image();
-      let timer: NodeJS.Timeout | null = null;
+      let timer: ReturnType<typeof setTimeout> | null = null;
 
       const cleanup = () => {
         if (timer) clearTimeout(timer);

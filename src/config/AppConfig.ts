@@ -24,6 +24,10 @@ export type PivotDefaults = {
   rootBreadcrumb: string;
 };
 
+export type MediaDefaults = {
+  useTrimmedImages: boolean;
+};
+
 const FILTER_DEFAULTS: FilterDefaults = {
   search: '',
   category: '',
@@ -44,6 +48,10 @@ const UI_DEFAULTS: UiDefaults = {
 const PIVOT_DEFAULTS: PivotDefaults = {
   dimension: 'category:presentation',
   rootBreadcrumb: 'All',
+};
+
+const MEDIA_DEFAULTS: MediaDefaults = {
+  useTrimmedImages: false, // Set to true to use trim=true parameter for transparent backgrounds
 };
 
 const DEVELOPER_SETTINGS_DEFAULTS: DeveloperSettings = {
@@ -74,6 +82,7 @@ export const APP_CONFIG = {
   filters: FILTER_DEFAULTS,
   ui: UI_DEFAULTS,
   pivot: PIVOT_DEFAULTS,
+  media: MEDIA_DEFAULTS,
   developerSettings: DEVELOPER_SETTINGS_DEFAULTS,
 } as const;
 
@@ -87,6 +96,10 @@ export function createDefaultUiState(): UiDefaults {
 
 export function createDefaultPivotState(): PivotDefaults {
   return { ...APP_CONFIG.pivot };
+}
+
+export function createDefaultMediaState(): MediaDefaults {
+  return { ...APP_CONFIG.media };
 }
 
 export function createDefaultDeveloperSettings(): DeveloperSettings {

@@ -23,6 +23,7 @@ import {
 } from './config/AppConfig';
 import { getImagesForVariant, getPrimaryVariant } from './utils/variantImageHelpers';
 import { ImageLoadQueue } from './utils/ImageLoadQueue';
+import { buildMediaUrl } from './utils/MediaUrlBuilder';
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -376,7 +377,12 @@ export default class App extends React.Component<{}, State> {
                 const storageId = variantImg.storageId;
 
                 // Use high-res images (1300px @ 85% quality) - same as LOD system
-                const src = `https://share.arkturian.com/proxy.php?id=${storageId}&width=1300&height=1300&format=webp&quality=85`;
+                const src = buildMediaUrl({
+                  storageId,
+                  width: 1300,
+                  height: 1300,
+                  quality: 85,
+                });
                 const imgObj: any = { storageId, src };
 
                 // Add to load queue

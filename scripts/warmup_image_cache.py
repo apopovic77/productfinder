@@ -73,7 +73,7 @@ def collect_media_entries(products: List[Dict]) -> Dict[int, Dict[str, str]]:
             break
     return media_map
 
-def warmup_image(product_id: str, storage_id: int, size: int, refresh: bool = False) -> Tuple[bool, str, int]:
+def warmup_image(product_id: str, storage_id: int, size: int, refresh: bool = False, trim: bool = False) -> Tuple[bool, str, int]:
     """
     Load a single image to cache it.
 
@@ -92,6 +92,8 @@ def warmup_image(product_id: str, storage_id: int, size: int, refresh: bool = Fa
     }
     if refresh:
         params['refresh'] = 'true'
+    if trim:
+        params['trim'] = 'true'
     
     # Retry logic for transient errors
     max_retries = 3
@@ -146,6 +148,11 @@ def main():
         default=3,
         help="Number of parallel download workers (default: 3).",
     )
+    parser.add_argument(
+        "--trim",
+        action="store_true",
+        help="Request trimmed/cropped images with transparent background (trim=true parameter).",
+    )
     args = parser.parse_args()
 
     print("🔥 O'Neal Image Cache Warmup Script\n")
@@ -174,6 +181,7 @@ def main():
           f"({len(media_entries)} media assets × {len(sizes)} sizes)")
     print(f"📊 Settings: {args.workers} parallel workers, 60s timeout, retry on transient errors")
     print(f"   • Refresh derivatives: {'yes' if not args.no_refresh else 'no'}")
+    print(f"   • Trimmed images: {'yes' if args.trim else 'no'}")
     print(f"   • Sizes: {', '.join(f'{s}px' for s in sizes)}")
     print(f"📊 Progress:\n")
 
@@ -187,7 +195,8 @@ def main():
                 product_id,
                 storage_id,
                 size,
-                refresh=(refresh and not args.no_refresh)
+                refresh=(refresh and not args.no_refresh),
+                trim=args.trim
             )
             for product_id, storage_id, size, refresh in tasks
         ]
