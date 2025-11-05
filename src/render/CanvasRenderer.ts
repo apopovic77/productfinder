@@ -69,6 +69,36 @@ export class CanvasRenderer<T> {
     this.productOverlay = new ProductOverlayCanvas(ctx, DEFAULT_OVERLAY_STYLE);
     this.productOverlayV2 = new ProductOverlayCanvasV2(ctx, MODERN_OVERLAY_STYLE);
   }
+
+  /**
+   * Compute the best-fit size for an image within a bounding box while preserving aspect ratio.
+   */
+  private getFittedDimensions(img: HTMLImageElement, boundsWidth: number, boundsHeight: number) {
+    const naturalWidth = img.naturalWidth || boundsWidth || 1;
+    const naturalHeight = img.naturalHeight || boundsHeight || 1;
+    const scale = Math.min(boundsWidth / naturalWidth, boundsHeight / naturalHeight);
+    const fittedWidth = naturalWidth * scale;
+    const fittedHeight = naturalHeight * scale;
+    return { width: fittedWidth, height: fittedHeight };
+  }
+
+  /**
+   * Draw an image inside the specified bounds while preserving aspect ratio (centered letterbox).
+   * Returns the actual drawn bounds for chaining calculations.
+   */
+  private drawImageFit(
+    img: HTMLImageElement,
+    boundsX: number,
+    boundsY: number,
+    boundsWidth: number,
+    boundsHeight: number
+  ) {
+    const { width, height } = this.getFittedDimensions(img, boundsWidth, boundsHeight);
+    const drawX = boundsX + (boundsWidth - width) / 2;
+    const drawY = boundsY + (boundsHeight - height) / 2;
+    this.ctx.drawImage(img, drawX, drawY, width, height);
+    return { x: drawX, y: drawY, width, height };
+  }
   
   start() {
     this.stop();
@@ -404,14 +434,6 @@ export class CanvasRenderer<T> {
           const aspectRatio = w / h;
           const isClearlyLandscape = aspectRatio > 1.2; // Width at least 20% larger than height
 
-          // DEBUG: Check actual image dimensions
-          if (img) {
-            console.log('[Renderer] Cell:', w.toFixed(0), 'x', h.toFixed(0),
-                        '| Image:', img.naturalWidth, 'x', img.naturalHeight,
-                        '| Aspect:', aspectRatio.toFixed(2),
-                        '| Spread:', isClearlyLandscape ? 'Vertical (↓)' : 'Horizontal (→)');
-          }
-
           // Calculate scaling and spacing to fit all images in cell
           // Total images to draw: main image + alternative images
           const totalImages = imageCount + 1;
@@ -426,13 +448,13 @@ export class CanvasRenderer<T> {
           // Don't scale down too much - keep at least 85% of original size
           targetScale = Math.max(targetScale, 0.85);
 
-          // Calculate scaled dimensions (static, no animation)
-          const scaledW = w * targetScale;
-          const scaledH = h * targetScale;
+          // Calculate scaled bounding box (static, no animation)
+          const boundingWidth = w * targetScale;
+          const boundingHeight = h * targetScale;
 
           // Calculate offset between images based on spread direction
-          const finalImageSize = isClearlyLandscape ? (h * targetScale) : (w * targetScale);
-          const maxOffset = finalImageSize * (1 - overlapFactor);
+          const axisSize = isClearlyLandscape ? boundingHeight : boundingWidth;
+          const maxOffset = axisSize * (1 - overlapFactor);
 
           // Draw from back to front
           for (let i = imageCount - 1; i >= 0; i--) {
@@ -454,7 +476,13 @@ export class CanvasRenderer<T> {
 
               // Draw the alternative image with transparency and scaling
               this.ctx.globalAlpha = 0.9 - (i * 0.1);
-              this.ctx.drawImage(altImg.loadedImage, stackedX, stackedY, scaledW, scaledH);
+              this.drawImageFit(
+                altImg.loadedImage,
+                stackedX,
+                stackedY,
+                boundingWidth,
+                boundingHeight
+              );
             }
           }
           this.ctx.globalAlpha = 1;
@@ -478,15 +506,18 @@ export class CanvasRenderer<T> {
           // Don't scale down too much - keep at least 85% of original size
           targetScale = Math.max(targetScale, 0.85);
 
-          const scaledW = w * targetScale;
-          const scaledH = h * targetScale;
-
-          this.ctx.drawImage(img, x, y, scaledW, scaledH);
+          this.drawImageFit(
+            img,
+            x,
+            y,
+            w * targetScale,
+            h * targetScale
+          );
         } else {
-          this.ctx.drawImage(img, x, y, w, h);
+          this.drawImageFit(img, x, y, w, h);
         }
       } else {
-        this.ctx.drawImage(img, x, y, w, h);
+        this.drawImageFit(img, x, y, w, h);
       }
 
       this.ctx.globalAlpha = 1;
