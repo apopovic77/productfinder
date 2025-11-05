@@ -30,8 +30,8 @@ interface LoadedImage {
 
 // Shared queue instance for all thumbnail loading
 const thumbnailQueue = new ImageLoadQueue<{ url: string; index: number }>({
-  maxConcurrent: 3,
-  mode: 'sequential',  // Sequential to prevent browser connection limits
+  maxConcurrent: 1,
+  mode: 'sequential',  // Sequential: load one image at a time to prevent browser connection limits
   timeout: 30000,
   retryCount: 1,
 });

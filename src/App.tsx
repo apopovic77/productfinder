@@ -135,9 +135,9 @@ export default class App extends React.Component<{}, State> {
   private fpsLastSample = 0;
   private fpsFrameCount = 0;
 
-  // Image load queue for variant images (configurable parallel/sequential loading)
+  // Image load queue for variant images (sequential loading)
   private imageLoadQueue = new ImageLoadQueue<{ storageId: number; index: number }>({
-    maxConcurrent: 3,        // Max 3 parallel image loads
+    maxConcurrent: 1,        // Sequential: only 1 image at a time
     mode: 'sequential',      // Load images one by one (prevents browser connection limit issues)
     timeout: 30000,          // 30s timeout
     retryCount: 1,           // Retry once on failure
