@@ -5,6 +5,7 @@ import type { GroupHeaderInfo } from '../layout/PivotLayouter';
 import { LOD_CONFIG } from '../config/LODConfig';
 import { ProductOverlayCanvas, DEFAULT_OVERLAY_STYLE } from './ProductOverlayCanvas';
 import { ProductOverlayCanvasV2, MODERN_OVERLAY_STYLE } from './ProductOverlayCanvasV2';
+import { ImageLoadQueue } from '../utils/ImageLoadQueue';
 
 type LoadTask = {
   nodeId: string;
@@ -50,8 +51,18 @@ export class CanvasRenderer<T> {
   // Image LOD tracking: nodeId -> current loaded size
   private loadedImageSizes = new Map<string, number>();
 
-  // Queue for pending image loads with re-check
-  private loadQueue: LoadTask[] = [];
+  // Current viewport bounds (updated each frame)
+  private viewportLeft = 0;
+  private viewportRight = 0;
+  private viewportTop = 0;
+  private viewportBottom = 0;
+  private zoomFactor = 1;
+
+  // Track loaded LOD level for pivot hero image
+  private pivotHeroLoadedSize: number | null = null;
+
+  // Image load queue (replaces simple array queue)
+  private imageLoadQueue!: ImageLoadQueue<LoadTask>;
 
   // Queue processing timing (non-blocking)
   private lastQueueProcessTime = 0;
@@ -68,6 +79,83 @@ export class CanvasRenderer<T> {
   ) {
     this.productOverlay = new ProductOverlayCanvas(ctx, DEFAULT_OVERLAY_STYLE);
     this.productOverlayV2 = new ProductOverlayCanvasV2(ctx, MODERN_OVERLAY_STYLE);
+
+    // Initialize ImageLoadQueue with shouldLoad validation
+    this.imageLoadQueue = new ImageLoadQueue<LoadTask>({
+      maxConcurrent: 1,
+      mode: 'sequential',
+      timeout: 30000,
+      retryCount: 1,
+      priorityInterruptThreshold: 0.2,
+      shouldLoad: (request) => {
+        // Validate if request is still relevant before loading
+        const metadata = request.metadata as LoadTask;
+
+        // Special handling for pivot hero image
+        if (metadata.nodeId === 'pivot') {
+          // Check if pivot is still active
+          if (!this.selectedProduct || !this.selectedProductBounds) {
+            return false; // Pivot no longer active
+          }
+
+          // Check if requested size is still appropriate for pivot
+          const pivotScale = 2.5;
+          const screenWidth = this.selectedProductBounds.width * this.zoomFactor * pivotScale;
+          const screenHeight = this.selectedProductBounds.height * this.zoomFactor * pivotScale;
+          const screenSize = Math.max(screenWidth, screenHeight);
+
+          const requiredSize = screenSize > LOD_CONFIG.transitionThreshold
+            ? LOD_CONFIG.highResolution
+            : LOD_CONFIG.lowResolution;
+
+          if (requiredSize !== metadata.size) {
+            return false; // Wrong LOD level for pivot
+          }
+
+          return true; // Pivot request still valid
+        }
+
+        // Normal node LOD validation
+        const nodes = this.getNodes();
+        const node = nodes.find(n => n.id === metadata.nodeId);
+
+        if (!node) {
+          return false; // Node no longer exists
+        }
+
+        // Check if node is still in viewport
+        const x = node.posX.targetValue ?? node.posX.value ?? 0;
+        const y = node.posY.targetValue ?? node.posY.value ?? 0;
+        const w = node.width.targetValue ?? node.width.value ?? 0;
+        const h = node.height.targetValue ?? node.height.value ?? 0;
+
+        const isInViewport = (
+          x + w >= this.viewportLeft &&
+          x <= this.viewportRight &&
+          y + h >= this.viewportTop &&
+          y <= this.viewportBottom
+        );
+
+        if (!isInViewport) {
+          return false; // Out of viewport
+        }
+
+        // Check if requested size is still appropriate
+        const screenW = w * this.zoomFactor;
+        const screenH = h * this.zoomFactor;
+        const maxScreenDimension = Math.max(screenW, screenH);
+
+        const requiredSize = maxScreenDimension > LOD_CONFIG.transitionThreshold
+          ? LOD_CONFIG.highResolution
+          : LOD_CONFIG.lowResolution;
+
+        if (requiredSize !== metadata.size) {
+          return false; // Wrong LOD level
+        }
+
+        return true; // Request still valid
+      }
+    });
   }
 
   /**
@@ -154,6 +242,13 @@ export class CanvasRenderer<T> {
     const viewportRight = viewportLeft + (canvas.width / scale);
     const viewportBottom = viewportTop + (canvas.height / scale);
 
+    // Store viewport bounds for shouldLoad validation
+    this.viewportLeft = viewportLeft;
+    this.viewportRight = viewportRight;
+    this.viewportTop = viewportTop;
+    this.viewportBottom = viewportBottom;
+    this.zoomFactor = scale;
+
     let queuedCount = 0;
 
     for (const node of nodes) {
@@ -184,6 +279,7 @@ export class CanvasRenderer<T> {
 
       // Check if we need to load a different size
       const currentSize = this.loadedImageSizes.get(node.id);
+
       if (currentSize !== requiredSize) {
         const product = node.data as any;
         const storageId = product.primaryImage?.storage_id;
@@ -199,130 +295,113 @@ export class CanvasRenderer<T> {
             Math.pow(nodeCenterX - centerX, 2) + Math.pow(nodeCenterY - centerY, 2)
           );
 
-          // Check if already in queue
-          const alreadyQueued = this.loadQueue.some(
-            task => task.nodeId === node.id && task.size === requiredSize
-          );
+          const taskId = `lod-${node.id}-${requiredSize}`;
+          const quality = requiredSize === LOD_CONFIG.highResolution ? LOD_CONFIG.highQuality : LOD_CONFIG.lowQuality;
+          const imageUrl = `https://share.arkturian.com/proxy.php?id=${storageId}&width=${requiredSize}&height=${requiredSize}&format=webp&quality=${quality}`;
 
-          if (!alreadyQueued) {
-            this.loadQueue.push({
+          // Add to ImageLoadQueue (automatically handles duplicates and priority sorting)
+          this.imageLoadQueue.add({
+            id: taskId,
+            url: imageUrl,
+            group: 'lod',
+            priority: distanceFromCenter, // Lower = closer to center = higher priority
+            metadata: {
               nodeId: node.id,
               storageId,
               size: requiredSize,
               priority: distanceFromCenter
+            }
+          }).then(result => {
+            // Image loaded successfully
+            const product = node.data as any;
+            if (product && typeof product.loadImageFromUrl === 'function') {
+              product._image = result.image;
+              this.loadedImageSizes.set(node.id, requiredSize);
+            }
+          }).catch(error => {
+            // Only log real errors, not cancelled requests (expected behavior)
+            if (error.error?.message !== 'Request cancelled' && error.error?.message !== 'Request no longer relevant') {
+              console.warn('[LOD] Failed to load image:', error);
+            }
+          });
+
+          queuedCount++;
+        }
+      }
+    }
+
+    // LOD for Pivot Hero Image (selected product)
+    if (this.selectedProduct && this.selectedProductBounds) {
+      const product = this.selectedProduct as any;
+      const variantImages = product.variants?.length > 0
+        ? (product.variants[0].media || [])
+        : (product.media || []);
+
+      if (variantImages.length > 0) {
+        const heroImage = variantImages[0];
+        const storageId = heroImage.storage_id;
+
+        if (storageId) {
+          // Calculate pivot image screen size (uses selectedProductBounds as reference)
+          // Pivot is typically 2-3x the cell size
+          const pivotScale = 2.5; // Pivot display scale multiplier
+          const screenWidth = this.selectedProductBounds.width * scale * pivotScale;
+          const screenHeight = this.selectedProductBounds.height * scale * pivotScale;
+          const screenSize = Math.max(screenWidth, screenHeight);
+
+          // Determine required LOD
+          const requiredSize = screenSize > LOD_CONFIG.transitionThreshold
+            ? LOD_CONFIG.highResolution
+            : LOD_CONFIG.lowResolution;
+
+          // Check if we need to load different size
+          if (this.pivotHeroLoadedSize !== requiredSize) {
+            const quality = requiredSize === LOD_CONFIG.highResolution ? LOD_CONFIG.highQuality : LOD_CONFIG.lowQuality;
+            const imageUrl = `https://share.arkturian.com/proxy.php?id=${storageId}&width=${requiredSize}&height=${requiredSize}&format=webp&quality=${quality}`;
+
+            // Priority 0 = highest priority (pivot is most important)
+            this.imageLoadQueue.add({
+              id: `pivot-hero-${storageId}-${requiredSize}`,
+              url: imageUrl,
+              group: 'pivot',
+              priority: 0, // Highest priority
+              metadata: {
+                nodeId: 'pivot',
+                storageId,
+                size: requiredSize,
+                priority: 0
+              }
+            }).then(result => {
+              // Update pivot hero image
+              this.selectedVariantHeroImage = result.image;
+              this.pivotHeroLoadedSize = requiredSize;
+            }).catch(error => {
+              if (error.error?.message !== 'Request cancelled' && error.error?.message !== 'Request no longer relevant') {
+                console.warn('[LOD] Failed to load pivot hero:', error);
+              }
             });
+
             queuedCount++;
           }
         }
       }
     }
-
-    // Sort queue by priority (lower = higher priority = center items first)
-    if (queuedCount > 0) {
-      this.loadQueue.sort((a, b) => a.priority - b.priority);
-    }
   }
 
   /**
-   * Process image load queue (integrated in RAF loop)
-   * Re-checks visibility before loading, cancels stale requests
-   * Loads limited images per cycle to prevent blocking
-   *
-   * Called from requestAnimationFrame loop with time-based rate limiting
+   * Process image load queue (no longer needed - ImageLoadQueue handles this)
+   * Kept as empty method for backwards compatibility
    */
   private processQueue() {
-    if (!this.viewport || this.loadQueue.length === 0) return;
-
-    const nodes = this.getNodes();
-    const scale = this.viewport.scale;
-    const canvas = this.ctx.canvas;
-
-    // Calculate current viewport bounds
-    const viewportLeft = -this.viewport.offset.x / scale;
-    const viewportTop = -this.viewport.offset.y / scale;
-    const viewportRight = viewportLeft + (canvas.width / scale);
-    const viewportBottom = viewportTop + (canvas.height / scale);
-
-    let loadedThisCycle = 0;
-
-    // Process queue from highest priority (front) to lowest priority (back)
-    while (this.loadQueue.length > 0 && loadedThisCycle < LOD_CONFIG.maxLoadsPerCycle) {
-      const task = this.loadQueue.shift()!;
-
-      // Find the node
-      const node = nodes.find(n => n.id === task.nodeId);
-      if (!node) continue; // Node no longer exists
-
-      // Re-check visibility
-      const x = node.posX.value ?? 0;
-      const y = node.posY.value ?? 0;
-      const w = node.width.value ?? 0;
-      const h = node.height.value ?? 0;
-
-      const isVisible = !(
-        x + w < viewportLeft ||
-        x > viewportRight ||
-        y + h < viewportTop ||
-        y > viewportBottom
-      );
-
-      if (!isVisible) {
-        // Node is no longer visible, skip this task
-        continue;
-      }
-
-      // Re-check if we still need this size
-      const screenWidth = w * scale;
-      const screenHeight = h * scale;
-      const screenSize = Math.max(screenWidth, screenHeight);
-      const requiredSize = screenSize > LOD_CONFIG.transitionThreshold
-        ? LOD_CONFIG.highResolution
-        : LOD_CONFIG.lowResolution;
-
-      if (requiredSize !== task.size) {
-        // Required size changed, skip this task (new task will be queued on next update)
-        continue;
-      }
-
-      const currentSize = this.loadedImageSizes.get(task.nodeId);
-      if (currentSize === requiredSize) {
-        // Already loaded, skip
-        continue;
-      }
-
-      // Load the image (async, fire-and-forget)
-      // On error, Product will keep existing image (see Product.loadImageFromUrl)
-      this.loadImageForNode(node, task.size);
-
-      // Mark as attempted (so we don't try again immediately)
-      // If it fails, the old image stays visible (better than nothing)
-      this.loadedImageSizes.set(task.nodeId, task.size);
-
-      loadedThisCycle++;
-    }
+    // ImageLoadQueue now handles all queue processing automatically
+    // No manual processing needed
   }
 
   /**
-   * Load image for a node with specific size (async, fire-and-forget)
-   * On error, the Product keeps its existing image
+   * loadImageForNode is no longer used - ImageLoadQueue handles loading directly
    */
   private loadImageForNode(node: LayoutNode<T>, size: number) {
-    const product = node.data as any;
-
-    // Check if this is a Product with storage_id and loadImageFromUrl method
-    if (!product.primaryImage?.storage_id || typeof product.loadImageFromUrl !== 'function') {
-      return;
-    }
-
-    const storageId = product.primaryImage.storage_id;
-    const quality = size === LOD_CONFIG.highResolution ? LOD_CONFIG.highQuality : LOD_CONFIG.lowQuality;
-    const imageUrl = `https://share.arkturian.com/proxy.php?id=${storageId}&width=${size}&format=webp&quality=${quality}`;
-
-    // Trigger async image load
-    // Product.loadImageFromUrl will:
-    // - Update product._image on success
-    // - Keep existing image on error
-    product.loadImageFromUrl(imageUrl);
+    // No-op: ImageLoadQueue handles all image loading now
   }
 
   private clear() { 

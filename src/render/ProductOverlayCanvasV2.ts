@@ -114,7 +114,7 @@ export class ProductOverlayCanvasV2 {
     let imageUrl = heroMedia.src;
 
     if (storageId) {
-      imageUrl = `https://share.arkturian.com/proxy.php?id=${storageId}&width=800&format=webp&quality=85`;
+      imageUrl = `https://share.arkturian.com/proxy.php?id=${storageId}&width=800&height=800&format=webp&quality=85`;
     }
 
     if (this.imageCache.has(imageUrl)) {

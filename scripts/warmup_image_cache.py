@@ -2,7 +2,7 @@
 """
 Warmup Image Cache - Preload all product images to cache them at Storage API
 
-This script loads all product images in both sizes (150px and 1300px) to ensure
+This script loads all product images in both sizes (130px and 1300px) to ensure
 they are cached at the Storage API endpoint for faster initial page loads.
 """
 
@@ -80,11 +80,15 @@ def warmup_image(product_id: str, storage_id: int, size: int, refresh: bool = Fa
     Returns:
         (success, product_id, size)
     """
-    base_url = f"https://api-storage.arkturian.com/storage/media/{storage_id}"
+    base_url = f"https://share.arkturian.com/proxy.php"
+    # Use quality matching production settings: 75 for low-res, 85 for high-res
+    quality = 75 if size <= 130 else 85
     params = {
+        'id': storage_id,
         'width': size,
+        'height': size,  # Set both width and height to limit max dimension
         'format': 'webp',
-        'quality': 85,
+        'quality': quality,
     }
     if refresh:
         params['refresh'] = 'true'
@@ -127,9 +131,9 @@ def warmup_image(product_id: str, storage_id: int, size: int, refresh: bool = Fa
 def main():
     parser = argparse.ArgumentParser(description="Warm up O'Neal product images on the Storage API.")
     parser.add_argument(
-        "--highres",
+        "--no-highres",
         action="store_true",
-        help="Additionally warm high-resolution (1300px) variants.",
+        help="Skip high-resolution (1300px) variants (only warm 130px).",
     )
     parser.add_argument(
         "--no-refresh",
@@ -156,7 +160,7 @@ def main():
         return
 
     sizes = list(BASE_SIZES)
-    if args.highres:
+    if not args.no_highres:
         sizes.append(HIGH_RES_SIZE)
 
     # Collect all image tasks (first size triggers refresh)

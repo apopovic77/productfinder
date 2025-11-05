@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Product } from '../types/Product';
+import { useImageQueue } from '../hooks/useImageQueue';
 import './ProductOverlayModal.css';
 
 type Props = {
@@ -151,11 +152,11 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
       });
 
       variantImageIds.forEach((storageId) => {
-        // Build proxy URL for variant images (130px to match pivot cache)
-        const proxyUrl = `https://share.arkturian.com/proxy.php?id=${storageId}&width=130&format=webp&quality=80`;
+        // Build proxy URL for variant images (130px)
+        const imageUrl = `https://share.arkturian.com/proxy.php?id=${storageId}&width=130&height=130&format=webp&quality=80`;
         images.push({
           storageId,
-          src: proxyUrl,
+          src: imageUrl,
           label: 'Variant'
         });
       });
@@ -169,6 +170,22 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
 
   // For backwards compatibility, expose as allImages (empty when loading)
   const allImages = thumbnailsLoading ? [] : thumbnailImages;
+
+  // Extract thumbnail URLs for ImageLoadQueue
+  const thumbnailUrls = useMemo(() => {
+    return allImages.map(img => {
+      if (img.storageId) {
+        return `https://share.arkturian.com/proxy.php?id=${img.storageId}&width=130&height=130&format=webp&quality=80`;
+      }
+      return img.src;
+    });
+  }, [allImages]);
+
+  // Load thumbnails through ImageLoadQueue
+  const { loadedImages: loadedThumbnails } = useImageQueue(thumbnailUrls, {
+    group: `product-thumbnails-${product.id}`,
+    priority: 100, // Lower priority than hero image
+  });
 
   // Update selected image when variant changes
   useEffect(() => {
@@ -248,8 +265,10 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
   // Get current storage ID
   const getCurrentStorageId = (): number | null => {
     if (selectedImageIndex >= 0 && selectedImageIndex < allImages.length) {
-      return allImages[selectedImageIndex].storageId;
+      const img = allImages[selectedImageIndex];
+      return img.storageId;
     }
+
     // Fallback
     if (activeVariant?.image_storage_id) {
       return activeVariant.image_storage_id;
@@ -264,7 +283,7 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
     const storageId = getCurrentStorageId();
 
     if (storageId) {
-      return `https://share.arkturian.com/proxy.php?id=${storageId}&width=130&format=webp&quality=75`;
+      return `https://share.arkturian.com/proxy.php?id=${storageId}&width=130&height=130&format=webp&quality=75`;
     }
 
     // Fallback to src if no storage_id
@@ -278,7 +297,7 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
     const storageId = getCurrentStorageId();
 
     if (storageId) {
-      return `https://share.arkturian.com/proxy.php?id=${storageId}&width=1300&format=webp&quality=85`;
+      return `https://share.arkturian.com/proxy.php?id=${storageId}&width=1300&height=1300&format=webp&quality=85`;
     }
 
     // Fallback to src if no storage_id
@@ -451,8 +470,9 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
             }}>
               {allImages.map((img, idx) => {
                 const thumbnailUrl = img.storageId
-                  ? `https://share.arkturian.com/proxy.php?id=${img.storageId}&width=130&format=webp&quality=80`
+                  ? `https://share.arkturian.com/proxy.php?id=${img.storageId}&width=130&height=130&format=webp&quality=80`
                   : img.src;
+                const loadedImage = loadedThumbnails.get(thumbnailUrl);
                 const isActive = idx === selectedImageIndex;
 
               return (
@@ -475,23 +495,23 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
                     backdropFilter: 'blur(5px)',
                     transition: 'all 0.2s ease',
                     transform: isActive ? 'scale(1.05)' : 'scale(1)',
-                    opacity: 1,
+                    opacity: loadedImage ? 1 : 0.5,
                     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
                   }}
                   onMouseEnter={(e) => {
-                    if (!isActive) {
+                    if (!isActive && loadedImage) {
                       e.currentTarget.style.opacity = '1';
                     }
                   }}
                   onMouseLeave={(e) => {
-                    if (!isActive) {
+                    if (!isActive && loadedImage) {
                       e.currentTarget.style.opacity = '0.7';
                     }
                   }}
                 >
-                  {thumbnailUrl ? (
+                  {loadedImage ? (
                     <img
-                      src={thumbnailUrl}
+                      src={loadedImage.src}
                       alt={`${product.name} - ${img.label}`}
                       style={{
                         width: '100%',
@@ -505,7 +525,7 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
                     />
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: 'white' }}>
-                      No URL
+                      Loading...
                     </div>
                   )}
                 </button>
@@ -652,7 +672,7 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
 
           {/* Image URLs */}
           <div style={{ marginTop: '8px', fontSize: '11px', fontFamily: 'monospace' }}>
-            <div style={{ marginBottom: '4px', fontWeight: '600', fontSize: '12px' }}>Canvas Low LOD (150px):</div>
+            <div style={{ marginBottom: '4px', fontWeight: '600', fontSize: '12px' }}>Canvas Low LOD (130px):</div>
             <a
               href={getLowResImageUrl()}
               target="_blank"
@@ -805,8 +825,9 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
               }}>
                 {allImages.map((img, idx) => {
                   const thumbnailUrl = img.storageId
-                    ? `https://share.arkturian.com/proxy.php?id=${img.storageId}&width=130&format=webp&quality=80`
+                    ? `https://share.arkturian.com/proxy.php?id=${img.storageId}&width=130&height=130&format=webp&quality=80`
                     : img.src;
+                  const loadedImage = loadedThumbnails.get(thumbnailUrl);
                   const isActive = idx === selectedImageIndex;
 
                   return (
@@ -824,30 +845,36 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
                         background: 'rgba(0, 0, 0, 0.3)',
                         transition: 'all 0.2s ease',
                         transform: isActive ? 'scale(1.05)' : 'scale(1)',
-                        opacity: isActive ? 1 : 0.7
+                        opacity: loadedImage ? (isActive ? 1 : 0.7) : 0.3
                       }}
                       onMouseEnter={(e) => {
-                        if (!isActive) {
+                        if (!isActive && loadedImage) {
                           e.currentTarget.style.opacity = '1';
                           e.currentTarget.style.transform = 'scale(1.05)';
                         }
                       }}
                       onMouseLeave={(e) => {
-                        if (!isActive) {
+                        if (!isActive && loadedImage) {
                           e.currentTarget.style.opacity = '0.7';
                           e.currentTarget.style.transform = 'scale(1)';
                         }
                       }}
                     >
-                      <img
-                        src={thumbnailUrl}
-                        alt={`${product.name} - ${img.label}`}
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover'
-                        }}
-                      />
+                      {loadedImage ? (
+                        <img
+                          src={loadedImage.src}
+                          alt={`${product.name} - ${img.label}`}
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover'
+                          }}
+                        />
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', color: 'white' }}>
+                          ...
+                        </div>
+                      )}
                     </button>
                   );
                 })}
@@ -976,7 +1003,7 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
 
               {/* Image URLs */}
               <div style={{ marginTop: '8px', fontSize: '11px', fontFamily: 'monospace' }}>
-                <div style={{ marginBottom: '4px', fontWeight: '600', fontSize: '12px' }}>Canvas Low LOD (150px):</div>
+                <div style={{ marginBottom: '4px', fontWeight: '600', fontSize: '12px' }}>Canvas Low LOD (130px):</div>
                 <a
                   href={getLowResImageUrl()}
                   target="_blank"

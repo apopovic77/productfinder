@@ -22,6 +22,7 @@ import {
   createDefaultUiState,
 } from './config/AppConfig';
 import { getImagesForVariant, getPrimaryVariant } from './utils/variantImageHelpers';
+import { ImageLoadQueue } from './utils/ImageLoadQueue';
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -132,6 +133,14 @@ export default class App extends React.Component<{}, State> {
   private fpsRaf: number | null = null;
   private fpsLastSample = 0;
   private fpsFrameCount = 0;
+
+  // Image load queue for variant images (configurable parallel/sequential loading)
+  private imageLoadQueue = new ImageLoadQueue<{ storageId: number; index: number }>({
+    maxConcurrent: 3,        // Max 3 parallel image loads
+    mode: 'sequential',      // Load images one by one (prevents browser connection limit issues)
+    timeout: 30000,          // 30s timeout
+    retryCount: 1,           // Retry once on failure
+  });
 
   state: State = createInitialState();
 
@@ -268,22 +277,51 @@ export default class App extends React.Component<{}, State> {
       this.controller.setFocusedProduct(focusedProduct);
     }
 
-    // Update selected product overlay (Canvas-based rendering)
+    // Update dialog position for connection line (separate from image loading)
+    if (prevState.dialogPosition !== this.state.dialogPosition) {
+      const renderer = this.controller.getRenderer();
+      if (renderer && this.state.overlayMode === 'react' && this.state.selectedProduct && this.state.dialogPosition) {
+        const node = this.controller.getProductNode(this.state.selectedProduct.id);
+        if (node) {
+          const nodeX = node.posX.targetValue ?? node.posX.value ?? 0;
+          const nodeY = node.posY.targetValue ?? node.posY.value ?? 0;
+          const nodeW = node.width.targetValue ?? node.width.value ?? 0;
+          const nodeH = node.height.targetValue ?? node.height.value ?? 0;
+
+          const productCenterX = nodeX + nodeW / 2;
+          const productCenterY = nodeY + nodeH / 2;
+
+          renderer.dialogConnectionPoint = { x: productCenterX, y: productCenterY };
+          renderer.dialogPosition = {
+            x: this.state.dialogPosition.x,
+            y: this.state.dialogPosition.y + 150 // Approximate middle of dialog
+          };
+        }
+      }
+    }
+
+    // Update selected product overlay and load images (only when product/variant changes)
     if (
       prevState.selectedProduct !== this.state.selectedProduct ||
       prevState.selectedVariant !== this.state.selectedVariant ||
       prevState.devSettings.heroDisplayMode !== this.state.devSettings.heroDisplayMode ||
       prevState.devSettings.overlayScaleMode !== this.state.devSettings.overlayScaleMode ||
-      prevState.overlayMode !== this.state.overlayMode ||
-      prevState.dialogPosition !== this.state.dialogPosition
+      prevState.overlayMode !== this.state.overlayMode
     ) {
       const renderer = this.controller.getRenderer();
       if (renderer) {
         renderer.heroDisplayMode = this.state.devSettings.heroDisplayMode;
         renderer.overlayScaleMode = this.state.devSettings.overlayScaleMode;
 
-        // Set dialog position for connection line rendering (React mode)
-        if (this.state.overlayMode === 'react' && this.state.selectedProduct && this.state.dialogPosition) {
+        // Load variant images for stacked display (React mode)
+        if (this.state.overlayMode === 'react' && this.state.selectedProduct) {
+          // Set selected product so renderer knows which product to draw stacked images for
+          renderer.selectedProduct = this.state.selectedProduct;
+
+          // Reset pivot hero LOD tracking when product changes
+          (renderer as any).pivotHeroLoadedSize = null;
+
+          // Get node bounds for LOD and connection line
           const node = this.controller.getProductNode(this.state.selectedProduct.id);
           if (node) {
             const nodeX = node.posX.targetValue ?? node.posX.value ?? 0;
@@ -291,96 +329,73 @@ export default class App extends React.Component<{}, State> {
             const nodeW = node.width.targetValue ?? node.width.value ?? 0;
             const nodeH = node.height.targetValue ?? node.height.value ?? 0;
 
-            const productCenterX = nodeX + nodeW / 2;
-            const productCenterY = nodeY + nodeH / 2;
+            // Set bounds for pivot LOD system
+            renderer.selectedProductBounds = { x: nodeX, y: nodeY, width: nodeW, height: nodeH };
 
-            renderer.dialogConnectionPoint = { x: productCenterX, y: productCenterY };
-            renderer.dialogPosition = {
-              x: this.state.dialogPosition.x,
-              y: this.state.dialogPosition.y + 150 // Approximate middle of dialog
-            };
+            // Update connection line position
+            if (this.state.dialogPosition) {
+              const productCenterX = nodeX + nodeW / 2;
+              const productCenterY = nodeY + nodeH / 2;
 
-            // Set selected product so renderer knows which product to draw stacked images for
-            renderer.selectedProduct = this.state.selectedProduct;
+              renderer.dialogConnectionPoint = { x: productCenterX, y: productCenterY };
+              renderer.dialogPosition = {
+                x: this.state.dialogPosition.x,
+                y: this.state.dialogPosition.y + 150
+              };
+            }
+          }
 
-            // Collect alternative images for stacked display
-            // Only load images for the currently selected variant
-            const product = this.state.selectedProduct as any;
-            const alternativeImages: Array<{
-              storageId: number;
-              src: string;
-              loadedImage?: HTMLImageElement;
-              orientation?: 'portrait' | 'landscape';
-            }> = [];
+          // Collect alternative images for stacked display
+          // Only load images for the currently selected variant
+          const product = this.state.selectedProduct as any;
+          const alternativeImages: Array<{
+            storageId: number;
+            src: string;
+            loadedImage?: HTMLImageElement;
+            orientation?: 'portrait' | 'landscape';
+          }> = [];
 
-            // Get the current variant (or primary variant if none selected)
-            const currentVariant = this.state.selectedVariant || getPrimaryVariant(product);
+          // Get the current variant (or primary variant if none selected)
+          const currentVariant = this.state.selectedVariant || getPrimaryVariant(product);
 
             if (currentVariant) {
               // Get all images for this variant (hero + gallery)
               const variantImages = getImagesForVariant(product, currentVariant);
 
-              // Load hero image (first image) for the variant
-              if (variantImages.length > 0) {
-                const heroImg = variantImages[0];
-                const heroSrc = `https://share.arkturian.com/proxy.php?id=${heroImg.storageId}&width=1300&format=webp&quality=85`;
+              // Hero image is now loaded automatically by LOD system in CanvasRenderer
+              // No need to load it here - LOD will handle upgrading from low-res to high-res
 
-                const loadHeroImage = (url: string, isRetry: boolean = false) => {
-                  const heroImage = new Image();
-                  heroImage.onload = () => {
-                    // Validate image loaded correctly
-                    if (heroImage.complete && heroImage.naturalWidth > 0 && heroImage.naturalHeight > 0) {
-                      console.log(`${isRetry ? '✅ Retry successful' : '✅ Loaded'} variant hero image:`, heroImg.storageId);
-                      renderer.selectedVariantHeroImage = heroImage;
-                    } else {
-                      console.warn(`❌ Variant hero image corrupt for ${heroImg.storageId} - using product default`);
-                      renderer.selectedVariantHeroImage = null;
+              // Cancel any pending image loads from previous product
+              const productGroup = `product-${this.state.selectedProduct.id}`;
+              this.imageLoadQueue.cancelGroup(productGroup);
 
-                      // Retry with refresh=true if this was the first attempt
-                      if (!isRetry && !url.includes('refresh=true')) {
-                        console.log(`🔄 Retrying variant hero with refresh=true: ${heroImg.storageId}`);
-                        loadHeroImage(url + '&refresh=true', true);
-                      }
-                    }
-                  };
-                  heroImage.onerror = () => {
-                    console.warn(`❌ Failed to load variant hero image: ${heroImg.storageId}`);
-                    renderer.selectedVariantHeroImage = null;
-
-                    // Retry with refresh=true if this was the first attempt
-                    if (!isRetry && !url.includes('refresh=true')) {
-                      console.log(`🔄 Retrying variant hero with refresh=true: ${heroImg.storageId}`);
-                      loadHeroImage(url + '&refresh=true', true);
-                    }
-                  };
-                  heroImage.src = url;
-                };
-
-                loadHeroImage(heroSrc);
-              } else {
-                renderer.selectedVariantHeroImage = null;
-              }
-
-              // Load images (skip first one as it's the main/hero image)
+              // Load images using the queue (skip first one as it's the main/hero image)
+              // Queue handles parallel/sequential loading and prevents browser connection limit issues
               for (let i = 1; i < variantImages.length; i++) {
                 const variantImg = variantImages[i];
                 const storageId = variantImg.storageId;
 
                 // Use high-res images (1300px @ 85% quality) - same as LOD system
-                const src = `https://share.arkturian.com/proxy.php?id=${storageId}&width=1300&format=webp&quality=85`;
+                const src = `https://share.arkturian.com/proxy.php?id=${storageId}&width=1300&height=1300&format=webp&quality=85`;
                 const imgObj: any = { storageId, src };
 
-                // Try to load the image (no crossOrigin to avoid CORS issues)
-                const img = new Image();
-                img.src = src;
-                img.onload = () => {
-                  imgObj.loadedImage = img;
-                  // Detect orientation
-                  imgObj.orientation = img.height > img.width ? 'portrait' : 'landscape';
-                };
-                img.onerror = (err) => {
-                  console.warn('[App] Failed to load alternative image:', storageId);
-                };
+                // Add to load queue
+                this.imageLoadQueue.add({
+                  id: `${productGroup}-img-${i}`,
+                  url: src,
+                  group: productGroup,
+                  priority: i, // Lower index = higher priority (hero first)
+                  metadata: { storageId, index: i }
+                }).then(result => {
+                  // Image loaded successfully
+                  imgObj.loadedImage = result.image;
+                  imgObj.orientation = result.image.height > result.image.width ? 'portrait' : 'landscape';
+                }).catch(error => {
+                  // Only log real errors, not cancelled requests (expected when switching products)
+                  if (error.error?.message !== 'Request cancelled' && error.error?.message !== 'Request no longer relevant') {
+                    console.warn('[App] Failed to load alternative image:', storageId, error.error);
+                  }
+                });
 
                 alternativeImages.push(imgObj);
               }
@@ -388,13 +403,13 @@ export default class App extends React.Component<{}, State> {
               renderer.selectedVariantHeroImage = null;
             }
 
-            renderer.alternativeImages = alternativeImages.length > 0 ? alternativeImages : null;
-          }
+          renderer.alternativeImages = alternativeImages.length > 0 ? alternativeImages : null;
         } else {
-          renderer.dialogConnectionPoint = null;
-          renderer.dialogPosition = null;
+          // No selected product - clear images
           renderer.alternativeImages = null;
           renderer.selectedVariantHeroImage = null;
+          renderer.dialogConnectionPoint = null;
+          renderer.dialogPosition = null;
         }
 
         // Only render in Canvas if overlayMode is 'canvas'

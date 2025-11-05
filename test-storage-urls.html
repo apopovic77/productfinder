@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Storage URL Test</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #fff; }
+    .test { margin: 20px 0; padding: 20px; border: 1px solid #444; border-radius: 8px; }
+    img { max-width: 200px; margin: 10px; border: 2px solid #666; }
+    .success { border-color: #0f0; }
+    .error { border-color: #f00; }
+    code { background: #333; padding: 4px 8px; border-radius: 4px; display: block; margin: 10px 0; }
+  </style>
+</head>
+<body>
+  <h1>Storage API URL Test</h1>
+
+  <div class="test" id="test1">
+    <h3>Test 1: Proxy URL (current)</h3>
+    <code>https://share.arkturian.com/proxy.php?id=4393&width=130&format=webp&quality=75</code>
+    <img id="img1" src="https://share.arkturian.com/proxy.php?id=4393&width=130&format=webp&quality=75" />
+    <div id="result1">Loading...</div>
+  </div>
+
+  <div class="test" id="test2">
+    <h3>Test 2: Direct Storage API (no /preview)</h3>
+    <code>https://api-storage.arkturian.com/storage/media/4393?width=130&format=webp&quality=75</code>
+    <img id="img2" src="https://api-storage.arkturian.com/storage/media/4393?width=130&format=webp&quality=75" />
+    <div id="result2">Loading...</div>
+  </div>
+
+  <div class="test" id="test3">
+    <h3>Test 3: Storage API with /preview</h3>
+    <code>https://api-storage.arkturian.com/storage/media/4393/preview?width=130&format=webp&quality=75</code>
+    <img id="img3" src="https://api-storage.arkturian.com/storage/media/4393/preview?width=130&format=webp&quality=75" />
+    <div id="result3">Loading...</div>
+  </div>
+
+  <script>
+    function testImage(imgId, resultId, testId) {
+      const img = document.getElementById(imgId);
+      const result = document.getElementById(resultId);
+      const test = document.getElementById(testId);
+
+      img.onload = () => {
+        result.innerHTML = `✅ SUCCESS - Image loaded (${img.naturalWidth}x${img.naturalHeight})`;
+        result.style.color = '#0f0';
+        test.classList.add('success');
+      };
+
+      img.onerror = (e) => {
+        result.innerHTML = `❌ FAILED - Could not load image`;
+        result.style.color = '#f00';
+        test.classList.add('error');
+        console.error(`${imgId} error:`, e);
+      };
+    }
+
+    testImage('img1', 'result1', 'test1');
+    testImage('img2', 'result2', 'test2');
+    testImage('img3', 'result3', 'test3');
+  </script>
+</body>
+</html>

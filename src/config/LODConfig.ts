@@ -7,11 +7,11 @@ export const LOD_CONFIG = {
   enabled: true,
 
   // Update frequencies (in milliseconds)
-  scanInterval: 5000,        // How often to scan for needed images (1 FPS = 1000ms)
+  scanInterval: 500,         // How often to scan for needed images (2 FPS = 500ms)
   processInterval: 100,      // How often to process the load queue (10 FPS = 100ms)
 
-  // Image resolutions
-  lowResolution: 150,        // Low quality image size (px)
+  // Image resolutions (max dimension - longest side will be this size)
+  lowResolution: 130,        // Low quality image size (px)
   highResolution: 1300,      // High quality image size (px)
 
   // Transition point (screen space size in pixels)
