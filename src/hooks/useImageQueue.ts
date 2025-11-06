@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ImageLoadQueue } from '../utils/ImageLoadQueue';
+import { globalImageQueue } from '../utils/GlobalImageQueue';
 
 /**
  * React Hook for loading images through ImageLoadQueue
@@ -28,14 +28,6 @@ interface LoadedImage {
   error: Error | null;
 }
 
-// Shared queue instance for all thumbnail loading
-const thumbnailQueue = new ImageLoadQueue<{ url: string; index: number }>({
-  maxConcurrent: 1,
-  mode: 'sequential',  // Sequential: load one image at a time to prevent browser connection limits
-  timeout: 30000,
-  retryCount: 1,
-});
-
 export function useImageQueue(
   urls: string[],
   options: UseImageQueueOptions = {}
@@ -44,7 +36,7 @@ export function useImageQueue(
   loading: boolean;
   error: Error | null;
 } {
-  const { group = 'default', priority = 0 } = options;
+  const { group = 'default', priority = 50 } = options; // Thumbnails: priority 50 (after hero=0, before variants=100+)
   const [loadedImages, setLoadedImages] = useState<Map<string, HTMLImageElement>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -53,12 +45,12 @@ export function useImageQueue(
   useEffect(() => {
     // Cancel previous group if it changed
     if (previousGroupRef.current && previousGroupRef.current !== group) {
-      thumbnailQueue.cancelGroup(previousGroupRef.current);
+      globalImageQueue.cancelGroup(previousGroupRef.current);
     }
     previousGroupRef.current = group;
 
     // Cancel current group when URLs change
-    thumbnailQueue.cancelGroup(group);
+    globalImageQueue.cancelGroup(group);
 
     // Reset state
     setLoadedImages(new Map());
@@ -75,7 +67,7 @@ export function useImageQueue(
 
     // Add all URLs to queue
     urls.forEach((url, index) => {
-      thumbnailQueue.add({
+      globalImageQueue.add({
         id: `${group}-${index}`,
         url,
         group,
@@ -111,7 +103,7 @@ export function useImageQueue(
 
     // Cleanup: cancel pending requests when component unmounts or URLs change
     return () => {
-      thumbnailQueue.cancelGroup(group);
+      globalImageQueue.cancelGroup(group);
     };
   }, [urls.join(','), group, priority]); // Depend on URL list and group
 

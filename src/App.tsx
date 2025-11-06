@@ -4,9 +4,11 @@ import type { Product } from './types/Product';
 import { ProductFinderController } from './controller/ProductFinderController';
 import ProductModal from './components/ProductModal';
 import { ProductAnnotations } from './components/ProductAnnotations';
+import { ProductImageAnnotations } from './components/ProductImageAnnotations';
 import { ProductOverlay } from './components/ProductOverlay';
 import { ProductOverlayModal } from './components/ProductOverlayModal';
 import { AnimatePresence } from 'framer-motion';
+import { fetchAnnotations } from './services/StorageAnnotationService';
 import { DeveloperOverlay, type DeveloperSettings } from './components/DeveloperOverlay';
 import { CustomSelect } from './components/CustomSelect';
 import type { SortMode } from './services/FilterService';
@@ -22,7 +24,7 @@ import {
   createDefaultUiState,
 } from './config/AppConfig';
 import { getImagesForVariant, getPrimaryVariant } from './utils/variantImageHelpers';
-import { ImageLoadQueue } from './utils/ImageLoadQueue';
+import { globalImageQueue } from './utils/GlobalImageQueue';
 import { buildMediaUrl } from './utils/MediaUrlBuilder';
 
 function clamp(n: number, min: number, max: number) {
@@ -135,13 +137,8 @@ export default class App extends React.Component<{}, State> {
   private fpsLastSample = 0;
   private fpsFrameCount = 0;
 
-  // Image load queue for variant images (sequential loading)
-  private imageLoadQueue = new ImageLoadQueue<{ storageId: number; index: number }>({
-    maxConcurrent: 1,        // Sequential: only 1 image at a time
-    mode: 'sequential',      // Load images one by one (prevents browser connection limit issues)
-    timeout: 30000,          // 30s timeout
-    retryCount: 1,           // Retry once on failure
-  });
+  // Use global shared image queue for truly sequential loading
+  private imageLoadQueue = globalImageQueue;
 
   state: State = createInitialState();
 
@@ -204,6 +201,11 @@ export default class App extends React.Component<{}, State> {
 
     document.addEventListener('keydown', this.handleKeyDown);
 
+    // Setup browser history management for back button
+    window.addEventListener('popstate', this.handlePopState);
+    // Push initial state so first back doesn't leave the app
+    this.pushHistoryState({ type: 'initial', breadcrumbs: this.state.pivotBreadcrumbs });
+
     // Start FPS counter
     this.startFPSCounter();
 
@@ -215,6 +217,7 @@ export default class App extends React.Component<{}, State> {
     this.controller.destroy();
     this.stopFPSCounter();
     window.removeEventListener('resize', this.handleResize);
+    window.removeEventListener('popstate', this.handlePopState);
     document.removeEventListener('keydown', this.handleKeyDown);
     const canvas = this.canvasRef.current;
     if (canvas) {
@@ -390,7 +393,7 @@ export default class App extends React.Component<{}, State> {
                   id: `${productGroup}-img-${i}`,
                   url: src,
                   group: productGroup,
-                  priority: i, // Lower index = higher priority (hero first)
+                  priority: 100 + i, // Alternative images: priority 100+ (after thumbnails, before LOD)
                   metadata: { storageId, index: i }
                 }).then(result => {
                   // Image loaded successfully
@@ -568,6 +571,9 @@ export default class App extends React.Component<{}, State> {
 
     this.controller.drillDownGroup(groupKey);
     this.syncPivotUI();
+
+    // Push history state for back button navigation
+    this.pushHistoryState({ type: 'drillDown', groupKey, breadcrumbs: this.state.pivotBreadcrumbs });
   };
 
   private showRelativeProduct = (delta: number) => {
@@ -648,6 +654,26 @@ export default class App extends React.Component<{}, State> {
       // Also set the primary variant
       const primaryVariant = getPrimaryVariant(product);
       this.setState({ selectedProduct: product, selectedVariant: primaryVariant });
+
+      // Load AI annotations for the hero image
+      const storageId = this.getProductStorageId(product);
+      if (storageId) {
+        fetchAnnotations(storageId).then((annotations) => {
+          const renderer = this.controller.getRenderer();
+          if (renderer) {
+            renderer.heroImageAnnotations = annotations;
+            // Rendering happens automatically in the animation loop
+          }
+        });
+      } else {
+        const renderer = this.controller.getRenderer();
+        if (renderer) {
+          renderer.heroImageAnnotations = null;
+        }
+      }
+
+      // Push history state for back button navigation
+      this.pushHistoryState({ type: 'productSelect', productId: product.id });
 
       // TODO: Modal dialog deaktiviert - User möchte kein Modal
       // const groupKey = this.controller.getGroupKeyForProduct(product);
@@ -1116,4 +1142,45 @@ export default class App extends React.Component<{}, State> {
       </div>
     );
   }
+
+  /**
+   * Push a new history state for back button navigation
+   */
+  private pushHistoryState(state: { type: string; [key: string]: any }) {
+    history.pushState(state, '', window.location.href);
+  }
+
+  /**
+   * Get storage ID from product media
+   */
+  private getProductStorageId(product: Product): number | null {
+    const media = product.media || [];
+    const heroMedia = media.find((m) => m.type === 'hero') || media[0];
+    return (heroMedia as any)?.storage_id || null;
+  }
+
+  /**
+   * Handle browser back button
+   */
+  private handlePopState = (event: PopStateEvent) => {
+    const state = event.state;
+
+    if (!state || state.type === 'initial') {
+      // First back - do nothing (stay in app)
+      // Re-push initial state so user can't navigate away
+      this.pushHistoryState({ type: 'initial', breadcrumbs: this.state.pivotBreadcrumbs });
+      return;
+    }
+
+    if (state.type === 'productSelect') {
+      // User navigated back from product selection - close product
+      this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null });
+    } else if (state.type === 'drillDown') {
+      // User navigated back from drill down - go back one breadcrumb level
+      const { pivotBreadcrumbs } = this.state;
+      if (pivotBreadcrumbs.length > 1) {
+        this.handleBreadcrumbClick(pivotBreadcrumbs.length - 2);
+      }
+    }
+  };
 }

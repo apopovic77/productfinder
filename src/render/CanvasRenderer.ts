@@ -5,7 +5,7 @@ import type { GroupHeaderInfo } from '../layout/PivotLayouter';
 import { LOD_CONFIG } from '../config/LODConfig';
 import { ProductOverlayCanvas, DEFAULT_OVERLAY_STYLE } from './ProductOverlayCanvas';
 import { ProductOverlayCanvasV2, MODERN_OVERLAY_STYLE } from './ProductOverlayCanvasV2';
-import { ImageLoadQueue } from '../utils/ImageLoadQueue';
+import { globalImageQueue } from '../utils/GlobalImageQueue';
 import { buildMediaUrl } from '../utils/MediaUrlBuilder';
 
 type LoadTask = {
@@ -42,6 +42,15 @@ export class CanvasRenderer<T> {
     orientation?: 'portrait' | 'landscape';
   }> | null = null; // Alternative product images for stacked display
 
+  // AI Annotations for hero image
+  public heroImageAnnotations: Array<{
+    label: string;
+    type: string;
+    anchor: { x: number; y: number }; // 0-1 normalized
+    box?: { x1: number; y1: number; x2: number; y2: number }; // 0-1 normalized
+    confidence: number;
+  }> | null = null;
+
   // Product overlay renderer (OOP class)
   private productOverlay: ProductOverlayCanvas;
   private productOverlayV2: ProductOverlayCanvasV2;
@@ -62,8 +71,8 @@ export class CanvasRenderer<T> {
   // Track loaded LOD level for pivot hero image
   private pivotHeroLoadedSize: number | null = null;
 
-  // Image load queue (replaces simple array queue)
-  private imageLoadQueue!: ImageLoadQueue<LoadTask>;
+  // Use global shared image queue for truly sequential loading
+  private imageLoadQueue = globalImageQueue;
 
   // Queue processing timing (non-blocking)
   private lastQueueProcessTime = 0;
@@ -80,83 +89,6 @@ export class CanvasRenderer<T> {
   ) {
     this.productOverlay = new ProductOverlayCanvas(ctx, DEFAULT_OVERLAY_STYLE);
     this.productOverlayV2 = new ProductOverlayCanvasV2(ctx, MODERN_OVERLAY_STYLE);
-
-    // Initialize ImageLoadQueue with shouldLoad validation
-    this.imageLoadQueue = new ImageLoadQueue<LoadTask>({
-      maxConcurrent: 1,
-      mode: 'sequential',
-      timeout: 30000,
-      retryCount: 1,
-      priorityInterruptThreshold: 0.2,
-      shouldLoad: (request) => {
-        // Validate if request is still relevant before loading
-        const metadata = request.metadata as LoadTask;
-
-        // Special handling for pivot hero image
-        if (metadata.nodeId === 'pivot') {
-          // Check if pivot is still active
-          if (!this.selectedProduct || !this.selectedProductBounds) {
-            return false; // Pivot no longer active
-          }
-
-          // Check if requested size is still appropriate for pivot
-          const pivotScale = 2.5;
-          const screenWidth = this.selectedProductBounds.width * this.zoomFactor * pivotScale;
-          const screenHeight = this.selectedProductBounds.height * this.zoomFactor * pivotScale;
-          const screenSize = Math.max(screenWidth, screenHeight);
-
-          const requiredSize = screenSize > LOD_CONFIG.transitionThreshold
-            ? LOD_CONFIG.highResolution
-            : LOD_CONFIG.lowResolution;
-
-          if (requiredSize !== metadata.size) {
-            return false; // Wrong LOD level for pivot
-          }
-
-          return true; // Pivot request still valid
-        }
-
-        // Normal node LOD validation
-        const nodes = this.getNodes();
-        const node = nodes.find(n => n.id === metadata.nodeId);
-
-        if (!node) {
-          return false; // Node no longer exists
-        }
-
-        // Check if node is still in viewport
-        const x = node.posX.targetValue ?? node.posX.value ?? 0;
-        const y = node.posY.targetValue ?? node.posY.value ?? 0;
-        const w = node.width.targetValue ?? node.width.value ?? 0;
-        const h = node.height.targetValue ?? node.height.value ?? 0;
-
-        const isInViewport = (
-          x + w >= this.viewportLeft &&
-          x <= this.viewportRight &&
-          y + h >= this.viewportTop &&
-          y <= this.viewportBottom
-        );
-
-        if (!isInViewport) {
-          return false; // Out of viewport
-        }
-
-        // Check if requested size is still appropriate
-        const screenW = w * this.zoomFactor;
-        const screenH = h * this.zoomFactor;
-        const maxScreenDimension = Math.max(screenW, screenH);
-
-        const requiredSize = maxScreenDimension > LOD_CONFIG.transitionThreshold
-          ? LOD_CONFIG.highResolution
-          : LOD_CONFIG.lowResolution;
-
-        if (requiredSize !== metadata.size) {
-          return false; // Wrong LOD level
-        }
-
-        return true; // Request still valid
-      }
-    });
   }
 
   /**
@@ -287,7 +219,7 @@ export class CanvasRenderer<T> {
 
         if (storageId) {
           // Calculate priority (lower = higher priority)
-          // Center of viewport = priority 0, edges = higher priority
+          // LOD images have low priority (1000+) - hero and dialog images load first
           const centerX = (viewportLeft + viewportRight) / 2;
           const centerY = (viewportTop + viewportBottom) / 2;
           const nodeCenterX = x + w / 2;
@@ -310,12 +242,12 @@ export class CanvasRenderer<T> {
             id: taskId,
             url: imageUrl,
             group: 'lod',
-            priority: distanceFromCenter, // Lower = closer to center = higher priority
+            priority: 1000 + distanceFromCenter, // Lowest priority (hero=0, thumbnails=10+, variants=100+, LOD=1000+)
             metadata: {
               nodeId: node.id,
               storageId,
               size: requiredSize,
-              priority: distanceFromCenter
+              priority: 1000 + distanceFromCenter
             }
           }).then(result => {
             // Image loaded successfully
@@ -717,6 +649,21 @@ export class CanvasRenderer<T> {
       this.ctx.restore();
     }
 
+    // Draw AI annotations on hero image (in canvas, VOR restore)
+    if (this.heroImageAnnotations && this.selectedProduct && this.viewport) {
+      const node = this.getNodes().find(n => {
+        const product = n.data as any as Product;
+        return product && product.id === this.selectedProduct!.id;
+      });
+      if (node) {
+        this.drawAnnotationDots(
+          this.heroImageAnnotations,
+          node,
+          this.viewport
+        );
+      }
+    }
+
     // Draw selected product overlay (in world space)
     if (this.selectedProduct && this.selectedProductAnchor && this.viewport && this.heroDisplayMode === 'overlay') {
       this.drawProductOverlay(this.selectedProduct, this.selectedProductAnchor.x, this.selectedProductAnchor.y);
@@ -826,5 +773,180 @@ export class CanvasRenderer<T> {
         offset: this.viewport.offset
       });
     }
+  }
+
+  /**
+   * Draw AI annotation dots on the hero product image (in world space, scale-invariant sizes)
+   */
+  private drawAnnotationDots(
+    annotations: Array<{
+      label: string;
+      type: string;
+      anchor: { x: number; y: number };
+      box?: { x1: number; y1: number; x2: number; y2: number };
+      confidence: number;
+    }>,
+    node: LayoutNode<T>,
+    viewport: ViewportTransform
+  ): void {
+    const scale = viewport.getTargetScale();
+
+    // Get product image bounds (in world space)
+    const x = node.posX.targetValue ?? node.posX.value ?? 0;
+    const y = node.posY.targetValue ?? node.posY.value ?? 0;
+    let width = node.width.targetValue ?? node.width.value ?? 0;
+    let height = node.height.targetValue ?? node.height.value ?? 0;
+
+    // Account for image scaling when multiple images are stacked
+    if (this.alternativeImages && this.alternativeImages.length > 0) {
+      const loadedImages = this.alternativeImages.filter(img => img.loadedImage);
+      if (loadedImages.length > 0) {
+        const totalImages = loadedImages.length + 1;
+        const overlapFactor = 0.7;
+        const spreadFactor = 1 + (totalImages - 1) * (1 - overlapFactor);
+        let targetScale = 1 / spreadFactor;
+        targetScale = Math.max(targetScale, 0.85);
+
+        width = width * targetScale;
+        height = height * targetScale;
+      }
+    }
+
+    this.ctx.save();
+
+    // Calculate all label positions and detect collisions
+    // Sizes proportional to image height for correct scaling
+    const fontSize = height * 0.0125; // 1.25% of image height
+    const padding = height * 0.005;
+    const labelPadding = height * 0.0025;
+
+    // First pass: calculate positions and dimensions
+    interface LabelLayout {
+      annotation: typeof annotations[0];
+      dotX: number;
+      dotY: number;
+      textX: number;
+      textY: number;
+      textWidth: number;
+      textHeight: number;
+      bounds: { x: number; y: number; width: number; height: number };
+    }
+
+    const labels: LabelLayout[] = [];
+    this.ctx.font = `${fontSize}px system-ui, -apple-system, sans-serif`;
+
+    for (const annotation of annotations) {
+      const dotX = x + annotation.anchor.x * width;
+      const dotY = y + annotation.anchor.y * height;
+      const textX = dotX + height * 0.015; // 1.5% of image height
+      let textY = dotY;
+
+      const textMetrics = this.ctx.measureText(annotation.label);
+      const textWidth = textMetrics.width;
+      const textHeight = fontSize * 2.2; // Include space for confidence
+
+      labels.push({
+        annotation,
+        dotX,
+        dotY,
+        textX,
+        textY,
+        textWidth,
+        textHeight,
+        bounds: {
+          x: textX - padding,
+          y: textY - textHeight / 2 - padding,
+          width: textWidth + padding * 2,
+          height: textHeight + padding * 2,
+        },
+      });
+    }
+
+    // Second pass: resolve collisions by shifting labels vertically
+    // Sort by Y position to process top-to-bottom
+    labels.sort((a, b) => a.textY - b.textY);
+
+    for (let i = 0; i < labels.length; i++) {
+      for (let j = 0; j < i; j++) {
+        const labelA = labels[i];
+        const labelB = labels[j];
+
+        // Check for overlap
+        const overlapX =
+          labelA.bounds.x < labelB.bounds.x + labelB.bounds.width &&
+          labelA.bounds.x + labelA.bounds.width > labelB.bounds.x;
+
+        const overlapY =
+          labelA.bounds.y < labelB.bounds.y + labelB.bounds.height + labelPadding &&
+          labelA.bounds.y + labelA.bounds.height + labelPadding > labelB.bounds.y;
+
+        if (overlapX && overlapY) {
+          // Shift both dot and label down to avoid overlap
+          const shiftAmount = (labelB.bounds.y + labelB.bounds.height + labelPadding) - labelA.bounds.y;
+          labelA.textY += shiftAmount;
+          labelA.dotY += shiftAmount;
+          labelA.bounds.y += shiftAmount;
+        }
+      }
+    }
+
+    // Third pass: draw everything
+    for (const label of labels) {
+      const { annotation, dotX, dotY, textX, textY, textWidth, textHeight } = label;
+
+      // Sizes proportional to image height
+      const dotSize = height * 0.006; // 0.6% of image height
+      const pulseSize = height * 0.01; // 1% of image height
+
+      // Draw pulsing ring (animated based on time)
+      const time = Date.now() / 1000;
+      const pulsePhase = (time % 2) / 2; // 0-1 over 2 seconds
+      const pulseSizeCurrent = pulseSize * (1 + pulsePhase);
+      const pulseOpacity = 1 - pulsePhase;
+
+      this.ctx.beginPath();
+      this.ctx.arc(dotX, dotY, pulseSizeCurrent, 0, Math.PI * 2);
+      this.ctx.strokeStyle = `rgba(255, 107, 0, ${pulseOpacity * 0.8})`;
+      this.ctx.lineWidth = height * 0.002;
+      this.ctx.stroke();
+
+      // Draw inner white circle
+      this.ctx.beginPath();
+      this.ctx.arc(dotX, dotY, dotSize, 0, Math.PI * 2);
+      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+      this.ctx.fill();
+
+      // Draw orange border
+      this.ctx.strokeStyle = '#ff6b00';
+      this.ctx.lineWidth = height * 0.002;
+      this.ctx.stroke();
+
+      // Draw text background
+      this.ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+      this.ctx.fillRect(
+        textX - padding,
+        textY - textHeight / 2 - padding,
+        textWidth + padding * 2,
+        textHeight + padding * 2
+      );
+
+      // Draw text
+      this.ctx.font = `${fontSize}px system-ui, -apple-system, sans-serif`;
+      this.ctx.textAlign = 'left';
+      this.ctx.textBaseline = 'middle';
+      this.ctx.fillStyle = '#ffffff';
+      this.ctx.fillText(annotation.label, textX, textY);
+
+      // Draw confidence below if available
+      if (annotation.confidence) {
+        const confidenceText = `${Math.round(annotation.confidence * 100)}%`;
+        const confidenceFontSize = height * 0.009; // 0.9% of image height
+        this.ctx.font = `${confidenceFontSize}px system-ui, -apple-system, sans-serif`;
+        this.ctx.fillStyle = 'rgba(255, 107, 0, 0.9)';
+        this.ctx.fillText(confidenceText, textX, textY + fontSize * 0.8);
+      }
+    }
+
+    this.ctx.restore();
   }
 }

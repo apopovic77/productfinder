@@ -184,7 +184,7 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
   // Load thumbnails through ImageLoadQueue
   const { loadedImages: loadedThumbnails } = useImageQueue(thumbnailUrls, {
     group: `product-thumbnails-${product.id}`,
-    priority: 100, // Lower priority than hero image
+    priority: 50, // Lower priority: after hero (0), before variants (100+) and LOD (1000+)
   });
 
   // Update selected image when variant changes
@@ -806,7 +806,7 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
         {/* Layout: Image + Info Panel */}
         <div className="pom-layout">
           {/* Left: Product Image */}
-          <div className="pom-image-section">
+          <div className="pom-image-section" style={{ position: 'relative' }}>
             <img
               src={getCurrentImage()}
               alt={product.name}
