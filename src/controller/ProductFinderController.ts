@@ -200,6 +200,24 @@ export class ProductFinderController {
     return this.filterService.getCriteria();
   }
 
+  setAiFilterProductIds(ids: string[]): void {
+    this.filterService.setIncludeIds(ids);
+    this.onDataChanged();
+  }
+
+  clearAiFilterProductIds(): void {
+    this.filterService.clearIncludeIds();
+    this.onDataChanged();
+  }
+
+  getAiFilterProductIds(): string[] {
+    return this.filterService.getIncludeIds();
+  }
+
+  isAiFilterActive(): boolean {
+    return this.filterService.hasIncludeIds();
+  }
+
   resetFilters(): void {
     this.filterService.resetCriteria();
     this.onDataChanged();

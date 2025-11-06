@@ -23,6 +23,7 @@ export class FilterService {
     weightMin: '',
     weightMax: '',
   };
+  private includeIds: Set<string> | null = null;
 
   setSortMode(mode: SortMode): void {
     this.sortMode = mode;
@@ -52,6 +53,27 @@ export class FilterService {
     };
   }
 
+  setIncludeIds(ids: string[] | null | undefined): void {
+    if (ids && ids.length) {
+      this.includeIds = new Set(ids.map(String));
+    } else {
+      this.includeIds = null;
+    }
+  }
+
+  clearIncludeIds(): void {
+    this.includeIds = null;
+  }
+
+  getIncludeIds(): string[] {
+    if (!this.includeIds) return [];
+    return Array.from(this.includeIds);
+  }
+
+  hasIncludeIds(): boolean {
+    return Boolean(this.includeIds && this.includeIds.size);
+  }
+
   filter(products: Product[]): Product[] {
     const { search, category, season, priceMin, priceMax, weightMin, weightMax } = this.criteria;
     
@@ -72,15 +94,19 @@ export class FilterService {
       const w = p.specifications?.weight;
       if (weightMin && (w === undefined || w < Number(weightMin))) return false;
       if (weightMax && (w === undefined || w > Number(weightMax))) return false;
+
+      if (this.includeIds && this.includeIds.size > 0) {
+        if (!this.includeIds.has(String(p.id))) return false;
+      }
       return true;
     });
   }
 
   sort(products: Product[]): Product[] {
     if (this.sortMode === 'none') return products;
-    
+
     const sorted = [...products];
-    
+
     switch (this.sortMode) {
       case 'name-asc':
         sorted.sort((a, b) => a.name.localeCompare(b.name));
@@ -104,7 +130,7 @@ export class FilterService {
         sorted.sort((a, b) => (b.season ?? 0) - (a.season ?? 0));
         break;
     }
-    
+
     return sorted;
   }
 

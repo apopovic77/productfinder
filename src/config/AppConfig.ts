@@ -76,6 +76,7 @@ const DEVELOPER_SETTINGS_DEFAULTS: DeveloperSettings = {
   priceBucketCount: 5,
   heroDisplayMode: 'overlay',
   overlayScaleMode: 'scale-with-content', // Skaliert mit Zoom wie die Produkte
+  imageSpreadDirection: 'auto' as 'auto' | 'horizontal' | 'vertical', // auto = based on aspect ratio
 };
 
 export const APP_CONFIG = {

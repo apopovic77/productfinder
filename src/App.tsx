@@ -26,6 +26,8 @@ import {
 import { getImagesForVariant, getPrimaryVariant } from './utils/variantImageHelpers';
 import { globalImageQueue } from './utils/GlobalImageQueue';
 import { buildMediaUrl } from './utils/MediaUrlBuilder';
+import QuickSearchCommandPalette from './components/QuickSearchCommandPalette';
+import { AiProductQueryService } from './services/AiProductQueryService';
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -79,6 +81,15 @@ type State = {
 
   // Dialog position for connection line
   dialogPosition: { x: number; y: number } | null;
+
+  // AI Quicksearch
+  isQuickSearchOpen: boolean;
+  quickSearchPrompt: string;
+  quickSearchLoading: boolean;
+  quickSearchError: string | null;
+  aiFilterProductIds: string[];
+  aiLastResultCount: number | null;
+  quickSearchPosition: { x: number; y: number } | null;
 };
 
 const createInitialState = (): State => {
@@ -127,6 +138,14 @@ const createInitialState = (): State => {
     zoom: 1,
     mobileFooterExpanded: false,
     dialogPosition: null,
+
+    isQuickSearchOpen: false,
+    quickSearchPrompt: '',
+    quickSearchLoading: false,
+    quickSearchError: null,
+    aiFilterProductIds: [],
+    aiLastResultCount: null,
+    quickSearchPosition: null,
   };
 };
 
@@ -200,6 +219,7 @@ export default class App extends React.Component<{}, State> {
     canvas.addEventListener('touchmove', this.handleCanvasTouchMove);
 
     document.addEventListener('keydown', this.handleKeyDown);
+    window.addEventListener('keydown', this.handleQuickSearchHotkey);
 
     // Setup browser history management for back button
     window.addEventListener('popstate', this.handlePopState);
@@ -219,6 +239,7 @@ export default class App extends React.Component<{}, State> {
     window.removeEventListener('resize', this.handleResize);
     window.removeEventListener('popstate', this.handlePopState);
     document.removeEventListener('keydown', this.handleKeyDown);
+    window.removeEventListener('keydown', this.handleQuickSearchHotkey);
     const canvas = this.canvasRef.current;
     if (canvas) {
       canvas.removeEventListener('click', this.handleCanvasClick);
@@ -316,6 +337,7 @@ export default class App extends React.Component<{}, State> {
       if (renderer) {
         renderer.heroDisplayMode = this.state.devSettings.heroDisplayMode;
         renderer.overlayScaleMode = this.state.devSettings.overlayScaleMode;
+        renderer.imageSpreadDirection = this.state.devSettings.imageSpreadDirection;
 
         // Load variant images for stacked display (React mode)
         if (this.state.overlayMode === 'react' && this.state.selectedProduct) {
@@ -373,7 +395,7 @@ export default class App extends React.Component<{}, State> {
               const productGroup = `product-${this.state.selectedProduct.id}`;
               this.imageLoadQueue.cancelGroup(productGroup);
 
-              // Load images using the queue (skip first one as it's the main/hero image)
+              // Load alternative images for spread animation (skip first image as it's the hero image)
               // Queue handles parallel/sequential loading and prevents browser connection limit issues
               for (let i = 1; i < variantImages.length; i++) {
                 const variantImg = variantImages[i];
@@ -843,6 +865,93 @@ export default class App extends React.Component<{}, State> {
     }
   };
 
+  private handleQuickSearchHotkey = (event: KeyboardEvent) => {
+    if (event.key === 'F3') {
+      event.preventDefault();
+    this.setState(prev => {
+      const nextOpen = !prev.isQuickSearchOpen;
+      let nextPosition = prev.quickSearchPosition;
+      if (nextOpen && !nextPosition && typeof window !== 'undefined') {
+        nextPosition = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+      }
+      return {
+        isQuickSearchOpen: nextOpen,
+        quickSearchError: null,
+        quickSearchPosition: nextPosition,
+      };
+    });
+    }
+
+    if (event.key === 'Escape' && this.state.isQuickSearchOpen) {
+      event.preventDefault();
+      this.closeQuickSearch();
+    }
+  };
+
+  private handleQuickSearchPromptChange = (value: string) => {
+    this.setState({ quickSearchPrompt: value });
+  };
+
+  private closeQuickSearch = () => {
+    if (this.state.quickSearchLoading) return;
+    this.setState({ isQuickSearchOpen: false, quickSearchError: null });
+  };
+
+  private clearAiFilter = () => {
+    this.controller.clearAiFilterProductIds();
+    this.setState({ aiFilterProductIds: [], aiLastResultCount: null });
+  };
+
+  private handleQuickSearchAutoPosition = (position: { x: number; y: number }) => {
+    this.setState({ quickSearchPosition: position });
+  };
+
+  private handleQuickSearchDrag = (position: { x: number; y: number }) => {
+    this.setState({ quickSearchPosition: position });
+  };
+
+  private handleQuickSearchSubmit = async () => {
+    if (this.state.quickSearchLoading) return;
+    const query = this.state.quickSearchPrompt.trim();
+    if (!query) {
+      this.setState({ quickSearchError: 'Bitte gib eine Suchbeschreibung ein.' });
+      return;
+    }
+
+    this.setState({ quickSearchLoading: true, quickSearchError: null });
+
+    try {
+      const { productIds } = await AiProductQueryService.queryProducts(query);
+      if (!productIds.length) {
+        this.setState({
+          quickSearchLoading: false,
+          quickSearchError: 'Keine passenden Produkte gefunden. Bitte prompt präzisieren.',
+        });
+        return;
+      }
+      this.controller.setAiFilterProductIds(productIds);
+      const matchedProducts = this.controller.getFilteredProducts();
+      const matchedIds = matchedProducts.map(p => p.id);
+      if (!matchedIds.length) {
+        this.setState({
+          quickSearchLoading: false,
+          quickSearchError: 'Die KI hat IDs geliefert, aber sie passen nicht zu geladenen Produkten.',
+        });
+        return;
+      }
+      this.setState({
+        quickSearchLoading: false,
+        isQuickSearchOpen: false,
+        quickSearchPrompt: '',
+        aiFilterProductIds: matchedIds,
+        aiLastResultCount: matchedIds.length,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Die KI-Suche ist fehlgeschlagen.';
+      this.setState({ quickSearchLoading: false, quickSearchError: message });
+    }
+  };
+
   render() {
     const { loading, error, selectedProduct, hoveredProduct, mousePos } = this.state;
     const {
@@ -861,7 +970,13 @@ export default class App extends React.Component<{}, State> {
       pivotBreadcrumbs,
       pivotDimensions,
       pivotDefinitions,
-      isPivotHeroMode
+      isPivotHeroMode,
+      isQuickSearchOpen,
+      quickSearchPrompt,
+      quickSearchLoading,
+      quickSearchError,
+      aiFilterProductIds,
+      aiLastResultCount,
     } = this.state;
 
     // Compute availability live but keep chip order stable
@@ -876,6 +991,25 @@ export default class App extends React.Component<{}, State> {
 
     return (
       <div className="pf-root">
+        <QuickSearchCommandPalette
+          isOpen={isQuickSearchOpen}
+          prompt={quickSearchPrompt}
+          onPromptChange={this.handleQuickSearchPromptChange}
+          onSubmit={this.handleQuickSearchSubmit}
+          onClose={this.closeQuickSearch}
+          isLoading={quickSearchLoading}
+          errorMessage={quickSearchError}
+          lastResultCount={aiLastResultCount}
+        position={this.state.quickSearchPosition ?? undefined}
+        onAutoPosition={this.handleQuickSearchAutoPosition}
+        onDrag={this.handleQuickSearchDrag}
+        />
+        {aiFilterProductIds.length > 0 && (
+          <div className="quicksearch-indicator">
+            <span>KI-Filter aktiv ({aiFilterProductIds.length})</span>
+            <button type="button" onClick={this.clearAiFilter}>Zurücksetzen</button>
+          </div>
+        )}
         {/* Primary toolbar intentionally hidden to maximize canvas area. Developer overlay remains accessible via F1. */}
         <div className="pf-stage">
           <canvas ref={this.canvasRef} className="pf-canvas" />

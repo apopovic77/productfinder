@@ -108,6 +108,7 @@ const ATTRIBUTE_HINTS: Record<string, AttributeHint> = {
   taxonomy_path: {
     label: 'Taxonomie',
     role: 'class',
+    source: { type: 'attribute', key: 'taxonomy_path', level: 999 }, // level 999 = use last part
   },
   brand: {
     label: 'Brand',

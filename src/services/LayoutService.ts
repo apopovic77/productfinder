@@ -64,12 +64,16 @@ export class LayoutService {
       this.pivotConfig = {
         ...this.pivotConfig,
         groupKey: (p: Product) => this.drillDownService.getGroupKey(p),
+        groupSort: (a: string, b: string) => {
+          const comparator = this.drillDownService.getGroupComparator();
+          return comparator(a, b);
+        },
         access: this.access,
         scale: this.scalePolicy
       };
       return new PivotLayouter<Product>(this.pivotConfig);
     }
-    
+
     // Grid/Masonry layouts
     const config = this.createGridConfig(mode);
     return new SimpleLayouter<Product>(config);
@@ -80,6 +84,10 @@ export class LayoutService {
       orientation: 'columns',
       flow: 'ltr',
       groupKey: (p: Product) => this.drillDownService.getGroupKey(p),
+      groupSort: (a: string, b: string) => {
+        const comparator = this.drillDownService.getGroupComparator();
+        return comparator(a, b);
+      },
       frameGap: 40,
       framePadding: 20,
       itemGap: 12,
@@ -122,7 +130,7 @@ export class LayoutService {
     const gap = Math.max(0, Math.round(gridConfig.spacing));
     const minCell = Math.max(5, Math.round(gridConfig.minCellSize));
     const maxCell = Math.max(minCell, Math.round(gridConfig.maxCellSize));
-    
+
     this.pivotConfig = {
       ...this.pivotConfig,
       frameGap: padding,
@@ -132,10 +140,14 @@ export class LayoutService {
       minCellSize: minCell,
       maxCellSize: maxCell,
       groupKey: (p: Product) => this.drillDownService.getGroupKey(p),
+      groupSort: (a: string, b: string) => {
+        const comparator = this.drillDownService.getGroupComparator();
+        return comparator(a, b);
+      },
       access: this.access,
       scale: this.scalePolicy
     };
-    
+
     this.layouter = new PivotLayouter<Product>(this.pivotConfig);
     this.heroLayouter = null;
     this.engine.setLayouter(this.layouter);
@@ -242,7 +254,11 @@ export class LayoutService {
           // Update pivot config with hero mode state for 'auto' scale resolution
           this.pivotConfig = {
             ...this.pivotConfig,
-            isHeroMode: false
+            isHeroMode: false,
+            groupSort: (a: string, b: string) => {
+              const comparator = this.drillDownService.getGroupComparator();
+              return comparator(a, b);
+            }
           };
           this.layouter = new PivotLayouter<Product>(this.pivotConfig);
           this.engine.setLayouter(this.layouter);
@@ -334,7 +350,11 @@ export class LayoutService {
     if (this.pivotConfig.orientation === orientation) return;
     this.pivotConfig = {
       ...this.pivotConfig,
-      orientation
+      orientation,
+      groupSort: (a: string, b: string) => {
+        const comparator = this.drillDownService.getGroupComparator();
+        return comparator(a, b);
+      }
     };
     this.layouter = new PivotLayouter<Product>(this.pivotConfig);
     this.engine.setLayouter(this.layouter);

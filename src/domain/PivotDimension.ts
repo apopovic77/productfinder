@@ -4,7 +4,7 @@ export type PivotDimensionKind = 'category' | 'class' | 'variation' | 'metadata'
 
 export type PivotDimensionSource =
   | { type: 'category'; level: number }
-  | { type: 'attribute'; key: string }
+  | { type: 'attribute'; key: string; level?: number }
   | { type: 'property'; key: string };
 
 export type PivotNumericBucket = {

@@ -7,6 +7,7 @@ import { ProductOverlayCanvas, DEFAULT_OVERLAY_STYLE } from './ProductOverlayCan
 import { ProductOverlayCanvasV2, MODERN_OVERLAY_STYLE } from './ProductOverlayCanvasV2';
 import { globalImageQueue } from '../utils/GlobalImageQueue';
 import { buildMediaUrl } from '../utils/MediaUrlBuilder';
+import { InterpolatedProperty } from 'arkturian-typescript-utils';
 
 type LoadTask = {
   nodeId: string;
@@ -21,6 +22,7 @@ export class CanvasRenderer<T> {
   public hoveredItem: T | null = null;
   public focusedItem: T | null = null;
   public hoveredGroupKey: string | null = null;
+  public hoveredGroupLabel: string | null = null; // Full label for tooltip
 
   // Selected product for overlay rendering
   public selectedProduct: Product | null = null;
@@ -28,6 +30,7 @@ export class CanvasRenderer<T> {
   public selectedProductBounds: { x: number; y: number; width: number; height: number } | null = null; // Cell dimensions
   public heroDisplayMode: 'overlay' | 'force-labels' = 'overlay';
   public overlayScaleMode: 'scale-invariant' | 'scale-with-content' = 'scale-invariant';
+  public imageSpreadDirection: 'auto' | 'horizontal' | 'vertical' = 'auto';
 
   // Variant-specific hero image (overrides product's primary image)
   public selectedVariantHeroImage: HTMLImageElement | null = null;
@@ -40,7 +43,11 @@ export class CanvasRenderer<T> {
     src: string;
     loadedImage?: HTMLImageElement;
     orientation?: 'portrait' | 'landscape';
-  }> | null = null; // Alternative product images for stacked display
+    spreadOffset?: InterpolatedProperty<number>;
+  }> | null = null;
+
+  // Interpolated scale for smooth animation when alternative images appear/disappear
+  private imageScaleFactor: InterpolatedProperty<number> = new InterpolatedProperty<number>('imageScale', 1.0, 1.0, 0.5); // Alternative product images for stacked display
 
   // AI Annotations for hero image
   public heroImageAnnotations: Array<{
@@ -352,6 +359,106 @@ export class CanvasRenderer<T> {
     this.ctx.clearRect(0,0,c.width,c.height); 
   }
 
+  /**
+   * Update hero mode offsets for products (makes them move aside when alternative images spread)
+   */
+  private updateHeroModeOffsets() {
+    if (!this.selectedProduct || !this.alternativeImages || this.alternativeImages.length === 0) {
+      // No selected product or no alternative images - reset all offsets to 0
+      const nodes = this.getNodes();
+      for (const n of nodes) {
+        n.heroOffsetX.targetValue = 0;
+      }
+      return;
+    }
+
+    const nodes = this.getNodes();
+    const loadedImages = this.alternativeImages.filter(img => img.loadedImage);
+    if (loadedImages.length === 0) {
+      // No loaded images yet - reset offsets
+      for (const n of nodes) {
+        n.heroOffsetX.targetValue = 0;
+      }
+      return;
+    }
+
+    // Find the selected product node
+    let selectedNode: any = null;
+    let selectedIndex = -1;
+    for (let i = 0; i < nodes.length; i++) {
+      const product = nodes[i].data as any;
+      if (product.id === this.selectedProduct.id) {
+        selectedNode = nodes[i];
+        selectedIndex = i;
+        break;
+      }
+    }
+
+    if (!selectedNode) {
+      // Selected product not found - reset offsets
+      for (const n of nodes) {
+        n.heroOffsetX.targetValue = 0;
+      }
+      return;
+    }
+
+    // Calculate how much space the alternative images need
+    // Use the same calculation as in the spread animation
+    const w = selectedNode.width.value ?? 0;
+    const h = selectedNode.height.value ?? 0;
+    const aspectRatio = w / h;
+    const isClearlyLandscape = aspectRatio > 1.2;
+
+    // Determine spread direction based on setting
+    let shouldSpreadVertically = false;
+    if (this.imageSpreadDirection === 'vertical') {
+      shouldSpreadVertically = true;
+    } else if (this.imageSpreadDirection === 'horizontal') {
+      shouldSpreadVertically = false;
+    } else {
+      // Auto mode: use aspect ratio
+      shouldSpreadVertically = isClearlyLandscape;
+    }
+
+    // Base offset calculation (same as in spread animation, but with more space in hero mode)
+    const baseOffset = shouldSpreadVertically ? h * 0.25 : w * 0.25;
+
+    // Calculate total spread width needed (maximum distance on either side)
+    // We use the same symmetric spread logic: alternating left/right
+    const imageCount = loadedImages.length;
+    let maxLeftOffset = 0;
+    let maxRightOffset = 0;
+
+    for (let i = 0; i < imageCount; i++) {
+      const side = i % 2 === 0 ? -1 : 1;
+      const distance = Math.floor(i / 2) + 1;
+      const offset = side * distance * baseOffset;
+
+      if (offset < 0) {
+        maxLeftOffset = Math.min(maxLeftOffset, offset);
+      } else {
+        maxRightOffset = Math.max(maxRightOffset, offset);
+      }
+    }
+
+    // Now apply offsets to all other products
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      const product = n.data as any;
+
+      if (product.id === this.selectedProduct.id) {
+        // Selected product stays in place
+        n.heroOffsetX.targetValue = 0;
+      } else if (i < selectedIndex) {
+        // Products to the left of selected product move left with extra spacing
+        n.heroOffsetX.targetValue = maxLeftOffset * 2.0; // Double the offset for more space
+      } else {
+        // Products to the right of selected product move right with extra spacing
+        n.heroOffsetX.targetValue = maxRightOffset * 2.0; // Double the offset for more space
+      }
+    }
+  }
+
   private drawRoundedRect(x: number, y: number, width: number, height: number, radius: number) {
     const r = Math.min(radius, height / 2, width / 2);
     this.ctx.beginPath();
@@ -365,6 +472,37 @@ export class CanvasRenderer<T> {
     this.ctx.lineTo(x, y + r);
     this.ctx.quadraticCurveTo(x, y, x + r, y);
     this.ctx.closePath();
+  }
+
+  /**
+   * Truncate text to fit within maxWidth, adding ellipsis if needed
+   * Returns the truncated text
+   */
+  private truncateText(text: string, maxWidth: number): string {
+    const metrics = this.ctx.measureText(text);
+    if (metrics.width <= maxWidth) {
+      return text;
+    }
+
+    // Binary search for the right length
+    let low = 0;
+    let high = text.length;
+    let best = '';
+
+    while (low <= high) {
+      const mid = Math.floor((low + high) / 2);
+      const testText = text.substring(0, mid) + '...';
+      const testMetrics = this.ctx.measureText(testText);
+
+      if (testMetrics.width <= maxWidth) {
+        best = testText;
+        low = mid + 1;
+      } else {
+        high = mid - 1;
+      }
+    }
+
+    return best || '...';
   }
 
   private async draw() {
@@ -388,9 +526,15 @@ export class CanvasRenderer<T> {
     }
     
     const nodes = this.getNodes();
-    
+
+    // Update hero mode offsets if needed (products moving aside for spread animation)
+    this.updateHeroModeOffsets();
+
     for (const n of nodes) {
-      const x = n.posX.value ?? 0, y = n.posY.value ?? 0;
+      const baseX = n.posX.value ?? 0;
+      const heroOffset = n.heroOffsetX.value ?? 0;
+      const x = baseX + heroOffset; // Apply hero mode offset
+      const y = n.posY.value ?? 0;
       const w = n.width.value ?? 0, h = n.height.value ?? 0;
       const scale = n.scale.value ?? 1;
       const opacity = n.opacity.value ?? 1;
@@ -460,44 +604,85 @@ export class CanvasRenderer<T> {
           // Total images to draw: main image + alternative images
           const totalImages = imageCount + 1;
 
-          // Overlap factor: how much images overlap (0.7 = 70% overlap, so 30% of next image visible)
-          const overlapFactor = 0.7;
+          // Overlap factor: how much images overlap (0.4 = 40% overlap, so 60% of next image visible)
+          // Lower value = more spread, more space between images
+          const overlapFactor = 0.4;
 
           // Calculate scale factor so all images fit in the cell
           const spreadFactor = 1 + (totalImages - 1) * (1 - overlapFactor);
           let targetScale = 1 / spreadFactor;
 
-          // Don't scale down too much - keep at least 85% of original size
-          targetScale = Math.max(targetScale, 0.85);
+          // Don't scale down too much - keep at least 75% of original size
+          targetScale = Math.max(targetScale, 0.75);
 
-          // Calculate scaled bounding box (static, no animation)
-          const boundingWidth = w * targetScale;
-          const boundingHeight = h * targetScale;
+          // Set target value for smooth animation
+          this.imageScaleFactor.targetValue = targetScale;
+
+          // Use animated scale value
+          const animatedScale = this.imageScaleFactor.value ?? 1.0;
+
+          // Calculate scaled bounding box with animated scale
+          const boundingWidth = w * animatedScale;
+          const boundingHeight = h * animatedScale;
 
           // Calculate offset between images based on spread direction
           const axisSize = isClearlyLandscape ? boundingHeight : boundingWidth;
-          const maxOffset = axisSize * (1 - overlapFactor);
+          const baseOffset = axisSize * (1 - overlapFactor);
 
-          // Draw from back to front
+          // Initialize InterpolatedProperty for each image if needed
+          // Spread symmetrically: left, right, left, right, ...
+          for (let i = 0; i < imageCount; i++) {
+            const altImg = loadedImages[i];
+            if (altImg && !altImg.spreadOffset) {
+              // Create InterpolatedProperty starting at 0, animating to target offset
+              altImg.spreadOffset = new InterpolatedProperty<number>(`spread-${i}`, 0, 0, 0.5);
+
+              // Calculate symmetric offset:
+              // i=0: -baseOffset (left)
+              // i=1: +baseOffset (right)
+              // i=2: -2*baseOffset (further left)
+              // i=3: +2*baseOffset (further right)
+              const side = i % 2 === 0 ? -1 : 1; // Alternate left (-1) and right (+1)
+              const distance = Math.floor(i / 2) + 1; // Distance multiplier (1, 1, 2, 2, 3, 3, ...)
+              altImg.spreadOffset.targetValue = side * distance * baseOffset;
+            }
+          }
+
+          // Calculate centering offset to keep images centered when scaled down
+          const centerOffsetX = (w - boundingWidth) / 2;
+          const centerOffsetY = (h - boundingHeight) / 2;
+
+          // Draw from back to front (furthest images first)
           for (let i = imageCount - 1; i >= 0; i--) {
             const altImg = loadedImages[i];
-            if (altImg && altImg.loadedImage) {
-              // Calculate position for this image (each image offset by maxOffset)
-              const stackOffset = maxOffset * (i + 1);
+            if (altImg && altImg.loadedImage && altImg.spreadOffset) {
+              // Use animated offset from InterpolatedProperty
+              const stackOffset = altImg.spreadOffset.value ?? 0;
 
-              let stackedX = x;
-              let stackedY = y;
+              let stackedX = x + centerOffsetX;
+              let stackedY = y + centerOffsetY;
 
-              if (isClearlyLandscape) {
-                // Clearly landscape: spread vertically (Y-axis)
-                stackedY = y + stackOffset;
+              // Determine spread direction based on setting
+              let shouldSpreadVertically = false;
+              if (this.imageSpreadDirection === 'vertical') {
+                shouldSpreadVertically = true;
+              } else if (this.imageSpreadDirection === 'horizontal') {
+                shouldSpreadVertically = false;
               } else {
-                // Portrait or square: spread horizontally (X-axis)
-                stackedX = x + stackOffset;
+                // Auto mode: use aspect ratio
+                shouldSpreadVertically = isClearlyLandscape;
+              }
+
+              if (shouldSpreadVertically) {
+                // Spread vertically (Y-axis)
+                stackedY = y + centerOffsetY + stackOffset;
+              } else {
+                // Spread horizontally (X-axis)
+                stackedX = x + centerOffsetX + stackOffset;
               }
 
               // Draw the alternative image with transparency and scaling
-              this.ctx.globalAlpha = 0.9 - (i * 0.1);
+              this.ctx.globalAlpha = 0.9 - (Math.floor(i / 2) * 0.1);
               this.drawImageFit(
                 altImg.loadedImage,
                 stackedX,
@@ -517,28 +702,30 @@ export class CanvasRenderer<T> {
       if (isSelectedProduct && this.alternativeImages && this.alternativeImages.length > 0) {
         const loadedImages = this.alternativeImages.filter(img => img.loadedImage);
         if (loadedImages.length > 0) {
-          // Use same scaling as alternative images
-          const aspectRatio = w / h;
-          const isClearlyLandscape = aspectRatio > 1.2;
-          const totalImages = loadedImages.length + 1;
-          const overlapFactor = 0.7;
-          const spreadFactor = 1 + (totalImages - 1) * (1 - overlapFactor);
-          let targetScale = 1 / spreadFactor;
+          // Use animated scale value (already set above in alternative images section)
+          const animatedScale = this.imageScaleFactor.value ?? 1.0;
 
-          // Don't scale down too much - keep at least 85% of original size
-          targetScale = Math.max(targetScale, 0.85);
+          // Center the scaled image
+          const scaledWidth = w * animatedScale;
+          const scaledHeight = h * animatedScale;
+          const centerOffsetX = (w - scaledWidth) / 2;
+          const centerOffsetY = (h - scaledHeight) / 2;
 
           this.drawImageFit(
             img,
-            x,
-            y,
-            w * targetScale,
-            h * targetScale
+            x + centerOffsetX,
+            y + centerOffsetY,
+            scaledWidth,
+            scaledHeight
           );
         } else {
+          // No loaded images yet - reset scale to 1.0
+          this.imageScaleFactor.targetValue = 1.0;
           this.drawImageFit(img, x, y, w, h);
         }
       } else {
+        // No alternative images - reset scale to 1.0 smoothly
+        this.imageScaleFactor.targetValue = 1.0;
         this.drawImageFit(img, x, y, w, h);
       }
 
@@ -566,54 +753,113 @@ export class CanvasRenderer<T> {
       this.ctx.restore();
     }
     
-    // Draw group headers (after products, so they're on top)
+    // Draw group headers (after products, so they're on top) - matching .pf-pivot-chip style
     const groupHeaders = this.getGroupHeaders();
     for (const header of groupHeaders) {
       const isHovered = this.hoveredGroupKey === header.key;
 
-      const radius = Math.min(22, header.height / 2);
+      // Rounded corners like .pf-pivot-chip (10px)
+      const radius = 10;
+
+      // Gradient matching .pf-pivot-chip style
       const gradient = this.ctx.createLinearGradient(
         header.x,
         header.y,
-        header.x,
+        header.x + header.width,
         header.y + header.height
       );
       if (isHovered) {
-        gradient.addColorStop(0, 'rgba(68, 203, 255, 0.95)');
-        gradient.addColorStop(1, 'rgba(51, 148, 255, 0.95)');
+        // Lighter hover gradient (like .pf-pivot-chip:hover)
+        gradient.addColorStop(0, '#3ab8ff');
+        gradient.addColorStop(1, '#22e4ee');
       } else {
-        gradient.addColorStop(0, 'rgba(134, 206, 255, 0.92)');
-        gradient.addColorStop(1, 'rgba(92, 164, 255, 0.95)');
+        // Default gradient: linear-gradient(145deg, #2aa8ef 0%, #12d4de 100%)
+        gradient.addColorStop(0, '#2aa8ef');
+        gradient.addColorStop(1, '#12d4de');
       }
 
-      this.drawRoundedRect(header.x, header.y, header.width, header.height, radius);
+      // Apply slight Y offset for hover effect (matching translateY(-2px))
+      const yOffset = isHovered ? -2 : 0;
+
+      this.drawRoundedRect(header.x, header.y + yOffset, header.width, header.height, radius);
       this.ctx.fillStyle = gradient;
       this.ctx.fill();
 
-      this.ctx.lineWidth = isHovered ? 2 : 1;
-      this.ctx.strokeStyle = isHovered ? 'rgba(41, 116, 255, 0.9)' : 'rgba(134, 190, 255, 0.7)';
-      this.ctx.stroke();
+      // No border (matching .pf-pivot-chip)
+      // Add subtle shadow for hover
+      if (isHovered) {
+        this.ctx.shadowColor = 'rgba(42, 168, 239, 0.3)';
+        this.ctx.shadowBlur = 12;
+        this.ctx.shadowOffsetY = 4;
+        this.ctx.fill(); // Re-fill with shadow
+        this.ctx.shadowColor = 'transparent';
+        this.ctx.shadowBlur = 0;
+        this.ctx.shadowOffsetY = 0;
+      }
 
-      // Draw text
-      this.ctx.fillStyle = isHovered ? '#0f172a' : '#0b1a33';
-      this.ctx.font = isHovered ? 'bold 16px system-ui' : '14px system-ui';
+      // White text (matching .pf-pivot-chip)
+      this.ctx.fillStyle = 'white';
+      this.ctx.font = isHovered ? 'bold 14px system-ui' : '13px system-ui';
       this.ctx.textAlign = 'center';
       this.ctx.textBaseline = 'middle';
+
+      // Calculate available width for text (leave padding on both sides)
+      const textPadding = 20;
+      const maxTextWidth = header.width - (textPadding * 2);
+
+      // Truncate text if needed
+      const displayText = this.truncateText(header.label, maxTextWidth);
+      const isTruncated = displayText !== header.label;
+
       this.ctx.fillText(
-        header.label, 
-        header.x + header.width / 2, 
-        header.y + header.height / 2
+        displayText,
+        header.x + header.width / 2,
+        header.y + yOffset + header.height / 2
       );
-      
-      // Draw click hint on hover
+
+      // Draw click hint or full text tooltip on hover
       if (isHovered) {
-        this.ctx.font = '11px system-ui';
-        this.ctx.fillStyle = 'rgba(15, 23, 42, 0.65)';
-        this.ctx.fillText(
-          'Click to drill down', 
-          header.x + header.width / 2, 
-          header.y + header.height / 2 + 12
-        );
+        if (isTruncated) {
+          // Show full text as tooltip above the button
+          const tooltipPadding = 12;
+          const tooltipFont = '14px system-ui';
+          this.ctx.font = tooltipFont;
+          const tooltipMetrics = this.ctx.measureText(header.label);
+          const tooltipWidth = tooltipMetrics.width + tooltipPadding * 2;
+          const tooltipHeight = 32;
+          const tooltipX = header.x + header.width / 2 - tooltipWidth / 2;
+          const tooltipY = header.y + yOffset - tooltipHeight - 8;
+
+          // Draw tooltip background
+          this.drawRoundedRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight, 8);
+          this.ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+          this.ctx.fill();
+          this.ctx.lineWidth = 1;
+          this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+          this.ctx.stroke();
+
+          // Draw full text in tooltip (white on dark background)
+          this.ctx.fillStyle = '#ffffff';
+          this.ctx.font = tooltipFont;
+          this.ctx.textAlign = 'center';
+          this.ctx.textBaseline = 'middle';
+          this.ctx.fillText(
+            header.label,
+            tooltipX + tooltipWidth / 2,
+            tooltipY + tooltipHeight / 2
+          );
+        } else {
+          // Show click hint if not truncated - white text with slight transparency
+          this.ctx.font = '11px system-ui';
+          this.ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+          this.ctx.textAlign = 'center';
+          this.ctx.textBaseline = 'middle';
+          this.ctx.fillText(
+            'Click to drill down',
+            header.x + header.width / 2,
+            header.y + yOffset + header.height / 2 + 12
+          );
+        }
       }
     }
 

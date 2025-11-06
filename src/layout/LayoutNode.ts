@@ -23,14 +23,15 @@ export class LayoutNode<T> {
   readonly height: InterpolatedProperty<number>;
   readonly opacity: InterpolatedProperty<number>;
   readonly scale: InterpolatedProperty<number>;
-  
+  readonly heroOffsetX: InterpolatedProperty<number>; // Hero-mode spread animation offset
+
   zIndex = 0;
   isNew = true;
-  
-  constructor(id: string, data: T) { 
-    this.id = id; 
+
+  constructor(id: string, data: T) {
+    this.id = id;
     this.data = data;
-    
+
     // Initialize interpolated properties ONCE
     // These will persist and smoothly interpolate when targets change
     this.posX = new InterpolatedProperty<number>('posX', 0, 0, 0.4);
@@ -39,6 +40,7 @@ export class LayoutNode<T> {
     this.height = new InterpolatedProperty<number>('height', 0, 0, 0.3);
     this.opacity = new InterpolatedProperty<number>('opacity', 0, 0, 0.3);
     this.scale = new InterpolatedProperty<number>('scale', 0.8, 0.8, 0.35);
+    this.heroOffsetX = new InterpolatedProperty<number>('heroOffsetX', 0, 0, 0.5); // Hero-mode spread offset
   }
   
   setTargets(pos: Vector2, size: Vector2, opacity?: number, scale?: number) {
@@ -65,6 +67,7 @@ export class LayoutNode<T> {
     this.height.setDuration(duration);
     this.opacity.setDuration(duration);
     this.scale.setDuration(duration);
+    this.heroOffsetX.setDuration(duration);
   }
 
   prime(pos: Vector2, size: Vector2) {

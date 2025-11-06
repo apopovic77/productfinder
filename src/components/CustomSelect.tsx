@@ -31,14 +31,22 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+
+      // Check if click is inside container OR inside dropdown (which is portaled to body)
+      const isInsideContainer = containerRef.current && containerRef.current.contains(target);
+      const isInsideDropdown = (target as Element).closest?.('.custom-select-dropdown');
+
+      if (!isInsideContainer && !isInsideDropdown) {
         setIsOpen(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isOpen]);
 
   // Calculate dropdown position and direction
   useEffect(() => {
@@ -107,7 +115,10 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
               <li
                 key={option.value}
                 className={`custom-select-option ${option.value === value ? 'selected' : ''}`}
-                onClick={() => handleSelect(option.value)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSelect(option.value);
+                }}
                 role="option"
                 aria-selected={option.value === value}
               >

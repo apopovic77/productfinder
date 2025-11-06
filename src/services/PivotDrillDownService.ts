@@ -527,9 +527,24 @@ export class PivotDrillDownService {
         return null;
       }
       case 'attribute': {
-        const attr = product.getAttributeValue(def.source.key);
-        if (attr !== undefined) return attr;
-        return product.attributes?.[def.source.key]?.value ?? null;
+        const attrKey = def.source.key;
+        const attr = product.getAttributeValue(attrKey);
+        if (attr !== undefined) {
+          // Handle taxonomy_path as hierarchical (split by ' > ' separator)
+          if (attrKey === 'taxonomy_path' && typeof attr === 'string' && attr.includes(' > ')) {
+            const parts = attr.split(' > ').filter(Boolean);
+            const requestedLevel = def.source.level ?? 0;
+
+            // Return the part at the requested level, or the last part if level is too high
+            if (requestedLevel < parts.length) {
+              return parts[requestedLevel];
+            }
+            // If level is beyond available parts, return the last part
+            return parts[parts.length - 1] || null;
+          }
+          return attr;
+        }
+        return product.attributes?.[attrKey]?.value ?? null;
       }
       case 'property': {
         const key = def.source.key;
@@ -919,5 +934,93 @@ export class PivotDrillDownService {
 
   resolveValue(product: Product, dimension: GroupDimension): string {
     return this.getDimensionValue(product, dimension);
+  }
+
+  /**
+   * Get a comparator function for sorting group keys in the current dimension.
+   * This ensures consistent group order regardless of product sort order.
+   */
+  getGroupComparator(): (a: string, b: string) => number {
+    const dimension = this.getDimension();
+    const def = this.dimensionByKey.get(dimension);
+
+    // Numeric dimensions: sort by bucket min/max
+    if (this.isNumericDimension(dimension)) {
+      const state = this.numericStates.get(dimension);
+      return (a: string, b: string) => {
+        const bucketA = state?.bucketMap.get(a);
+        const bucketB = state?.bucketMap.get(b);
+        if (bucketA && bucketB) {
+          if (bucketA.min !== bucketB.min) return bucketA.min - bucketB.min;
+          if (bucketA.max !== bucketB.max) return bucketA.max - bucketB.max;
+        }
+        return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+      };
+    }
+
+    // Dimensions with explicit order
+    const order = this.dimensionOrder.get(dimension);
+    if (order) {
+      return (a: string, b: string) => {
+        const idxA = order.get(a) ?? Number.MAX_SAFE_INTEGER;
+        const idxB = order.get(b) ?? Number.MAX_SAFE_INTEGER;
+        if (idxA !== idxB) return idxA - idxB;
+        return a.localeCompare(b);
+      };
+    }
+
+    // Product family dimension: use family order from profile
+    const dimensionMatchesFamily =
+      dimension.includes('product_family') ||
+      def?.attributeKey === 'product_family' ||
+      def?.label?.toLowerCase().includes('familie');
+
+    if (dimensionMatchesFamily) {
+      let familyList: readonly string[] | undefined;
+      const getOrderFor = (category: string): readonly string[] | undefined =>
+        this.profile.getProductFamilyOrderForCategory?.(category) ??
+        this.profile.productFamilyOrders?.[category];
+
+      // Look for category in filter stack
+      for (let i = this.filterStack.length - 1; i >= 0; i--) {
+        const filter = this.filterStack[i];
+        if (filter.dimension === 'category:presentation') {
+          familyList = getOrderFor(filter.value);
+          if (familyList?.length) break;
+        }
+      }
+
+      // Fallback: use combined family orders
+      if (!familyList || !familyList.length) {
+        const orders = this.profile.productFamilyOrders
+          ? Array.from(
+              new Set(
+                Object.values(this.profile.productFamilyOrders)
+                  .flat()
+                  .filter(Boolean)
+              )
+            )
+          : [];
+        familyList = orders.length ? orders : undefined;
+      }
+
+      if (familyList && familyList.length) {
+        const familyOrder = new Map(familyList.map((label, index) => [label, index] as [string, number]));
+        return (a: string, b: string) => {
+          const idxA = familyOrder.get(a) ?? Number.MAX_SAFE_INTEGER;
+          const idxB = familyOrder.get(b) ?? Number.MAX_SAFE_INTEGER;
+          if (idxA !== idxB) return idxA - idxB;
+          return a.localeCompare(b);
+        };
+      }
+    }
+
+    // Category/class dimensions: alphabetical
+    if (def?.role === 'category' || def?.role === 'class') {
+      return (a: string, b: string) => a.localeCompare(b);
+    }
+
+    // Default: locale compare with numeric
+    return (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
   }
 }

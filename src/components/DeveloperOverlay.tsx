@@ -20,6 +20,7 @@ export type ForceLabelsConfig = {
 
 export type HeroDisplayMode = 'overlay' | 'force-labels';
 export type OverlayScaleMode = 'scale-invariant' | 'scale-with-content';
+export type ImageSpreadDirection = 'auto' | 'horizontal' | 'vertical';
 
 export type DeveloperSettings = {
   gridConfig: GridConfig;
@@ -31,6 +32,7 @@ export type DeveloperSettings = {
   priceBucketCount: number;
   heroDisplayMode: HeroDisplayMode;
   overlayScaleMode: OverlayScaleMode;
+  imageSpreadDirection: ImageSpreadDirection;
 };
 
 type DeveloperOverlayProps = {
@@ -122,7 +124,8 @@ export const DeveloperOverlay: React.FC<DeveloperOverlayProps> = ({
       priceBucketMode: 'static',
       priceBucketCount: 5,
       heroDisplayMode: 'overlay',
-      overlayScaleMode: 'scale-invariant',
+      overlayScaleMode: 'scale-with-content',
+      imageSpreadDirection: 'auto',
     });
   };
 
@@ -322,6 +325,20 @@ export const DeveloperOverlay: React.FC<DeveloperOverlayProps> = ({
               >
                 <option value="scale-invariant">Fixed Size (always readable)</option>
                 <option value="scale-with-content">Scale with Zoom (like products)</option>
+              </select>
+            </div>
+
+            <div className="dev-control">
+              <label>
+                Image Spread Direction: <strong>{settings.imageSpreadDirection === 'auto' ? 'Auto (aspect ratio)' : settings.imageSpreadDirection === 'horizontal' ? 'Horizontal' : 'Vertical'}</strong>
+              </label>
+              <select
+                value={settings.imageSpreadDirection}
+                onChange={(e) => updateSetting('imageSpreadDirection', e.target.value as ImageSpreadDirection)}
+              >
+                <option value="auto">Auto (based on aspect ratio)</option>
+                <option value="horizontal">Horizontal (left/right)</option>
+                <option value="vertical">Vertical (up/down)</option>
               </select>
             </div>
           </div>
