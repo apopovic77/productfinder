@@ -421,23 +421,29 @@ export class CanvasRenderer<T> {
     }
 
     // Base offset calculation (same as in spread animation, but with more space in hero mode)
-    const baseOffset = shouldSpreadVertically ? h * 0.25 : w * 0.25;
+    // Vertical spreading uses smaller offset (0.08) to keep images very tight
+    const baseOffset = shouldSpreadVertically ? h * 0.08 : w * 0.25;
 
-    // Calculate total spread width needed (maximum distance on either side)
-    // We use the same symmetric spread logic: alternating left/right
-    const imageCount = loadedImages.length;
+    // Only calculate and apply horizontal offsets for neighboring products if spreading horizontally
+    // When spreading vertically (up/down), we don't need to move neighbors left/right
     let maxLeftOffset = 0;
     let maxRightOffset = 0;
 
-    for (let i = 0; i < imageCount; i++) {
-      const side = i % 2 === 0 ? -1 : 1;
-      const distance = Math.floor(i / 2) + 1;
-      const offset = side * distance * baseOffset;
+    if (!shouldSpreadVertically) {
+      // Calculate total spread width needed (maximum distance on either side)
+      // We use the same symmetric spread logic: alternating left/right
+      const imageCount = loadedImages.length;
 
-      if (offset < 0) {
-        maxLeftOffset = Math.min(maxLeftOffset, offset);
-      } else {
-        maxRightOffset = Math.max(maxRightOffset, offset);
+      for (let i = 0; i < imageCount; i++) {
+        const side = i % 2 === 0 ? -1 : 1;
+        const distance = Math.floor(i / 2) + 1;
+        const offset = side * distance * baseOffset;
+
+        if (offset < 0) {
+          maxLeftOffset = Math.min(maxLeftOffset, offset);
+        } else {
+          maxRightOffset = Math.max(maxRightOffset, offset);
+        }
       }
     }
 
@@ -625,9 +631,21 @@ export class CanvasRenderer<T> {
           const boundingWidth = w * animatedScale;
           const boundingHeight = h * animatedScale;
 
+          // Determine spread direction based on setting
+          let shouldSpreadVertically = false;
+          if (this.imageSpreadDirection === 'vertical') {
+            shouldSpreadVertically = true;
+          } else if (this.imageSpreadDirection === 'horizontal') {
+            shouldSpreadVertically = false;
+          } else {
+            // Auto mode: use aspect ratio
+            shouldSpreadVertically = isClearlyLandscape;
+          }
+
           // Calculate offset between images based on spread direction
-          const axisSize = isClearlyLandscape ? boundingHeight : boundingWidth;
-          const baseOffset = axisSize * (1 - overlapFactor);
+          // Vertical spreading uses smaller offset (0.35) to keep images very tight
+          const axisSize = shouldSpreadVertically ? boundingHeight : boundingWidth;
+          const baseOffset = shouldSpreadVertically ? axisSize * 0.35 : axisSize * (1 - overlapFactor);
 
           // Initialize InterpolatedProperty for each image if needed
           // Spread symmetrically: left, right, left, right, ...

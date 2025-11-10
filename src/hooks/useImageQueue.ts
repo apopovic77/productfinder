@@ -36,7 +36,7 @@ export function useImageQueue(
   loading: boolean;
   error: Error | null;
 } {
-  const { group = 'default', priority = 50 } = options; // Thumbnails: priority 50 (after hero=0, before variants=100+)
+  const { group = 'default', priority = 200 } = options; // Dialog thumbnails: priority 200 (after canvas images and variants, before LOD=1000+)
   const [loadedImages, setLoadedImages] = useState<Map<string, HTMLImageElement>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);

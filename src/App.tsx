@@ -6,7 +6,9 @@ import ProductModal from './components/ProductModal';
 import { ProductAnnotations } from './components/ProductAnnotations';
 import { ProductImageAnnotations } from './components/ProductImageAnnotations';
 import { ProductOverlay } from './components/ProductOverlay';
-import { ProductOverlayModal } from './components/ProductOverlayModal';
+import { ProductOverlayModalV2 as ProductOverlayModal } from './components/ProductOverlayModalV2';
+import { ProductOverlayModalV3 } from './components/ProductOverlayModalV3';
+import { HeroVideoBackground } from './components/HeroVideoBackground';
 import { AnimatePresence } from 'framer-motion';
 import { fetchAnnotations } from './services/StorageAnnotationService';
 import { DeveloperOverlay, type DeveloperSettings } from './components/DeveloperOverlay';
@@ -216,7 +218,7 @@ export default class App extends React.Component<{}, State> {
 
     // Touch events for mobile
     canvas.addEventListener('touchend', this.handleCanvasTouchEnd);
-    canvas.addEventListener('touchmove', this.handleCanvasTouchMove);
+    canvas.addEventListener('touchmove', this.handleCanvasTouchMove, { passive: true }); // Passive for better scroll performance
 
     document.addEventListener('keydown', this.handleKeyDown);
     window.addEventListener('keydown', this.handleQuickSearchHotkey);
@@ -246,7 +248,7 @@ export default class App extends React.Component<{}, State> {
       canvas.removeEventListener('mousemove', this.handleCanvasMouseMove);
       canvas.removeEventListener('mouseleave', this.handleCanvasMouseLeave);
       canvas.removeEventListener('touchend', this.handleCanvasTouchEnd);
-      canvas.removeEventListener('touchmove', this.handleCanvasTouchMove);
+      canvas.removeEventListener('touchmove', this.handleCanvasTouchMove, { passive: true } as any);
     }
     window.removeEventListener('resize', this.handleOrientationChange);
   }
@@ -316,11 +318,18 @@ export default class App extends React.Component<{}, State> {
           const productCenterX = nodeX + nodeW / 2;
           const productCenterY = nodeY + nodeH / 2;
 
-          renderer.dialogConnectionPoint = { x: productCenterX, y: productCenterY };
-          renderer.dialogPosition = {
-            x: this.state.dialogPosition.x,
-            y: this.state.dialogPosition.y + 150 // Approximate middle of dialog
-          };
+          // Update connection line (but NOT in Hero Mode with video)
+          if (!this.state.isPivotHeroMode) {
+            renderer.dialogConnectionPoint = { x: productCenterX, y: productCenterY };
+            renderer.dialogPosition = {
+              x: this.state.dialogPosition.x,
+              y: this.state.dialogPosition.y + 150 // Approximate middle of dialog
+            };
+          } else {
+            // Clear connection line in Hero Mode
+            renderer.dialogConnectionPoint = null;
+            renderer.dialogPosition = null;
+          }
         }
       }
     }
@@ -358,8 +367,8 @@ export default class App extends React.Component<{}, State> {
             // Set bounds for pivot LOD system
             renderer.selectedProductBounds = { x: nodeX, y: nodeY, width: nodeW, height: nodeH };
 
-            // Update connection line position
-            if (this.state.dialogPosition) {
+            // Update connection line position (but NOT in Hero Mode with video)
+            if (this.state.dialogPosition && !this.state.isPivotHeroMode) {
               const productCenterX = nodeX + nodeW / 2;
               const productCenterY = nodeY + nodeH / 2;
 
@@ -368,6 +377,10 @@ export default class App extends React.Component<{}, State> {
                 x: this.state.dialogPosition.x,
                 y: this.state.dialogPosition.y + 150
               };
+            } else if (this.state.isPivotHeroMode) {
+              // Clear connection line in Hero Mode
+              renderer.dialogConnectionPoint = null;
+              renderer.dialogPosition = null;
             }
           }
 
@@ -388,12 +401,36 @@ export default class App extends React.Component<{}, State> {
               // Get all images for this variant (hero + gallery)
               const variantImages = getImagesForVariant(product, currentVariant);
 
-              // Hero image is now loaded automatically by LOD system in CanvasRenderer
-              // No need to load it here - LOD will handle upgrading from low-res to high-res
-
               // Cancel any pending image loads from previous product
               const productGroup = `product-${this.state.selectedProduct.id}`;
               this.imageLoadQueue.cancelGroup(productGroup);
+
+              // IMMEDIATELY load hero image with HIGHEST priority (priority: 0)
+              // This ensures the main selected product image loads BEFORE alternative images
+              if (variantImages.length > 0 && variantImages[0].storageId) {
+                const heroStorageId = variantImages[0].storageId;
+                const heroSrc = buildMediaUrl({
+                  storageId: heroStorageId,
+                  width: 1300,
+                  quality: 85,
+                  trim: true,
+                });
+
+                this.imageLoadQueue.add({
+                  id: `${productGroup}-hero`,
+                  url: heroSrc,
+                  group: productGroup,
+                  priority: 0, // HIGHEST PRIORITY - load hero image FIRST!
+                  metadata: { storageId: heroStorageId, index: 0, isHero: true }
+                }).then(result => {
+                  // Hero image loaded - this is handled by LOD system
+                  // No need to set it here, LOD will pick it up
+                }).catch(error => {
+                  if (error.error?.message !== 'Request cancelled' && error.error?.message !== 'Request no longer relevant') {
+                    console.warn('[App] Failed to load hero image:', heroStorageId, error.error);
+                  }
+                });
+              }
 
               // Load alternative images for spread animation (skip first image as it's the hero image)
               // Queue handles parallel/sequential loading and prevents browser connection limit issues
@@ -402,11 +439,13 @@ export default class App extends React.Component<{}, State> {
                 const storageId = variantImg.storageId;
 
                 // Use high-res images (1300px @ 85% quality) - same as LOD system
+                // Use trim=true to remove margins for better fit when stacking
+                // Only specify width to preserve aspect ratio of trimmed image
                 const src = buildMediaUrl({
                   storageId,
                   width: 1300,
-                  height: 1300,
                   quality: 85,
+                  trim: true,
                 });
                 const imgObj: any = { storageId, src };
 
@@ -478,12 +517,31 @@ export default class App extends React.Component<{}, State> {
   private handleResize = () => {
     this.controller.handleResize();
   };
-  
+
   private handleOrientationChange = () => {
     const orientation = this.computePivotOrientation();
     if (orientation !== this.state.pivotOrientation) {
       this.controller.setPivotOrientation(orientation);
       this.setState({ pivotOrientation: orientation });
+    }
+  };
+
+  // Dialog callbacks (as class methods to prevent re-creation on each render)
+  private handleDialogPositionChange = (pos: { x: number; y: number }) => {
+    // Only update if position actually changed
+    const current = this.state.dialogPosition;
+    if (!current || current.x !== pos.x || current.y !== pos.y) {
+      this.setState({ dialogPosition: pos });
+    }
+  };
+
+  private handleDialogVariantChange = (variant: any) => {
+    // Only update if variant actually changed
+    const currentVariant = this.state.selectedVariant;
+    const newVariantId = variant?.sku || variant?.name || '';
+    const currentVariantId = currentVariant?.sku || currentVariant?.name || '';
+    if (newVariantId !== currentVariantId) {
+      this.setState({ selectedVariant: variant });
     }
   };
   
@@ -725,7 +783,11 @@ export default class App extends React.Component<{}, State> {
       });
       canvas.style.cursor = product ? 'pointer' : 'default';
     } else if (product) {
-      this.setState({ mousePos: { x: e.clientX, y: e.clientY } });
+      // Only update mousePos if it has actually changed to prevent infinite re-renders
+      const currentPos = this.state.mousePos;
+      if (!currentPos || currentPos.x !== e.clientX || currentPos.y !== e.clientY) {
+        this.setState({ mousePos: { x: e.clientX, y: e.clientY } });
+      }
     }
   };
 
@@ -1232,15 +1294,31 @@ export default class App extends React.Component<{}, State> {
           )}
         </div>
 
-        {/* React Product Info Panel (fixed right side) */}
+        {/* React Product Info Panel (fixed right side OR Hero Mode with Video) */}
         <AnimatePresence>
           {this.state.overlayMode === 'react' && selectedProduct && (
-            <ProductOverlayModal
-              product={selectedProduct}
-              onClose={() => this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null })}
-              onPositionChange={(pos) => this.setState({ dialogPosition: pos })}
-              onVariantChange={(variant) => this.setState({ selectedVariant: variant })}
-            />
+            // Hero Mode (< 8 products): Fullscreen Video + V3 Dialog
+            this.state.isPivotHeroMode ? (
+              <HeroVideoBackground
+                storageId={6550}
+                onClose={() => this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null })}
+              >
+                <ProductOverlayModalV3
+                  product={selectedProduct}
+                  onClose={() => this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null })}
+                  onPositionChange={this.handleDialogPositionChange}
+                  onVariantChange={this.handleDialogVariantChange}
+                />
+              </HeroVideoBackground>
+            ) : (
+              // Normal Mode: V2 Dialog
+              <ProductOverlayModal
+                product={selectedProduct}
+                onClose={() => this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null })}
+                onPositionChange={this.handleDialogPositionChange}
+                onVariantChange={this.handleDialogVariantChange}
+              />
+            )
           )}
         </AnimatePresence>
         

@@ -155,7 +155,7 @@ export class ProductFinderController {
     const bounds = this.layoutService.getContentBounds(this.canvas.width, this.canvas.height);
 
     if (!bounds) {
-      console.warn('[ProductFinderController] No content bounds available');
+      // No bounds available yet (e.g., during initial load) - this is normal
       return;
     }
 

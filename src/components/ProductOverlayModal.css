@@ -14,27 +14,27 @@
 
 .pom-container {
   position: relative;
-  width: min(720px, 95vw);
+  width: min(240px, 95vw);
   max-height: 90vh;
   background: white;
-  border-radius: 24px;
+  border-radius: 20px;
   overflow: hidden;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
 }
 
 .pom-close {
   position: absolute;
-  top: 20px;
-  right: 20px;
-  width: 44px;
-  height: 44px;
-  min-width: 44px;
-  min-height: 44px;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
   border-radius: 50%;
   border: none;
   background: rgba(0, 0, 0, 0.3);
   color: white;
-  font-size: 28px;
+  font-size: 20px;
   font-weight: 300;
   cursor: pointer;
   z-index: 10;
@@ -53,24 +53,21 @@
 
 .pom-layout {
   display: grid;
-  grid-template-columns: 40% 60%;
-  min-height: 600px;
+  grid-template-columns: 1fr;
+  min-height: auto;
   max-height: 90vh;
 }
 
 @media (max-width: 968px) {
   .pom-layout {
     grid-template-columns: 1fr;
+    min-height: auto;
   }
 }
 
-/* Image Section */
+/* Image Section - Hidden for compact layout */
 .pom-image-section {
-  background: linear-gradient(135deg, #f5f7fa 0%, #e8eef5 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 40px;
+  display: none;
 }
 
 .pom-product-image {
@@ -85,12 +82,23 @@
   background: rgba(65, 145, 235, 0.3);
   backdrop-filter: blur(40px) saturate(180%);
   -webkit-backdrop-filter: blur(40px) saturate(180%);
-  padding: 40px;
+  padding: 16px;
   color: white;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 12px;
+}
+
+/* Hide all non-essential elements - only show title, price, dropdowns, button */
+.pom-features,
+.pom-material,
+.pom-section {
+  display: none !important;
+}
+
+.pom-material-item {
+  display: none !important;
 }
 
 /* Custom Scrollbar Styling */
@@ -130,15 +138,16 @@
 }
 
 .pom-title {
-  font-size: 32px;
+  font-size: 18px;
   font-weight: 700;
   margin: 0;
   line-height: 1.2;
   color: white;
+  word-break: break-word;
 }
 
 .pom-price {
-  font-size: 36px;
+  font-size: 24px;
   font-weight: 700;
   color: white;
 }
@@ -156,22 +165,22 @@
 
 .pom-dropdown {
   width: 100%;
-  padding: 14px 20px;
+  padding: 10px 12px;
   background: rgba(255, 255, 255, 0.18);
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 16px;
+  border-radius: 12px;
   color: white;
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 20 20' fill='none' stroke='white' stroke-width='2'%3E%3Cpolyline points='6 8 10 12 14 8'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 20 20' fill='none' stroke='white' stroke-width='2'%3E%3Cpolyline points='6 8 10 12 14 8'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 16px center;
-  background-size: 20px;
-  padding-right: 48px;
+  background-position: right 10px center;
+  background-size: 16px;
+  padding-right: 36px;
 }
 
 .pom-dropdown:hover {
@@ -345,10 +354,10 @@
 
 .pom-button {
   width: 100%;
-  padding: 16px 24px;
+  padding: 12px 16px;
   border: none;
-  border-radius: 14px;
-  font-size: 18px;
+  border-radius: 12px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -390,70 +399,98 @@
   transform: translateY(0);
 }
 
-/* Mobile adjustments */
+/* Mobile adjustments - Compact version with only essentials */
 @media (max-width: 968px) {
   .pom-container {
-    width: 100%;
-    max-height: 95vh;
-    border-radius: 16px;
+    width: min(240px, 95vw);
+    max-width: 240px;
+    max-height: auto;
+    border-radius: 12px;
   }
 
+  /* Hide image section on mobile */
   .pom-image-section {
-    padding: 30px;
-    min-height: 300px;
+    display: none;
+  }
+
+  /* Hide all non-essential elements on mobile */
+  .pom-features,
+  .pom-material,
+  .pom-section {
+    display: none !important;
+  }
+
+  .pom-material-item {
+    display: none !important;
   }
 
   .pom-info-panel {
-    padding: 30px;
+    padding: 12px;
+    gap: 10px;
   }
 
   .pom-title {
-    font-size: 26px;
+    font-size: 14px;
+    line-height: 1.2;
   }
 
   .pom-price {
-    font-size: 30px;
+    font-size: 18px;
   }
 
   .pom-dropdowns {
     grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .pom-dropdown {
+    padding: 10px 14px;
+    font-size: 13px;
   }
 }
 
 @media (max-width: 640px) {
   .pom-backdrop {
-    padding: 10px;
+    padding: 8px;
   }
 
   .pom-container {
-    border-radius: 12px;
-  }
-
-  .pom-image-section {
-    padding: 20px;
-    min-height: 250px;
+    width: min(220px, 95vw);
+    max-width: 220px;
+    border-radius: 10px;
   }
 
   .pom-info-panel {
-    padding: 24px;
-    gap: 20px;
+    padding: 12px;
+    gap: 10px;
   }
 
   .pom-title {
-    font-size: 22px;
+    font-size: 13px;
+    line-height: 1.2;
   }
 
   .pom-price {
-    font-size: 26px;
+    font-size: 16px;
+  }
+
+  .pom-dropdowns {
+    gap: 6px;
+  }
+
+  .pom-dropdown {
+    padding: 8px 12px;
+    font-size: 12px;
+    border-radius: 8px;
   }
 
   .pom-close {
-    top: 12px;
-    right: 12px;
-    width: 40px;
-    height: 40px;
-    min-width: 40px;
-    min-height: 40px;
-    font-size: 24px;
+    top: 8px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    font-size: 20px;
   }
 }

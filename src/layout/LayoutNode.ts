@@ -44,18 +44,23 @@ export class LayoutNode<T> {
   }
   
   setTargets(pos: Vector2, size: Vector2, opacity?: number, scale?: number) {
-    this.posX.targetValue = pos.x; 
-    this.posY.targetValue = pos.y;
-    this.width.targetValue = size.x; 
-    this.height.targetValue = size.y;
-    if (opacity !== undefined) this.opacity.targetValue = opacity;
-    if (scale !== undefined) this.scale.targetValue = scale;
-    
-    // Fade in new nodes
+    // NEW: If node is brand new, set position IMMEDIATELY to avoid animation from (0,0)
     if (this.isNew) {
+      this.posX.setImmediate(pos.x);
+      this.posY.setImmediate(pos.y);
+      this.width.setImmediate(size.x);
+      this.height.setImmediate(size.y);
       this.opacity.targetValue = 1;
       this.scale.targetValue = 1;
       this.isNew = false;
+    } else {
+      // Existing nodes: animate to new position
+      this.posX.targetValue = pos.x;
+      this.posY.targetValue = pos.y;
+      this.width.targetValue = size.x;
+      this.height.targetValue = size.y;
+      if (opacity !== undefined) this.opacity.targetValue = opacity;
+      if (scale !== undefined) this.scale.targetValue = scale;
     }
   }
   
