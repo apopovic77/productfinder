@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 import AnnotationTester from './pages/AnnotationTester.tsx'
-import { PreloaderProvider, PreloaderOverlay } from 'react-asset-preloader'
+import { PreloaderProvider, PreloaderOverlay } from './libs/react-asset-preloader'
 import { AppPreloaderWrapper } from './components/AppPreloaderWrapper'
 
 const isAnnot = typeof window !== 'undefined' && (window.location.pathname === '/annot' || new URLSearchParams(window.location.search).get('annot') === '1')

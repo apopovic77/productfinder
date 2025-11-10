@@ -20,6 +20,7 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+  const [dialogOpacity, setDialogOpacity] = useState(1);
   const [error, setError] = useState<string | null>(null);
 
   // Build video URL from Storage API
@@ -55,10 +56,11 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
   // Handle close with fade-out animation
   const handleClose = () => {
     setIsClosing(true);
-    // Wait for fade-out animation (2 seconds) before actually closing
+    setDialogOpacity(0); // Fade out dialog
+    // Wait for fade-out animation (2 seconds + buffer) before actually closing
     setTimeout(() => {
       onClose();
-    }, 2000); // 2 seconds fade-out
+    }, 2100); // 2.1 seconds to ensure animation completes
   };
 
   // ESC key to close
@@ -98,8 +100,14 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
       )}
 
       {/* Overlay Content (Dialog) */}
-      <div className="hero-video-content">
-        {!isClosing && React.Children.map(children, child => {
+      <div
+        className="hero-video-content"
+        style={{
+          opacity: dialogOpacity,
+          transition: 'opacity 2s ease-in-out'
+        }}
+      >
+        {React.Children.map(children, child => {
           if (React.isValidElement(child)) {
             // Override child's onClose to use our handleClose with fade-out
             return React.cloneElement(child, { onClose: handleClose } as any);

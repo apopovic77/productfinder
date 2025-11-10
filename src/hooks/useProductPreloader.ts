@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { usePreloader } from 'react-asset-preloader';
+import { usePreloader } from '../libs/react-asset-preloader';
 import { fetchProducts } from '../data/ProductRepository';
 import { buildMediaUrl } from '../utils/MediaUrlBuilder';
 import { getImagesForVariant, getPrimaryVariant } from '../utils/variantImageHelpers';
