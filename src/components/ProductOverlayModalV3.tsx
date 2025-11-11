@@ -164,7 +164,7 @@ export const ProductOverlayModalV3: React.FC<Props> = ({ product, onClose, posit
       });
 
       variantImageIds.forEach((storageId) => {
-        const imageUrl = `https://share.arkturian.com/proxy.php?id=${storageId}&width=130&format=webp&quality=80&trim=true`;
+        const imageUrl = `https://share.arkturian.com/proxy.php?id=${storageId}&width=130&format=webp&quality=80&trim=false`;
         images.push({
           storageId,
           src: imageUrl,
@@ -185,7 +185,7 @@ export const ProductOverlayModalV3: React.FC<Props> = ({ product, onClose, posit
   const thumbnailUrls = useMemo(() => {
     return allImages.map(img => {
       if (img.storageId) {
-        return `https://share.arkturian.com/proxy.php?id=${img.storageId}&width=130&format=webp&quality=80&trim=true`;
+        return `https://share.arkturian.com/proxy.php?id=${img.storageId}&width=130&format=webp&quality=80&trim=false`;
       }
       return img.src;
     });
@@ -194,7 +194,7 @@ export const ProductOverlayModalV3: React.FC<Props> = ({ product, onClose, posit
   // Load thumbnails through ImageLoadQueue
   const { loadedImages: loadedThumbnails } = useImageQueue(thumbnailUrls, {
     group: `product-thumbnails-${product.id}`,
-    priority: 200, // Low priority: Load AFTER canvas images (hero=0, LOD=1000+)
+    priority: -30, // HIGHEST PRIORITY: Thumbnails are small, cache-friendly, and instantly visible!
   });
 
   // Update selected image when variant changes
@@ -289,7 +289,8 @@ export const ProductOverlayModalV3: React.FC<Props> = ({ product, onClose, posit
     const storageId = getCurrentStorageId();
 
     if (storageId) {
-      return `https://share.arkturian.com/proxy.php?id=${storageId}&width=1300&format=webp&quality=85&trim=true`;
+      // Main dialog image: NO trim (consistent aspect ratio with thumbnail - prevents visual jump during LOD update)
+      return `https://share.arkturian.com/proxy.php?id=${storageId}&width=1300&format=webp&quality=85&trim=false`;
     }
 
     const media = product.media || [];
@@ -380,7 +381,7 @@ export const ProductOverlayModalV3: React.FC<Props> = ({ product, onClose, posit
   const highResUrl = getHighResImageUrl();
   const { loadedImages: loadedHeroImages } = useImageQueue([highResUrl], {
     group: `product-hero-${product.id}`,
-    priority: 150, // Medium-high priority for hero dialog
+    priority: -10, // ABSOLUTE HIGHEST PRIORITY - Main dialog image should load/sharpen FIRST!
   });
   const loadedHeroImage = loadedHeroImages.get(highResUrl);
 
@@ -402,9 +403,9 @@ export const ProductOverlayModalV3: React.FC<Props> = ({ product, onClose, posit
         padding: '32px', // More padding
         boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)', // Stronger shadow
       }}
-      initial={{ opacity: 0, y: 100 }}
+      initial={{ opacity: 0, y: 0 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 50 }}
+      exit={{ opacity: 0, y: 0 }}
       transition={{
         duration: 0.6,
         ease: [0.4, 0, 0.2, 1], // Smooth easing
@@ -491,11 +492,12 @@ export const ProductOverlayModalV3: React.FC<Props> = ({ product, onClose, posit
           overflowY: 'visible',
           maxWidth: '100%',
           minHeight: '80px',
+          paddingTop: '8px',
           paddingBottom: '8px',
         }}>
           {allImages.map((img, idx) => {
             const thumbnailUrl = img.storageId
-              ? `https://share.arkturian.com/proxy.php?id=${img.storageId}&width=130&format=webp&quality=80&trim=true`
+              ? `https://share.arkturian.com/proxy.php?id=${img.storageId}&width=130&format=webp&quality=80&trim=false`
               : img.src;
             const loadedImage = loadedThumbnails.get(thumbnailUrl);
             const isActive = idx === selectedImageIndex;

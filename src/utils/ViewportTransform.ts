@@ -168,11 +168,13 @@ export class ViewportTransform {
     const centerX = (this.viewportWidth - scaledWidth) / 2 - this.contentBounds.minX * this.targetScale;
     const centerY = (this.viewportHeight - scaledHeight) / 2 - this.contentBounds.minY * this.targetScale;
 
-    // Bounds: content edges can't go past viewport edges
-    const maxOffsetX = shouldCenterX ? centerX : 0;
-    const minOffsetX = shouldCenterX ? centerX : this.viewportWidth - scaledWidth;
-    const maxOffsetY = shouldCenterY ? centerY : 0;
-    const minOffsetY = shouldCenterY ? centerY : this.viewportHeight - scaledHeight;
+    // Bounds: account for extended content bounds (e.g., Hero Mode allows edge products to center)
+    // If minX < 0, content was extended to the left → allow panning right (positive maxOffsetX)
+    // If content extends beyond viewport, allow panning left (negative minOffsetX)
+    const maxOffsetX = shouldCenterX ? centerX : -this.contentBounds.minX * this.targetScale;
+    const minOffsetX = shouldCenterX ? centerX : this.viewportWidth - scaledWidth - this.contentBounds.minX * this.targetScale;
+    const maxOffsetY = shouldCenterY ? centerY : -this.contentBounds.minY * this.targetScale;
+    const minOffsetY = shouldCenterY ? centerY : this.viewportHeight - scaledHeight - this.contentBounds.minY * this.targetScale;
 
     return {
       minOffsetX,

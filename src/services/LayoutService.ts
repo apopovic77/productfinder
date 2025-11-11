@@ -594,7 +594,7 @@ export class LayoutService {
     // Hero Mode: Dynamic bounds based on actual content (allows vertical centering)
     const isHeroMode = this.isPivotHeroMode();
     if (isHeroMode) {
-      return this.calculateDynamicBounds(nodes);
+      return this.calculateDynamicBounds(nodes, viewportWidth);
     }
 
     // Pivot Mode: Fixed bounds based on viewport (prevents unwanted centering)
@@ -611,13 +611,19 @@ export class LayoutService {
   /**
    * Calculate dynamic bounds based on actual content
    * Used in Hero Mode to allow vertical centering
+   *
+   * @param viewportWidth - Optional viewport width for Hero Mode bounds extension
    */
-  private calculateDynamicBounds(nodes: any[]): { width: number; height: number; minX: number; minY: number; maxX: number; maxY: number; maxItemHeight: number } {
+  private calculateDynamicBounds(nodes: any[], viewportWidth?: number): { width: number; height: number; minX: number; minY: number; maxX: number; maxY: number; maxItemHeight: number } {
     let minX = Infinity;
     let minY = Infinity;
     let maxX = -Infinity;
     let maxY = -Infinity;
     let maxItemHeight = 0;
+
+    // Track first and last product for Hero Mode extension calculation
+    let firstProduct: { x: number; w: number } | null = null;
+    let lastProduct: { x: number; w: number } | null = null;
 
     // Include product nodes in bounds
     for (const node of nodes) {
@@ -625,6 +631,14 @@ export class LayoutService {
       const y = node.posY.targetValue ?? node.posY.value ?? 0;
       const w = node.width.targetValue ?? node.width.value ?? 0;
       const h = node.height.targetValue ?? node.height.value ?? 0;
+
+      // Track first (leftmost) and last (rightmost) products
+      if (!firstProduct || x < firstProduct.x) {
+        firstProduct = { x, w };
+      }
+      if (!lastProduct || x + w > (lastProduct.x + lastProduct.w)) {
+        lastProduct = { x, w };
+      }
 
       minX = Math.min(minX, x);
       minY = Math.min(minY, y);
@@ -642,6 +656,23 @@ export class LayoutService {
       minY = Math.min(minY, header.y);
       maxX = Math.max(maxX, header.x + header.width);
       maxY = Math.max(maxY, header.y + header.height);
+    }
+
+    // Hero Mode: Extend bounds to allow first/last product center to reach viewport center
+    if (viewportWidth && firstProduct && lastProduct) {
+      // To center first product: its center must be at viewportWidth/2
+      // This requires: minX = firstProductCenter - viewportWidth/2
+      const firstProductCenter = firstProduct.x + firstProduct.w / 2;
+      const requiredMinX = firstProductCenter - (viewportWidth / 2);
+
+      // To center last product: its center must be at viewportWidth/2
+      // This requires: maxX = lastProductCenter + viewportWidth/2
+      const lastProductCenter = lastProduct.x + lastProduct.w / 2;
+      const requiredMaxX = lastProductCenter + (viewportWidth / 2);
+
+      // Set bounds to these exact values
+      minX = requiredMinX;
+      maxX = requiredMaxX;
     }
 
     return {

@@ -1,3 +1,5 @@
+import { imageCache } from './IndexedDBImageCache';
+
 /**
  * Generic Image Load Queue
  *
@@ -7,6 +9,7 @@
  * - Request cancellation by group or ID
  * - Progress callbacks
  * - Pause/Resume support
+ * - IndexedDB cache for instant loading
  *
  * Usage:
  * ```typescript
@@ -407,9 +410,99 @@ export class ImageLoadQueue<T = any> {
   }
 
   /**
-   * Load a single image with timeout
+   * Load a single image with timeout and IndexedDB cache
+   *
+   * Flow:
+   * 1. Check IndexedDB cache first
+   * 2. Cache HIT: Return instantly (0ms network time!)
+   * 3. Cache MISS: Fetch from network, cache blob, return image
+   *
+   * CORS is now enabled on share.arkturian.com/proxy.php
    */
-  private loadImage(url: string, timeout: number): Promise<HTMLImageElement> {
+  private async loadImage(url: string, timeout: number): Promise<HTMLImageElement> {
+    // Step 1: Try IndexedDB cache first
+    try {
+      const cachedBlob = await imageCache.get(url);
+
+      if (cachedBlob) {
+        // Cache HIT - convert blob to Image instantly!
+        return this.blobToImage(cachedBlob);
+      }
+    } catch (error) {
+      // Cache read failed - fall back to network
+      console.warn('[ImageLoadQueue] Cache read failed:', error);
+    }
+
+    // Step 2: Cache MISS - fetch from network with caching enabled
+    try {
+      return await this.loadImageWithFetch(url, timeout);
+    } catch (error) {
+      // Fetch failed (CORS or network error) - fall back to <img> tag
+      console.warn('[ImageLoadQueue] Fetch failed, using <img> fallback:', error);
+      return this.loadImageWithImgTag(url, timeout);
+    }
+  }
+
+  /**
+   * Load image using fetch() - enables caching but requires CORS
+   */
+  private async loadImageWithFetch(url: string, timeout: number): Promise<HTMLImageElement> {
+    return new Promise((resolve, reject) => {
+      let timer: ReturnType<typeof setTimeout> | null = null;
+      let fetchAborted = false;
+
+      const cleanup = () => {
+        if (timer) clearTimeout(timer);
+        fetchAborted = true;
+      };
+
+      timer = setTimeout(() => {
+        cleanup();
+        reject(new Error(`Image load timeout: ${url}`));
+      }, timeout);
+
+      // Fetch as blob to enable caching
+      fetch(url, { mode: 'cors' })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          return response.blob();
+        })
+        .then(async blob => {
+          if (fetchAborted) return;
+
+          // Cache ONLY thumbnails (≤300px width) to save IndexedDB space
+          // High-res images (1300px) are NOT cached (too large, rarely reused)
+          const shouldCache = this.shouldCacheImage(url, blob);
+          if (shouldCache) {
+            imageCache.set(url, blob).catch(err => {
+              console.warn('[ImageLoadQueue] Failed to cache image:', err);
+            });
+          }
+
+          // Convert blob to Image
+          const img = await this.blobToImage(blob);
+          cleanup();
+          resolve(img);
+        })
+        .catch(error => {
+          if (fetchAborted) return;
+          cleanup();
+          // Mark CORS errors specially
+          if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+            reject(new Error(`CORS error: ${url}`));
+          } else {
+            reject(new Error(`Failed to load image: ${url} - ${error.message}`));
+          }
+        });
+    });
+  }
+
+  /**
+   * Load image using <img> tag - works cross-origin but can't cache
+   */
+  private loadImageWithImgTag(url: string, timeout: number): Promise<HTMLImageElement> {
     return new Promise((resolve, reject) => {
       const img = new Image();
       let timer: ReturnType<typeof setTimeout> | null = null;
@@ -436,6 +529,63 @@ export class ImageLoadQueue<T = any> {
       }, timeout);
 
       img.src = url;
+    });
+  }
+
+  /**
+   * Decide whether to cache an image based on size
+   * Only cache thumbnails (≤300px) to save IndexedDB space
+   */
+  private shouldCacheImage(url: string, blob: Blob): boolean {
+    try {
+      // Extract width from URL (e.g., "width=130")
+      const urlObj = new URL(url);
+      const width = urlObj.searchParams.get('width');
+
+      if (width) {
+        const widthNum = parseInt(width, 10);
+        // Cache only thumbnails (≤300px width)
+        if (widthNum <= 300) {
+          return true;
+        }
+      }
+
+      // Also check blob size: cache only if < 50KB
+      if (blob.size < 50 * 1024) {
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      // If URL parsing fails, cache small blobs only
+      return blob.size < 50 * 1024;
+    }
+  }
+
+  /**
+   * Convert Blob to HTMLImageElement
+   *
+   * Note: We do NOT revoke the blob URL to avoid race conditions with parallel loading.
+   * This creates a small memory leak, but it's acceptable for thumbnails (~3-5KB each).
+   * The browser will clean up URLs when the page is closed.
+   */
+  private blobToImage(blob: Blob): Promise<HTMLImageElement> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const objectUrl = URL.createObjectURL(blob);
+
+      img.onload = () => {
+        // DO NOT REVOKE - causes race conditions with parallel loading
+        resolve(img);
+      };
+
+      img.onerror = () => {
+        // On error, we can safely revoke (won't be used anyway)
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error('Failed to decode image blob'));
+      };
+
+      img.src = objectUrl;
     });
   }
 

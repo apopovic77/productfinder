@@ -21,6 +21,7 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
   const [isLoaded, setIsLoaded] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [dialogOpacity, setDialogOpacity] = useState(1);
+  const [overlayOpacity, setOverlayOpacity] = useState(1);
   const [error, setError] = useState<string | null>(null);
 
   // Build video URL from Storage API
@@ -57,10 +58,13 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
   const handleClose = () => {
     setIsClosing(true);
     setDialogOpacity(0); // Fade out dialog
-    // Wait for fade-out animation (2 seconds + buffer) before actually closing
+    setOverlayOpacity(0); // Fade out video overlay
+
+    // Call onClose after 50ms to trigger canvas animations (alternative products return)
+    // This allows canvas animation to run simultaneously with video fadeout
     setTimeout(() => {
       onClose();
-    }, 2100); // 2.1 seconds to ensure animation completes
+    }, 50);
   };
 
   // ESC key to close
@@ -89,7 +93,13 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
       />
 
       {/* Dark Overlay for better text readability */}
-      <div className="hero-video-overlay" />
+      <div
+        className="hero-video-overlay"
+        style={{
+          opacity: overlayOpacity,
+          transition: 'opacity 1s ease-in-out'
+        }}
+      />
 
       {/* Error Message */}
       {error && (
@@ -104,7 +114,7 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
         className="hero-video-content"
         style={{
           opacity: dialogOpacity,
-          transition: 'opacity 2s ease-in-out'
+          transition: 'opacity 1s ease-in-out'
         }}
       >
         {React.Children.map(children, child => {

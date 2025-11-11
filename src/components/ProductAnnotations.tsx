@@ -1,4 +1,4 @@
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useState } from 'react';
 import { ForceLabels } from 'react-force-labels';
 import type { Label } from 'react-force-labels';
 import { Vector2 } from 'arkturian-typescript-utils';
@@ -126,6 +126,8 @@ const ProductAnnotationsComponent: React.FC<ProductAnnotationsProps> = ({
     forceConfig.friction,
   ]);
 
+  const [hoveredLabelId, setHoveredLabelId] = useState<string | null>(null);
+
   return (
     <div
       style={{
@@ -134,8 +136,8 @@ const ProductAnnotationsComponent: React.FC<ProductAnnotationsProps> = ({
         left: 0,
         width: canvasWidth,
         height: canvasHeight,
-        pointerEvents: 'none', // Let clicks pass through to canvas
-        zIndex: 10, // Above canvas
+        pointerEvents: 'none',
+        zIndex: 10,
         transform: `translate(${viewportOffsetX}px, ${viewportOffsetY}px) scale(${viewportScale})`,
         transformOrigin: '0 0',
       }}
@@ -145,20 +147,68 @@ const ProductAnnotationsComponent: React.FC<ProductAnnotationsProps> = ({
         labels={labels}
         width={canvasWidth / viewportScale}
         height={canvasHeight / viewportScale}
-        showConnectors={true}
+        showConnectors={hoveredLabelId !== null} // Only show connector on hover
         forceConfig={memoizedForceConfig}
-        style={{
-          backgroundColor: 'rgba(255, 255, 255, 0.95)',
-          textColor: '#1a1a1a',
-          borderColor: '#3b82f6',
-          borderWidth: 2,
-          borderRadius: 8,
-          fontSize: 14 / viewportScale,
-          fontFamily: 'system-ui, -apple-system, sans-serif',
-          fontWeight: 600,
-          padding: 10 / viewportScale,
-          shadow: true,
-          opacity: 1,
+        renderLabel={(label, position) => {
+          const isHovered = hoveredLabelId === label.id;
+
+          return (
+            <div
+              key={label.id}
+              style={{
+                position: 'absolute',
+                left: position.x,
+                top: position.y,
+                transform: 'translate(-50%, -50%)',
+                pointerEvents: 'all',
+                cursor: 'pointer',
+                zIndex: isHovered ? 100 : 1,
+              }}
+              onMouseEnter={() => setHoveredLabelId(label.id)}
+              onMouseLeave={() => setHoveredLabelId(null)}
+            >
+              {/* Circle dot */}
+              <div
+                style={{
+                  width: isHovered ? '16px' : '12px',
+                  height: isHovered ? '16px' : '12px',
+                  borderRadius: '50%',
+                  background: 'rgba(255, 255, 255, 0.95)',
+                  border: `2px solid #3b82f6`,
+                  boxShadow: isHovered
+                    ? '0 4px 12px rgba(59, 130, 246, 0.5)'
+                    : '0 2px 8px rgba(0, 0, 0, 0.3)',
+                  transition: 'all 0.2s ease',
+                }}
+              />
+
+              {/* Text label on hover */}
+              {isHovered && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '20px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                    color: '#1a1a1a',
+                    border: '2px solid #3b82f6',
+                    borderRadius: '8px',
+                    padding: `${10 / viewportScale}px`,
+                    fontSize: `${14 / viewportScale}px`,
+                    fontFamily: 'system-ui, -apple-system, sans-serif',
+                    fontWeight: 600,
+                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)',
+                    whiteSpace: 'nowrap',
+                    pointerEvents: 'none',
+                    animation: 'fadeIn 0.15s ease',
+                  }}
+                >
+                  {label.content}
+                </div>
+              )}
+            </div>
+          );
         }}
       />
     </div>

@@ -212,14 +212,23 @@ export class CanvasRenderer<T> {
       const screenHeight = h * scale;
       const screenSize = Math.max(screenWidth, screenHeight);
 
-      // Determine required image size based on config
-      const requiredSize = screenSize > LOD_CONFIG.transitionThreshold
-        ? LOD_CONFIG.highResolution
-        : LOD_CONFIG.lowResolution;
+      // Determine required image size with HYSTERESIS to prevent flickering
+      const currentSize = this.loadedImageSizes.get(node.id);
+      let requiredSize: number;
+
+      if (currentSize === LOD_CONFIG.highResolution) {
+        // Currently high-res: only switch down if below lower threshold
+        requiredSize = screenSize < LOD_CONFIG.transitionThresholdDown
+          ? LOD_CONFIG.lowResolution
+          : LOD_CONFIG.highResolution;
+      } else {
+        // Currently low-res (or no image): only switch up if above upper threshold
+        requiredSize = screenSize > LOD_CONFIG.transitionThresholdUp
+          ? LOD_CONFIG.highResolution
+          : LOD_CONFIG.lowResolution;
+      }
 
       // Check if we need to load a different size
-      const currentSize = this.loadedImageSizes.get(node.id);
-
       if (currentSize !== requiredSize) {
         const product = node.data as any;
         const storageId = product.primaryImage?.storage_id;
@@ -235,13 +244,17 @@ export class CanvasRenderer<T> {
             Math.pow(nodeCenterX - centerX, 2) + Math.pow(nodeCenterY - centerY, 2)
           );
 
-          const taskId = `lod-${node.id}-${requiredSize}`;
+          // CANCEL old pending request for this node to prevent race conditions
+          const taskId = `lod-${node.id}`; // Simplified ID (no size) to enable cancellation
+          this.imageLoadQueue.cancel(taskId);
+
           const quality = requiredSize === LOD_CONFIG.highResolution ? LOD_CONFIG.highQuality : LOD_CONFIG.lowQuality;
           const imageUrl = buildMediaUrl({
             storageId,
             width: requiredSize,
             height: requiredSize,
             quality,
+            trim: false, // Always NO trim for consistent aspect ratio (no visual jump during LOD updates)
           });
 
           // Add to ImageLoadQueue (automatically handles duplicates and priority sorting)
@@ -294,24 +307,36 @@ export class CanvasRenderer<T> {
           const screenHeight = this.selectedProductBounds.height * scale * pivotScale;
           const screenSize = Math.max(screenWidth, screenHeight);
 
-          // Determine required LOD
-          const requiredSize = screenSize > LOD_CONFIG.transitionThreshold
-            ? LOD_CONFIG.highResolution
-            : LOD_CONFIG.lowResolution;
+          // Determine required LOD with HYSTERESIS
+          let requiredSize: number;
+          if (this.pivotHeroLoadedSize === LOD_CONFIG.highResolution) {
+            requiredSize = screenSize < LOD_CONFIG.transitionThresholdDown
+              ? LOD_CONFIG.lowResolution
+              : LOD_CONFIG.highResolution;
+          } else {
+            requiredSize = screenSize > LOD_CONFIG.transitionThresholdUp
+              ? LOD_CONFIG.highResolution
+              : LOD_CONFIG.lowResolution;
+          }
 
           // Check if we need to load different size
           if (this.pivotHeroLoadedSize !== requiredSize) {
+            // CANCEL old pending request for pivot hero to prevent race conditions
+            const taskId = `pivot-hero-${storageId}`; // Simplified ID (no size)
+            this.imageLoadQueue.cancel(taskId);
+
             const quality = requiredSize === LOD_CONFIG.highResolution ? LOD_CONFIG.highQuality : LOD_CONFIG.lowQuality;
             const imageUrl = buildMediaUrl({
               storageId,
               width: requiredSize,
               height: requiredSize,
               quality,
+              trim: false, // Always NO trim for consistent aspect ratio (no visual jump)
             });
 
             // Priority 0 = highest priority (pivot is most important)
             this.imageLoadQueue.add({
-              id: `pivot-hero-${storageId}-${requiredSize}`,
+              id: taskId,
               url: imageUrl,
               group: 'pivot',
               priority: 0, // Highest priority

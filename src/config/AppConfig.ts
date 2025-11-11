@@ -51,7 +51,7 @@ const PIVOT_DEFAULTS: PivotDefaults = {
 };
 
 const MEDIA_DEFAULTS: MediaDefaults = {
-  useTrimmedImages: false, // Set to true to use trim=true parameter for transparent backgrounds
+  useTrimmedImages: false, // Default: false. Trim is applied selectively (high-res only) to preserve aspect ratio consistency
 };
 
 const DEVELOPER_SETTINGS_DEFAULTS: DeveloperSettings = {
