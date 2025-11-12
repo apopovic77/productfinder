@@ -54,14 +54,34 @@ export const ProductOverlayModalV3: React.FC<Props> = ({ product, onClose, posit
 
   // Helper functions to parse variant name - memoized to prevent re-creation
   const getColor = useCallback((variant: any): string => {
+    // Try option2 first (some variants have color in option2)
+    if (variant.option2) return String(variant.option2);
+    // Then option1
     if (variant.option1) return String(variant.option1);
-    const parts = (variant.name || '').split('/').map((s: string) => s.trim());
+    // Fallback to parsing name: "Color1/Color2/Color3 / Size"
+    // Split by " / " (with spaces) to separate colors from size
+    const parts = (variant.name || '').split(' / ').map((s: string) => s.trim());
     return parts[0] || variant.sku || 'Default';
   }, []);
 
   const getSize = useCallback((variant: any): string => {
-    if (variant.option2) return String(variant.option2);
-    const parts = (variant.name || '').split('/').map((s: string) => s.trim());
+    // Try option1 first (some variants have size in option1)
+    if (variant.option1 && !variant.option2) return String(variant.option1);
+    // If both exist, option1 is likely the size
+    if (variant.option1 && variant.option2) {
+      // Check if option1 looks like a size (contains numbers or is short)
+      const opt1 = String(variant.option1);
+      const opt2 = String(variant.option2);
+      // If opt1 is numeric or short (like "XL", "M", "42"), it's likely a size
+      if (/^\d+$/.test(opt1) || opt1.length <= 3) {
+        return opt1;
+      }
+      // Otherwise opt2 is the color, so there's no size
+      return '';
+    }
+    // Fallback to parsing name: "Color1/Color2/Color3 / Size"
+    // Split by " / " (with spaces) to separate colors from size
+    const parts = (variant.name || '').split(' / ').map((s: string) => s.trim());
     return parts[1] || '';
   }, []);
 
@@ -86,6 +106,12 @@ export const ProductOverlayModalV3: React.FC<Props> = ({ product, onClose, posit
     setSelectedImageIndex(0);
     setImageOpacity(1);
   }, [product.id, allColors]);
+
+  // Reset selected image when color changes
+  useEffect(() => {
+    setSelectedImageIndex(0);
+    setImageOpacity(1);
+  }, [selectedColor]);
 
   // Handle image change with fade transition
   const handleImageChange = useCallback((newIndex: number) => {
@@ -141,12 +167,12 @@ export const ProductOverlayModalV3: React.FC<Props> = ({ product, onClose, posit
     setThumbnailImages([]);
   }, [product.id]);
 
-  // Load new thumbnails
+  // Load new thumbnails - filtered by selected color
   useEffect(() => {
     const timer = setTimeout(() => {
       const images: Array<{ storageId: number | null; src: string; label: string }> = [];
 
-      // Add product media images
+      // Add product media images (these are shared across all variants)
       const media = product.media || [];
       media.forEach((m, idx) => {
         const storageId = (m as any).storage_id || null;
@@ -155,9 +181,11 @@ export const ProductOverlayModalV3: React.FC<Props> = ({ product, onClose, posit
         images.push({ storageId, src, label });
       });
 
-      // Add unique variant images
+      // Add variant images ONLY for the selected color
+      const colorVariants = variants.filter((v: any) => getColor(v) === selectedColor);
       const variantImageIds = new Set<number>();
-      variants.forEach((v: any) => {
+
+      colorVariants.forEach((v: any) => {
         if (v.image_storage_id && !images.some(img => img.storageId === v.image_storage_id)) {
           variantImageIds.add(v.image_storage_id);
         }
@@ -177,7 +205,7 @@ export const ProductOverlayModalV3: React.FC<Props> = ({ product, onClose, posit
     }, 10);
 
     return () => clearTimeout(timer);
-  }, [product.id, product.media, variants]);
+  }, [product.id, product.media, variants, selectedColor, getColor]);
 
   const allImages = thumbnailsLoading ? [] : thumbnailImages;
 

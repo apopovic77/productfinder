@@ -251,6 +251,9 @@ function derivePresentationCategory(args: DerivePresentationCategoryArgs): Prese
   const combinedProtectorText = combinedText;
   const looksLikeProtector = PROTECTOR_KEYWORDS.some(keyword => combinedProtectorText.includes(keyword));
 
+  // DEBUG: Log category decisions
+  const result = (() => {
+
   if (looksLikeProtector) {
     return 'Protektoren';
   }
@@ -298,6 +301,20 @@ function derivePresentationCategory(args: DerivePresentationCategoryArgs): Prese
   }
 
   return 'Accessoires';
+  })();
+
+  // DEBUG: Log if product is categorized as Helme
+  if (result === 'Helme') {
+    console.log('[CATEGORY DEBUG] Helme:', {
+      name: args.productName,
+      primary,
+      secondary,
+      family,
+      reason: primary === 'helmets' ? 'primary=helmets' : name.includes('helm') ? 'name contains helm' : 'unknown'
+    });
+  }
+
+  return result;
 }
 
 function normalizeProductFamily(args: NormalizeProductFamilyArgs): string | undefined {

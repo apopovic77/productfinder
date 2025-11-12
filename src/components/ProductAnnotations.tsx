@@ -1,4 +1,4 @@
-import React, { useRef, useMemo, useState } from 'react';
+import React, { useRef, useMemo, useState, useCallback } from 'react';
 import { ForceLabels } from 'react-force-labels';
 import type { Label } from 'react-force-labels';
 import { Vector2 } from 'arkturian-typescript-utils';
@@ -18,6 +18,73 @@ type ProductAnnotationsProps = {
 };
 
 /**
+ * Individual Label Content Component
+ */
+const LabelContent: React.FC<{
+  id: string;
+  text: string;
+  isHovered: boolean;
+  viewportScale: number;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
+}> = React.memo(({ id, text, isHovered, viewportScale, onMouseEnter, onMouseLeave }) => {
+  return (
+    <div
+      style={{
+        position: 'relative',
+        pointerEvents: 'all',
+        cursor: 'pointer',
+      }}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
+      {/* Circle dot */}
+      <div
+        style={{
+          width: isHovered ? '16px' : '12px',
+          height: isHovered ? '16px' : '12px',
+          borderRadius: '50%',
+          background: 'rgba(255, 255, 255, 0.95)',
+          border: `2px solid #3b82f6`,
+          boxShadow: isHovered
+            ? '0 4px 12px rgba(59, 130, 246, 0.5)'
+            : '0 2px 8px rgba(0, 0, 0, 0.3)',
+          transition: 'all 0.2s ease',
+        }}
+      />
+
+      {/* Text label on hover */}
+      {isHovered && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+            color: '#1a1a1a',
+            border: '2px solid #3b82f6',
+            borderRadius: '8px',
+            padding: `${10 / viewportScale}px`,
+            fontSize: `${14 / viewportScale}px`,
+            fontFamily: 'system-ui, -apple-system, sans-serif',
+            fontWeight: 600,
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)',
+            whiteSpace: 'nowrap',
+            pointerEvents: 'none',
+            animation: 'fadeIn 0.15s ease',
+          }}
+        >
+          {text}
+        </div>
+      )}
+    </div>
+  );
+});
+
+LabelContent.displayName = 'LabelContent';
+
+/**
  * Product Annotations Component
  * Displays force-directed labels around a product in Hero Mode
  *
@@ -35,20 +102,35 @@ const ProductAnnotationsComponent: React.FC<ProductAnnotationsProps> = ({
   viewportOffsetY,
   forceConfig,
 }) => {
-  // Store STABLE label objects in ref to prevent recreation
-  // Labels use WORLD COORDINATES (anchorX, anchorY) - the parent div handles viewport transform
-  const labelsRef = useRef<{ labels: Label[]; productId: string } | null>(null);
+  const [hoveredLabelId, setHoveredLabelId] = useState<string | null>(null);
 
-  // Only recreate labels when product changes
-  if (!labelsRef.current || labelsRef.current.productId !== product.id) {
+  // Create labels - must include hoveredLabelId in dependencies so labels update on hover
+  const labels = useMemo(() => {
     const result: Label[] = [];
+
+    const handlers = {
+      price: { onMouseEnter: () => setHoveredLabelId('price'), onMouseLeave: () => setHoveredLabelId(null) },
+      name: { onMouseEnter: () => setHoveredLabelId('name'), onMouseLeave: () => setHoveredLabelId(null) },
+      category: { onMouseEnter: () => setHoveredLabelId('category'), onMouseLeave: () => setHoveredLabelId(null) },
+      weight: { onMouseEnter: () => setHoveredLabelId('weight'), onMouseLeave: () => setHoveredLabelId(null) },
+      season: { onMouseEnter: () => setHoveredLabelId('season'), onMouseLeave: () => setHoveredLabelId(null) },
+      brand: { onMouseEnter: () => setHoveredLabelId('brand'), onMouseLeave: () => setHoveredLabelId(null) },
+    };
 
     // Price (highest priority - stays closest)
     if (product.price?.value) {
       result.push({
         id: 'price',
         anchor: new Vector2(anchorX, anchorY - 80),
-        content: `€ ${product.price.value.toFixed(2)}`,
+        content: (
+          <LabelContent
+            id="price"
+            text={`€ ${product.price.value.toFixed(2)}`}
+            isHovered={hoveredLabelId === 'price'}
+            viewportScale={viewportScale}
+            {...handlers.price}
+          />
+        ),
         priority: 5,
       });
     }
@@ -57,7 +139,15 @@ const ProductAnnotationsComponent: React.FC<ProductAnnotationsProps> = ({
     result.push({
       id: 'name',
       anchor: new Vector2(anchorX - 120, anchorY),
-      content: product.name,
+      content: (
+        <LabelContent
+          id="name"
+          text={product.name}
+          isHovered={hoveredLabelId === 'name'}
+          viewportScale={viewportScale}
+          {...handlers.name}
+        />
+      ),
       priority: 4,
     });
 
@@ -66,7 +156,15 @@ const ProductAnnotationsComponent: React.FC<ProductAnnotationsProps> = ({
       result.push({
         id: 'category',
         anchor: new Vector2(anchorX + 100, anchorY + 60),
-        content: product.category[0],
+        content: (
+          <LabelContent
+            id="category"
+            text={product.category[0]}
+            isHovered={hoveredLabelId === 'category'}
+            viewportScale={viewportScale}
+            {...handlers.category}
+          />
+        ),
         priority: 2,
       });
     }
@@ -76,7 +174,15 @@ const ProductAnnotationsComponent: React.FC<ProductAnnotationsProps> = ({
       result.push({
         id: 'weight',
         anchor: new Vector2(anchorX - 100, anchorY + 80),
-        content: `${product.weight}g`,
+        content: (
+          <LabelContent
+            id="weight"
+            text={`${product.weight}g`}
+            isHovered={hoveredLabelId === 'weight'}
+            viewportScale={viewportScale}
+            {...handlers.weight}
+          />
+        ),
         priority: 2,
       });
     }
@@ -86,7 +192,15 @@ const ProductAnnotationsComponent: React.FC<ProductAnnotationsProps> = ({
       result.push({
         id: 'season',
         anchor: new Vector2(anchorX + 90, anchorY - 60),
-        content: `Season ${product.season}`,
+        content: (
+          <LabelContent
+            id="season"
+            text={`Season ${product.season}`}
+            isHovered={hoveredLabelId === 'season'}
+            viewportScale={viewportScale}
+            {...handlers.season}
+          />
+        ),
         priority: 1,
       });
     }
@@ -96,16 +210,21 @@ const ProductAnnotationsComponent: React.FC<ProductAnnotationsProps> = ({
       result.push({
         id: 'brand',
         anchor: new Vector2(anchorX - 80, anchorY - 70),
-        content: product.brand,
+        content: (
+          <LabelContent
+            id="brand"
+            text={product.brand}
+            isHovered={hoveredLabelId === 'brand'}
+            viewportScale={viewportScale}
+            {...handlers.brand}
+          />
+        ),
         priority: 3,
       });
     }
 
-    labelsRef.current = { labels: result, productId: product.id };
-  }
-
-  // Use the STABLE labels array from ref
-  const labels = labelsRef.current.labels;
+    return result;
+  }, [product.id, product.price?.value, product.name, product.category, product.weight, product.season, product.brand, anchorX, anchorY, viewportScale, hoveredLabelId]);
 
   // Memoize forceConfig object to prevent recreation on every render
   const memoizedForceConfig = useMemo(() => ({
@@ -126,8 +245,6 @@ const ProductAnnotationsComponent: React.FC<ProductAnnotationsProps> = ({
     forceConfig.friction,
   ]);
 
-  const [hoveredLabelId, setHoveredLabelId] = useState<string | null>(null);
-
   return (
     <div
       style={{
@@ -147,69 +264,9 @@ const ProductAnnotationsComponent: React.FC<ProductAnnotationsProps> = ({
         labels={labels}
         width={canvasWidth / viewportScale}
         height={canvasHeight / viewportScale}
-        showConnectors={hoveredLabelId !== null} // Only show connector on hover
+        showConnectors={hoveredLabelId !== null}
         forceConfig={memoizedForceConfig}
-        renderLabel={(label, position) => {
-          const isHovered = hoveredLabelId === label.id;
-
-          return (
-            <div
-              key={label.id}
-              style={{
-                position: 'absolute',
-                left: position.x,
-                top: position.y,
-                transform: 'translate(-50%, -50%)',
-                pointerEvents: 'all',
-                cursor: 'pointer',
-                zIndex: isHovered ? 100 : 1,
-              }}
-              onMouseEnter={() => setHoveredLabelId(label.id)}
-              onMouseLeave={() => setHoveredLabelId(null)}
-            >
-              {/* Circle dot */}
-              <div
-                style={{
-                  width: isHovered ? '16px' : '12px',
-                  height: isHovered ? '16px' : '12px',
-                  borderRadius: '50%',
-                  background: 'rgba(255, 255, 255, 0.95)',
-                  border: `2px solid #3b82f6`,
-                  boxShadow: isHovered
-                    ? '0 4px 12px rgba(59, 130, 246, 0.5)'
-                    : '0 2px 8px rgba(0, 0, 0, 0.3)',
-                  transition: 'all 0.2s ease',
-                }}
-              />
-
-              {/* Text label on hover */}
-              {isHovered && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '20px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                    color: '#1a1a1a',
-                    border: '2px solid #3b82f6',
-                    borderRadius: '8px',
-                    padding: `${10 / viewportScale}px`,
-                    fontSize: `${14 / viewportScale}px`,
-                    fontFamily: 'system-ui, -apple-system, sans-serif',
-                    fontWeight: 600,
-                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.3)',
-                    whiteSpace: 'nowrap',
-                    pointerEvents: 'none',
-                    animation: 'fadeIn 0.15s ease',
-                  }}
-                >
-                  {label.content}
-                </div>
-              )}
-            </div>
-          );
-        }}
+        renderMode="html"
       />
     </div>
   );
