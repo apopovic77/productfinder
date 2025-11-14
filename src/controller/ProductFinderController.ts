@@ -135,6 +135,11 @@ export class ProductFinderController {
     if (this.canvas) {
       this.layoutService.layout(this.canvas.width, this.canvas.height);
 
+      // Update renderer hero mode state
+      if (this.renderer) {
+        this.renderer.isHeroMode = this.layoutService.isPivotHeroMode();
+      }
+
       // Calculate and set content bounds after layout
       this.updateContentBounds();
     }

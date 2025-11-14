@@ -9,6 +9,8 @@ type ProductAnnotationsProps = {
   product: Product;
   anchorX: number;  // Product center X in world coordinates
   anchorY: number;  // Product center Y in world coordinates
+  productWidth?: number;   // Actual product width from trim bounds (in world coordinates)
+  productHeight?: number;  // Actual product height from trim bounds (in world coordinates)
   canvasWidth: number;
   canvasHeight: number;
   viewportScale: number;
@@ -95,6 +97,8 @@ const ProductAnnotationsComponent: React.FC<ProductAnnotationsProps> = ({
   product,
   anchorX,
   anchorY,
+  productWidth,
+  productHeight,
   canvasWidth,
   canvasHeight,
   viewportScale,
@@ -108,6 +112,10 @@ const ProductAnnotationsComponent: React.FC<ProductAnnotationsProps> = ({
   const labels = useMemo(() => {
     const result: Label[] = [];
 
+    // Calculate product bounds (use half-dimensions for positioning relative to center)
+    const halfWidth = (productWidth ?? 200) / 2;   // Fallback to 200px if not provided
+    const halfHeight = (productHeight ?? 200) / 2; // Fallback to 200px if not provided
+
     const handlers = {
       price: { onMouseEnter: () => setHoveredLabelId('price'), onMouseLeave: () => setHoveredLabelId(null) },
       name: { onMouseEnter: () => setHoveredLabelId('name'), onMouseLeave: () => setHoveredLabelId(null) },
@@ -118,10 +126,11 @@ const ProductAnnotationsComponent: React.FC<ProductAnnotationsProps> = ({
     };
 
     // Price (highest priority - stays closest)
+    // Position above the actual product (using trim bounds)
     if (product.price?.value) {
       result.push({
         id: 'price',
-        anchor: new Vector2(anchorX, anchorY - 80),
+        anchor: new Vector2(anchorX, anchorY - halfHeight - 20),
         content: (
           <LabelContent
             id="price"
@@ -135,10 +144,10 @@ const ProductAnnotationsComponent: React.FC<ProductAnnotationsProps> = ({
       });
     }
 
-    // Product name
+    // Product name - position to the left of the actual product
     result.push({
       id: 'name',
-      anchor: new Vector2(anchorX - 120, anchorY),
+      anchor: new Vector2(anchorX - halfWidth - 20, anchorY),
       content: (
         <LabelContent
           id="name"
@@ -151,11 +160,11 @@ const ProductAnnotationsComponent: React.FC<ProductAnnotationsProps> = ({
       priority: 4,
     });
 
-    // Category
+    // Category - position to the right and below the actual product
     if (product.category?.[0]) {
       result.push({
         id: 'category',
-        anchor: new Vector2(anchorX + 100, anchorY + 60),
+        anchor: new Vector2(anchorX + halfWidth + 20, anchorY + halfHeight / 2),
         content: (
           <LabelContent
             id="category"
@@ -169,11 +178,11 @@ const ProductAnnotationsComponent: React.FC<ProductAnnotationsProps> = ({
       });
     }
 
-    // Weight
+    // Weight - position to the left and below the actual product
     if (product.weight) {
       result.push({
         id: 'weight',
-        anchor: new Vector2(anchorX - 100, anchorY + 80),
+        anchor: new Vector2(anchorX - halfWidth - 20, anchorY + halfHeight - 20),
         content: (
           <LabelContent
             id="weight"
@@ -187,11 +196,11 @@ const ProductAnnotationsComponent: React.FC<ProductAnnotationsProps> = ({
       });
     }
 
-    // Season
+    // Season - position to the right and above the actual product
     if (product.season) {
       result.push({
         id: 'season',
-        anchor: new Vector2(anchorX + 90, anchorY - 60),
+        anchor: new Vector2(anchorX + halfWidth, anchorY - halfHeight),
         content: (
           <LabelContent
             id="season"
@@ -205,11 +214,11 @@ const ProductAnnotationsComponent: React.FC<ProductAnnotationsProps> = ({
       });
     }
 
-    // Brand
+    // Brand - position to the left and above the actual product
     if (product.brand) {
       result.push({
         id: 'brand',
-        anchor: new Vector2(anchorX - 80, anchorY - 70),
+        anchor: new Vector2(anchorX - halfWidth, anchorY - halfHeight - 40),
         content: (
           <LabelContent
             id="brand"
@@ -224,7 +233,7 @@ const ProductAnnotationsComponent: React.FC<ProductAnnotationsProps> = ({
     }
 
     return result;
-  }, [product.id, product.price?.value, product.name, product.category, product.weight, product.season, product.brand, anchorX, anchorY, viewportScale, hoveredLabelId]);
+  }, [product.id, product.price?.value, product.name, product.category, product.weight, product.season, product.brand, anchorX, anchorY, productWidth, productHeight, viewportScale, hoveredLabelId]);
 
   // Memoize forceConfig object to prevent recreation on every render
   const memoizedForceConfig = useMemo(() => ({

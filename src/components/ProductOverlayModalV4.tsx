@@ -37,7 +37,7 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
   const taxonomyFamily = derivedTaxonomy?.product_family;
 
   // Dialog position state - entire dialog scrolls (no internal overflow)
-  const initialTop = window.innerHeight * 0.35; // Initial: 35% from top = 65% screen height
+  const initialTop = window.innerHeight * 0.12; // Initial: 12% from top for better centering
   const [dialogTop, setDialogTop] = useState(initialTop);
   const dialogRef = React.useRef<HTMLDivElement>(null);
 

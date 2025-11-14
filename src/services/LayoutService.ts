@@ -163,7 +163,7 @@ export class LayoutService {
 
   private createHeroLayouter(): HeroLayouter<Product> {
     return new HeroLayouter<Product>({
-      spacing: Math.max(24, this.pivotConfig.itemGap ?? 12),
+      spacing: 100, // Gap between products in hero mode
       targetHeightRatio: 0.8,
       minHeight: this.pivotConfig.minCellSize ?? 120,
       horizontalPadding: this.pivotConfig.framePadding ?? 40,

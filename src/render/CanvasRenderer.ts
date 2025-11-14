@@ -34,6 +34,17 @@ export class CanvasRenderer<T> {
   public overlayScaleMode: 'scale-invariant' | 'scale-with-content' = 'scale-invariant';
   public imageSpreadDirection: 'auto' | 'horizontal' | 'vertical' = 'auto';
 
+  // Hero product trim bounds (normalized 0-1 coordinates for text positioning)
+  public heroProductTrimBounds: { x: number; y: number; width: number; height: number } | null = null;
+
+  // Interpolated trim OFFSETS for smooth animation when trim bounds load (relative to image bounds)
+  private heroTrimTopOffset: InterpolatedProperty<number> = new InterpolatedProperty<number>('heroTrimTopOffset', 0, 0, 0.3);
+  private heroTrimBottomOffset: InterpolatedProperty<number> = new InterpolatedProperty<number>('heroTrimBottomOffset', 0, 0, 0.3);
+  private heroTrimXOffset: InterpolatedProperty<number> = new InterpolatedProperty<number>('heroTrimXOffset', 0, 0, 0.3);
+  private heroTrimWidthScale: InterpolatedProperty<number> = new InterpolatedProperty<number>('heroTrimWidthScale', 1, 1, 0.3);
+  private heroTrimInitialized: boolean = false;
+  private heroTrimBoundsApplied: boolean = false; // Track if trim bounds were already applied
+
   // Variant-specific hero image (overrides product's primary image)
   public selectedVariantHeroImage: HTMLImageElement | null = null;
 
@@ -66,6 +77,9 @@ export class CanvasRenderer<T> {
 
   // Toggle between V1 and V2 overlay
   public overlayVersion: 'v1' | 'v2' = 'v2'; // Default to V2
+
+  // Hero Mode state (set by Controller)
+  public isHeroMode: boolean = false;
 
   // Image LOD tracking: nodeId -> current loaded size
   private loadedImageSizes = new Map<string, number>();
@@ -576,18 +590,30 @@ export class CanvasRenderer<T> {
 
     if (!shouldSpreadVertically) {
       // Calculate total spread width needed (maximum distance on either side)
-      // We use the same symmetric spread logic: alternating left/right
       const imageCount = loadedImages.length;
 
-      for (let i = 0; i < imageCount; i++) {
-        const side = i % 2 === 0 ? -1 : 1;
-        const distance = Math.floor(i / 2) + 1;
-        const offset = side * distance * baseOffset;
-
-        if (offset < 0) {
-          maxLeftOffset = Math.min(maxLeftOffset, offset);
-        } else {
+      if (this.isHeroMode) {
+        // Hero Mode: All variants spread RIGHT, so only right neighbors need space
+        // Calculate total width needed on the right side
+        for (let i = 0; i < imageCount; i++) {
+          const distance = i + 1;
+          const offset = distance * baseOffset;
           maxRightOffset = Math.max(maxRightOffset, offset);
+        }
+        // Left side: no space needed
+        maxLeftOffset = 0;
+      } else {
+        // Pivot Mode: Symmetric spread (alternating left/right)
+        for (let i = 0; i < imageCount; i++) {
+          const side = i % 2 === 0 ? -1 : 1;
+          const distance = Math.floor(i / 2) + 1;
+          const offset = side * distance * baseOffset;
+
+          if (offset < 0) {
+            maxLeftOffset = Math.min(maxLeftOffset, offset);
+          } else {
+            maxRightOffset = Math.max(maxRightOffset, offset);
+          }
         }
       }
     }
@@ -601,8 +627,14 @@ export class CanvasRenderer<T> {
         // Selected product stays in place
         n.heroOffsetX.targetValue = 0;
       } else if (i < selectedIndex) {
-        // Products to the left of selected product move left with extra spacing
-        n.heroOffsetX.targetValue = maxLeftOffset * 2.0; // Double the offset for more space
+        // Products to the left of selected product
+        if (this.isHeroMode) {
+          // Hero Mode: Left neighbors stay in place (no shift needed)
+          n.heroOffsetX.targetValue = 0;
+        } else {
+          // Pivot Mode: Left neighbors move left with extra spacing
+          n.heroOffsetX.targetValue = maxLeftOffset * 2.0; // Double the offset for more space
+        }
       } else {
         // Products to the right of selected product move right with extra spacing
         n.heroOffsetX.targetValue = maxRightOffset * 2.0; // Double the offset for more space
@@ -654,6 +686,114 @@ export class CanvasRenderer<T> {
     }
 
     return best || '...';
+  }
+
+  /**
+   * Render product name and variant color labels in Hero Mode
+   * Product name: Top-left above product
+   * Variant color: Center-bottom below product
+   */
+  private renderHeroModeLabels(
+    product: Product,
+    x: number,
+    y: number,
+    w: number,
+    h: number
+  ) {
+    if (!this.isHeroMode) {
+      return;
+    }
+
+    const variants = (product as any).variants || [];
+    if (variants.length === 0) return;
+
+    // Get primary variant (first with image or just first)
+    const primaryVariant = variants.find((v: any) => v.image_storage_id) || variants[0];
+    if (!primaryVariant) return;
+
+    // Extract color from variant name (e.g., "Black/White / L" → "Black/White")
+    const getVariantColor = (variant: any): string => {
+      if (!variant?.name) return '';
+      const parts = variant.name.split('/').map((s: string) => s.trim());
+      // Take first two parts for color (handles "Color1/Color2 / Size" format)
+      return parts.slice(0, Math.min(2, parts.length)).join('/');
+    };
+
+    const variantColor = getVariantColor(primaryVariant);
+
+    // Initialize interpolated OFFSETS on first call (start with 0 = image bounds)
+    if (!this.heroTrimInitialized) {
+      // Start with image bounds (0 offset, h for bottom, 1.0 scale)
+      this.heroTrimTopOffset.value = 0;
+      this.heroTrimTopOffset.targetValue = 0;
+      this.heroTrimBottomOffset.value = h;
+      this.heroTrimBottomOffset.targetValue = h;
+      this.heroTrimXOffset.value = 0;
+      this.heroTrimXOffset.targetValue = 0;
+      this.heroTrimWidthScale.value = 1;
+      this.heroTrimWidthScale.targetValue = 1;
+      this.heroTrimInitialized = true;
+      console.log('[CanvasRenderer] Hero trim offsets initialized with image bounds');
+    }
+
+    // Update target OFFSETS only ONCE when trim bounds first become available
+    if (this.heroProductTrimBounds && !this.heroTrimBoundsApplied) {
+      const tb = this.heroProductTrimBounds;
+      // Offsets relative to image bounds - SET ONCE!
+      this.heroTrimTopOffset.targetValue = tb.y * h;
+      this.heroTrimBottomOffset.targetValue = (tb.y + tb.height) * h;
+      this.heroTrimXOffset.targetValue = tb.x * w;
+      this.heroTrimWidthScale.targetValue = tb.width;
+      this.heroTrimBoundsApplied = true;
+      console.log('[CanvasRenderer] ✓ Trim bounds applied ONCE:', tb);
+    }
+
+    // Calculate final positions by applying interpolated offsets to current x,y,w,h
+    const trimTop = y + (this.heroTrimTopOffset.value ?? 0);
+    const trimBottom = y + (this.heroTrimBottomOffset.value ?? h);
+    const trimX = x + (this.heroTrimXOffset.value ?? 0);
+    const trimWidth = w * (this.heroTrimWidthScale.value ?? 1);
+
+    console.log('[renderHeroModeLabels] Current x,y,w,h:', { x, y, w, h });
+    console.log('[renderHeroModeLabels] Offsets:', {
+      topOffset: this.heroTrimTopOffset.value,
+      bottomOffset: this.heroTrimBottomOffset.value,
+      xOffset: this.heroTrimXOffset.value,
+      widthScale: this.heroTrimWidthScale.value
+    });
+    console.log('[renderHeroModeLabels] Final trim positions:', { trimTop, trimBottom, trimX, trimWidth });
+    console.log('[renderHeroModeLabels] Product name Y:', trimTop - 30, 'Variant Y:', trimBottom + 30);
+
+    // Render product name (centered, above product)
+    this.ctx.save();
+    this.ctx.font = '600 32px "ITC Avant Garde Gothic", -apple-system, sans-serif';
+    this.ctx.fillStyle = '#000000';
+    this.ctx.textAlign = 'center';
+    this.ctx.textBaseline = 'bottom';
+
+    // Remove "O'NEAL" from product name if present (case-insensitive)
+    let productName = product.name.toUpperCase();
+    productName = productName.replace(/O'NEAL\s*/gi, '').trim();
+
+    const productNameY = trimTop - 50; // 50px above trim bounds (actual product)
+    const maxProductNameWidth = trimWidth;
+    const truncatedProductName = this.truncateText(productName, maxProductNameWidth);
+    this.ctx.fillText(truncatedProductName, trimX + trimWidth / 2, productNameY);
+
+    // Render variant color (center-bottom, below product)
+    if (variantColor) {
+      this.ctx.font = '300 28px "ITC Avant Garde Gothic", -apple-system, sans-serif';
+      this.ctx.fillStyle = '#666666';
+      this.ctx.textAlign = 'center';
+      this.ctx.textBaseline = 'top';
+
+      const variantColorY = trimBottom + 50; // 50px below trim bounds (actual product)
+      const maxVariantWidth = trimWidth;
+      const truncatedColor = this.truncateText(variantColor.toUpperCase(), maxVariantWidth);
+      this.ctx.fillText(truncatedColor, trimX + trimWidth / 2, variantColorY);
+    }
+
+    this.ctx.restore();
   }
 
   private async draw() {
@@ -793,21 +933,31 @@ export class CanvasRenderer<T> {
           const baseOffset = shouldSpreadVertically ? axisSize * 0.35 : axisSize * (1 - overlapFactor);
 
           // Initialize InterpolatedProperty for each image if needed
-          // Spread symmetrically: left, right, left, right, ...
+          // Pivot Mode: Spread symmetrically (left, right, left, right...)
+          // Hero Mode: Spread all to the right (catalog style)
           for (let i = 0; i < imageCount; i++) {
             const altImg = loadedImages[i];
             if (altImg && !altImg.spreadOffset) {
               // Create InterpolatedProperty starting at 0, animating to target offset
               altImg.spreadOffset = new InterpolatedProperty<number>(`spread-${i}`, 0, 0, 0.5);
 
-              // Calculate symmetric offset:
-              // i=0: -baseOffset (left)
-              // i=1: +baseOffset (right)
-              // i=2: -2*baseOffset (further left)
-              // i=3: +2*baseOffset (further right)
-              const side = i % 2 === 0 ? -1 : 1; // Alternate left (-1) and right (+1)
-              const distance = Math.floor(i / 2) + 1; // Distance multiplier (1, 1, 2, 2, 3, 3, ...)
-              altImg.spreadOffset.targetValue = side * distance * baseOffset;
+              if (this.isHeroMode) {
+                // Hero Mode: All variants spread to the RIGHT (catalog style)
+                // i=0: +baseOffset (right)
+                // i=1: +2*baseOffset (further right)
+                // i=2: +3*baseOffset (even further right)
+                const distance = i + 1;
+                altImg.spreadOffset.targetValue = distance * baseOffset;
+              } else {
+                // Pivot Mode: Calculate symmetric offset:
+                // i=0: -baseOffset (left)
+                // i=1: +baseOffset (right)
+                // i=2: -2*baseOffset (further left)
+                // i=3: +2*baseOffset (further right)
+                const side = i % 2 === 0 ? -1 : 1; // Alternate left (-1) and right (+1)
+                const distance = Math.floor(i / 2) + 1; // Distance multiplier (1, 1, 2, 2, 3, 3, ...)
+                altImg.spreadOffset.targetValue = side * distance * baseOffset;
+              }
             }
           }
 
@@ -893,14 +1043,14 @@ export class CanvasRenderer<T> {
       }
 
       this.ctx.globalAlpha = 1;
-      
+
       // Only show focus indicator for keyboard navigation
       if (isFocused) {
         // Subtle green border for focused item
         this.ctx.strokeStyle = '#10b981';
         this.ctx.lineWidth = 3;
         this.ctx.strokeRect(x, y, w, h);
-        
+
         // Dashed outer border for extra visibility
         this.ctx.setLineDash([8, 4]);
         this.ctx.strokeStyle = '#10b981';
@@ -908,8 +1058,11 @@ export class CanvasRenderer<T> {
         this.ctx.strokeRect(x - 6, y - 6, w + 12, h + 12);
         this.ctx.setLineDash([]);
       }
-      
-      // NO TEXT RENDERING - Clean Microsoft Pivot style!
+
+      // Hero Mode: Render product name and variant color labels
+      this.renderHeroModeLabels(product, x, y, w, h);
+
+      // NO TEXT RENDERING IN PIVOT MODE - Clean Microsoft Pivot style!
       // Text will be shown in tooltip on hover
       
       // Restore item transform

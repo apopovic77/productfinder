@@ -25,7 +25,7 @@ import {
   createDefaultPivotState,
   createDefaultUiState,
 } from './config/AppConfig';
-import { getImagesForVariant, getPrimaryVariant } from './utils/variantImageHelpers';
+import { getImagesForVariant, getPrimaryVariant, getUniqueColorVariants } from './utils/variantImageHelpers';
 import { globalImageQueue } from './utils/GlobalImageQueue';
 import { buildMediaUrl } from './utils/MediaUrlBuilder';
 import QuickSearchCommandPalette from './components/QuickSearchCommandPalette';
@@ -106,6 +106,10 @@ type State = {
 
   // V4 Dialog trigger (zoom-based, not hero-mode-based)
   shouldShowV4Dialog: boolean;
+
+  // Hero product trim bounds (for text positioning)
+  heroProductTrimBounds: { x: number; y: number; width: number; height: number } | null;
+  heroProductPolygon: { x: number; y: number }[] | null;
 };
 
 const createInitialState = (): State => {
@@ -171,6 +175,9 @@ const createInitialState = (): State => {
     footerFloatingPosition: null,
 
     shouldShowV4Dialog: false,
+
+    heroProductTrimBounds: null,
+    heroProductPolygon: null,
   };
 };
 
@@ -386,6 +393,13 @@ export default class App extends React.Component<{}, State> {
           // Reset pivot hero LOD tracking when product changes
           (renderer as any).pivotHeroLoadedSize = null;
 
+          // Reset trim bounds animation when product changes
+          if (prevState.selectedProduct !== this.state.selectedProduct) {
+            (renderer as any).heroTrimInitialized = false;
+            (renderer as any).heroTrimBoundsApplied = false;
+            renderer.heroProductTrimBounds = null;
+          }
+
           // Get node bounds for LOD and connection line
           const node = this.controller.getProductNode(this.state.selectedProduct.id);
           if (node) {
@@ -415,7 +429,8 @@ export default class App extends React.Component<{}, State> {
           }
 
           // Collect alternative images for stacked display
-          // Only load images for the currently selected variant
+          // Pivot Mode: Load different perspectives of SAME variant
+          // Hero Mode: Load different color variants of SAME product
           const product = this.state.selectedProduct as any;
           const alternativeImages: Array<{
             storageId: number;
@@ -428,8 +443,29 @@ export default class App extends React.Component<{}, State> {
           const currentVariant = this.state.selectedVariant || getPrimaryVariant(product);
 
             if (currentVariant) {
-              // Get all images for this variant (hero + gallery)
-              const variantImages = getImagesForVariant(product, currentVariant);
+              // Check if we're in Hero Mode
+              const isHeroMode = this.state.isPivotHeroMode;
+
+              let imagesToLoad: Array<{ storageId: number; role?: string; src?: string }> = [];
+
+              if (isHeroMode) {
+                // Hero Mode: Load hero image of each unique color variant
+                const uniqueVariants = getUniqueColorVariants(product);
+
+                // Load hero images for ALL color variants (not just current)
+                for (const variant of uniqueVariants) {
+                  const variantImages = getImagesForVariant(product, variant);
+                  if (variantImages.length > 0 && variantImages[0].storageId) {
+                    // Only add hero image (first image) for each variant
+                    imagesToLoad.push(variantImages[0]);
+                  }
+                }
+              } else {
+                // Pivot Mode: Load all images (perspectives) of current variant
+                imagesToLoad = getImagesForVariant(product, currentVariant);
+              }
+
+              const variantImages = imagesToLoad;
 
               // Cancel any pending image loads from previous product
               const productGroup = `product-${this.state.selectedProduct.id}`;
@@ -443,7 +479,7 @@ export default class App extends React.Component<{}, State> {
                   storageId: heroStorageId,
                   width: 1300,
                   quality: 85,
-                  trim: true,
+                  trim: false, // Keep full image as product images are not perfectly isolated
                 });
 
                 this.imageLoadQueue.add({
@@ -455,6 +491,53 @@ export default class App extends React.Component<{}, State> {
                 }).then(result => {
                   // Hero image loaded - this is handled by LOD system
                   // No need to set it here, LOD will pick it up
+
+                  // Fetch trim bounds for text positioning
+                  const trimBoundsUrl = `https://api-storage.arkturian.com/storage/media/${heroStorageId}/trim-bounds`;
+                  console.log('[App] Fetching trim bounds for storage ID:', heroStorageId, 'URL:', trimBoundsUrl);
+                  fetch(trimBoundsUrl, {
+                    headers: {
+                      'X-API-Key': 'oneal_demo_token'
+                    }
+                  })
+                    .then(async res => {
+                      console.log('[App] Trim bounds response status:', res.status);
+                      const data = await res.json();
+                      console.log('[App] Trim bounds data received:', JSON.stringify(data, null, 2));
+
+                      if (res.status === 404) {
+                        console.warn('[App] 404 - Trim bounds not cached yet. Triggering computation...');
+                        // Trigger computation by calling with ?generate=true (default is already true, but being explicit)
+                        const refreshUrl = `${trimBoundsUrl}?generate=true`;
+                        console.log('[App] Fetching with generate=true:', refreshUrl);
+                        const refreshRes = await fetch(refreshUrl, {
+                          headers: { 'X-API-Key': 'oneal_demo_token' }
+                        });
+                        const refreshData = await refreshRes.json();
+                        console.log('[App] Generate response:', JSON.stringify(refreshData, null, 2));
+                        return refreshData;
+                      }
+                      return data;
+                    })
+                    .then(data => {
+                      // API returns trim bounds data directly, with 'normalized' array [x1, y1, x2, y2]
+                      if (data.normalized && Array.isArray(data.normalized) && data.normalized.length === 4) {
+                        const [x1, y1, x2, y2] = data.normalized;
+                        const trimBounds = {
+                          x: x1,
+                          y: y1,
+                          width: x2 - x1,
+                          height: y2 - y1,
+                        };
+                        console.log('[App] ✓ Setting trim bounds:', trimBounds, 'from normalized:', data.normalized);
+                        this.setState({ heroProductTrimBounds: trimBounds });
+                      } else {
+                        console.warn('[App] ✗ Invalid trim bounds response data:', data);
+                      }
+                    })
+                    .catch(err => {
+                      console.error('[App] Failed to load trim bounds for storage ID', heroStorageId, ':', err);
+                    });
                 }).catch(error => {
                   if (error.error?.message !== 'Request cancelled' && error.error?.message !== 'Request no longer relevant') {
                     console.warn('[App] Failed to load hero image:', heroStorageId, error.error);
@@ -469,13 +552,13 @@ export default class App extends React.Component<{}, State> {
                 const storageId = variantImg.storageId;
 
                 // Use high-res images (1300px @ 85% quality) - same as LOD system
-                // Use trim=true to remove margins for better fit when stacking
-                // Only specify width to preserve aspect ratio of trimmed image
+                // Keep full image as product images are not perfectly isolated
+                // Only specify width to preserve aspect ratio
                 const src = buildMediaUrl({
                   storageId,
                   width: 1300,
                   quality: 85,
-                  trim: true,
+                  trim: false, // Keep full image as product images are not perfectly isolated
                 });
                 const imgObj: any = { storageId, src };
 
@@ -539,6 +622,15 @@ export default class App extends React.Component<{}, State> {
           renderer.selectedProductAnchor = null;
           renderer.selectedProductBounds = null;
         }
+      }
+    }
+
+    // Update trim bounds for Hero Mode text positioning
+    if (prevState.heroProductTrimBounds !== this.state.heroProductTrimBounds) {
+      const renderer = this.controller.getRenderer();
+      if (renderer) {
+        renderer.heroProductTrimBounds = this.state.heroProductTrimBounds;
+        console.log('[App] Updated renderer trim bounds:', this.state.heroProductTrimBounds);
       }
     }
 
@@ -854,6 +946,30 @@ export default class App extends React.Component<{}, State> {
         const viewportHeight = canvas.height;
         const heightPercentage = productScreenHeight / viewportHeight;
         shouldShowV4 = heightPercentage > 0.65;
+      }
+
+      // Hero Mode: Check variant count for expansion logic
+      const isHeroMode = this.controller.isPivotHeroMode();
+      if (isHeroMode) {
+        const uniqueVariants = getUniqueColorVariants(product);
+
+        if (uniqueVariants.length === 1) {
+          // Only 1 variant → Force V4 Modal to open immediately
+          shouldShowV4 = true;
+        } else if (uniqueVariants.length > 1) {
+          // Multiple variants
+          // Check if this product is already selected (variants already expanded)
+          const wasAlreadySelected = this.state.selectedProduct?.id === product.id;
+
+          if (wasAlreadySelected) {
+            // Second click on same product → Open V4 Modal
+            shouldShowV4 = true;
+          } else {
+            // First click → Expand variants first (don't open V4 yet)
+            // The alternativeImages system (in componentDidUpdate) will handle showing variants
+            shouldShowV4 = false;
+          }
+        }
       }
 
       // Set selected product to show annotations (in Hero Mode)
@@ -1328,14 +1444,38 @@ export default class App extends React.Component<{}, State> {
             const viewport = this.controller.getViewportTransform();
             if (!viewport) return null;
 
-            const productCenterX = (node.posX.targetValue ?? node.posX.value ?? 0) + (node.width.targetValue ?? node.width.value ?? 0) / 2;
-            const productCenterY = (node.posY.targetValue ?? node.posY.value ?? 0) + (node.height.targetValue ?? node.height.value ?? 0) / 2;
+            const nodeX = node.posX.targetValue ?? node.posX.value ?? 0;
+            const nodeY = node.posY.targetValue ?? node.posY.value ?? 0;
+            const nodeWidth = node.width.targetValue ?? node.width.value ?? 0;
+            const nodeHeight = node.height.targetValue ?? node.height.value ?? 0;
+
+            // Calculate anchor point and dimensions from trim bounds (if available)
+            // Trim bounds are normalized (0-1), scale them to node dimensions
+            const trimBounds = this.state.heroProductTrimBounds;
+
+            let anchorX, anchorY, productWidth, productHeight;
+
+            if (trimBounds) {
+              // Use trim bounds center as anchor
+              anchorX = nodeX + (trimBounds.x + trimBounds.width / 2) * nodeWidth;
+              anchorY = nodeY + (trimBounds.y + trimBounds.height / 2) * nodeHeight;
+              productWidth = trimBounds.width * nodeWidth;
+              productHeight = trimBounds.height * nodeHeight;
+            } else {
+              // Fallback to image center
+              anchorX = nodeX + nodeWidth / 2;
+              anchorY = nodeY + nodeHeight / 2;
+              productWidth = undefined;
+              productHeight = undefined;
+            }
 
             return (
               <ProductAnnotations
                 product={selectedProduct}
-                anchorX={productCenterX}
-                anchorY={productCenterY}
+                anchorX={anchorX}
+                anchorY={anchorY}
+                productWidth={productWidth}
+                productHeight={productHeight}
                 canvasWidth={canvas.width}
                 canvasHeight={canvas.height}
                 viewportScale={viewport.getTargetScale()}
