@@ -5,6 +5,7 @@ import { WeightScalePolicy, type ScaleContext } from './ScalePolicy';
 import { SCALE_CONFIG, resolveScaleEnabled } from '../config/ScaleConfig';
 import { PivotGroup } from './PivotGroup';
 import { Vector2 } from 'arkturian-typescript-utils';
+import { BUCKET_BUTTON_CONFIG } from '../config/BucketButtonConfig';
 
 export type Orientation = 'rows' | 'columns';
 export type Flow = 'ltr' | 'rtl' | 'ttb' | 'btt';
@@ -17,7 +18,11 @@ export type PivotConfig<T> = {
   groupSort?: (a: string, b: string) => number;
   itemSort?: (a: T, b: T) => number;
   frameGap: number;
-  framePadding: number;
+  framePadding: number; // fallback if individual paddings not set
+  framePaddingTop?: number;
+  framePaddingRight?: number;
+  framePaddingBottom?: number;
+  framePaddingLeft?: number;
   itemGap: number;
   rowBaseHeight?: number;
   colBaseWidth?: number;
@@ -47,9 +52,26 @@ export type GroupHeaderInfo = {
 export class PivotLayouter<T> {
   // Store group header positions for rendering and hit-testing
   private groupHeaders: GroupHeaderInfo[] = [];
-  
+
   constructor(private config: PivotConfig<T>) {}
-  
+
+  // Helper getters for individual padding values (use fallback if not set)
+  private get paddingTop(): number {
+    return this.config.framePaddingTop ?? this.config.framePadding;
+  }
+
+  private get paddingRight(): number {
+    return this.config.framePaddingRight ?? this.config.framePadding;
+  }
+
+  private get paddingBottom(): number {
+    return this.config.framePaddingBottom ?? this.config.framePadding;
+  }
+
+  private get paddingLeft(): number {
+    return this.config.framePaddingLeft ?? this.config.framePadding;
+  }
+
   /**
    * Get group header positions (for rendering)
    */
@@ -107,15 +129,15 @@ export class PivotLayouter<T> {
       // === INTELLIGENT CELL MATRIX PIVOT LAYOUT ===
       // Global optimization: Find cell size that fits the LARGEST group, use for all groups
       
-      const headerHeight = 40;
+      const headerHeight = BUCKET_BUTTON_CONFIG.height;
       const numGroups = keys.length;
 
       if (orientation === 'rows') {
         const totalGaps = this.config.frameGap * Math.max(0, numGroups - 1);
-        const availableHeight = view.height - totalGaps - this.config.framePadding * 2;
+        const availableHeight = view.height - totalGaps - this.paddingTop - this.paddingBottom;
         const frameHeight = availableHeight / Math.max(1, numGroups);
-        const matrixWidth = Math.max(1, view.width - this.config.framePadding * 2 - this.config.itemGap * 2);
-        const matrixHeight = Math.max(1, frameHeight - headerHeight - this.config.itemGap * 2);
+        const matrixWidth = Math.max(1, view.width - this.paddingLeft - this.paddingRight);
+        const matrixHeight = Math.max(1, frameHeight - headerHeight);
         const spacing = this.config.itemGap;
 
         let maxProductsInAnyGroup = 0;
@@ -173,8 +195,12 @@ export class PivotLayouter<T> {
           globalRows = Math.max(1, Math.floor((matrixHeight + spacing) / (globalCellSize + spacing)));
         }
 
-        let offsetY = this.config.framePadding;
-        for (const k of keys) {
+        // Limit to MAX_COLUMNS rows (same as columns orientation)
+        const MAX_ROWS = 10;
+        const visibleKeys = keys.slice(0, MAX_ROWS);
+
+        let offsetY = this.paddingTop;
+        for (const k of visibleKeys) {
           const list = groups.get(k)!;
           if (this.config.itemSort) list.sort((a, b) => this.config.itemSort!(a.data, b.data));
 
@@ -190,13 +216,13 @@ export class PivotLayouter<T> {
           this.groupHeaders.push({
             key: k,
             label: k,
-            x: this.config.framePadding,
+            x: this.paddingLeft,
             y: offsetY,
-            width: view.width - this.config.framePadding * 2,
+            width: view.width - this.paddingLeft - this.paddingRight,
             height: headerHeight
           });
 
-          const baseY = offsetY + headerHeight + spacing;
+          const baseY = offsetY + headerHeight;
 
           for (let row = 0; row < rowsInFrame; row++) {
             for (let col = 0; col < colsInFrame; col++) {
@@ -205,7 +231,7 @@ export class PivotLayouter<T> {
               const node = list[productIndex];
               const scale = deriveScale(node);
               const finalSize = cellSize * scale;
-              const x = this.config.framePadding + spacing + col * (cellSize + spacing);
+              const x = this.paddingLeft + col * (cellSize + spacing);
               const y = baseY + row * (cellSize + spacing);
               node.posX.value = x;
               node.posY.value = y;
@@ -222,25 +248,27 @@ export class PivotLayouter<T> {
         return;
       }
 
-      // Calculate frame width: ALL groups must fit on screen initially
-      const totalGaps = this.config.frameGap * Math.max(0, numGroups - 1);
-      const totalPadding = this.config.framePadding * 2;
+      // Calculate frame width: Limit to max 10 columns for better readability
+      const MAX_COLUMNS = 10;
+      const visibleGroups = Math.min(numGroups, MAX_COLUMNS);
+      const totalGaps = this.config.frameGap * Math.max(0, visibleGroups - 1);
+      const totalPadding = this.paddingLeft + this.paddingRight;
       const availableWidth = view.width - totalGaps - totalPadding;
-      const frameWidth = availableWidth / Math.max(1, numGroups);
-      
+      const frameWidth = availableWidth / Math.max(1, visibleGroups);
+
       // Calculate available height for products (minus header and padding)
-      const availableHeight = view.height - this.config.framePadding - headerHeight - 20;
-      
+      const availableHeight = view.height - this.paddingBottom - this.paddingTop - headerHeight;
+
       // STEP 1: Find the group with the MOST products
       let maxProductsInAnyGroup = 0;
       for (const k of keys) {
         const list = groups.get(k)!;
         maxProductsInAnyGroup = Math.max(maxProductsInAnyGroup, list.length);
       }
-      
+
       // STEP 2: Calculate optimal cell size for the LARGEST group
       const spacing = this.config.itemGap;
-      const matrixWidth = Math.max(1, frameWidth - spacing * 2);
+      const matrixWidth = Math.max(1, frameWidth);
       const matrixHeight = Math.max(1, availableHeight);
       
       const fitsAllProducts = (cellSize: number): boolean => {
@@ -303,9 +331,10 @@ export class PivotLayouter<T> {
         globalRows = Math.max(1, Math.floor((matrixHeight + spacing) / (globalCellSize + spacing)));
       }
       
-      // STEP 3: Layout all groups using the SAME cell size
-      let offsetX = this.config.framePadding;
-      for (const k of keys) {
+      // STEP 3: Layout all groups using the SAME cell size (max 10 visible)
+      let offsetX = this.paddingLeft;
+      const visibleKeys = keys.slice(0, MAX_COLUMNS);
+      for (const k of visibleKeys) {
         const list = groups.get(k)!;
         if (this.config.itemSort) list.sort((a, b) => this.config.itemSort!(a.data, b.data));
         this.config.onGroupLayout?.(k, list);
@@ -322,8 +351,8 @@ export class PivotLayouter<T> {
           Math.min(globalCols, maxColsForFrame, productsInThisGroup)
         );
         const rowsInFrame = Math.max(1, Math.ceil(productsInThisGroup / colsInFrame));
-        
-        const headerY = view.height - headerHeight - this.config.framePadding;
+
+        const headerY = view.height - headerHeight - this.paddingBottom;
 
         // Store group header position at bottom of column (classic Pivot style)
         this.groupHeaders.push({
@@ -334,20 +363,20 @@ export class PivotLayouter<T> {
           width: frameWidth,
           height: headerHeight
         });
-        
-        const baseY = headerY - this.config.itemGap - cellSize;
+
+        const baseY = headerY - cellSize;
 
         // Layout products in a grid within this column (BOTTOM TO TOP, LEFT TO RIGHT)
         for (let row = 0; row < rowsInFrame; row++) {
           for (let col = 0; col < colsInFrame; col++) {
             const productIndex = row * colsInFrame + col;
             if (productIndex >= list.length) break;
-            
+
             const node = list[productIndex];
             const scale = deriveScale(node);
             const finalSize = cellSize * scale;
-            
-            const x = offsetX + this.config.itemGap + col * (cellSize + spacing);
+
+            const x = offsetX + col * (cellSize + spacing);
             const y = baseY - row * (cellSize + spacing);
              
             node.posX.value = x;
@@ -368,15 +397,15 @@ export class PivotLayouter<T> {
       inner.spacingY = this.config.itemGap;
 
       const totalGap = this.config.frameGap * Math.max(0, keys.length - 1);
-      const frameWidth = Math.max(0, (view.width - totalGap - 2 * this.config.framePadding) / Math.max(1, keys.length));
+      const frameWidth = Math.max(0, (view.width - totalGap - this.paddingLeft - this.paddingRight) / Math.max(1, keys.length));
 
-      let offsetX = this.config.framePadding;
+      let offsetX = this.paddingLeft;
       for (const k of keys) {
           const list = groups.get(k)!;
           if (this.config.itemSort) list.sort((a, b) => this.config.itemSort!(a.data, b.data));
           this.config.onGroupLayout?.(k, list);
         const cols = inner.deriveCols(frameWidth, baseH);
-        inner.layout(offsetX, view.height - this.config.framePadding, frameWidth, list, baseH, cols, deriveScale);
+        inner.layout(offsetX, view.height - this.paddingBottom, frameWidth, list, baseH, cols, deriveScale);
         offsetX += frameWidth + this.config.frameGap;
       }
     }

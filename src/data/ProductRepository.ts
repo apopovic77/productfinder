@@ -82,6 +82,97 @@ function toString(value: unknown): string | undefined {
   return str.length ? str : undefined;
 }
 
+type PosterGroup =
+  | 'poster_apparel'
+  | 'poster_gloves'
+  | 'poster_shoes'
+  | 'poster_protectors'
+  | 'poster_accessories'
+  | 'poster_goggles'
+  | 'poster_other';
+
+function derivePosterGroup(args: {
+  presentationCategory?: string | null;
+  productFamily?: string | null;
+  productName: string;
+  meta?: Record<string, unknown>;
+  aiTags?: string[];
+}): PosterGroup {
+  const metaGroup = toString((args.meta as any)?.poster_group);
+  if (metaGroup) {
+    return sanitizePosterGroup(metaGroup);
+  }
+
+  const category = (args.presentationCategory ?? '').toLowerCase();
+  const family = (args.productFamily ?? '').toLowerCase();
+  const name = args.productName.toLowerCase();
+  const tags = new Set((args.aiTags ?? []).map(tag => tag.toLowerCase()));
+
+  if (category.includes('brillen') || tags.has('goggle')) {
+    return 'poster_goggles';
+  }
+
+  if (category.includes('protektoren')) {
+    return 'poster_protectors';
+  }
+
+  if (category.includes('schuhe')) {
+    return 'poster_shoes';
+  }
+
+  const isGlove =
+    family.includes('handschuh') ||
+    family.includes('glove') ||
+    name.includes('handschuh') ||
+    name.includes('glove') ||
+    tags.has('glove');
+  if (category.includes('kleidung') && isGlove) {
+    return 'poster_gloves';
+  }
+
+  if (category.includes('kleidung')) {
+    return 'poster_apparel';
+  }
+
+  const accessoryKeywords = ['sock', 'socke', 'socken', 'bag', 'backpack', 'toolbag', 'pack', 'neckwarmer', 'waist', 'headband'];
+  const isAccessory = accessoryKeywords.some(keyword => name.includes(keyword));
+  if (category.includes('accessoire') || isAccessory) {
+    return 'poster_accessories';
+  }
+
+  if (isGlove) {
+    return 'poster_gloves';
+  }
+
+  return 'poster_other';
+}
+
+function sanitizePosterGroup(value: string): PosterGroup {
+  const normalized = value.trim().toLowerCase();
+  switch (normalized) {
+    case 'poster_apparel':
+    case 'apparel':
+      return 'poster_apparel';
+    case 'poster_gloves':
+    case 'gloves':
+      return 'poster_gloves';
+    case 'poster_shoes':
+    case 'shoes':
+      return 'poster_shoes';
+    case 'poster_protectors':
+    case 'protectors':
+      return 'poster_protectors';
+    case 'poster_accessories':
+    case 'accessories':
+      return 'poster_accessories';
+    case 'poster_goggles':
+    case 'goggles':
+      return 'poster_goggles';
+    default:
+      return 'poster_other';
+  }
+}
+
 function mapProduct(p: OnealProduct): Product | null {
   const attributes: Record<string, ProductAttribute> = {};
   const originalCategories = Array.isArray(p.category) ? p.category.filter(Boolean) : [];
@@ -263,6 +354,27 @@ function mapProduct(p: OnealProduct): Product | null {
     sourcePath: 'variants.length',
   });
 
+  const apiAny = p as any;
+  const aiTags = Array.isArray(apiAny.ai_tags)
+    ? apiAny.ai_tags.filter((tag: unknown) => typeof tag === 'string' && tag.trim().length)
+    : [];
+
+  const posterGroup = derivePosterGroup({
+    presentationCategory,
+    productFamily: normalizedFamily ?? taxonomy?.product_family ?? undefined,
+    productName: p.name,
+    meta: p.meta as Record<string, unknown>,
+    aiTags,
+  });
+
+  addAttribute(attributes, {
+    key: 'poster_group',
+    label: 'Poster Gruppe',
+    type: 'enum',
+    value: posterGroup,
+    sourcePath: 'poster.group',
+  });
+
   const colorTokens = new Set<string>();
   const sizeTokens = new Set<string>();
   for (const variant of variants) {
@@ -294,11 +406,6 @@ function mapProduct(p: OnealProduct): Product | null {
         sourcePath: 'variants[].name',
       }
     : undefined);
-  const apiAny = p as any;
-  const aiTags = Array.isArray(apiAny.ai_tags)
-    ? apiAny.ai_tags.filter((tag: unknown) => typeof tag === 'string' && tag.trim().length)
-    : [];
-
   const aiAnalysisRaw = apiAny.ai_analysis ?? {};
   const aiAnalysis = Object.keys(aiAnalysisRaw).length
     ? {

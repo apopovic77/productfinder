@@ -34,10 +34,10 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   const taxonomySport = derivedTaxonomy?.sport;
   const taxonomyFamily = derivedTaxonomy?.product_family;
 
-  // Drag state - start positioned on the right side
+  // Drag state - start positioned near center-right
   const [dragPosition, setDragPosition] = useState(() => ({
-    x: window.innerWidth - DIALOG_WIDTH - 50, // width + margin
-    y: 20
+    x: window.innerWidth * 0.65 - DIALOG_WIDTH / 2, // 65% from left, centered
+    y: window.innerHeight * 0.25 // 25% from top
   }));
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -353,6 +353,27 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     }
   };
 
+  // Parse product name: Remove "O'NEAL" if first word, split first word (thin) from rest (bold)
+  const parseProductName = (name: string): { firstWord: string; restWords: string } => {
+    let words = name.trim().split(/\s+/);
+
+    // Remove O'NEAL if it's the first word (case insensitive)
+    if (words.length > 0 && words[0].toUpperCase().replace(/'/g, '').replace(/-/g, '') === 'ONEAL') {
+      words = words.slice(1);
+    }
+
+    if (words.length === 0) {
+      return { firstWord: '', restWords: '' };
+    }
+
+    const firstWord = words[0];
+    const restWords = words.slice(1).join(' ');
+
+    return { firstWord, restWords };
+  };
+
+  const { firstWord: productFirstWord, restWords: productRestWords } = parseProductName(product.name);
+
   // Icon mapping
   const getFeatureIcon = (icon: ParsedFeature['icon']) => {
     const iconMap = {
@@ -421,8 +442,19 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         ×
       </button>
 
-      {/* Title - smaller */}
-      <h2 className="pom-title" style={{ fontSize: '14px', marginBottom: '8px' }}>{product.name}</h2>
+      {/* Title - V4 Style: First word thin, rest bold */}
+      <h2 className="pom-title" style={{ fontSize: '14px', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '-0.01em', lineHeight: '1.1' }}>
+        {productFirstWord && (
+          <div style={{ fontWeight: '400' }}>
+            {productFirstWord}
+          </div>
+        )}
+        {productRestWords && (
+          <div style={{ fontWeight: '900' }}>
+            {productRestWords}
+          </div>
+        )}
+      </h2>
 
       {/* Thumbnail Gallery - Compact */}
       {allImages.length > 0 && (

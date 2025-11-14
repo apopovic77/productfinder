@@ -254,12 +254,16 @@ function derivePresentationCategory(args: DerivePresentationCategoryArgs): Prese
   // DEBUG: Log category decisions
   const result = (() => {
 
-  if (looksLikeProtector) {
-    return 'Protektoren';
+  // PRIORITY 1: Goggle/Brille detection (catches B-10, B-55, Tear Offs, Lenses, etc.)
+  // Must come BEFORE helmets check because demo DB has goggles miscategorized as "Helme"
+  const goggleKeywords = ['goggle', 'brille', 'tear off', 'tear-off', 'lens', 'scheibe', 'roll off', 'roll-off', 'b-10', 'b-22', 'b-33', 'b-55', 'vault'];
+  const isGoggleProduct = goggleKeywords.some(keyword => name.includes(keyword) || url.includes(keyword));
+  if (isGoggleProduct) {
+    return 'Brillen';
   }
 
-  if (name.includes('goggle') || name.includes('brille') || url.includes('goggle')) {
-    return 'Brillen';
+  if (looksLikeProtector) {
+    return 'Protektoren';
   }
 
   const SHOE_REGEX = /(?:^|[^a-z])(boot|boots|stiefel|shoe|shoes|schuh|schuhe|sneaker)(?:[^a-z]|$)/;
@@ -269,6 +273,7 @@ function derivePresentationCategory(args: DerivePresentationCategoryArgs): Prese
     return 'Schuhe & Stiefel';
   }
 
+  // PRIORITY 2: Category-based detection (but goggles already filtered out above)
   switch (primary) {
     case 'helmets':
       return 'Helme';
@@ -287,6 +292,7 @@ function derivePresentationCategory(args: DerivePresentationCategoryArgs): Prese
       break;
   }
 
+  // PRIORITY 3: Name-based fallback
   if (name.includes('helmet') || name.includes('helm')) return 'Helme';
   if (name.includes('protector') || name.includes('protektor')) return 'Protektoren';
   if (

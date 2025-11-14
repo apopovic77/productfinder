@@ -5,11 +5,9 @@ export class SkeletonRenderer {
   
   draw(itemCount: number = 20) {
     const c = this.ctx.canvas;
-    
-    // Clear canvas
+
+    // Clear canvas - transparent, body background shows through
     this.ctx.clearRect(0, 0, c.width, c.height);
-    this.ctx.fillStyle = '#fff';
-    this.ctx.fillRect(0, 0, c.width, c.height);
     
     // Calculate grid layout
     const padding = 20;

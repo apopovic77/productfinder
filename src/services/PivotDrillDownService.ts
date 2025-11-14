@@ -65,8 +65,14 @@ export class PivotDrillDownService {
   private heroThreshold = Math.max(1, Math.floor(PIVOT_PROFILE.heroThreshold));
   private heroModeActive = false;
   private readonly priceRefineThreshold = Math.max(1, Math.floor(PIVOT_PROFILE.priceRefineThreshold));
+  private userSelectedDimension = false; // Track if user manually selected a dimension
 
   setModel(analysis: PivotAnalysisResult | null): void {
+    // IMPORTANT: Preserve user-selected dimension across model changes
+    const preserveUserSelection = this.userSelectedDimension;
+    const preservedDimensionIndex = preserveUserSelection ? this.currentDimensionIndex : null;
+    const preservedDimensionKey = preserveUserSelection ? this.currentDimensionKey : null;
+
     this.analysis = analysis;
     this.dimensions = analysis?.dimensions ?? [];
     this.dimensionByKey.clear();
@@ -92,6 +98,13 @@ export class PivotDrillDownService {
       this.rootDimensionIndex = 0;
       this.currentDimensionIndex = 0;
       this.currentDimensionKey = null;
+    }
+
+    // Restore user-selected dimension if it was set
+    if (preserveUserSelection && preservedDimensionIndex !== null) {
+      this.currentDimensionIndex = preservedDimensionIndex;
+      this.currentDimensionKey = preservedDimensionKey;
+      this.userSelectedDimension = true;
     }
   }
 
@@ -128,13 +141,15 @@ export class PivotDrillDownService {
     if (index === -1) return;
     this.currentDimensionIndex = index;
     this.currentDimensionKey = dimension;
+    this.userSelectedDimension = true; // User manually selected this dimension
     if (!this.isNumericDimension(dimension)) {
       this.numericStates.delete(dimension);
     }
   }
 
   getDimension(): GroupDimension {
-    return this.currentDimensionKey ?? this.hierarchy[this.currentDimensionIndex] ?? this.hierarchy[0] ?? '';
+    const dimension = this.currentDimensionKey ?? this.hierarchy[this.currentDimensionIndex] ?? this.hierarchy[0] ?? '';
+    return dimension;
   }
 
   getHierarchy(): GroupDimension[] {
@@ -146,7 +161,17 @@ export class PivotDrillDownService {
     const dims: GroupDimension[] = [];
     for (const key of this.hierarchy) {
       if (!this.canUseDimension(key)) continue;
-      if (this.countDistinctValues(filtered, key) > 1) {
+
+      // IMPORTANT: If a dimension is already used as a filter, don't show it as pivot option
+      // (e.g., if filtered to "Schwarz", showing color pivot with only "Schwarz" bucket is pointless)
+      const isAlreadyFiltered = this.filterStack.some(f => f.dimension === key);
+      if (isAlreadyFiltered) continue;
+
+      // Only show dimensions that have multiple distinct values
+      // (including color - no point showing color if all products are the same color)
+      const hasMultipleValues = this.countDistinctValues(filtered, key) > 1;
+
+      if (hasMultipleValues) {
         dims.push(key);
       }
     }
@@ -197,6 +222,7 @@ export class PivotDrillDownService {
       }
     }
     this.filterStack.push(entry);
+    this.userSelectedDimension = false; // Reset on drill-down
     this.syncDimensionWithStack();
     this.heroModeActive = false;
     if (this.isNumericDimension(dimension)) {
@@ -211,6 +237,7 @@ export class PivotDrillDownService {
     if (this.isNumericDimension(removed.dimension)) {
       this.numericStates.delete(removed.dimension);
     }
+    this.userSelectedDimension = false; // Reset on drill-up
     this.syncDimensionWithStack();
     this.heroModeActive = false;
     return true;
@@ -222,6 +249,7 @@ export class PivotDrillDownService {
     this.currentDimensionKey = this.hierarchy[this.currentDimensionIndex] ?? null;
     this.numericStates.clear();
     this.heroModeActive = false;
+    this.userSelectedDimension = false; // Reset on reset
   }
 
   getFilters(): DrillDownFilter[] {
@@ -244,6 +272,11 @@ export class PivotDrillDownService {
   }
 
   setState(state: DrillDownState): void {
+    // IMPORTANT: If user manually selected a dimension, preserve it!
+    const preserveUserSelection = this.userSelectedDimension;
+    const preservedDimensionIndex = preserveUserSelection ? this.currentDimensionIndex : null;
+    const preservedDimensionKey = preserveUserSelection ? this.currentDimensionKey : null;
+
     const idx = this.hierarchy.indexOf(state.dimension);
     if (idx >= 0) {
       this.rootDimensionIndex = idx;
@@ -269,7 +302,18 @@ export class PivotDrillDownService {
 
     this.filterStack = validFilters;
     this.numericStates.clear();
-    this.syncDimensionWithStack();
+
+    // Don't call syncDimensionWithStack if user selected dimension
+    if (!preserveUserSelection) {
+      this.syncDimensionWithStack();
+    }
+
+    // Restore user-selected dimension if it was set
+    if (preserveUserSelection && preservedDimensionIndex !== null) {
+      this.currentDimensionIndex = preservedDimensionIndex;
+      this.currentDimensionKey = preservedDimensionKey;
+      this.userSelectedDimension = true;
+    }
   }
 
   filterProducts(products: Product[]): Product[] {
@@ -296,9 +340,13 @@ export class PivotDrillDownService {
       return new Map();
     }
 
+    // DEBUG: Show dimension selection state
+    console.log(`[groupProducts] BEFORE ensureMeaningfulDimension: userSelectedDimension=${this.userSelectedDimension}, currentDimensionIndex=${this.currentDimensionIndex}, dimension=${this.getDimension()}`);
+
     this.ensureMeaningfulDimension(filtered);
 
     const dimension = this.getDimension();
+    console.log(`[groupProducts] AFTER ensureMeaningfulDimension: userSelectedDimension=${this.userSelectedDimension}, currentDimensionIndex=${this.currentDimensionIndex}, dimension=${dimension}`);
     if (this.isNumericDimension(dimension)) {
       this.recomputeNumericBuckets(filtered, dimension);
     }
@@ -309,6 +357,10 @@ export class PivotDrillDownService {
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(product);
     }
+
+    // DEBUG: Show which dimension is being used and the created groups
+    console.log(`[groupProducts] Using dimension: ${dimension} | Created ${groups.size} groups:`, Array.from(groups.keys()));
+
     return this.sortGroups(groups, dimension);
   }
 
@@ -369,6 +421,12 @@ export class PivotDrillDownService {
 
   private ensureMeaningfulDimension(products: Product[]): void {
     if (!products.length) return;
+
+    // If user manually selected a dimension, respect their choice
+    if (this.userSelectedDimension) {
+      return;
+    }
+
     let index = this.currentDimensionIndex;
     while (index < this.hierarchy.length) {
       const key = this.hierarchy[index];
@@ -376,6 +434,7 @@ export class PivotDrillDownService {
         index++;
         continue;
       }
+
       const distinct = this.countDistinctValues(products, key);
       if (distinct > 1) break;
       index++;
@@ -393,6 +452,11 @@ export class PivotDrillDownService {
   }
 
   private syncDimensionWithStack(): void {
+    // If user manually selected a dimension, respect their choice
+    if (this.userSelectedDimension) {
+      return;
+    }
+
     if (!this.filterStack.length) {
       this.currentDimensionIndex = this.rootDimensionIndex;
     } else {
@@ -429,7 +493,34 @@ export class PivotDrillDownService {
         this.hierarchy.length - 1
       );
     }
-    this.currentDimensionKey = this.hierarchy[this.currentDimensionIndex] ?? null;
+
+    // IMPORTANT: If the chosen dimension is already in the filter stack, skip to next available dimension
+    // (e.g., if filtered to "Schwarz", don't use color as pivot dimension)
+    let candidateKey = this.hierarchy[this.currentDimensionIndex] ?? null;
+    if (candidateKey && this.filterStack.some(f => f.dimension === candidateKey)) {
+      // Find next dimension that's not already filtered
+      for (let i = this.currentDimensionIndex + 1; i < this.hierarchy.length; i++) {
+        const nextKey = this.hierarchy[i];
+        if (!this.filterStack.some(f => f.dimension === nextKey)) {
+          this.currentDimensionIndex = i;
+          candidateKey = nextKey;
+          break;
+        }
+      }
+      // If no dimension found after current, search from beginning
+      if (candidateKey && this.filterStack.some(f => f.dimension === candidateKey)) {
+        for (let i = 0; i < this.currentDimensionIndex; i++) {
+          const prevKey = this.hierarchy[i];
+          if (!this.filterStack.some(f => f.dimension === prevKey)) {
+            this.currentDimensionIndex = i;
+            candidateKey = prevKey;
+            break;
+          }
+        }
+      }
+    }
+
+    this.currentDimensionKey = candidateKey;
   }
 
   private countDistinctValues(products: Product[], dimension: GroupDimension): number {
@@ -468,6 +559,51 @@ export class PivotDrillDownService {
     }
 
     let value = String(raw);
+
+    // For color dimensions, extract only the PRIMARY (first) color from combinations
+    // and normalize to 8 basic color groups: Schwarz, Weiß, Rot, Gelb, Grün, Cyan, Blau, Magenta
+    if (dimension === 'attribute:variant_colors') {
+      const originalValue = value;
+      const firstColor = value.split('/')[0].trim().toLowerCase();
+
+      // Normalize to 8 basic color groups (Grundfarben)
+      if (firstColor.includes('black') || firstColor.includes('schwarz')) {
+        value = 'Schwarz';
+      } else if (firstColor.includes('white') || firstColor.includes('weiß') || firstColor.includes('weiss')) {
+        value = 'Weiß';
+      } else if (firstColor.includes('red') || firstColor.includes('rot') || firstColor.includes('orange') ||
+                 firstColor.includes('coral') || firstColor.includes('maroon')) {
+        value = 'Rot';
+      } else if (firstColor.includes('yellow') || firstColor.includes('gelb') || firstColor.includes('gold') ||
+                 firstColor.includes('neon') || firstColor.includes('fluo') || firstColor.includes('hi-vis')) {
+        value = 'Gelb';
+      } else if (firstColor.includes('green') || firstColor.includes('grün') || firstColor.includes('lime') ||
+                 firstColor.includes('olive') || firstColor.includes('mint') || firstColor.includes('camo')) {
+        value = 'Grün';
+      } else if (firstColor.includes('cyan') || firstColor.includes('turquoise') || firstColor.includes('türkis') ||
+                 firstColor.includes('teal') || firstColor.includes('aqua') || firstColor.includes('ice')) {
+        value = 'Cyan';
+      } else if (firstColor.includes('blue') || firstColor.includes('blau') || firstColor.includes('navy') ||
+                 firstColor.includes('sky')) {
+        value = 'Blau';
+      } else if (firstColor.includes('pink') || firstColor.includes('magenta') || firstColor.includes('purple') ||
+                 firstColor.includes('violet') || firstColor.includes('lila') || firstColor.includes('fuchsia')) {
+        value = 'Magenta';
+      } else if (firstColor.includes('gray') || firstColor.includes('grey') || firstColor.includes('grau') ||
+                 firstColor.includes('silver') || firstColor.includes('charcoal') || firstColor.includes('slate') ||
+                 firstColor.includes('steel') || firstColor.includes('titanium') || firstColor.includes('anthracite') ||
+                 firstColor.includes('gunmetal') || firstColor.includes('stone')) {
+        // Gray tones -> map to Schwarz as they're closer to achromatic
+        value = 'Schwarz';
+      } else if (firstColor.includes('brown') || firstColor.includes('braun') || firstColor.includes('bronze') ||
+                 firstColor.includes('beige') || firstColor.includes('sand') || firstColor.includes('tan')) {
+        // Brown tones -> map to Rot/Gelb mix, but for simplicity use Rot
+        value = 'Rot';
+      } else {
+        // Fallback: map to closest color or Schwarz
+        value = 'Schwarz';
+      }
+    }
 
     if (
       (dimension === 'category:presentation' || dimension === 'category:primary') &&
@@ -703,6 +839,16 @@ export class PivotDrillDownService {
     }
 
     const buckets = this.buildNumericBuckets(values, def, bucketCount);
+
+    // DEBUG: Show the created buckets with their labels and ranges
+    console.log(`[recomputeNumericBuckets] Dimension: ${dimension}, Unit: ${def.numeric?.unit}, Mode: ${this.priceBucketMode}`);
+    console.log(`[recomputeNumericBuckets] Created ${buckets.length} buckets:`, buckets.map(b => ({
+      label: b.label,
+      min: b.min,
+      max: b.max,
+      inclusiveMax: b.inclusiveMax
+    })));
+
     const bucketMap = new Map<string, NumericBucket>();
     buckets.forEach(bucket => bucketMap.set(bucket.label, bucket));
     this.numericStates.set(dimension, {
@@ -752,10 +898,15 @@ export class PivotDrillDownService {
     for (let i = 0; i < bucketCount; i++) {
       const isLast = i === bucketCount - 1;
       const upper = isLast ? Infinity : lower + step;
+
+      // Smart rounding based on value magnitude
+      const roundedLower = this.smartRound(lower);
+      const roundedUpper = isLast ? Infinity : this.smartRound(upper);
+
       buckets.push({
-        label: this.formatRange(lower, upper, isLast, unit),
-        min: lower,
-        max: upper,
+        label: this.formatRange(roundedLower, roundedUpper, isLast, unit),
+        min: roundedLower,
+        max: roundedUpper,
         inclusiveMax: isLast,
       });
       lower = upper;
@@ -795,10 +946,15 @@ export class PivotDrillDownService {
 
       const min = sorted[startIndex];
       const max = i === bucketCount - 1 ? Infinity : sorted[endIndex + 1] ?? endValue;
+
+      // Smart rounding based on value magnitude
+      const roundedMin = this.smartRound(min);
+      const roundedMax = i === bucketCount - 1 ? Infinity : this.smartRound(max);
+
       buckets.push({
-        label: this.formatRange(min, max, i === bucketCount - 1, unit),
-        min,
-        max,
+        label: this.formatRange(roundedMin, roundedMax, i === bucketCount - 1, unit),
+        min: roundedMin,
+        max: roundedMax,
         inclusiveMax: i === bucketCount - 1,
       });
       startIndex = endIndex + 1;
@@ -874,10 +1030,15 @@ export class PivotDrillDownService {
       const cluster = clusters[i];
       const nextMin = clusters[i + 1]?.min ?? Infinity;
       const upper = isLast ? Infinity : (cluster.max + nextMin) / 2;
+
+      // Smart rounding based on value magnitude
+      const roundedMin = this.smartRound(cluster.min);
+      const roundedUpper = isLast ? Infinity : this.smartRound(upper);
+
       buckets.push({
-        label: this.formatRange(cluster.min, upper, isLast, unit),
-        min: cluster.min,
-        max: upper,
+        label: this.formatRange(roundedMin, roundedUpper, isLast, unit),
+        min: roundedMin,
+        max: roundedUpper,
         inclusiveMax: isLast,
       });
     }
@@ -914,22 +1075,81 @@ export class PivotDrillDownService {
     return this.filterStack.some(f => f.dimension === dimension);
   }
 
+  /**
+   * Smart rounding based on value magnitude (proportional):
+   * - Values < 10: round to 0.5 (e.g., 3.7 → 4.0, 8.2 → 8.0)
+   * - Values 10-100: round to 5 (e.g., 47 → 45, 83 → 85)
+   * - Values 100-1000: round to 50 (e.g., 347 → 350, 483 → 500)
+   * - Values 1000-10000: round to 500 (e.g., 3470 → 3500, 4830 → 5000)
+   * - Values >= 10000: round to 5000 (e.g., 34700 → 35000)
+   */
+  private smartRound(value: number): number {
+    if (!Number.isFinite(value)) return value;
+
+    const absValue = Math.abs(value);
+    let rounded: number;
+
+    if (absValue < 10) {
+      // Round to 0.5
+      rounded = Math.round(value * 2) / 2;
+    } else if (absValue < 100) {
+      // Round to 5
+      rounded = Math.round(value / 5) * 5;
+    } else if (absValue < 1000) {
+      // Round to 50
+      rounded = Math.round(value / 50) * 50;
+    } else if (absValue < 10000) {
+      // Round to 500
+      rounded = Math.round(value / 500) * 500;
+    } else {
+      // Round to 5000
+      rounded = Math.round(value / 5000) * 5000;
+    }
+
+    return rounded;
+  }
+
   private formatRange(min: number, max: number, inclusive: boolean, unit?: string): string {
+    // Round values for cleaner display
+    const roundedMin = Math.round(min);
+    const roundedMax = Math.round(max);
+
+    // Check if this is a price (EUR/€) - use simplified format
+    const isPrice = unit && (unit.toUpperCase().includes('EUR') || unit.includes('€'));
+
+    if (isPrice) {
+      // Simplified price labels for pivot columns
+      if (!Number.isFinite(max)) {
+        // Last bucket: "> €400"
+        return `> €${roundedMin}`;
+      }
+      // All other buckets: "< €100", "< €200", etc.
+      return `< €${roundedMax}`;
+    }
+
+    // Check if this is an integer dimension (e.g., variant count, quantity)
+    // If both min and max are whole numbers, treat as integers
+    const isInteger = Number.isInteger(min) && (Number.isInteger(max) || !Number.isFinite(max));
+
+    // Non-price formatting
     const toText = (v: number) => {
       if (!Number.isFinite(v)) return '∞';
-      if (Math.abs(v) >= 1000) return v.toFixed(0);
-      if (Math.abs(v) >= 100) return v.toFixed(1);
-      return v.toFixed(2);
+      // For integer dimensions, use whole numbers without decimals
+      if (isInteger) return Math.round(v).toString();
+      // For decimal dimensions, round and show
+      return Math.round(v).toString();
     };
+
     const format = (v: number) => (unit ? `${toText(v)} ${unit}` : toText(v));
+
+    // Simplified pivot labels: Show only upper bound for ranges
     if (!Number.isFinite(max)) {
+      // Last bucket: show only lower bound with "+"
       return `${format(min)}+`;
     }
-    const maxText = format(max);
-    if (inclusive) {
-      return `${format(min)} – ${maxText}`;
-    }
-    return `${format(min)} – < ${maxText}`;
+
+    // For all other buckets: show only upper bound with "<"
+    return `< ${format(max)}`;
   }
 
   resolveValue(product: Product, dimension: GroupDimension): string {

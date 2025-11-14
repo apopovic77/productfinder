@@ -88,7 +88,7 @@ export class ViewportTransform {
     const scaleY = this.viewportHeight / this.contentBounds.height;
 
     // Use the smaller scale to ensure everything fits
-    this.fitToContentScale = Math.min(scaleX, scaleY) * 0.95; // 95% to add some padding
+    this.fitToContentScale = Math.min(scaleX, scaleY); // No padding, exact fit
 
     // Max zoom: largest product can be at most 2× the screen height
     // Formula: maxProductHeight * maxScale = screenHeight * 2

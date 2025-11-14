@@ -1,6 +1,6 @@
 import type { Product } from '../types/Product';
 
-export type SortMode = 'name-asc' | 'name-desc' | 'price-asc' | 'price-desc' | 'weight-asc' | 'weight-desc' | 'season-desc' | 'none';
+export type SortMode = 'name-asc' | 'name-desc' | 'price-asc' | 'price-desc' | 'weight-asc' | 'weight-desc' | 'color-asc' | 'color-desc' | 'none';
 
 export type FilterCriteria = {
   search: string;
@@ -126,8 +126,19 @@ export class FilterService {
       case 'weight-desc':
         sorted.sort((a, b) => (b.specifications?.weight ?? 0) - (a.specifications?.weight ?? 0));
         break;
-      case 'season-desc':
-        sorted.sort((a, b) => (b.season ?? 0) - (a.season ?? 0));
+      case 'color-asc':
+        sorted.sort((a, b) => {
+          const colorA = a.colors?.[0] ?? '';
+          const colorB = b.colors?.[0] ?? '';
+          return colorA.localeCompare(colorB);
+        });
+        break;
+      case 'color-desc':
+        sorted.sort((a, b) => {
+          const colorA = a.colors?.[0] ?? '';
+          const colorB = b.colors?.[0] ?? '';
+          return colorB.localeCompare(colorA);
+        });
         break;
     }
 

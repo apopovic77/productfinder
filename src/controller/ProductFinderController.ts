@@ -75,7 +75,8 @@ export class ProductFinderController {
       () => this.layoutService.getEngine().all(),
       this.renderAccess,
       this.viewportService.getTransform(),
-      () => this.layoutService.getGroupHeaders()
+      () => this.layoutService.getGroupHeaders(),
+      () => this.layoutService.getPivotDimension()
     );
 
     // Setup favorites listener
@@ -342,27 +343,38 @@ export class ProductFinderController {
          // Resize
          handleResize(): void {
            if (!this.canvas) return;
-           
-           // Get viewport size from parent or window
+
+           // Get viewport size from canvas element itself (respects CSS insets like left/right)
+           // Canvas may have insets applied (e.g., when footer is in sidebar mode)
            const parent = this.canvas.parentElement;
-           const viewportWidth = parent?.clientWidth || window.innerWidth;
-           const viewportHeight = parent?.clientHeight || window.innerHeight;
-           
-           // Ensure we have valid dimensions
-           if (viewportWidth === 0 || viewportHeight === 0) {
-             console.warn('Canvas parent has zero dimensions, using window size');
-             this.canvas.width = window.innerWidth;
-             this.canvas.height = window.innerHeight;
-             this.layoutService.layout(window.innerWidth, window.innerHeight);
-             this.updateContentBounds();
+           if (!parent) {
+             console.warn('Canvas has no parent element');
              return;
            }
 
-           // Set canvas size to match viewport
+           // Calculate actual available space considering CSS insets
+           const computedStyle = window.getComputedStyle(this.canvas);
+           const left = parseFloat(computedStyle.left) || 0;
+           const right = parseFloat(computedStyle.right) || 0;
+           const top = parseFloat(computedStyle.top) || 0;
+           const bottom = parseFloat(computedStyle.bottom) || 0;
+
+           const parentWidth = parent.clientWidth;
+           const parentHeight = parent.clientHeight;
+
+           // Calculate actual canvas dimensions after insets
+           const viewportWidth = parentWidth - left - right;
+           const viewportHeight = parentHeight - top - bottom;
+
+           // Ensure we have valid dimensions
+           if (viewportWidth <= 0 || viewportHeight <= 0) {
+             console.warn('Canvas has invalid dimensions after insets', { viewportWidth, viewportHeight, left, right, top, bottom });
+             return;
+           }
+
+           // Set canvas size to match calculated viewport
            this.canvas.width = viewportWidth;
            this.canvas.height = viewportHeight;
-
-           // Canvas resized
 
            // Layout uses viewport size
            this.layoutService.layout(viewportWidth, viewportHeight);

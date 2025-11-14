@@ -81,18 +81,19 @@ const ATTRIBUTE_HINTS: Record<string, AttributeHint> = {
     priorityBoost: 0.2,
     source: { type: 'attribute', key: 'presentation_category' },
   },
+  poster_group: {
+    candidateKey: 'poster:group',
+    label: 'Poster Gruppe',
+    role: 'category',
+    priorityBoost: 0.15,
+    source: { type: 'attribute', key: 'poster_group' },
+  },
   sport: {
     label: 'Sport',
     role: 'category',
     priorityBoost: 0.05,
   },
-  category_primary: {
-    candidateKey: 'category:primary',
-    label: 'Primäre Kategorie',
-    role: 'class',
-    parentKey: undefined,
-    source: { type: 'category', level: 0 },
-  },
+  // category_primary: REMOVED - redundant with presentation_category
   category_secondary: {
     candidateKey: 'category:secondary',
     label: 'Unterkategorie',
@@ -307,13 +308,14 @@ export class PivotDimensionAnalyzer {
       const attributeEntries = Object.entries(product.attributes ?? {});
 
       const categories = Array.isArray(product.category) ? product.category.filter(Boolean) : [];
-      if (categories.length && !product.hasAttribute('category_primary')) {
+      // Skip index 0 (primary category) as it's redundant with presentation_category
+      if (categories.length > 1 && !product.hasAttribute('category_primary')) {
         categories.forEach((value, index) => {
-          if (!value) return;
-          const key = index === 0 ? 'category:primary' : `category:${index}`;
-          const label = index === 0
-            ? 'Produktkategorie'
-            : index === 1
+          // Skip index 0 - we use presentation_category instead
+          if (index === 0 || !value) return;
+
+          const key = `category:${index}`;
+          const label = index === 1
               ? 'Unterkategorie'
               : `Kategorie ${index + 1}`;
           const candidate = ensureCandidate(
@@ -323,9 +325,9 @@ export class PivotDimensionAnalyzer {
             'enum',
             undefined,
             {
-              requiredParent: index > 0 ? (index === 1 ? 'category:primary' : `category:${index - 1}`) : undefined,
+              requiredParent: index === 1 ? 'category:presentation' : `category:${index - 1}`,
               rawAttributeKey: `legacy_category_${index}`,
-              hintRole: index === 0 ? 'category' : 'class',
+              hintRole: 'class',
             }
           );
           this.recordValue(candidate, value, product.id);
@@ -333,6 +335,9 @@ export class PivotDimensionAnalyzer {
       }
 
       for (const [attrKey, attr] of attributeEntries) {
+        // Skip category_primary as it's redundant with presentation_category
+        if (attrKey === 'category_primary') continue;
+
         if (!attr) continue;
         const rawValue = attr.value ?? attr.normalizedValue;
         if (rawValue === undefined || rawValue === null || rawValue === '') continue;
@@ -586,15 +591,54 @@ export class PivotDimensionAnalyzer {
       const isLast = i === bucketCount - 1;
       const upper = isLast ? Infinity : lower + step;
       const inclusive = isLast;
+
+      // Smart rounding based on value magnitude
+      const roundedLower = this.smartRound(lower);
+      const roundedUpper = isLast ? Infinity : this.smartRound(upper);
+
       buckets.push({
-        label: this.formatRangeLabel(lower, upper, inclusive, unit),
-        min: lower,
-        max: upper,
+        label: this.formatRangeLabel(roundedLower, roundedUpper, inclusive, unit),
+        min: roundedLower,
+        max: roundedUpper,
         inclusiveMax: inclusive,
       });
       lower = upper;
     }
     return buckets;
+  }
+
+  /**
+   * Smart rounding based on value magnitude (proportional):
+   * - Values < 10: round to 0.5 (e.g., 3.7 → 4.0, 8.2 → 8.0)
+   * - Values 10-100: round to 5 (e.g., 47 → 45, 83 → 85)
+   * - Values 100-1000: round to 50 (e.g., 347 → 350, 483 → 500)
+   * - Values 1000-10000: round to 500 (e.g., 3470 → 3500, 4830 → 5000)
+   * - Values >= 10000: round to 5000 (e.g., 34700 → 35000)
+   */
+  private smartRound(value: number): number {
+    if (!Number.isFinite(value)) return value;
+
+    const absValue = Math.abs(value);
+    let rounded: number;
+
+    if (absValue < 10) {
+      // Round to 0.5
+      rounded = Math.round(value * 2) / 2;
+    } else if (absValue < 100) {
+      // Round to 5
+      rounded = Math.round(value / 5) * 5;
+    } else if (absValue < 1000) {
+      // Round to 50
+      rounded = Math.round(value / 50) * 50;
+    } else if (absValue < 10000) {
+      // Round to 500
+      rounded = Math.round(value / 500) * 500;
+    } else {
+      // Round to 5000
+      rounded = Math.round(value / 5000) * 5000;
+    }
+
+    return rounded;
   }
 
   private formatNumeric(value: number): string {
@@ -609,8 +653,29 @@ export class PivotDimensionAnalyzer {
   }
 
   private formatRangeLabel(min: number, max: number, inclusive: boolean, unit?: string): string {
+    // Check if this is a price (EUR/€) - use simplified format
+    const isPrice = unit && (unit.toUpperCase().includes('EUR') || unit.includes('€'));
+
+    if (isPrice) {
+      // Simplified price labels for pivot columns
+      if (!Number.isFinite(max)) {
+        // Last bucket: "> €400"
+        return `> €${min}`;
+      }
+      // All other buckets: "< €100", "< €200", etc.
+      return `< €${max}`;
+    }
+
+    // Check if this is an integer dimension (e.g., variant count, quantity)
+    // If both min and max are whole numbers, treat as integers
+    const isInteger = Number.isInteger(min) && (Number.isInteger(max) || !Number.isFinite(max));
+
+    // Non-price formatting (original logic)
     const toText = (v: number) => {
       if (!Number.isFinite(v)) return '∞';
+      // For integer dimensions, always show whole numbers
+      if (isInteger) return v.toFixed(0);
+      // For decimal dimensions, use adaptive precision
       if (Math.abs(v) >= 1000) return v.toFixed(0);
       if (Math.abs(v) >= 10) return v.toFixed(1);
       return v.toFixed(2);
@@ -618,10 +683,13 @@ export class PivotDimensionAnalyzer {
 
     const format = (v: number) => (unit ? `${toText(v)} ${unit}` : toText(v));
 
+    // Simplified pivot labels: Show only upper bound for ranges
     if (!Number.isFinite(max)) {
+      // Last bucket: show only lower bound with "+"
       return `${format(min)}+`;
     }
-    const maxText = format(max);
-    return `${format(min)} – ${inclusive ? maxText : `< ${maxText}`}`;
+
+    // For all other buckets: show only upper bound with "<"
+    return `< ${format(max)}`;
   }
 }

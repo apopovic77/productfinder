@@ -7,7 +7,7 @@ import { ProductAnnotations } from './components/ProductAnnotations';
 import { ProductImageAnnotations } from './components/ProductImageAnnotations';
 import { ProductOverlay } from './components/ProductOverlay';
 import { ProductOverlayModalV2 as ProductOverlayModal } from './components/ProductOverlayModalV2';
-import { ProductOverlayModalV3 } from './components/ProductOverlayModalV3';
+import { ProductOverlayModalV4 } from './components/ProductOverlayModalV4';
 import { HeroVideoBackground } from './components/HeroVideoBackground';
 import { AnimatePresence } from 'framer-motion';
 import { fetchAnnotations } from './services/StorageAnnotationService';
@@ -30,6 +30,8 @@ import { globalImageQueue } from './utils/GlobalImageQueue';
 import { buildMediaUrl } from './utils/MediaUrlBuilder';
 import QuickSearchCommandPalette from './components/QuickSearchCommandPalette';
 import { AiProductQueryService } from './services/AiProductQueryService';
+import { categoryMediaService } from './services/CategoryMediaService';
+import { FOOTER_CONFIG, type FooterPosition } from './config/FooterConfig';
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -92,6 +94,15 @@ type State = {
   aiFilterProductIds: string[];
   aiLastResultCount: number | null;
   quickSearchPosition: { x: number; y: number } | null;
+
+  // AI Prompt (Footer)
+  aiPrompt: string;
+  aiPromptLoading: boolean;
+  aiPromptError: string | null;
+
+  // Footer position
+  footerPosition: FooterPosition;
+  footerFloatingPosition: { x: number; y: number } | null;
 };
 
 const createInitialState = (): State => {
@@ -148,11 +159,19 @@ const createInitialState = (): State => {
     aiFilterProductIds: [],
     aiLastResultCount: null,
     quickSearchPosition: null,
+
+    aiPrompt: '',
+    aiPromptLoading: false,
+    aiPromptError: null,
+
+    footerPosition: FOOTER_CONFIG.position,
+    footerFloatingPosition: null,
   };
 };
 
 export default class App extends React.Component<{}, State> {
   private canvasRef = React.createRef<HTMLCanvasElement>();
+  private footerRef = React.createRef<HTMLDivElement>();
   private controller = new ProductFinderController();
   private fpsRaf: number | null = null;
   private fpsLastSample = 0;
@@ -167,8 +186,14 @@ export default class App extends React.Component<{}, State> {
     const canvas = this.canvasRef.current;
     if (!canvas) return;
 
+    // Load category media in parallel with controller initialization
+    const mediaPromise = categoryMediaService.load().catch(err => {
+      console.warn('[App] Failed to load category media, continuing without hero images:', err);
+    });
+
     // Initialize controller
     await this.controller.initialize(canvas);
+    await mediaPromise;
     this.controller.updateGridConfig(this.state.devSettings.gridConfig);
     this.controller.setAnimationDuration(this.state.devSettings.animationDuration);
     this.controller.setPriceBucketConfig(
@@ -515,6 +540,36 @@ export default class App extends React.Component<{}, State> {
   }
 
   private handleResize = () => {
+    const canvas = this.canvasRef.current;
+    const footer = this.footerRef.current;
+
+    if (canvas && footer) {
+      const footerPosition = this.state.footerPosition;
+
+      // Set canvas insets ONLY for footer sidebar modes (not for padding config)
+      // This prevents products from going under the footer panel
+      if (footerPosition === 'left' || footerPosition === 'right') {
+        const footerWidth = footer.offsetWidth;
+
+        if (footerPosition === 'left') {
+          canvas.style.left = `${footerWidth}px`;
+          canvas.style.right = '0px';
+        } else if (footerPosition === 'right') {
+          canvas.style.left = '0px';
+          canvas.style.right = `${footerWidth}px`;
+        }
+      } else {
+        // Bottom/floating modes - no insets needed
+        canvas.style.left = '0px';
+        canvas.style.right = '0px';
+      }
+
+      // Never set top/bottom insets (those are controlled by padding config in layout)
+      canvas.style.top = '0px';
+      canvas.style.bottom = '0px';
+    }
+
+    // Controller's handleResize will read CSS insets and adjust canvas accordingly
     this.controller.handleResize();
   };
 
@@ -544,6 +599,57 @@ export default class App extends React.Component<{}, State> {
       this.setState({ selectedVariant: variant });
     }
   };
+
+  // Footer drag functionality
+  private footerDragOffset: { x: number; y: number } | null = null;
+
+  private handleFooterDragStart = (e: React.MouseEvent) => {
+    if (this.state.footerPosition !== 'floating') return;
+
+    // Calculate offset from mouse to footer top-left
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    this.footerDragOffset = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    };
+
+    // Initialize position if not set
+    if (!this.state.footerFloatingPosition) {
+      this.setState({
+        footerFloatingPosition: {
+          x: rect.left,
+          y: rect.top,
+        },
+      });
+    }
+
+    document.addEventListener('mousemove', this.handleFooterDrag);
+    document.addEventListener('mouseup', this.handleFooterDragEnd);
+  };
+
+  private handleFooterDrag = (e: MouseEvent) => {
+    if (!this.footerDragOffset) return;
+
+    const newX = e.clientX - this.footerDragOffset.x;
+    const newY = e.clientY - this.footerDragOffset.y;
+
+    // Keep within viewport bounds
+    const maxX = window.innerWidth - 320; // Footer width
+    const maxY = window.innerHeight - 200; // Min footer height
+
+    this.setState({
+      footerFloatingPosition: {
+        x: Math.max(0, Math.min(newX, maxX)),
+        y: Math.max(30, Math.min(newY, maxY)), // Below header
+      },
+    });
+  };
+
+  private handleFooterDragEnd = () => {
+    this.footerDragOffset = null;
+    document.removeEventListener('mousemove', this.handleFooterDrag);
+    document.removeEventListener('mouseup', this.handleFooterDragEnd);
+  };
   
   private computePivotOrientation(): Orientation {
     const { innerWidth, innerHeight } = window;
@@ -558,10 +664,12 @@ export default class App extends React.Component<{}, State> {
     // Keep a stable order based on analyzer definitions. Do not reorder chips dynamically.
     const dims: GroupDimension[] = [...preferredOrder];
     const sequence = this.controller.getDisplayOrder().map(p => p.id);
+    // Filter out weight dimension (not useful for pivoting)
+    const filteredDims = dims.filter(dim => dim !== 'attribute:weight');
     this.setState({
       pivotBreadcrumbs: this.controller.getPivotBreadcrumbs(),
       pivotDimension: currentDim,
-      pivotDimensions: dims,
+      pivotDimensions: filteredDims,
       pivotDefinitions: definitions,
       pivotOrientation: this.controller.getPivotOrientation(),
       pivotGroups: this.controller.getPivotGroups(),
@@ -948,6 +1056,36 @@ export default class App extends React.Component<{}, State> {
       event.preventDefault();
       this.closeQuickSearch();
     }
+
+    if ((event.key === 'M' || event.key === 'm') && event.ctrlKey && event.shiftKey) {
+      event.preventDefault();
+      this.setState(prev => ({
+        layoutMode: prev.layoutMode === 'poster' ? 'pivot' : 'poster',
+      }));
+    }
+
+    // Cycle through footer positions with Ctrl+Shift+F
+    if ((event.key === 'F' || event.key === 'f') && event.ctrlKey && event.shiftKey) {
+      event.preventDefault();
+      const positions: FooterPosition[] = ['bottom', 'right', 'left', 'floating'];
+      const currentIndex = positions.indexOf(this.state.footerPosition);
+      const nextIndex = (currentIndex + 1) % positions.length;
+      const nextPosition = positions[nextIndex];
+
+      // Initialize floating position if switching to floating mode
+      const floatingPos =
+        nextPosition === 'floating' && !this.state.footerFloatingPosition
+          ? { x: FOOTER_CONFIG.floating.defaultPosition.x, y: FOOTER_CONFIG.floating.defaultPosition.y }
+          : this.state.footerFloatingPosition;
+
+      this.setState({
+        footerPosition: nextPosition,
+        footerFloatingPosition: floatingPos,
+      }, () => {
+        // Trigger resize to recalculate layout with new canvas bounds
+        requestAnimationFrame(() => this.handleResize());
+      });
+    }
   };
 
   private handleQuickSearchPromptChange = (value: string) => {
@@ -1014,6 +1152,50 @@ export default class App extends React.Component<{}, State> {
     }
   };
 
+  private handleAIPromptSubmit = async () => {
+    if (this.state.aiPromptLoading) return;
+    const query = this.state.aiPrompt.trim();
+    if (!query) {
+      this.setState({ aiPromptError: 'Please enter a search query' });
+      return;
+    }
+
+    this.setState({ aiPromptLoading: true, aiPromptError: null });
+
+    try {
+      const { productIds } = await AiProductQueryService.queryProducts(query);
+      if (!productIds.length) {
+        this.setState({
+          aiPromptLoading: false,
+          aiPromptError: 'No products found. Try a different query.',
+        });
+        return;
+      }
+      this.controller.setAiFilterProductIds(productIds);
+      const matchedProducts = this.controller.getFilteredProducts();
+      const matchedIds = matchedProducts.map(p => p.id);
+
+      if (!matchedIds.length) {
+        this.setState({
+          aiPromptLoading: false,
+          aiPromptError: 'AI returned IDs but they don\'t match loaded products.',
+        });
+        return;
+      }
+
+      this.setState({
+        aiPrompt: '', // Clear input after successful query
+        aiPromptLoading: false,
+        aiPromptError: null,
+        aiFilterProductIds: matchedIds,
+        aiLastResultCount: matchedIds.length,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'AI search failed';
+      this.setState({ aiPromptLoading: false, aiPromptError: message });
+    }
+  };
+
   render() {
     const { loading, error, selectedProduct, hoveredProduct, mousePos } = this.state;
     const {
@@ -1073,7 +1255,37 @@ export default class App extends React.Component<{}, State> {
           </div>
         )}
         {/* Primary toolbar intentionally hidden to maximize canvas area. Developer overlay remains accessible via F1. */}
-        <div className="pf-stage">
+
+        {/* Header bar with logo and title */}
+        <div className="pf-header">
+          <div className="pf-header-logo">
+            <img src="https://api-storage.arkturian.com/storage/media/7246?variant=thumbnail&height=25&trim=true" alt="O'NEAL" height="25" />
+          </div>
+          <div className="pf-header-breadcrumbs">
+            {pivotBreadcrumbs.map((crumb, i) => (
+              <React.Fragment key={`header-${crumb}-${i}`}>
+                {i > 0 && <span className="pf-header-breadcrumb-sep">›</span>}
+                <span
+                  role="button"
+                  tabIndex={i === pivotBreadcrumbs.length - 1 ? -1 : 0}
+                  className={`pf-header-breadcrumb ${i === pivotBreadcrumbs.length - 1 ? 'active' : ''}`}
+                  onClick={() => this.handleBreadcrumbClick(i)}
+                  onKeyDown={evt => {
+                    if (evt.key === 'Enter' || evt.key === ' ') {
+                      evt.preventDefault();
+                      this.handleBreadcrumbClick(i);
+                    }
+                  }}
+                >
+                  {crumb}
+                </span>
+              </React.Fragment>
+            ))}
+          </div>
+          <div className="pf-header-title">Product Finder</div>
+        </div>
+
+        <div className={`pf-stage pf-stage-${this.state.footerPosition}`}>
           <canvas ref={this.canvasRef} className="pf-canvas" />
 
           {/* Force labels overlay (only for force-labels mode) - rendered as HTML */}
@@ -1104,76 +1316,174 @@ export default class App extends React.Component<{}, State> {
           })()}
         </div>
 
-        <div className={`pf-bottom-bar ${this.state.mobileFooterExpanded ? 'expanded' : 'collapsed'}`}>
-          {/* Desktop: PATH section (always visible) */}
+        <div
+          ref={this.footerRef}
+          className={`pf-bottom-bar pf-footer-${this.state.footerPosition} ${this.state.mobileFooterExpanded ? 'expanded' : 'collapsed'}`}
+          style={
+            this.state.footerPosition === 'floating' && this.state.footerFloatingPosition
+              ? {
+                  '--footer-floating-x': `${this.state.footerFloatingPosition.x}px`,
+                  '--footer-floating-y': `${this.state.footerFloatingPosition.y}px`,
+                } as React.CSSProperties
+              : undefined
+          }
+          onMouseDown={this.state.footerPosition === 'floating' ? this.handleFooterDragStart : undefined}
+        >
+          {/* Desktop: AI Prompt section (always visible) */}
           <div className="pf-bottom-section pf-bottom-left pf-bottom-desktop-section">
-            <span className="pf-bottom-label">Path</span>
-            <div className="pf-bottom-crumbs">
-              {pivotBreadcrumbs.map((crumb, i) => (
-                <React.Fragment key={`${crumb}-${i}`}>
-                  {i > 0 && <span className="pf-pivot-sep">›</span>}
-                  <span
-                    role="button"
-                    tabIndex={i === pivotBreadcrumbs.length - 1 ? -1 : 0}
-                    className={`pf-bottom-crumb ${i === pivotBreadcrumbs.length - 1 ? 'active' : ''}`}
-                    onClick={() => this.handleBreadcrumbClick(i)}
-                    onKeyDown={evt => {
-                      if (evt.key === 'Enter' || evt.key === ' ') {
-                        evt.preventDefault();
-                        this.handleBreadcrumbClick(i);
-                      }
-                    }}
-                  >
-                    {crumb}
-                  </span>
-                </React.Fragment>
-              ))}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span className="pf-bottom-label">✨ Ask AI</span>
+              {this.state.aiLastResultCount !== null && this.state.aiFilterProductIds.length > 0 && (
+                <span className="pf-ai-result-count">
+                  {this.state.aiLastResultCount} {this.state.aiLastResultCount === 1 ? 'result' : 'results'}
+                </span>
+              )}
             </div>
+            <div className="pf-ai-prompt-container">
+              <input
+                type="text"
+                className="pf-ai-prompt-input"
+                placeholder="Ask me anything about the products..."
+                value={this.state.aiPrompt || ''}
+                onChange={(e) => this.setState({ aiPrompt: e.target.value, aiPromptError: null })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && this.state.aiPrompt?.trim() && !this.state.aiPromptLoading) {
+                    this.handleAIPromptSubmit();
+                  }
+                }}
+                disabled={this.state.aiPromptLoading}
+              />
+              <button
+                type="button"
+                className="pf-ai-prompt-submit"
+                onClick={() => this.handleAIPromptSubmit()}
+                disabled={!this.state.aiPrompt?.trim() || this.state.aiPromptLoading}
+                title="Submit prompt"
+              >
+                {this.state.aiPromptLoading ? (
+                  <svg className="pf-ai-spinner" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" opacity="0.25"></circle>
+                    <path d="M12 2 A10 10 0 0 1 22 12" opacity="0.75"></path>
+                  </svg>
+                ) : (
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                  </svg>
+                )}
+              </button>
+            </div>
+            {this.state.aiPromptError && (
+              <div className="pf-ai-prompt-error">{this.state.aiPromptError}</div>
+            )}
           </div>
 
           {/* Desktop: DIMENSIONS section (always visible) */}
           <div className="pf-bottom-section pf-bottom-center pf-bottom-desktop-section">
-            <span className="pf-bottom-label">Dimensions</span>
-            <div className="pf-bottom-dimensions">
-              {layoutMode === 'pivot' ? (
-                <div className="pf-bottom-dimension-row">
-                  {pivotDimensions.map(dim => (
+            {isPivotHeroMode && layoutMode === 'pivot' ? (
+              <>
+                <span className="pf-bottom-label">Sort</span>
+                <div className="pf-bottom-sort-hero">
+                  {[
+                    { value: 'none', label: 'None', icon: '−' },
+                    { value: 'name-asc', label: 'Name ↑', icon: 'A↑' },
+                    { value: 'name-desc', label: 'Name ↓', icon: 'Z↓' },
+                    { value: 'price-asc', label: 'Price ↑', icon: '€↑' },
+                    { value: 'price-desc', label: 'Price ↓', icon: '€↓' },
+                    { value: 'weight-asc', label: 'Weight ↑', icon: '⚖↑' },
+                    { value: 'weight-desc', label: 'Weight ↓', icon: '⚖↓' },
+                    { value: 'color-asc', label: 'Color ↑', icon: '🎨↑' },
+                    { value: 'color-desc', label: 'Color ↓', icon: '🎨↓' },
+                  ].map(opt => (
                     <button
+                      key={opt.value}
                       type="button"
-                      key={dim}
-                      className={`pf-pivot-chip ${dim === pivotDimension ? 'active' : ''}`}
-                      onClick={() => this.handleDimensionClick(dim)}
-                      disabled={dim === pivotDimension || !availableDimsNow.includes(dim)}
-                      aria-current={dim === pivotDimension}
-                      aria-disabled={!availableDimsNow.includes(dim)}
+                      className={`pf-sort-chip ${sortMode === opt.value ? 'active' : ''}`}
+                      onClick={() => this.setState({ sortMode: opt.value as SortMode, selectedProduct: null, selectedVariant: null, dialogPosition: null })}
+                      title={opt.label}
                     >
-                      {getDimensionLabel(dim)}
+                      {opt.label}
                     </button>
                   ))}
                 </div>
-              ) : (
-                <span className="pf-bottom-placeholder">Dimensions available in Pivot layout</span>
-              )}
-            </div>
+              </>
+            ) : (
+              <>
+                <span className="pf-bottom-label">Dimensions</span>
+                <div className="pf-bottom-dimensions">
+                  {layoutMode === 'pivot' ? (
+                    <div className="pf-bottom-dimension-row">
+                      {pivotDimensions
+                        .filter(dim => availableDimsNow.includes(dim))
+                        .map(dim => (
+                          <button
+                            type="button"
+                            key={dim}
+                            className={`pf-pivot-chip ${dim === pivotDimension ? 'active' : ''}`}
+                            onClick={() => this.handleDimensionClick(dim)}
+                            aria-current={dim === pivotDimension}
+                          >
+                            {getDimensionLabel(dim)}
+                          </button>
+                        ))}
+                    </div>
+                  ) : (
+                    <span className="pf-bottom-placeholder">Dimensions available in Pivot layout</span>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
-          {/* Desktop: SORT section (always visible) */}
+          {/* Desktop: SORT section (hidden in Hero Mode) */}
+          {!(isPivotHeroMode && layoutMode === 'pivot') && (
+            <div className="pf-bottom-section pf-bottom-right pf-bottom-desktop-section">
+              <label className="pf-bottom-label" htmlFor="pf-bottom-sort">Sort</label>
+              <CustomSelect
+                value={sortMode}
+                onChange={(value) => this.setState({ sortMode: value as SortMode, selectedProduct: null, selectedVariant: null, dialogPosition: null })}
+                options={[
+                  { value: 'none', label: 'None' },
+                  { value: 'name-asc', label: 'Name (A-Z)' },
+                  { value: 'name-desc', label: 'Name (Z-A)' },
+                  { value: 'price-asc', label: 'Price (Low-High)' },
+                  { value: 'price-desc', label: 'Price (High-Low)' },
+                  { value: 'weight-asc', label: 'Weight (Light-Heavy)' },
+                  { value: 'weight-desc', label: 'Weight (Heavy-Light)' },
+                  { value: 'color-asc', label: 'Color (A-Z)' },
+                  { value: 'color-desc', label: 'Color (Z-A)' },
+                ]}
+              />
+            </div>
+          )}
+
+          {/* Desktop: RESET button (always visible) */}
           <div className="pf-bottom-section pf-bottom-right pf-bottom-desktop-section">
-            <label className="pf-bottom-label" htmlFor="pf-bottom-sort">Sort</label>
-            <CustomSelect
-              value={sortMode}
-              onChange={(value) => this.setState({ sortMode: value as SortMode, selectedProduct: null, selectedVariant: null, dialogPosition: null })}
-              options={[
-                { value: 'none', label: 'None' },
-                { value: 'name-asc', label: 'Name (A-Z)' },
-                { value: 'name-desc', label: 'Name (Z-A)' },
-                { value: 'price-asc', label: 'Price (Low-High)' },
-                { value: 'price-desc', label: 'Price (High-Low)' },
-                { value: 'weight-asc', label: 'Weight (Light-Heavy)' },
-                { value: 'weight-desc', label: 'Weight (Heavy-Light)' },
-                { value: 'season-desc', label: 'Season (Newest)' },
-              ]}
-            />
+            <label className="pf-bottom-label">Reset</label>
+            <button
+              className="pf-reset-button"
+              onClick={() => {
+                const initialState = createInitialState();
+                this.setState({
+                  sortMode: initialState.sortMode,
+                  pivotBreadcrumbs: initialState.pivotBreadcrumbs,
+                  selectedProduct: null,
+                  selectedVariant: null,
+                  dialogPosition: null,
+                  aiFilterProductIds: [],
+                  aiLastResultCount: null,
+                  aiPrompt: '',
+                });
+                this.controller.resetPivot();
+              }}
+              title="Reset to start view"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M2 8a6 6 0 1 1 0 .01" />
+                <path d="M2 4v4h4" />
+              </svg>
+              Start
+            </button>
           </div>
 
           {/* Mobile: Collapsed summary view */}
@@ -1237,7 +1547,8 @@ export default class App extends React.Component<{}, State> {
                     { value: 'price-desc', label: 'Price (High-Low)' },
                     { value: 'weight-asc', label: 'Weight (Light-Heavy)' },
                     { value: 'weight-desc', label: 'Weight (Heavy-Light)' },
-                    { value: 'season-desc', label: 'Season (Newest)' },
+                    { value: 'color-asc', label: 'Color (A-Z)' },
+                    { value: 'color-desc', label: 'Color (Z-A)' },
                   ]}
                 />
               </div>
@@ -1246,19 +1557,19 @@ export default class App extends React.Component<{}, State> {
                 <div className="pf-bottom-dimensions">
                   {layoutMode === 'pivot' ? (
                     <div className="pf-bottom-dimension-row">
-                      {pivotDimensions.map(dim => (
-                        <button
-                          type="button"
-                          key={dim}
-                          className={`pf-pivot-chip ${dim === pivotDimension ? 'active' : ''}`}
-                          onClick={() => this.handleDimensionClick(dim)}
-                          disabled={dim === pivotDimension || !availableDimsNow.includes(dim)}
-                          aria-current={dim === pivotDimension}
-                          aria-disabled={!availableDimsNow.includes(dim)}
-                        >
-                          {getDimensionLabel(dim)}
-                        </button>
-                      ))}
+                      {pivotDimensions
+                        .filter(dim => availableDimsNow.includes(dim))
+                        .map(dim => (
+                          <button
+                            type="button"
+                            key={dim}
+                            className={`pf-pivot-chip ${dim === pivotDimension ? 'active' : ''}`}
+                            onClick={() => this.handleDimensionClick(dim)}
+                            aria-current={dim === pivotDimension}
+                          >
+                            {getDimensionLabel(dim)}
+                          </button>
+                        ))}
                     </div>
                   ) : (
                     <span className="pf-bottom-placeholder">Dimensions available in Pivot layout</span>
@@ -1303,7 +1614,7 @@ export default class App extends React.Component<{}, State> {
                 storageId={6550}
                 onClose={() => this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null })}
               >
-                <ProductOverlayModalV3
+                <ProductOverlayModalV4
                   product={selectedProduct}
                   onClose={() => this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null })}
                   onPositionChange={this.handleDialogPositionChange}

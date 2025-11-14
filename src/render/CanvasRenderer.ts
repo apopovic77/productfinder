@@ -8,6 +8,8 @@ import { ProductOverlayCanvasV2, MODERN_OVERLAY_STYLE } from './ProductOverlayCa
 import { globalImageQueue } from '../utils/GlobalImageQueue';
 import { buildMediaUrl } from '../utils/MediaUrlBuilder';
 import { InterpolatedProperty } from 'arkturian-typescript-utils';
+import { categoryMediaService } from '../services/CategoryMediaService';
+import { BUCKET_BUTTON_CONFIG } from '../config/BucketButtonConfig';
 
 type LoadTask = {
   nodeId: string;
@@ -84,18 +86,136 @@ export class CanvasRenderer<T> {
   // Queue processing timing (non-blocking)
   private lastQueueProcessTime = 0;
 
+  // Hero images for group headers (bucket buttons)
+  private groupHeaderImages = new Map<string, HTMLImageElement>(); // key: dimension:value
+  private groupHeaderImageLoading = new Set<string>(); // Track loading state
+
   // Hit detection: Path2D objects for each rendered product
   private productPaths = new Map<string, { path: Path2D; product: T }>();
+
+  // Color name to hex mapping for rendering color swatches
+  private readonly colorMap: Record<string, string> = {
+    // Basic colors
+    'black': '#000000',
+    'white': '#FFFFFF',
+    'red': '#DC2626',
+    'blue': '#2563EB',
+    'green': '#16A34A',
+    'yellow': '#EAB308',
+    'orange': '#EA580C',
+    'pink': '#EC4899',
+    'purple': '#9333EA',
+    'gray': '#6B7280',
+    'grey': '#6B7280',
+    'brown': '#92400E',
+
+    // Extended colors
+    'beige': '#D4AF37',
+    'gold': '#FFD700',
+    'silver': '#C0C0C0',
+    'bronze': '#CD7F32',
+    'neon': '#39FF14',
+    'lime': '#00FF00',
+    'mint': '#98FF98',
+    'maroon': '#800000',
+
+    // Shades
+    'camo': '#78866B',
+    'camouflage': '#78866B',
+    'olive': '#808000',
+    'navy': '#000080',
+    'teal': '#008080',
+    'cyan': '#00FFFF',
+    'magenta': '#FF00FF',
+    'turquoise': '#40E0D0',
+    'aqua': '#00FFFF',
+    'ice': '#D0F0FF',
+    'frost': '#E0F6FF',
+    'sky': '#87CEEB',
+    'sand': '#C2B280',
+    'stone': '#8B8680',
+    'charcoal': '#36454F',
+    'slate': '#708090',
+    'steel': '#B0C4DE',
+    'chrome': '#E5E4E2',
+    'titanium': '#878681',
+
+    // Neon/Hi-Vis colors
+    'hi-vis': '#FFFF00',
+    'hivis': '#FFFF00',
+    'hiviz': '#FFFF00',
+    'fluo': '#39FF14',
+    'fluorescent': '#39FF14',
+    'neon yellow': '#DFFF00',
+    'neon green': '#39FF14',
+    'neon orange': '#FF6600',
+    'neon pink': '#FF10F0',
+
+    // Other common motorcycle gear colors
+    'titanium': '#878681',
+    'anthracite': '#293133',
+    'gunmetal': '#2a3439'
+  };
 
   constructor(
     private ctx: CanvasRenderingContext2D,
     private getNodes: () => LayoutNode<T>[],
     private renderAccessors: { label(item: T): string; priceText(item: T): string },
     private viewport: ViewportTransform | null = null,
-    private getGroupHeaders: () => GroupHeaderInfo[] = () => []
+    private getGroupHeaders: () => GroupHeaderInfo[] = () => [],
+    private getPivotDimension: () => string = () => ''
   ) {
     this.productOverlay = new ProductOverlayCanvas(ctx, DEFAULT_OVERLAY_STYLE);
     this.productOverlayV2 = new ProductOverlayCanvasV2(ctx, MODERN_OVERLAY_STYLE);
+  }
+
+  /**
+   * Parse color from label and return hex code.
+   * Handles normalized color groups: Schwarz, Weiß, Rot, Gelb, Grün, Cyan, Blau, Magenta
+   */
+  private parseColorFromLabel(label: string): string[] {
+    const lowerLabel = label.toLowerCase();
+
+    // Handle normalized color groups (Grundfarben from PivotDrillDownService)
+    if (lowerLabel === 'schwarz' || lowerLabel === 'black') return ['#000000'];
+    if (lowerLabel === 'weiß' || lowerLabel === 'weiss' || lowerLabel === 'white') return ['#FFFFFF'];
+    if (lowerLabel === 'rot' || lowerLabel === 'red') return ['#E63312'];
+    if (lowerLabel === 'gelb' || lowerLabel === 'yellow') return ['#FFED00'];
+    if (lowerLabel === 'grün' || lowerLabel === 'green') return ['#00FF00'];
+    if (lowerLabel === 'cyan') return ['#00FFFF'];
+    if (lowerLabel === 'blau' || lowerLabel === 'blue') return ['#0000FF'];
+    if (lowerLabel === 'magenta') return ['#FF00FF'];
+
+    // Fallback: try to parse from colorMap
+    const colors: string[] = [];
+    const parts = lowerLabel.split(/[\/\-,]/);
+    const sortedColorNames = Object.keys(this.colorMap).sort((a, b) => b.length - a.length);
+
+    for (const part of parts) {
+      const trimmed = part.trim();
+      if (!trimmed) continue;
+
+      let found = false;
+      for (const colorName of sortedColorNames) {
+        if (trimmed === colorName || trimmed.startsWith(colorName + ' ') ||
+            trimmed.endsWith(' ' + colorName) || trimmed.includes(' ' + colorName + ' ')) {
+          colors.push(this.colorMap[colorName]);
+          found = true;
+          break;
+        }
+      }
+
+      if (!found) {
+        for (const colorName of sortedColorNames) {
+          if (trimmed.includes(colorName)) {
+            colors.push(this.colorMap[colorName]);
+            break;
+          }
+        }
+      }
+    }
+
+    return colors.length > 0 ? colors : ['#94A3B8'];
   }
 
   /**
@@ -379,9 +499,10 @@ export class CanvasRenderer<T> {
     // No-op: ImageLoadQueue handles all image loading now
   }
 
-  private clear() { 
-    const c = this.ctx.canvas; 
-    this.ctx.clearRect(0,0,c.width,c.height); 
+  private clear() {
+    const c = this.ctx.canvas;
+    this.ctx.clearRect(0,0,c.width,c.height);
+    // Canvas is transparent - body background shows through
   }
 
   /**
@@ -798,71 +919,223 @@ export class CanvasRenderer<T> {
     
     // Draw group headers (after products, so they're on top) - matching .pf-pivot-chip style
     const groupHeaders = this.getGroupHeaders();
+    const currentDimension = this.getPivotDimension();
+
     for (const header of groupHeaders) {
       const isHovered = this.hoveredGroupKey === header.key;
 
-      // Rounded corners like .pf-pivot-chip (10px)
-      const radius = 10;
+      // Rounded corners from config
+      const radius = BUCKET_BUTTON_CONFIG.cornerRadius;
+      const yOffset = isHovered ? BUCKET_BUTTON_CONFIG.hover.yOffset : 0;
 
-      // Gradient matching .pf-pivot-chip style
-      const gradient = this.ctx.createLinearGradient(
-        header.x,
-        header.y,
-        header.x + header.width,
-        header.y + header.height
-      );
-      if (isHovered) {
-        // Lighter hover gradient (like .pf-pivot-chip:hover)
-        gradient.addColorStop(0, '#3ab8ff');
-        gradient.addColorStop(1, '#22e4ee');
+      // Apply width extension (negative margin effect)
+      const widthExt = BUCKET_BUTTON_CONFIG.widthExtension;
+      const buttonX = header.x - widthExt;
+      const buttonWidth = header.width + (widthExt * 2);
+
+      // Try to load hero image for this header
+      const imageKey = `${currentDimension}:${header.label}`;
+      this.loadGroupHeaderImage(currentDimension, header.label);
+      const heroImage = this.groupHeaderImages.get(imageKey);
+
+      // Draw background (image or gradient)
+      this.ctx.save();
+      this.drawRoundedRect(buttonX, header.y + yOffset, buttonWidth, header.height, radius);
+      this.ctx.clip(); // Clip to rounded rect
+
+      if (heroImage && heroImage.complete && heroImage.naturalWidth > 0) {
+        // Draw hero image as background (cover mode)
+        this.drawImageCover(
+          heroImage,
+          buttonX,
+          header.y + yOffset,
+          buttonWidth,
+          header.height
+        );
+
+        // Dark overlay for text readability
+        const opacity = isHovered ? BUCKET_BUTTON_CONFIG.imageOverlay.opacityHover : BUCKET_BUTTON_CONFIG.imageOverlay.opacityNormal;
+        this.ctx.fillStyle = `rgba(0, 0, 0, ${opacity})`;
+        this.ctx.fillRect(buttonX, header.y + yOffset, buttonWidth, header.height);
       } else {
-        // Default gradient: linear-gradient(145deg, #2aa8ef 0%, #12d4de 100%)
-        gradient.addColorStop(0, '#2aa8ef');
-        gradient.addColorStop(1, '#12d4de');
+        // Fallback gradient
+        const gradient = this.ctx.createLinearGradient(
+          buttonX,
+          header.y,
+          buttonX + buttonWidth,
+          header.y + header.height
+        );
+        const colors = isHovered ? BUCKET_BUTTON_CONFIG.gradient.hover : BUCKET_BUTTON_CONFIG.gradient.normal;
+        gradient.addColorStop(0, colors.start);
+        gradient.addColorStop(1, colors.end);
+        this.ctx.fillStyle = gradient;
+        this.ctx.fillRect(buttonX, header.y + yOffset, buttonWidth, header.height);
       }
 
-      // Apply slight Y offset for hover effect (matching translateY(-2px))
-      const yOffset = isHovered ? -2 : 0;
+      this.ctx.restore();
 
-      this.drawRoundedRect(header.x, header.y + yOffset, header.width, header.height, radius);
-      this.ctx.fillStyle = gradient;
-      this.ctx.fill();
-
-      // No border (matching .pf-pivot-chip)
       // Add subtle shadow for hover
       if (isHovered) {
-        this.ctx.shadowColor = 'rgba(42, 168, 239, 0.3)';
-        this.ctx.shadowBlur = 12;
-        this.ctx.shadowOffsetY = 4;
-        this.ctx.fill(); // Re-fill with shadow
-        this.ctx.shadowColor = 'transparent';
-        this.ctx.shadowBlur = 0;
-        this.ctx.shadowOffsetY = 0;
+        this.ctx.save();
+        this.ctx.shadowColor = BUCKET_BUTTON_CONFIG.hover.shadow.color;
+        this.ctx.shadowBlur = BUCKET_BUTTON_CONFIG.hover.shadow.blur;
+        this.ctx.shadowOffsetY = BUCKET_BUTTON_CONFIG.hover.shadow.offsetY;
+        this.drawRoundedRect(buttonX, header.y + yOffset, buttonWidth, header.height, radius);
+        this.ctx.fillStyle = 'transparent';
+        this.ctx.fill();
+        this.ctx.restore();
       }
 
-      // White text (matching .pf-pivot-chip)
-      this.ctx.fillStyle = 'white';
-      this.ctx.font = isHovered ? 'bold 14px system-ui' : '13px system-ui';
-      this.ctx.textAlign = 'center';
-      this.ctx.textBaseline = 'middle';
+      // Check if we're in color pivot mode
+      const isColorDimension = currentDimension === 'attribute:variant_colors';
+      let isTruncated = false;
 
-      // Calculate available width for text (leave padding on both sides)
-      const textPadding = 20;
-      const maxTextWidth = header.width - (textPadding * 2);
+      if (isColorDimension) {
+        // Render color swatches instead of text
+        const colors = this.parseColorFromLabel(header.label);
+        const centerX = header.x + header.width / 2;
+        const centerY = header.y + yOffset + header.height / 2;
+        const circleRadius = Math.min(header.width, header.height) * 0.35;
 
-      // Truncate text if needed
-      const displayText = this.truncateText(header.label, maxTextWidth);
-      const isTruncated = displayText !== header.label;
+        if (colors.length === 1) {
+          // Single color: one circle
+          this.ctx.beginPath();
+          this.ctx.arc(centerX, centerY, circleRadius, 0, Math.PI * 2);
+          this.ctx.fillStyle = colors[0];
+          this.ctx.fill();
+          // White border for visibility
+          this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+          this.ctx.lineWidth = 2;
+          this.ctx.stroke();
+        } else if (colors.length === 2) {
+          // Two colors: split circle
+          this.ctx.save();
+          this.ctx.beginPath();
+          this.ctx.arc(centerX, centerY, circleRadius, 0, Math.PI * 2);
+          this.ctx.clip();
 
-      this.ctx.fillText(
-        displayText,
-        header.x + header.width / 2,
-        header.y + yOffset + header.height / 2
-      );
+          // Left half
+          this.ctx.fillStyle = colors[0];
+          this.ctx.fillRect(
+            centerX - circleRadius,
+            centerY - circleRadius,
+            circleRadius,
+            circleRadius * 2
+          );
+
+          // Right half
+          this.ctx.fillStyle = colors[1];
+          this.ctx.fillRect(
+            centerX,
+            centerY - circleRadius,
+            circleRadius,
+            circleRadius * 2
+          );
+
+          this.ctx.restore();
+
+          // Border
+          this.ctx.beginPath();
+          this.ctx.arc(centerX, centerY, circleRadius, 0, Math.PI * 2);
+          this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+          this.ctx.lineWidth = 2;
+          this.ctx.stroke();
+        } else if (colors.length >= 3) {
+          // Three or more colors: pie chart
+          this.ctx.save();
+          const angleStep = (Math.PI * 2) / colors.length;
+          for (let i = 0; i < colors.length; i++) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(centerX, centerY);
+            this.ctx.arc(
+              centerX,
+              centerY,
+              circleRadius,
+              i * angleStep - Math.PI / 2,
+              (i + 1) * angleStep - Math.PI / 2
+            );
+            this.ctx.closePath();
+            this.ctx.fillStyle = colors[i];
+            this.ctx.fill();
+          }
+          this.ctx.restore();
+
+          // Border
+          this.ctx.beginPath();
+          this.ctx.arc(centerX, centerY, circleRadius, 0, Math.PI * 2);
+          this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+          this.ctx.lineWidth = 2;
+          this.ctx.stroke();
+        }
+      } else {
+        // Regular text rendering (non-color dimensions)
+        this.ctx.fillStyle = BUCKET_BUTTON_CONFIG.font.color;
+        const fontSize = isHovered ? BUCKET_BUTTON_CONFIG.font.sizeHover : BUCKET_BUTTON_CONFIG.font.sizeNormal;
+        const fontWeight = isHovered ? BUCKET_BUTTON_CONFIG.font.weightHover : BUCKET_BUTTON_CONFIG.font.weightNormal;
+        this.ctx.font = `${fontWeight} ${fontSize}px ${BUCKET_BUTTON_CONFIG.font.family}`;
+        this.ctx.textAlign = BUCKET_BUTTON_CONFIG.font.alignHorizontal;
+        this.ctx.textBaseline = BUCKET_BUTTON_CONFIG.font.alignVertical;
+
+        // Get individual padding values
+        const { paddingTop, paddingRight, paddingBottom, paddingLeft } = BUCKET_BUTTON_CONFIG.spacing;
+
+        // Calculate available width for text (subtract left and right padding)
+        const maxTextWidth = header.width - paddingLeft - paddingRight;
+
+        // Truncate text if needed
+        let displayText = this.truncateText(header.label, maxTextWidth);
+        const isTruncated = displayText !== header.label;
+
+        // Apply text transform
+        const textTransform = BUCKET_BUTTON_CONFIG.font.textTransform;
+        if (textTransform === 'uppercase') {
+          displayText = displayText.toUpperCase();
+        } else if (textTransform === 'lowercase') {
+          displayText = displayText.toLowerCase();
+        } else if (textTransform === 'capitalize') {
+          displayText = displayText.charAt(0).toUpperCase() + displayText.slice(1).toLowerCase();
+        }
+
+        // Calculate text position based on alignment
+        let textX: number;
+        let textY: number;
+
+        // Horizontal alignment
+        switch (BUCKET_BUTTON_CONFIG.font.alignHorizontal) {
+          case 'left':
+            textX = header.x + paddingLeft;
+            break;
+          case 'right':
+            textX = header.x + header.width - paddingRight;
+            break;
+          case 'center':
+          default:
+            textX = header.x + paddingLeft + (header.width - paddingLeft - paddingRight) / 2;
+            break;
+        }
+
+        // Vertical alignment
+        switch (BUCKET_BUTTON_CONFIG.font.alignVertical) {
+          case 'top':
+            textY = header.y + yOffset + paddingTop;
+            break;
+          case 'bottom':
+            textY = header.y + yOffset + header.height - paddingBottom;
+            break;
+          case 'middle':
+          default:
+            textY = header.y + yOffset + paddingTop + (header.height - paddingTop - paddingBottom) / 2;
+            break;
+        }
+
+        this.ctx.fillText(displayText, textX, textY);
+      }
 
       // Draw click hint or full text tooltip on hover
       if (isHovered) {
-        if (isTruncated) {
+        // For color dimensions, always show the color name as tooltip
+        // For other dimensions, show tooltip only if text is truncated
+        if (isColorDimension || isTruncated) {
           // Show full text as tooltip above the button
           const tooltipPadding = 12;
           const tooltipFont = '14px system-ui';
@@ -1237,5 +1510,88 @@ export class CanvasRenderer<T> {
     }
 
     this.ctx.restore();
+  }
+
+  /**
+   * Load hero image for group header (bucket button)
+   * Uses fallback images from config if no specific image exists
+   */
+  private loadGroupHeaderImage(dimension: string, dimensionValue: string): void {
+    const imageKey = `${dimension}:${dimensionValue}`;
+
+    // Skip if already loaded or loading
+    if (this.groupHeaderImages.has(imageKey) || this.groupHeaderImageLoading.has(imageKey)) {
+      return;
+    }
+
+    // Check if media exists (with fallback support)
+    const imageUrl = categoryMediaService.getHeroImageUrlWithFallback(
+      dimension,
+      dimensionValue,
+      BUCKET_BUTTON_CONFIG.fallbackImages,
+      {
+        width: 600,
+        height: 200,
+        quality: 85
+      }
+    );
+
+    if (!imageUrl) {
+      return; // No hero image and no fallbacks configured
+    }
+
+    // Mark as loading
+    this.groupHeaderImageLoading.add(imageKey);
+
+    // Load image
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+
+    img.onload = () => {
+      this.groupHeaderImages.set(imageKey, img);
+      this.groupHeaderImageLoading.delete(imageKey);
+    };
+
+    img.onerror = () => {
+      console.warn(`[CanvasRenderer] Failed to load hero image for ${imageKey}`);
+      this.groupHeaderImageLoading.delete(imageKey);
+    };
+
+    img.src = imageUrl;
+  }
+
+  /**
+   * Draw image in "cover" mode (fills area while maintaining aspect ratio)
+   */
+  private drawImageCover(
+    img: HTMLImageElement,
+    x: number,
+    y: number,
+    width: number,
+    height: number
+  ): void {
+    const imgRatio = img.naturalWidth / img.naturalHeight;
+    const areaRatio = width / height;
+
+    let sourceX = 0;
+    let sourceY = 0;
+    let sourceWidth = img.naturalWidth;
+    let sourceHeight = img.naturalHeight;
+
+    if (imgRatio > areaRatio) {
+      // Image is wider - crop sides
+      sourceWidth = img.naturalHeight * areaRatio;
+      sourceX = (img.naturalWidth - sourceWidth) / 2;
+    } else {
+      // Image is taller - crop top/bottom
+      sourceHeight = img.naturalWidth / areaRatio;
+      sourceY = (img.naturalHeight - sourceHeight) / 2;
+    }
+
+    this.ctx.drawImage(
+      img,
+      sourceX, sourceY, sourceWidth, sourceHeight,
+      x, y, width, height
+    );
   }
 }

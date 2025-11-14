@@ -13,6 +13,63 @@
   --pf-accent-strong: #556dff;
 }
 
+/* ITC Avant Garde Gothic Font Family */
+@font-face {
+  font-family: 'ITC Avant Garde Gothic';
+  src: url('/fonts/ITC Avant Garde Gothic CE Book/ITC Avant Garde Gothic CE Book.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'ITC Avant Garde Gothic';
+  src: url('/fonts/ITC Avant Garde Gothic CE Book Oblique/ITC Avant Garde Gothic CE Book Oblique.otf') format('opentype');
+  font-weight: 400;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: 'ITC Avant Garde Gothic';
+  src: url('/fonts/ITC Avant Garde Gothic Medium/ITC Avant Garde Gothic Medium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'ITC Avant Garde Gothic';
+  src: url('/fonts/ITC Avant Garde Gothic Medium Oblique/ITC Avant Garde Gothic Medium Oblique.otf') format('opentype');
+  font-weight: 500;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: 'ITC Avant Garde Gothic';
+  src: url('/fonts/ITC Avant Garde Gothic CE Demi/ITC Avant Garde Gothic CE Demi.otf') format('opentype');
+  font-weight: 600;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'ITC Avant Garde Gothic';
+  src: url('/fonts/ITC Avant Garde Gothic CE Demi Oblique/ITC Avant Garde Gothic CE Demi Oblique.otf') format('opentype');
+  font-weight: 600;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: 'ITC Avant Garde Gothic';
+  src: url('/fonts/ITC Avant Garde Gothic Bold/ITC Avant Garde Gothic Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'ITC Avant Garde Gothic';
+  src: url('/fonts/ITC Avant Garde Gothic Bold Oblique/ITC Avant Garde Gothic Bold Oblique.otf') format('opentype');
+  font-weight: 700;
+  font-style: italic;
+}
+
 html, body, #root {
   width: 100%;
   height: 100%;
@@ -22,13 +79,9 @@ html, body, #root {
 body {
   width: 100%;
   height: 100%;
-  background: linear-gradient(
-    145deg,
-    #117be0 0%,     /* tieferes, sattes Blau oben */
-    #2aa8ef 45%,    /* lebendiges Cyan in der Mitte */
-    #12d4de 100%    /* leuchtendes Türkis unten */
-  );color: var(--pf-text);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #ffffff;
+  color: var(--pf-text);
+  font-family: 'ITC Avant Garde Gothic', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 .pf-root {
@@ -145,6 +198,64 @@ body {
   box-shadow: 0 16px 40px -28px rgba(93, 117, 255, 0.85);
 }
 
+/* Header bar with logo and title */
+.pf-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 35px;
+  padding: 0 20px;
+  background: #000000;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  z-index: 100;
+}
+
+.pf-header-logo {
+  display: flex;
+  align-items: center;
+}
+
+.pf-header-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  letter-spacing: 0.02em;
+  margin-left: auto;
+}
+
+.pf-header-breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 16px;
+}
+
+.pf-header-breadcrumb {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.pf-header-breadcrumb:hover:not(.active) {
+  color: rgba(255, 255, 255, 1);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.pf-header-breadcrumb.active {
+  color: rgba(255, 255, 255, 0.4);
+  cursor: default;
+}
+
+.pf-header-breadcrumb-sep {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 12px;
+  user-select: none;
+}
+
 .pf-stage {
   position: relative;
   flex: 1 1 auto;
@@ -154,12 +265,21 @@ body {
   border-bottom: none;
 }
 
+/* Adjust stage container when footer is a sidebar - this makes the canvas parent smaller */
+.pf-stage-left {
+  padding-left: 0; /* Will be set dynamically */
+}
+
+.pf-stage-right {
+  padding-right: 0; /* Will be set dynamically */
+}
+
 .pf-canvas {
   display: block;
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
+  /* width/height removed - inset defines size automatically */
+  /* When left/right insets are modified in JS, the canvas will automatically resize */
   z-index: 1;
   background: transparent;
 }
@@ -179,6 +299,132 @@ body {
   box-sizing: border-box;
   overflow-x: hidden;
   overflow-y: visible;
+  transition: all 300ms ease;
+}
+
+/* Footer Position Modes */
+
+/* Bottom mode (default) - V4 Glassmorphism Style */
+.pf-footer-bottom {
+  position: relative;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(230, 230, 230, 0.85);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border-top: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 -24px 64px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+  /* Inherits grid layout from .pf-bottom-bar */
+}
+
+/* Right sidebar mode - V4 Glassmorphism Style */
+.pf-footer-right {
+  position: absolute;
+  top: 30px; /* Below header */
+  right: 0;
+  bottom: 0;
+  width: 300px;
+  height: auto;
+  max-height: calc(100vh - 30px);
+  display: flex;
+  flex-direction: column;
+  grid-template-columns: none;
+  padding: 20px;
+  background: rgba(230, 230, 230, 0.85);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border-left: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: -24px 0 64px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+  overflow-y: auto;
+  overflow-x: hidden;
+  z-index: 50;
+}
+
+.pf-footer-right .pf-bottom-section {
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.pf-footer-right .pf-bottom-left,
+.pf-footer-right .pf-bottom-center,
+.pf-footer-right .pf-bottom-right {
+  justify-self: stretch;
+  align-items: stretch;
+  text-align: left;
+}
+
+/* Left sidebar mode - V4 Glassmorphism Style */
+.pf-footer-left {
+  position: absolute;
+  top: 30px; /* Below header */
+  left: 0;
+  bottom: 0;
+  width: 300px;
+  height: auto;
+  max-height: calc(100vh - 30px);
+  display: flex;
+  flex-direction: column;
+  grid-template-columns: none;
+  padding: 20px;
+  background: rgba(230, 230, 230, 0.85);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border-right: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 24px 0 64px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+  overflow-y: auto;
+  overflow-x: hidden;
+  z-index: 50;
+}
+
+.pf-footer-left .pf-bottom-section {
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.pf-footer-left .pf-bottom-left,
+.pf-footer-left .pf-bottom-center,
+.pf-footer-left .pf-bottom-right {
+  justify-self: stretch;
+  align-items: stretch;
+  text-align: left;
+}
+
+/* Floating dialog mode (overlay) - V4 Glassmorphism Style */
+.pf-footer-floating {
+  position: fixed;
+  top: var(--footer-floating-y, 80px);
+  left: var(--footer-floating-x, 20px);
+  width: 320px;
+  height: auto;
+  max-height: calc(100vh - 100px);
+  display: flex;
+  flex-direction: column;
+  grid-template-columns: none;
+  padding: 20px;
+  background: rgba(230, 230, 230, 0.85);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+  overflow-y: auto;
+  overflow-x: hidden;
+  z-index: 200;
+  cursor: move;
+}
+
+.pf-footer-floating .pf-bottom-section {
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.pf-footer-floating .pf-bottom-left,
+.pf-footer-floating .pf-bottom-center,
+.pf-footer-floating .pf-bottom-right {
+  justify-self: stretch;
+  align-items: stretch;
+  text-align: left;
 }
 
 /* Hide mobile-only elements on desktop */
@@ -227,8 +473,9 @@ body {
 .pf-bottom-label {
   font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: rgba(210, 220, 255, 0.85);
+  letter-spacing: 0.1em;
+  color: rgba(0, 0, 0, 0.6);
+  font-weight: 600;
 }
 
 .pf-bottom-crumbs {
@@ -236,6 +483,91 @@ body {
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
+}
+
+/* AI Prompt Input */
+.pf-ai-prompt-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.pf-ai-prompt-input {
+  flex: 1;
+  background: rgba(240, 240, 240, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  color: #1a1a1a;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.pf-ai-prompt-input:focus {
+  border-color: rgba(0, 0, 0, 0.3);
+  background: rgba(250, 250, 250, 0.95);
+}
+
+.pf-ai-prompt-input::placeholder {
+  color: rgba(0, 0, 0, 0.4);
+}
+
+.pf-ai-prompt-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  background: #1a1a1a;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pf-ai-prompt-submit:hover:not(:disabled) {
+  background: #000000;
+  border-color: rgba(0, 0, 0, 0.25);
+}
+
+.pf-ai-prompt-submit:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.pf-ai-prompt-submit:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.pf-ai-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.pf-ai-prompt-error {
+  font-size: 11px;
+  color: rgba(255, 100, 100, 0.9);
+  margin-top: 4px;
+}
+
+.pf-ai-result-count {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(42, 168, 239, 0.25);
+  color: rgba(200, 230, 255, 0.9);
+  font-weight: 500;
 }
 
 .pf-bottom-crumb {
@@ -305,42 +637,123 @@ body {
 }
 
 .pf-bottom-section select {
-  background: rgba(12, 18, 42, 0.25);
-  border: 1px solid rgba(129, 146, 255, 0.22);
-  color: var(--pf-text);
-  border-radius: 10px;
-  padding: 6px 14px;
-  font-size: 13px;
+  background: rgba(240, 240, 240, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  color: #1a1a1a;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  cursor: pointer;
 }
 
 .pf-pivot-chip {
   border: none;
-  border-radius: 10px;
-  background: linear-gradient(145deg, #2aa8ef 0%, #12d4de 100%);
+  border-radius: 8px;
+  background: #1a1a1a;
   padding: 8px 20px;
   font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.2s ease;
+  transition: all 0.2s;
   color: white;
   box-shadow: none;
 }
 
 .pf-pivot-chip:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(42, 168, 239, 0.3);
+  background: #000000;
 }
 
 .pf-pivot-chip.active {
-  background: linear-gradient(145deg, #1a88cf 0%, #0eb4be 100%);
+  background: #000000;
   color: white;
   cursor: default;
-  font-weight: 600;
-  box-shadow: 0 2px 8px rgba(26, 136, 207, 0.4);
+  font-weight: 700;
 }
 
 .pf-pivot-chip:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* Reset Button */
+.pf-reset-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 16px;
+  background: #1a1a1a;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pf-reset-button:hover {
+  background: #000000;
+  border-color: rgba(0, 0, 0, 0.25);
+}
+
+.pf-reset-button svg {
+  flex-shrink: 0;
+}
+
+/* Hero Mode Sort Buttons */
+.pf-bottom-sort-hero {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  animation: slideInFromRight 0.4s ease-out;
+}
+
+@keyframes slideInFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.pf-sort-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  border-radius: 18px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1.5px solid rgba(0, 0, 0, 0.2);
+  background: rgba(240, 240, 240, 0.9);
+  color: #1a1a1a;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.pf-sort-chip:hover {
+  background: rgba(250, 250, 250, 0.95);
+  border-color: rgba(0, 0, 0, 0.3);
+  transform: translateY(-1px);
+}
+
+.pf-sort-chip.active {
+  background: #1a1a1a;
+  color: white;
+  font-weight: 600;
+  border-color: rgba(0, 0, 0, 0.3);
+  box-shadow: none;
 }
 
 .pf-pivot-sep {
@@ -619,8 +1032,11 @@ body {
   }
 
   .pf-pivot-chip.active {
-    background: linear-gradient(145deg, #1a88cf 0%, #0eb4be 100%);
+    background: #000000;
+    color: white;
     font-weight: 600;
+    border-color: rgba(0, 0, 0, 0.3);
+    box-shadow: none;
   }
 
   /* PATH at bottom */

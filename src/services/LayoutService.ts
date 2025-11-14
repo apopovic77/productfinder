@@ -11,8 +11,11 @@ import { PivotDrillDownService, type GroupDimension, type PriceBucketConfig, typ
 import { HeroLayouter } from '../layout/HeroLayouter';
 import type { PivotAnalysisResult, PivotDimensionDefinition } from './PivotDimensionAnalyzer';
 import { ACTIVE_PIVOT_PROFILE } from '../config/pivot';
+import { PosterLayouter, type PosterRowDefinition } from '../layout/PosterLayouter';
+import type { PosterLayoutConfig } from '../layout/PosterLayouter';
+import { CANVAS_PADDING_CONFIG } from '../config/CanvasPaddingConfig';
 
-export type LayoutMode = 'grid' | 'masonry' | 'compact' | 'large' | 'pivot';
+export type LayoutMode = 'grid' | 'masonry' | 'compact' | 'large' | 'pivot' | 'poster';
 
 const PIVOT_PROFILE = ACTIVE_PIVOT_PROFILE;
 
@@ -22,7 +25,7 @@ const createOrderMap = (items: readonly string[] = []): Map<string, number> =>
 export class LayoutService {
   private mode: LayoutMode = 'pivot'; // Start with pivot layout!
   private engine: LayoutEngine<Product>;
-  private layouter: SimpleLayouter<Product> | PivotLayouter<Product> | HeroLayouter<Product>;
+  private layouter: SimpleLayouter<Product> | PivotLayouter<Product> | HeroLayouter<Product> | PosterLayouter<Product>;
   private heroLayouter: HeroLayouter<Product> | null = null;
   private access = new ProductLayoutAccessors();
   private scalePolicy = new WeightScalePolicy();
@@ -38,6 +41,39 @@ export class LayoutService {
   private displayOrderIds: string[] = [];
   private nodeToGroup = new Map<string, string>();
   private pivotModel: PivotAnalysisResult | null = null;
+  private previousPivotDimension: GroupDimension | null = null;
+  private readonly posterRows: PosterRowDefinition[] = [
+    {
+      key: 'poster_apparel',
+      label: 'TRAIL & ENDURO PANTS · JERSEYS · JACKETS',
+      height: 150,
+    },
+    {
+      key: 'poster_shoes',
+      label: 'PINNED SHOES · ELEMENT SHOES · CASUAL FOOTWEAR',
+      height: 130,
+    },
+    {
+      key: 'poster_gloves',
+      label: 'GLOVES · PALM SAVER · WINTER & ELITE',
+      height: 130,
+    },
+    {
+      key: 'poster_protectors',
+      label: 'PROTECTIVE GEAR · JACKETS · SLEEVES · PADS',
+      height: 160,
+    },
+    {
+      key: 'poster_accessories',
+      label: 'SOCKS · BAGS · LIFESTYLE ACCESSORIES',
+      height: 130,
+    },
+    {
+      key: 'poster_goggles',
+      label: 'GOGGLES · LENSES · ACCESSORIES',
+      height: 120,
+    },
+  ];
 
   private static readonly PRESENTATION_ORDER = createOrderMap(PIVOT_PROFILE.presentationCategoryOrder);
 
@@ -58,7 +94,7 @@ export class LayoutService {
     this.applyAnimationDuration();
   }
 
-  private createLayouter(mode: LayoutMode): SimpleLayouter<Product> | PivotLayouter<Product> {
+  private createLayouter(mode: LayoutMode): SimpleLayouter<Product> | PivotLayouter<Product> | PosterLayouter<Product> {
     if (mode === 'pivot') {
       // Ensure dynamic group key stays in sync with drill-down dimension
       this.pivotConfig = {
@@ -72,6 +108,9 @@ export class LayoutService {
         scale: this.scalePolicy
       };
       return new PivotLayouter<Product>(this.pivotConfig);
+    }
+    if (mode === 'poster') {
+      return this.createPosterLayouter();
     }
 
     // Grid/Masonry layouts
@@ -88,9 +127,13 @@ export class LayoutService {
         const comparator = this.drillDownService.getGroupComparator();
         return comparator(a, b);
       },
-      frameGap: 40,
-      framePadding: 20,
-      itemGap: 12,
+      frameGap: CANVAS_PADDING_CONFIG.frameGap,
+      framePadding: CANVAS_PADDING_CONFIG.paddingLeft,
+      framePaddingTop: CANVAS_PADDING_CONFIG.paddingTop,
+      framePaddingRight: CANVAS_PADDING_CONFIG.paddingRight,
+      framePaddingBottom: CANVAS_PADDING_CONFIG.paddingBottom,
+      framePaddingLeft: CANVAS_PADDING_CONFIG.paddingLeft,
+      itemGap: CANVAS_PADDING_CONFIG.itemGap,
       rowBaseHeight: 150,
       minCellSize: 80,
       maxCellSize: 220,
@@ -105,6 +148,17 @@ export class LayoutService {
         }
       }
     };
+  }
+
+  private createPosterLayouter(): PosterLayouter<Product> {
+    const config: PosterLayoutConfig<Product> = {
+      rows: this.posterRows,
+      margin: 48,
+      columnGap: 18,
+      rowGap: 36,
+      groupKey: (product) => this.drillDownService.getGroupKey(product),
+    };
+    return new PosterLayouter<Product>(config);
   }
 
   private createHeroLayouter(): HeroLayouter<Product> {
@@ -211,8 +265,20 @@ export class LayoutService {
 
   setMode(mode: LayoutMode): void {
     if (this.mode === mode) return;
+    const previousMode = this.mode;
     this.mode = mode;
     this.layouter = this.createLayouter(mode);
+    if (mode === 'poster') {
+      const currentDimension = this.drillDownService.getDimension();
+      if (currentDimension !== 'poster:group' && this.drillDownService.canUseDimension('poster:group')) {
+        this.previousPivotDimension = currentDimension;
+        this.drillDownService.setDimension('poster:group');
+      }
+    } else if (previousMode === 'poster' && this.drillDownService.getDimension() === 'poster:group') {
+      if (this.previousPivotDimension && this.drillDownService.canUseDimension(this.previousPivotDimension)) {
+        this.drillDownService.setDimension(this.previousPivotDimension);
+      }
+    }
     if (mode !== 'pivot') {
       this.heroLayouter = null;
     }
@@ -267,6 +333,9 @@ export class LayoutService {
       }
       this.displayOrderIds = [];
       this.nodeToGroup.clear();
+    } else if (this.mode === 'poster') {
+      this.displayOrderIds = [];
+      this.nodeToGroup.clear();
     }
     this.engine.layout({ width, height });
   }
@@ -274,6 +343,10 @@ export class LayoutService {
   updateGridConfig(gridConfig: { spacing: number; margin: number; minCellSize: number; maxCellSize: number }): void {
     if (this.mode === 'pivot') {
       this.updatePivotConfigFromGrid(gridConfig);
+      return;
+    }
+    if (this.mode === 'poster') {
+      // Poster layout uses fixed sizing; ignore grid config updates.
       return;
     }
     
@@ -420,19 +493,22 @@ export class LayoutService {
    * Get group headers from pivot layouter (for rendering)
    */
   getGroupHeaders() {
-    if (this.mode !== 'pivot' || !(this.layouter instanceof PivotLayouter)) {
-      return [];
+    if (this.mode === 'pivot' && this.layouter instanceof PivotLayouter) {
+      const headers = this.layouter.getGroupHeaders();
+      if (!this.pivotGroups.length) {
+        return headers;
+      }
+      const labelMap = new Map(this.pivotGroups.map(group => [group.key, group.label] as const));
+      return headers.map(header => (
+        labelMap.has(header.key)
+          ? { ...header, label: labelMap.get(header.key)! }
+          : header
+      ));
     }
-    const headers = this.layouter.getGroupHeaders();
-    if (!this.pivotGroups.length) {
-      return headers;
+    if (this.mode === 'poster' && this.layouter instanceof PosterLayouter) {
+      return this.layouter.getGroupHeaders();
     }
-    const labelMap = new Map(this.pivotGroups.map(group => [group.key, group.label] as const));
-    return headers.map(header => (
-      labelMap.has(header.key)
-        ? { ...header, label: labelMap.get(header.key)! }
-        : header
-    ));
+    return [];
   }
   
   /**
@@ -724,16 +800,17 @@ export class LayoutService {
     // This prevents vertical centering in pivot mode
     const width = Math.max(actualWidth, viewportWidth);
 
-    // Vertical bounds: ALWAYS use viewport size (0 to viewportHeight)
-    // This ensures content stays at its layout position (top or bottom aligned)
-    // without being centered by the rubberband system
+    // IMPORTANT: Fixed bounds must start at 0 to ensure symmetric centering
+    // If we preserve the actual minX (e.g., framePadding=20), the rubberband
+    // would center based on asymmetric bounds (20 to 1940 instead of 0 to 1920)
+    // causing the layout to appear offset
     return {
-      minX,
+      minX: 0,  // Always start at left edge for symmetric centering
       minY: 0,  // Always start at top
-      maxX: minX + width,
+      maxX: viewportWidth,  // Always end at viewport width
       maxY: viewportHeight,  // Always end at viewport height
-      width,
-      height: viewportHeight,  // Height is always viewport height
+      width: viewportWidth,
+      height: viewportHeight,
       maxItemHeight
     };
   }
