@@ -103,6 +103,9 @@ type State = {
   // Footer position
   footerPosition: FooterPosition;
   footerFloatingPosition: { x: number; y: number } | null;
+
+  // V4 Dialog trigger (zoom-based, not hero-mode-based)
+  shouldShowV4Dialog: boolean;
 };
 
 const createInitialState = (): State => {
@@ -166,6 +169,8 @@ const createInitialState = (): State => {
 
     footerPosition: FOOTER_CONFIG.position,
     footerFloatingPosition: null,
+
+    shouldShowV4Dialog: false,
   };
 };
 
@@ -726,7 +731,7 @@ export default class App extends React.Component<{}, State> {
     if (index === pivotBreadcrumbs.length - 1) return; // current level
 
     // Close dialog immediately on pivot navigation
-    this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null });
+    this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false });
 
     if (index === 0) {
       this.controller.resetPivot();
@@ -747,7 +752,7 @@ export default class App extends React.Component<{}, State> {
     if (dimension === this.state.pivotDimension) return;
 
     // Close dialog immediately on dimension change
-    this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null });
+    this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false });
 
     this.controller.setPivotDimension(dimension);
     this.syncPivotUI();
@@ -755,7 +760,7 @@ export default class App extends React.Component<{}, State> {
 
   private handleGroupSelect = (groupKey: string) => {
     // Close dialog immediately on group drill down
-    this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null });
+    this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false });
 
     this.controller.drillDownGroup(groupKey);
     this.syncPivotUI();
@@ -790,7 +795,7 @@ export default class App extends React.Component<{}, State> {
 
       if (overlayClick === 'close') {
         // Close the overlay
-        this.setState({ selectedProduct: null, selectedVariant: null });
+        this.setState({ selectedProduct: null, selectedVariant: null, shouldShowV4Dialog: false });
         return;
       } else if (overlayClick === 'view') {
         // Open product on O'Neal website
@@ -838,10 +843,23 @@ export default class App extends React.Component<{}, State> {
       // Rubberband system will automatically prevent bounds violations
       this.controller.centerOnProduct(product);
 
+      // Calculate whether to show V4 dialog based on product size (zoom-based trigger)
+      // V4 is shown when clicked product occupies >65% of screen height
+      let shouldShowV4 = false;
+      const node = this.controller.getProductNode(product.id);
+      if (node && canvas) {
+        const productHeight = node.height.targetValue ?? node.height.value ?? 0;
+        const zoom = this.controller.getZoom();
+        const productScreenHeight = productHeight * zoom;
+        const viewportHeight = canvas.height;
+        const heightPercentage = productScreenHeight / viewportHeight;
+        shouldShowV4 = heightPercentage > 0.65;
+      }
+
       // Set selected product to show annotations (in Hero Mode)
       // Also set the primary variant
       const primaryVariant = getPrimaryVariant(product);
-      this.setState({ selectedProduct: product, selectedVariant: primaryVariant });
+      this.setState({ selectedProduct: product, selectedVariant: primaryVariant, shouldShowV4Dialog: shouldShowV4 });
 
       // Load AI annotations for the hero image
       const storageId = this.getProductStorageId(product);
@@ -870,7 +888,7 @@ export default class App extends React.Component<{}, State> {
       // this.setState({ selectedProduct: product, selectedIndex: idx, modalDirection: 0, modalSequence: sequence });
     } else {
       // Clicked on empty space - deselect product
-      this.setState({ selectedProduct: null, selectedVariant: null });
+      this.setState({ selectedProduct: null, selectedVariant: null, shouldShowV4Dialog: false });
     }
   };
 
@@ -925,7 +943,7 @@ export default class App extends React.Component<{}, State> {
       const overlayClick = renderer?.checkOverlayClick(x, y);
 
       if (overlayClick === 'close') {
-        this.setState({ selectedProduct: null, selectedVariant: null });
+        this.setState({ selectedProduct: null, selectedVariant: null, shouldShowV4Dialog: false });
         return;
       } else if (overlayClick === 'view') {
         const product = this.state.selectedProduct;
@@ -956,10 +974,23 @@ export default class App extends React.Component<{}, State> {
     const product = this.controller.hitTest(x, y);
     if (product) {
       this.controller.centerOnProduct(product);
+
+      // Calculate whether to show V4 dialog based on product size (zoom-based trigger)
+      let shouldShowV4 = false;
+      const node = this.controller.getProductNode(product.id);
+      if (node && canvas) {
+        const productHeight = node.height.targetValue ?? node.height.value ?? 0;
+        const zoom = this.controller.getZoom();
+        const productScreenHeight = productHeight * zoom;
+        const viewportHeight = canvas.height;
+        const heightPercentage = productScreenHeight / viewportHeight;
+        shouldShowV4 = heightPercentage > 0.65;
+      }
+
       const primaryVariant = getPrimaryVariant(product);
-      this.setState({ selectedProduct: product, selectedVariant: primaryVariant });
+      this.setState({ selectedProduct: product, selectedVariant: primaryVariant, shouldShowV4Dialog: shouldShowV4 });
     } else {
-      this.setState({ selectedProduct: null, selectedVariant: null });
+      this.setState({ selectedProduct: null, selectedVariant: null, shouldShowV4Dialog: false });
     }
   };
 
@@ -1399,7 +1430,7 @@ export default class App extends React.Component<{}, State> {
                       key={opt.value}
                       type="button"
                       className={`pf-sort-chip ${sortMode === opt.value ? 'active' : ''}`}
-                      onClick={() => this.setState({ sortMode: opt.value as SortMode, selectedProduct: null, selectedVariant: null, dialogPosition: null })}
+                      onClick={() => this.setState({ sortMode: opt.value as SortMode, selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false })}
                       title={opt.label}
                     >
                       {opt.label}
@@ -1441,7 +1472,7 @@ export default class App extends React.Component<{}, State> {
               <label className="pf-bottom-label" htmlFor="pf-bottom-sort">Sort</label>
               <CustomSelect
                 value={sortMode}
-                onChange={(value) => this.setState({ sortMode: value as SortMode, selectedProduct: null, selectedVariant: null, dialogPosition: null })}
+                onChange={(value) => this.setState({ sortMode: value as SortMode, selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false })}
                 options={[
                   { value: 'none', label: 'None' },
                   { value: 'name-asc', label: 'Name (A-Z)' },
@@ -1470,6 +1501,7 @@ export default class App extends React.Component<{}, State> {
                   selectedProduct: null,
                   selectedVariant: null,
                   dialogPosition: null,
+                  shouldShowV4Dialog: false,
                   aiFilterProductIds: [],
                   aiLastResultCount: null,
                   aiPrompt: '',
@@ -1538,7 +1570,7 @@ export default class App extends React.Component<{}, State> {
                 <label className="pf-bottom-label" htmlFor="pf-bottom-sort-mobile">SORT</label>
                 <CustomSelect
                   value={sortMode}
-                  onChange={(value) => this.setState({ sortMode: value as SortMode, selectedProduct: null, selectedVariant: null, dialogPosition: null })}
+                  onChange={(value) => this.setState({ sortMode: value as SortMode, selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false })}
                   options={[
                     { value: 'none', label: 'None' },
                     { value: 'name-asc', label: 'Name (A-Z)' },
@@ -1605,27 +1637,27 @@ export default class App extends React.Component<{}, State> {
           )}
         </div>
 
-        {/* React Product Info Panel (fixed right side OR Hero Mode with Video) */}
+        {/* React Product Info Panel (fixed right side OR zoom-based V4 Dialog with Video) */}
         <AnimatePresence>
           {this.state.overlayMode === 'react' && selectedProduct && (
-            // Hero Mode (< 8 products): Fullscreen Video + V3 Dialog
-            this.state.isPivotHeroMode ? (
+            // V4 Dialog (zoom-based): Shown when product occupies >65% of screen height
+            this.state.shouldShowV4Dialog ? (
               <HeroVideoBackground
                 storageId={6550}
-                onClose={() => this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null })}
+                onClose={() => this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false })}
               >
                 <ProductOverlayModalV4
                   product={selectedProduct}
-                  onClose={() => this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null })}
+                  onClose={() => this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false })}
                   onPositionChange={this.handleDialogPositionChange}
                   onVariantChange={this.handleDialogVariantChange}
                 />
               </HeroVideoBackground>
             ) : (
-              // Normal Mode: V2 Dialog
+              // V2 Dialog: Default dialog for normal zoom levels
               <ProductOverlayModal
                 product={selectedProduct}
-                onClose={() => this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null })}
+                onClose={() => this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false })}
                 onPositionChange={this.handleDialogPositionChange}
                 onVariantChange={this.handleDialogVariantChange}
               />
@@ -1697,7 +1729,7 @@ export default class App extends React.Component<{}, State> {
 
     if (state.type === 'productSelect') {
       // User navigated back from product selection - close product
-      this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null });
+      this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false });
     } else if (state.type === 'drillDown') {
       // User navigated back from drill down - go back one breadcrumb level
       const { pivotBreadcrumbs } = this.state;

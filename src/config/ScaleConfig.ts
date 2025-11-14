@@ -10,11 +10,12 @@
 export const SCALE_CONFIG = {
   // Master switch for all scaling features
   // true = always on, false = always off, 'auto' = on in hero mode only
-  enabled: 'auto' as boolean | 'auto',
+  // Disabled to prevent product enlargement in hero mode
+  enabled: false as boolean | 'auto',
 
   // Weight-based scaling: light items smaller, heavy items larger
   weight: {
-    enabled: 'auto' as boolean | 'auto',  // true/false/'auto' - auto means disabled in pivot, enabled in hero
+    enabled: false as boolean | 'auto',  // Disabled to keep all products same size
     clampMin: 0.6,   // minimum scale factor
     clampMax: 1.8,   // maximum scale factor
   },

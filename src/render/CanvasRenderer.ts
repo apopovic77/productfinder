@@ -152,7 +152,6 @@ export class CanvasRenderer<T> {
     'neon pink': '#FF10F0',
 
     // Other common motorcycle gear colors
-    'titanium': '#878681',
     'anthracite': '#293133',
     'gunmetal': '#2a3439'
   };
@@ -1074,7 +1073,9 @@ export class CanvasRenderer<T> {
         const fontWeight = isHovered ? BUCKET_BUTTON_CONFIG.font.weightHover : BUCKET_BUTTON_CONFIG.font.weightNormal;
         this.ctx.font = `${fontWeight} ${fontSize}px ${BUCKET_BUTTON_CONFIG.font.family}`;
         this.ctx.textAlign = BUCKET_BUTTON_CONFIG.font.alignHorizontal;
-        this.ctx.textBaseline = BUCKET_BUTTON_CONFIG.font.alignVertical;
+        // Convert 'center' to 'middle' for canvas textBaseline
+        const verticalAlign = BUCKET_BUTTON_CONFIG.font.alignVertical;
+        this.ctx.textBaseline = verticalAlign === 'center' ? 'middle' : verticalAlign;
 
         // Get individual padding values
         const { paddingTop, paddingRight, paddingBottom, paddingLeft } = BUCKET_BUTTON_CONFIG.spacing;
@@ -1122,7 +1123,7 @@ export class CanvasRenderer<T> {
           case 'bottom':
             textY = header.y + yOffset + header.height - paddingBottom;
             break;
-          case 'middle':
+          case 'center':
           default:
             textY = header.y + yOffset + paddingTop + (header.height - paddingTop - paddingBottom) / 2;
             break;

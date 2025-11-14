@@ -465,10 +465,8 @@ export class ViewportTransform {
     this.targetOffset.x = offsetX;
     this.targetOffset.y = offsetY;
 
-    // Also reset current values for instant reset (no interpolation/animation)
-    this.scale = this.fitToContentScale;
-    this.offset.x = offsetX;
-    this.offset.y = offsetY;
+    // Let interpolation handle the animation smoothly
+    // (removed instant reset for continuous flow during mode switches)
   }
 
   /**

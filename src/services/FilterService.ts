@@ -128,15 +128,17 @@ export class FilterService {
         break;
       case 'color-asc':
         sorted.sort((a, b) => {
-          const colorA = a.colors?.[0] ?? '';
-          const colorB = b.colors?.[0] ?? '';
+          // Note: Color sorting not implemented as Product type doesn't have colors property
+          const colorA = (a as any).color ?? '';
+          const colorB = (b as any).color ?? '';
           return colorA.localeCompare(colorB);
         });
         break;
       case 'color-desc':
         sorted.sort((a, b) => {
-          const colorA = a.colors?.[0] ?? '';
-          const colorB = b.colors?.[0] ?? '';
+          // Note: Color sorting not implemented as Product type doesn't have colors property
+          const colorA = (a as any).color ?? '';
+          const colorB = (b as any).color ?? '';
           return colorB.localeCompare(colorA);
         });
         break;

@@ -169,16 +169,11 @@ export class ProductFinderController {
     const isHeroMode = this.layoutService.isPivotHeroMode();
 
     if (isHeroMode) {
-      // Hero mode: Horizontal-only scrolling, scale 1.0, start at left
+      // Hero mode: Horizontal-only scrolling, scale 1.0 (no zoom)
+      // HeroLayouter makes products large (80% viewport height), so no camera zoom needed
       this.viewportService.setLockVerticalPan(true);  // Lock vertical panning
-
-      const viewport = this.viewportService.getTransform();
-      if (viewport && this.canvas) {
-        const scale = 1.0;
-        const offsetX = -bounds.minX * scale;  // Start at left edge (first product visible)
-        const offsetY = (this.canvas.height - bounds.height * scale) / 2 - bounds.minY * scale;  // Center vertically
-        viewport.setImmediate(scale, offsetX, offsetY);
-      }
+      // Keep camera at scale 1.0 - don't call resetToFitContent()!
+      // Product sizes are handled by HeroLayouter, not by camera zoom
     } else {
       // Normal mode: Enable vertical panning, fit all content
       this.viewportService.setLockVerticalPan(false);  // Enable vertical panning

@@ -58,12 +58,13 @@ export class HeroLayouter<T> implements ILayouter<T> {
       const x = currentX;
       const y = centerY - height / 2;
 
-      node.posX.value = x;
-      node.posY.value = y;
-      node.width.value = width;
-      node.height.value = height;
-      node.scale.value = 1;
-      node.opacity.value = 1;
+      // Use targetValue for smooth interpolation (continuous flow)
+      node.posX.targetValue = x;
+      node.posY.targetValue = y;
+      node.width.targetValue = width;
+      node.height.targetValue = height;
+      node.scale.targetValue = 1;
+      node.opacity.targetValue = 1;
 
       currentX += width + spacing;
     }

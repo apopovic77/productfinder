@@ -166,12 +166,12 @@ export const BUCKET_BUTTON_CONFIG = {
    */
   gradient: {
     normal: {
-      start: '#2aa8ef',
-      end: '#12d4de',
+      start: '#1a1a1a',  // Dark black/gray
+      end: '#2d2d2d',    // Slightly lighter black
     },
     hover: {
-      start: '#3ab8ff',
-      end: '#22e4ee',
+      start: '#2d2d2d',  // Lighter on hover
+      end: '#404040',    // Even lighter
     },
   },
 
