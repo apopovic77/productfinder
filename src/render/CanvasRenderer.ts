@@ -37,13 +37,6 @@ export class CanvasRenderer<T> {
   // Hero product trim bounds (normalized 0-1 coordinates for text positioning)
   public heroProductTrimBounds: { x: number; y: number; width: number; height: number } | null = null;
 
-  // Interpolated trim OFFSETS for smooth animation when trim bounds load (relative to image bounds)
-  private heroTrimTopOffset: InterpolatedProperty<number> = new InterpolatedProperty<number>('heroTrimTopOffset', 0, 0, 0.3);
-  private heroTrimBottomOffset: InterpolatedProperty<number> = new InterpolatedProperty<number>('heroTrimBottomOffset', 0, 0, 0.3);
-  private heroTrimXOffset: InterpolatedProperty<number> = new InterpolatedProperty<number>('heroTrimXOffset', 0, 0, 0.3);
-  private heroTrimWidthScale: InterpolatedProperty<number> = new InterpolatedProperty<number>('heroTrimWidthScale', 1, 1, 0.3);
-  private heroTrimInitialized: boolean = false;
-  private heroTrimBoundsApplied: boolean = false; // Track if trim bounds were already applied
 
   // Variant-specific hero image (overrides product's primary image)
   public selectedVariantHeroImage: HTMLImageElement | null = null;
@@ -690,8 +683,9 @@ export class CanvasRenderer<T> {
 
   /**
    * Render product name and variant color labels in Hero Mode
-   * Product name: Top-left above product
-   * Variant color: Center-bottom below product
+   * Only renders when trim bounds are available
+   * Product name: Centered, 50px above trim bounds
+   * Variant color: Centered, 50px below trim bounds
    */
   private renderHeroModeLabels(
     product: Product,
@@ -701,6 +695,11 @@ export class CanvasRenderer<T> {
     h: number
   ) {
     if (!this.isHeroMode) {
+      return;
+    }
+
+    // Only render text when trim bounds are available
+    if (!this.heroProductTrimBounds) {
       return;
     }
 
@@ -721,48 +720,12 @@ export class CanvasRenderer<T> {
 
     const variantColor = getVariantColor(primaryVariant);
 
-    // Initialize interpolated OFFSETS on first call (start with 0 = image bounds)
-    if (!this.heroTrimInitialized) {
-      // Start with image bounds (0 offset, h for bottom, 1.0 scale)
-      this.heroTrimTopOffset.value = 0;
-      this.heroTrimTopOffset.targetValue = 0;
-      this.heroTrimBottomOffset.value = h;
-      this.heroTrimBottomOffset.targetValue = h;
-      this.heroTrimXOffset.value = 0;
-      this.heroTrimXOffset.targetValue = 0;
-      this.heroTrimWidthScale.value = 1;
-      this.heroTrimWidthScale.targetValue = 1;
-      this.heroTrimInitialized = true;
-      console.log('[CanvasRenderer] Hero trim offsets initialized with image bounds');
-    }
-
-    // Update target OFFSETS only ONCE when trim bounds first become available
-    if (this.heroProductTrimBounds && !this.heroTrimBoundsApplied) {
-      const tb = this.heroProductTrimBounds;
-      // Offsets relative to image bounds - SET ONCE!
-      this.heroTrimTopOffset.targetValue = tb.y * h;
-      this.heroTrimBottomOffset.targetValue = (tb.y + tb.height) * h;
-      this.heroTrimXOffset.targetValue = tb.x * w;
-      this.heroTrimWidthScale.targetValue = tb.width;
-      this.heroTrimBoundsApplied = true;
-      console.log('[CanvasRenderer] ✓ Trim bounds applied ONCE:', tb);
-    }
-
-    // Calculate final positions by applying interpolated offsets to current x,y,w,h
-    const trimTop = y + (this.heroTrimTopOffset.value ?? 0);
-    const trimBottom = y + (this.heroTrimBottomOffset.value ?? h);
-    const trimX = x + (this.heroTrimXOffset.value ?? 0);
-    const trimWidth = w * (this.heroTrimWidthScale.value ?? 1);
-
-    console.log('[renderHeroModeLabels] Current x,y,w,h:', { x, y, w, h });
-    console.log('[renderHeroModeLabels] Offsets:', {
-      topOffset: this.heroTrimTopOffset.value,
-      bottomOffset: this.heroTrimBottomOffset.value,
-      xOffset: this.heroTrimXOffset.value,
-      widthScale: this.heroTrimWidthScale.value
-    });
-    console.log('[renderHeroModeLabels] Final trim positions:', { trimTop, trimBottom, trimX, trimWidth });
-    console.log('[renderHeroModeLabels] Product name Y:', trimTop - 30, 'Variant Y:', trimBottom + 30);
+    // Calculate trim bounds positions directly (no animation)
+    const tb = this.heroProductTrimBounds;
+    const trimTop = y + tb.y * h;
+    const trimBottom = y + (tb.y + tb.height) * h;
+    const trimX = x + tb.x * w;
+    const trimWidth = w * tb.width;
 
     // Render product name (centered, above product)
     this.ctx.save();

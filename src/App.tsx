@@ -393,10 +393,8 @@ export default class App extends React.Component<{}, State> {
           // Reset pivot hero LOD tracking when product changes
           (renderer as any).pivotHeroLoadedSize = null;
 
-          // Reset trim bounds animation when product changes
+          // Reset trim bounds when product changes
           if (prevState.selectedProduct !== this.state.selectedProduct) {
-            (renderer as any).heroTrimInitialized = false;
-            (renderer as any).heroTrimBoundsApplied = false;
             renderer.heroProductTrimBounds = null;
           }
 
