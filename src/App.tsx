@@ -454,8 +454,11 @@ export default class App extends React.Component<{}, State> {
                 for (const variant of uniqueVariants) {
                   const variantImages = getImagesForVariant(product, variant);
                   if (variantImages.length > 0 && variantImages[0].storageId) {
-                    // Only add hero image (first image) for each variant
-                    imagesToLoad.push(variantImages[0]);
+                    // Only add hero image (first image) for each variant, include variant name
+                    imagesToLoad.push({
+                      ...variantImages[0],
+                      variantName: variant.name
+                    });
                   }
                 }
               } else {
@@ -548,6 +551,7 @@ export default class App extends React.Component<{}, State> {
               for (let i = 1; i < variantImages.length; i++) {
                 const variantImg = variantImages[i];
                 const storageId = variantImg.storageId;
+                const variantName = (variantImg as any).variantName; // Variant name from hero mode
 
                 // Use high-res images (1300px @ 85% quality) - same as LOD system
                 // Keep full image as product images are not perfectly isolated
@@ -558,7 +562,7 @@ export default class App extends React.Component<{}, State> {
                   quality: 85,
                   trim: false, // Keep full image as product images are not perfectly isolated
                 });
-                const imgObj: any = { storageId, src };
+                const imgObj: any = { storageId, src, variantName };
 
                 // Add to load queue
                 this.imageLoadQueue.add({

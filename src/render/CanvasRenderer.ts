@@ -47,6 +47,7 @@ export class CanvasRenderer<T> {
   public alternativeImages: Array<{
     storageId: number;
     src: string;
+    variantName?: string; // Variant name for label (e.g., "Black/White / L")
     loadedImage?: HTMLImageElement;
     orientation?: 'portrait' | 'landscape';
     spreadOffset?: InterpolatedProperty<number>;
@@ -682,6 +683,55 @@ export class CanvasRenderer<T> {
   }
 
   /**
+   * Extract color from variant name (e.g., "Black/White / L" → "Black/White")
+   */
+  private getVariantColor(variantName: string): string {
+    if (!variantName) return '';
+    const parts = variantName.split('/').map((s: string) => s.trim());
+    // Take first two parts for color (handles "Color1/Color2 / Size" format)
+    return parts.slice(0, Math.min(2, parts.length)).join('/');
+  }
+
+  /**
+   * Render variant color label below image (for stacked variants in Hero Mode)
+   * Only renders when trim bounds are available
+   */
+  private renderVariantLabel(
+    variantName: string,
+    x: number,
+    y: number,
+    w: number,
+    h: number
+  ) {
+    if (!this.isHeroMode || !this.heroProductTrimBounds) {
+      return;
+    }
+
+    const variantColor = this.getVariantColor(variantName);
+    if (!variantColor) return;
+
+    // Calculate trim bounds positions
+    const tb = this.heroProductTrimBounds;
+    const trimBottom = y + (tb.y + tb.height) * h;
+    const trimX = x + tb.x * w;
+    const trimWidth = w * tb.width;
+
+    // Render variant color (center-bottom, below product)
+    this.ctx.save();
+    this.ctx.font = '300 28px "ITC Avant Garde Gothic", -apple-system, sans-serif';
+    this.ctx.fillStyle = '#666666';
+    this.ctx.textAlign = 'center';
+    this.ctx.textBaseline = 'top';
+
+    const variantColorY = trimBottom + 50; // 50px below trim bounds (actual product)
+    const maxVariantWidth = trimWidth;
+    const truncatedColor = this.truncateText(variantColor.toUpperCase(), maxVariantWidth);
+    this.ctx.fillText(truncatedColor, trimX + trimWidth / 2, variantColorY);
+
+    this.ctx.restore();
+  }
+
+  /**
    * Render product name and variant color labels in Hero Mode
    * Only renders when trim bounds are available
    * Product name: Centered, 50px above trim bounds
@@ -710,15 +760,7 @@ export class CanvasRenderer<T> {
     const primaryVariant = variants.find((v: any) => v.image_storage_id) || variants[0];
     if (!primaryVariant) return;
 
-    // Extract color from variant name (e.g., "Black/White / L" → "Black/White")
-    const getVariantColor = (variant: any): string => {
-      if (!variant?.name) return '';
-      const parts = variant.name.split('/').map((s: string) => s.trim());
-      // Take first two parts for color (handles "Color1/Color2 / Size" format)
-      return parts.slice(0, Math.min(2, parts.length)).join('/');
-    };
-
-    const variantColor = getVariantColor(primaryVariant);
+    const variantColor = this.getVariantColor(primaryVariant.name);
 
     // Calculate trim bounds positions directly (no animation)
     const tb = this.heroProductTrimBounds;
@@ -966,6 +1008,13 @@ export class CanvasRenderer<T> {
                 boundingWidth,
                 boundingHeight
               );
+
+              // Render variant label for this stacked image (if variantName is available)
+              if (altImg.variantName) {
+                this.ctx.globalAlpha = 1; // Full opacity for text
+                this.renderVariantLabel(altImg.variantName, stackedX, stackedY, boundingWidth, boundingHeight);
+                this.ctx.globalAlpha = 0.9 - (Math.floor(i / 2) * 0.1); // Restore image alpha for next iteration
+              }
             }
           }
           this.ctx.globalAlpha = 1;

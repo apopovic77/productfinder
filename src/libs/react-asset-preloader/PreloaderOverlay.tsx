@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode, FC } from 'react';
+import { useRef, useEffect } from 'react';
 import { usePreloader } from './PreloaderContext';
 import type { PreloaderConfig } from './types';
 
@@ -6,17 +7,43 @@ interface PreloaderOverlayProps {
   config?: PreloaderConfig;
   logo?: ReactNode;
   message?: string;
+  backgroundVideoStorageId?: number; // Optional background video from Storage API
 }
 
 export const PreloaderOverlay: FC<PreloaderOverlayProps> = ({
   config = {},
   logo,
   message = 'Loading...',
+  backgroundVideoStorageId = 6550, // Default: O'Neal background video
 }) => {
   const { state } = usePreloader();
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   const shouldHide =
     !state.isLoading && (state.progress === 100 || (state.total ?? 0) === 0);
+
+  // Build video URL from Storage API
+  const videoUrl = backgroundVideoStorageId
+    ? `https://share.arkturian.com/proxy.php?id=${backgroundVideoStorageId}&format=mp4`
+    : null;
+
+  // Start video playback when loaded
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !videoUrl) return;
+
+    const handleLoadedData = () => {
+      // Start video at 1 second instead of 0 (same as HeroVideoBackground)
+      if (video.currentTime === 0) {
+        video.currentTime = 1;
+      }
+    };
+
+    video.addEventListener('loadeddata', handleLoadedData);
+    return () => {
+      video.removeEventListener('loadeddata', handleLoadedData);
+    };
+  }, [videoUrl]);
 
   if (shouldHide) {
     return null;
@@ -121,8 +148,45 @@ export const PreloaderOverlay: FC<PreloaderOverlayProps> = ({
     fontSize: '12px',
   };
 
+  const videoStyle: CSSProperties = {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+    zIndex: -1,
+    opacity: 0.6,
+  };
+
+  const videoOverlayStyle: CSSProperties = {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    zIndex: -1,
+  };
+
   return (
     <div style={overlayStyle}>
+      {/* Background Video */}
+      {videoUrl && (
+        <>
+          <video
+            ref={videoRef}
+            style={videoStyle}
+            src={videoUrl}
+            autoPlay
+            loop
+            muted
+            playsInline
+          />
+          <div style={videoOverlayStyle} />
+        </>
+      )}
+
       <div style={containerStyle}>
         <div
           style={{

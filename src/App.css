@@ -233,11 +233,12 @@ body {
 
 .pf-header-breadcrumb {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 1);
   cursor: pointer;
   padding: 2px 6px;
   border-radius: 4px;
   transition: all 0.2s ease;
+  text-decoration: underline;
 }
 
 .pf-header-breadcrumb:hover:not(.active) {
@@ -246,8 +247,9 @@ body {
 }
 
 .pf-header-breadcrumb.active {
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 1);
   cursor: default;
+  text-decoration: none;
 }
 
 .pf-header-breadcrumb-sep {
