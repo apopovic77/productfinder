@@ -16,7 +16,8 @@
 /* ITC Avant Garde Gothic Font Family */
 @font-face {
   font-family: 'ITC Avant Garde Gothic';
-  src: url('/fonts/ITC Avant Garde Gothic CE Book/ITC Avant Garde Gothic CE Book.otf') format('opentype');
+  src: url('/fonts/ITC Avant Garde Gothic CE Book/ITC Avant Garde Gothic CE Book.woff2') format('woff2'),
+       url('/fonts/ITC Avant Garde Gothic CE Book/ITC Avant Garde Gothic CE Book.otf') format('opentype');
   font-weight: 400;
   font-style: normal;
 }
@@ -44,7 +45,8 @@
 
 @font-face {
   font-family: 'ITC Avant Garde Gothic';
-  src: url('/fonts/ITC Avant Garde Gothic CE Demi/ITC Avant Garde Gothic CE Demi.otf') format('opentype');
+  src: url('/fonts/ITC Avant Garde Gothic CE Demi/ITC Avant Garde Gothic CE Demi.woff2') format('woff2'),
+       url('/fonts/ITC Avant Garde Gothic CE Demi/ITC Avant Garde Gothic CE Demi.otf') format('opentype');
   font-weight: 600;
   font-style: normal;
 }

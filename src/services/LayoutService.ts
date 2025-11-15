@@ -670,7 +670,7 @@ export class LayoutService {
     // Hero Mode: Dynamic bounds based on actual content (allows vertical centering)
     const isHeroMode = this.isPivotHeroMode();
     if (isHeroMode) {
-      return this.calculateDynamicBounds(nodes, viewportWidth);
+      return this.calculateDynamicBounds(nodes, viewportWidth, viewportHeight);
     }
 
     // Pivot Mode: Fixed bounds based on viewport (prevents unwanted centering)
@@ -689,8 +689,9 @@ export class LayoutService {
    * Used in Hero Mode to allow vertical centering
    *
    * @param viewportWidth - Optional viewport width for Hero Mode bounds extension
+   * @param viewportHeight - Optional viewport height for Hero Mode bounds extension
    */
-  private calculateDynamicBounds(nodes: any[], viewportWidth?: number): { width: number; height: number; minX: number; minY: number; maxX: number; maxY: number; maxItemHeight: number } {
+  private calculateDynamicBounds(nodes: any[], viewportWidth?: number, viewportHeight?: number): { width: number; height: number; minX: number; minY: number; maxX: number; maxY: number; maxItemHeight: number } {
     let minX = Infinity;
     let minY = Infinity;
     let maxX = -Infinity;
@@ -736,7 +737,7 @@ export class LayoutService {
 
     // Hero Mode: Extend bounds to allow first/last product center to reach viewport center
     if (viewportWidth && firstProduct && lastProduct) {
-      // To center first product: its center must be at viewportWidth/2
+      // Horizontal extension: To center first product: its center must be at viewportWidth/2
       // This requires: minX = firstProductCenter - viewportWidth/2
       const firstProductCenter = firstProduct.x + firstProduct.w / 2;
       const requiredMinX = firstProductCenter - (viewportWidth / 2);
@@ -746,9 +747,21 @@ export class LayoutService {
       const lastProductCenter = lastProduct.x + lastProduct.w / 2;
       const requiredMaxX = lastProductCenter + (viewportWidth / 2);
 
-      // Set bounds to these exact values
+      // Set horizontal bounds to these exact values
       minX = requiredMinX;
       maxX = requiredMaxX;
+    }
+
+    // Hero Mode: Also extend vertical bounds to allow vertical centering when zoomed out
+    if (viewportHeight && minY !== Infinity && maxY !== -Infinity) {
+      // Calculate current content vertical center
+      const contentHeight = maxY - minY;
+      const contentCenterY = minY + contentHeight / 2;
+
+      // Extend bounds symmetrically around content center to allow full vertical centering
+      // When zoomed out, content should be able to center vertically in viewport
+      minY = contentCenterY - (viewportHeight / 2);
+      maxY = contentCenterY + (viewportHeight / 2);
     }
 
     return {
