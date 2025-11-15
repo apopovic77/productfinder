@@ -444,7 +444,7 @@ export default class App extends React.Component<{}, State> {
               // Check if we're in Hero Mode
               const isHeroMode = this.state.isPivotHeroMode;
 
-              let imagesToLoad: Array<{ storageId: number; role?: string; src?: string }> = [];
+              let imagesToLoad: Array<{ storageId: number; role?: string; src?: string; variantName?: string }> = [];
 
               if (isHeroMode) {
                 // Hero Mode: Load hero image of each unique color variant
