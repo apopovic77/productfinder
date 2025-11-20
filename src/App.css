@@ -206,11 +206,12 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 35px;
-  padding: 0 20px;
+  min-height: 48px;
+  padding: 0 40px;
   background: #000000;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   z-index: 100;
+  gap: 20px;
 }
 
 .pf-header-logo {
@@ -223,7 +224,6 @@ body {
   font-weight: 500;
   color: rgba(255, 255, 255, 0.9);
   letter-spacing: 0.02em;
-  margin-left: auto;
 }
 
 .pf-header-breadcrumbs {
@@ -565,6 +565,89 @@ body {
   margin-top: 4px;
 }
 
+.pf-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.pf-header-search {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.pf-header-search-inner {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+}
+
+.pf-header-search-input {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  font-size: 13px;
+  backdrop-filter: blur(6px);
+}
+
+.pf-header-search-input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.pf-header-search-results {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: 100%;
+  max-height: 260px;
+  overflow-y: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  z-index: 120;
+}
+
+.pf-header-search-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border: none;
+  background: transparent;
+  color: #111827;
+  cursor: pointer;
+  text-align: left;
+}
+
+.pf-header-search-result:hover {
+  background: rgba(17, 24, 39, 0.08);
+}
+
+.pf-header-search-name {
+  font-size: 13px;
+  font-weight: 600;
+  flex: 1;
+  margin-right: 12px;
+}
+
+.pf-header-search-price {
+  font-size: 12px;
+  color: rgba(55, 65, 81, 0.9);
+}
+
+.pf-header-search-empty {
+  padding: 12px 14px;
+  font-size: 12px;
+  color: rgba(55, 65, 81, 0.7);
+}
+
 .pf-ai-result-count {
   font-size: 10px;
   padding: 2px 8px;
@@ -708,6 +791,113 @@ body {
 
 .pf-reset-button svg {
   flex-shrink: 0;
+}
+
+.pf-cart-empty {
+  font-size: 12px;
+  color: rgba(55, 65, 81, 0.7);
+  padding: 8px 0;
+}
+
+.pf-cart-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.pf-cart-item {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.pf-cart-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(243, 244, 246, 0.6);
+}
+
+.pf-cart-thumb-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(55, 65, 81, 0.6);
+  font-weight: 700;
+}
+
+.pf-cart-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.pf-cart-item-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.pf-cart-item-variant {
+  font-size: 11px;
+  color: rgba(75, 85, 99, 0.9);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.pf-cart-item-price {
+  font-size: 12px;
+  color: #047857;
+  font-weight: 600;
+}
+
+.pf-cart-item-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.pf-cart-qty {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 12px;
+  padding: 4px 6px;
+}
+
+.pf-cart-qty button {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #111827;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pf-cart-qty span {
+  min-width: 20px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
 }
 
 /* Hero Mode Sort Buttons */

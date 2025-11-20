@@ -37,6 +37,17 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
+type CartItem = {
+  id: string;
+  productId: string;
+  variantKey: string;
+  name: string;
+  variantLabel?: string;
+  priceText?: string;
+  imageUrl?: string;
+  quantity: number;
+};
+
 type State = {
   loading: boolean;
   error: string | null;
@@ -110,6 +121,10 @@ type State = {
   // Hero product trim bounds (for text positioning)
   heroProductTrimBounds: { x: number; y: number; width: number; height: number } | null;
   heroProductPolygon: { x: number; y: number }[] | null;
+
+  // Footer helpers
+  footerSearchTerm: string;
+  cartItems: CartItem[];
 };
 
 const createInitialState = (): State => {
@@ -178,6 +193,9 @@ const createInitialState = (): State => {
 
     heroProductTrimBounds: null,
     heroProductPolygon: null,
+
+    footerSearchTerm: '',
+    cartItems: [],
   };
 };
 
@@ -863,6 +881,112 @@ export default class App extends React.Component<{}, State> {
     this.pushHistoryState({ type: 'drillDown', groupKey, breadcrumbs: this.state.pivotBreadcrumbs });
   };
 
+  private filterFooterSearchResults(term: string): Product[] {
+    const query = term.trim().toLowerCase();
+    if (!query) {
+      return [];
+    }
+    const results = this.state.filteredProducts.filter((product) => {
+      const nameMatch = product.name?.toLowerCase().includes(query);
+      const skuMatch = (product.sku || '').toLowerCase().includes(query);
+      return nameMatch || skuMatch;
+    });
+    return results.slice(0, 8);
+  }
+
+  private handleFooterSearchChange = (value: string) => {
+    this.setState({ footerSearchTerm: value });
+  };
+
+  private handleFooterSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      const [firstMatch] = this.filterFooterSearchResults(this.state.footerSearchTerm);
+      if (firstMatch) {
+        this.handleFooterSearchSelect(firstMatch.id);
+      }
+    }
+    if (event.key === 'Escape') {
+      this.setState({ footerSearchTerm: '' });
+    }
+  };
+
+  private handleFooterSearchSelect = (productId: string) => {
+    const product =
+      this.state.filteredProducts.find((p) => p.id === productId) ||
+      this.controller.getDisplayOrder().find((p) => p.id === productId);
+    if (!product) {
+      return;
+    }
+    this.openProductDetails(product);
+    this.setState({ footerSearchTerm: '' });
+  };
+
+  private getVariantKeyFromPayload(payload: { product: Product; variant?: any; variantLabel?: string }): string {
+    const variant = payload.variant;
+    const key = variant?.sku || variant?.id || payload.variantLabel || 'base';
+    return String(key);
+  }
+
+  private handleProductBuy = (payload: {
+    product: Product;
+    variant?: any;
+    priceText?: string;
+    imageUrl?: string;
+    variantLabel?: string;
+    quantity?: number;
+  }) => {
+    const delta = payload.quantity ?? 1;
+    if (delta === 0) return;
+    const variantKey = this.getVariantKeyFromPayload(payload);
+    const itemId = `${payload.product.id}-${variantKey}`;
+
+    this.setState((prev) => {
+      const existingIndex = prev.cartItems.findIndex(item => item.id === itemId);
+      let cartItems = [...prev.cartItems];
+
+      if (existingIndex >= 0) {
+        const existing = cartItems[existingIndex];
+        const newQuantity = existing.quantity + delta;
+        if (newQuantity <= 0) {
+          cartItems.splice(existingIndex, 1);
+        } else {
+          cartItems[existingIndex] = { ...existing, quantity: newQuantity };
+        }
+      } else if (delta > 0) {
+        const newItem: CartItem = {
+          id: itemId,
+          productId: payload.product.id,
+          variantKey,
+          name: payload.product.name,
+          variantLabel: payload.variantLabel || payload.variant?.name || payload.variant?.sku,
+          priceText: payload.priceText,
+          imageUrl: payload.imageUrl,
+          quantity: delta,
+        };
+        cartItems = [newItem, ...cartItems].slice(0, 6);
+      }
+
+      return { cartItems };
+    });
+  };
+
+  private handleCartItemQuantityChange = (itemId: string, delta: number) => {
+    if (!delta) return;
+    this.setState(prev => {
+      const index = prev.cartItems.findIndex(item => item.id === itemId);
+      if (index === -1) return null;
+      const cartItems = [...prev.cartItems];
+      const target = cartItems[index];
+      const newQuantity = target.quantity + delta;
+      if (newQuantity <= 0) {
+        cartItems.splice(index, 1);
+      } else {
+        cartItems[index] = { ...target, quantity: newQuantity };
+      }
+      return { cartItems };
+    });
+  };
+
   private showRelativeProduct = (delta: number) => {
     const { filteredProducts, selectedIndex, modalSequence } = this.state;
     if (selectedIndex < 0 || modalSequence.length === 0) return;
@@ -873,6 +997,56 @@ export default class App extends React.Component<{}, State> {
     if (!nextProduct) return;
     this.setState({ selectedProduct: nextProduct, selectedIndex: nextIndex, modalDirection: Math.sign(delta) });
   };
+
+  private openProductDetails(product: Product, options: { pushHistory?: boolean } = {}) {
+    const canvas = this.canvasRef.current;
+
+    this.controller.centerOnProduct(product);
+
+    let shouldShowV4 = false;
+    const node = this.controller.getProductNode(product.id);
+    if (node && canvas) {
+      const productHeight = node.height.targetValue ?? node.height.value ?? 0;
+      const zoom = this.controller.getZoom();
+      const productScreenHeight = productHeight * zoom;
+      const viewportHeight = canvas.height;
+      const heightPercentage = productScreenHeight / viewportHeight;
+      shouldShowV4 = heightPercentage > 0.65;
+    }
+
+    const isHeroMode = this.controller.isPivotHeroMode();
+    if (isHeroMode) {
+      const uniqueVariants = getUniqueColorVariants(product);
+      if (uniqueVariants.length === 1) {
+        shouldShowV4 = true;
+      } else if (uniqueVariants.length > 1) {
+        const wasAlreadySelected = this.state.selectedProduct?.id === product.id;
+        shouldShowV4 = wasAlreadySelected;
+      }
+    }
+
+    const primaryVariant = getPrimaryVariant(product);
+    this.setState({ selectedProduct: product, selectedVariant: primaryVariant, shouldShowV4Dialog: shouldShowV4 });
+
+    const storageId = this.getProductStorageId(product);
+    if (storageId) {
+      fetchAnnotations(storageId).then((annotations) => {
+        const renderer = this.controller.getRenderer();
+        if (renderer) {
+          renderer.heroImageAnnotations = annotations;
+        }
+      });
+    } else {
+      const renderer = this.controller.getRenderer();
+      if (renderer) {
+        renderer.heroImageAnnotations = null;
+      }
+    }
+
+    if (options.pushHistory !== false) {
+      this.pushHistoryState({ type: 'productSelect', productId: product.id });
+    }
+  }
 
   private handleCanvasClick = (e: MouseEvent) => {
     const canvas = this.canvasRef.current;
@@ -931,79 +1105,7 @@ export default class App extends React.Component<{}, State> {
     // Otherwise check for product click
     const product = this.controller.hitTest(x, y);
     if (product) {
-      // Product clicked
-
-      // Center the clicked product smoothly (if zoomed in)
-      // Rubberband system will automatically prevent bounds violations
-      this.controller.centerOnProduct(product);
-
-      // Calculate whether to show V4 dialog based on product size (zoom-based trigger)
-      // V4 is shown when clicked product occupies >65% of screen height
-      let shouldShowV4 = false;
-      const node = this.controller.getProductNode(product.id);
-      if (node && canvas) {
-        const productHeight = node.height.targetValue ?? node.height.value ?? 0;
-        const zoom = this.controller.getZoom();
-        const productScreenHeight = productHeight * zoom;
-        const viewportHeight = canvas.height;
-        const heightPercentage = productScreenHeight / viewportHeight;
-        shouldShowV4 = heightPercentage > 0.65;
-      }
-
-      // Hero Mode: Check variant count for expansion logic
-      const isHeroMode = this.controller.isPivotHeroMode();
-      if (isHeroMode) {
-        const uniqueVariants = getUniqueColorVariants(product);
-
-        if (uniqueVariants.length === 1) {
-          // Only 1 variant → Force V4 Modal to open immediately
-          shouldShowV4 = true;
-        } else if (uniqueVariants.length > 1) {
-          // Multiple variants
-          // Check if this product is already selected (variants already expanded)
-          const wasAlreadySelected = this.state.selectedProduct?.id === product.id;
-
-          if (wasAlreadySelected) {
-            // Second click on same product → Open V4 Modal
-            shouldShowV4 = true;
-          } else {
-            // First click → Expand variants first (don't open V4 yet)
-            // The alternativeImages system (in componentDidUpdate) will handle showing variants
-            shouldShowV4 = false;
-          }
-        }
-      }
-
-      // Set selected product to show annotations (in Hero Mode)
-      // Also set the primary variant
-      const primaryVariant = getPrimaryVariant(product);
-      this.setState({ selectedProduct: product, selectedVariant: primaryVariant, shouldShowV4Dialog: shouldShowV4 });
-
-      // Load AI annotations for the hero image
-      const storageId = this.getProductStorageId(product);
-      if (storageId) {
-        fetchAnnotations(storageId).then((annotations) => {
-          const renderer = this.controller.getRenderer();
-          if (renderer) {
-            renderer.heroImageAnnotations = annotations;
-            // Rendering happens automatically in the animation loop
-          }
-        });
-      } else {
-        const renderer = this.controller.getRenderer();
-        if (renderer) {
-          renderer.heroImageAnnotations = null;
-        }
-      }
-
-      // Push history state for back button navigation
-      this.pushHistoryState({ type: 'productSelect', productId: product.id });
-
-      // TODO: Modal dialog deaktiviert - User möchte kein Modal
-      // const groupKey = this.controller.getGroupKeyForProduct(product);
-      // const sequence = this.controller.getDisplayOrderForGroup(groupKey).map(p => p.id);
-      // const idx = sequence.indexOf(product.id);
-      // this.setState({ selectedProduct: product, selectedIndex: idx, modalDirection: 0, modalSequence: sequence });
+      this.openProductDetails(product);
     } else {
       // Clicked on empty space - deselect product
       this.setState({ selectedProduct: null, selectedVariant: null, shouldShowV4Dialog: false });
@@ -1370,6 +1472,8 @@ export default class App extends React.Component<{}, State> {
       quickSearchError,
       aiFilterProductIds,
       aiLastResultCount,
+    footerSearchTerm,
+    cartItems,
     } = this.state;
 
     // Compute availability live but keep chip order stable
@@ -1377,8 +1481,10 @@ export default class App extends React.Component<{}, State> {
 
     const cats = this.controller.getUniqueCategories();
     const seasons = this.controller.getUniqueSeasons();
+    const totalCartQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
     const getDimensionLabel = (dim: GroupDimension) => pivotDefinitions.find(d => d.key === dim)?.label ?? dim;
+    const footerSearchResults = this.filterFooterSearchResults(footerSearchTerm);
 
     if (error) return <div className="container"><div className="error">{error}</div></div>;
 
@@ -1407,29 +1513,64 @@ export default class App extends React.Component<{}, State> {
 
         {/* Header bar with logo and title */}
         <div className="pf-header">
-          <div className="pf-header-logo">
-            <img src="https://api-storage.arkturian.com/storage/media/7246?variant=thumbnail&height=25&trim=true" alt="O'NEAL" height="25" />
+          <div className="pf-header-left">
+            <div className="pf-header-logo">
+              <img src="https://api-storage.arkturian.com/storage/media/7235?variant=thumbnail&height=25&trim=true" alt="O'NEAL" height="25" />
+            </div>
+            <div className="pf-header-breadcrumbs">
+              {pivotBreadcrumbs.map((crumb, i) => (
+                <React.Fragment key={`header-${crumb}-${i}`}>
+                  {i > 0 && <span className="pf-header-breadcrumb-sep">›</span>}
+                  <span
+                    role="button"
+                    tabIndex={i === pivotBreadcrumbs.length - 1 ? -1 : 0}
+                    className={`pf-header-breadcrumb ${i === pivotBreadcrumbs.length - 1 ? 'active' : ''}`}
+                    onClick={() => this.handleBreadcrumbClick(i)}
+                    onKeyDown={evt => {
+                      if (evt.key === 'Enter' || evt.key === ' ') {
+                        evt.preventDefault();
+                        this.handleBreadcrumbClick(i);
+                      }
+                    }}
+                  >
+                    {crumb}
+                  </span>
+                </React.Fragment>
+              ))}
+            </div>
           </div>
-          <div className="pf-header-breadcrumbs">
-            {pivotBreadcrumbs.map((crumb, i) => (
-              <React.Fragment key={`header-${crumb}-${i}`}>
-                {i > 0 && <span className="pf-header-breadcrumb-sep">›</span>}
-                <span
-                  role="button"
-                  tabIndex={i === pivotBreadcrumbs.length - 1 ? -1 : 0}
-                  className={`pf-header-breadcrumb ${i === pivotBreadcrumbs.length - 1 ? 'active' : ''}`}
-                  onClick={() => this.handleBreadcrumbClick(i)}
-                  onKeyDown={evt => {
-                    if (evt.key === 'Enter' || evt.key === ' ') {
-                      evt.preventDefault();
-                      this.handleBreadcrumbClick(i);
-                    }
-                  }}
-                >
-                  {crumb}
-                </span>
-              </React.Fragment>
-            ))}
+          <div className="pf-header-search">
+            <div className="pf-header-search-inner">
+              <input
+                type="text"
+                className="pf-header-search-input"
+                placeholder="Search visible products..."
+                value={footerSearchTerm}
+                onChange={(e) => this.handleFooterSearchChange(e.target.value)}
+                onKeyDown={this.handleFooterSearchKeyDown}
+              />
+              {footerSearchTerm.trim().length > 0 && (
+                <div className="pf-header-search-results">
+                  {footerSearchResults.length === 0 ? (
+                    <div className="pf-header-search-empty">No matches</div>
+                  ) : (
+                    footerSearchResults.map((product) => (
+                      <button
+                        type="button"
+                        key={`header-result-${product.id}`}
+                        className="pf-header-search-result"
+                        onClick={() => this.handleFooterSearchSelect(product.id)}
+                      >
+                        <span className="pf-header-search-name">{product.name}</span>
+                        {product.price?.formatted && (
+                          <span className="pf-header-search-price">{product.price.formatted}</span>
+                        )}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
           </div>
           <div className="pf-header-title">Product Finder</div>
         </div>
@@ -1549,6 +1690,7 @@ export default class App extends React.Component<{}, State> {
             {this.state.aiPromptError && (
               <div className="pf-ai-prompt-error">{this.state.aiPromptError}</div>
             )}
+
           </div>
 
           {/* Desktop: DIMENSIONS section (always visible) */}
@@ -1630,6 +1772,41 @@ export default class App extends React.Component<{}, State> {
             </div>
           )}
 
+          <div className="pf-bottom-section pf-bottom-right pf-bottom-desktop-section">
+            <label className="pf-bottom-label">Cart</label>
+            {cartItems.length === 0 ? (
+              <div className="pf-cart-empty">Cart is empty</div>
+            ) : (
+              <div className="pf-cart-list">
+                {cartItems.map((item) => (
+                  <div key={item.id} className="pf-cart-item">
+                    {item.imageUrl ? (
+                      <img src={item.imageUrl} alt={item.name} className="pf-cart-thumb" />
+                    ) : (
+                      <div className="pf-cart-thumb pf-cart-thumb-placeholder">?</div>
+                    )}
+                    <div className="pf-cart-item-info">
+                      <div className="pf-cart-item-name">{item.name}</div>
+                      {item.variantLabel && <div className="pf-cart-item-variant">{item.variantLabel}</div>}
+                      <div className="pf-cart-item-bottom">
+                        {item.priceText && <div className="pf-cart-item-price">{item.priceText}</div>}
+                        <div className="pf-cart-qty">
+                          <button type="button" onClick={() => this.handleCartItemQuantityChange(item.id, -1)} aria-label="Decrease quantity">
+                            −
+                          </button>
+                          <span>{item.quantity}</span>
+                          <button type="button" onClick={() => this.handleCartItemQuantityChange(item.id, 1)} aria-label="Increase quantity">
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Desktop: RESET button (always visible) */}
           <div className="pf-bottom-section pf-bottom-right pf-bottom-desktop-section">
             <label className="pf-bottom-label">Reset</label>
@@ -1672,6 +1849,11 @@ export default class App extends React.Component<{}, State> {
                     {getDimensionLabel(pivotDimension)}: {pivotBreadcrumbs[pivotBreadcrumbs.length - 1]}
                   </span>
                 </div>
+                {cartItems.length > 0 && (
+                <div className="pf-bottom-collapsed-row">
+                  <span className="pf-bottom-summary-text">Cart: {totalCartQuantity}</span>
+                </div>
+              )}
                 {sortMode !== 'none' && (
                   <div className="pf-bottom-collapsed-row">
                     <span className="pf-bottom-summary-text">
@@ -1775,6 +1957,41 @@ export default class App extends React.Component<{}, State> {
                   ))}
                 </div>
               </div>
+
+              <div className="pf-bottom-section pf-bottom-right pf-bottom-mobile-section">
+                <span className="pf-bottom-label">CART</span>
+                {cartItems.length === 0 ? (
+                  <div className="pf-cart-empty">Cart is empty</div>
+                ) : (
+                  <div className="pf-cart-list">
+                    {cartItems.map((item) => (
+                      <div key={`mobile-cart-${item.id}`} className="pf-cart-item">
+                        {item.imageUrl ? (
+                          <img src={item.imageUrl} alt={item.name} className="pf-cart-thumb" />
+                        ) : (
+                          <div className="pf-cart-thumb pf-cart-thumb-placeholder">?</div>
+                        )}
+                        <div className="pf-cart-item-info">
+                          <div className="pf-cart-item-name">{item.name}</div>
+                          {item.variantLabel && <div className="pf-cart-item-variant">{item.variantLabel}</div>}
+                          <div className="pf-cart-item-bottom">
+                            {item.priceText && <div className="pf-cart-item-price">{item.priceText}</div>}
+                            <div className="pf-cart-qty">
+                              <button type="button" onClick={() => this.handleCartItemQuantityChange(item.id, -1)} aria-label="Decrease quantity">
+                                −
+                              </button>
+                              <span>{item.quantity}</span>
+                              <button type="button" onClick={() => this.handleCartItemQuantityChange(item.id, 1)} aria-label="Increase quantity">
+                                +
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </>
           )}
         </div>
@@ -1803,6 +2020,7 @@ export default class App extends React.Component<{}, State> {
                     onClose={() => this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false })}
                     onPositionChange={this.handleDialogPositionChange}
                     onVariantChange={this.handleDialogVariantChange}
+                    onBuy={this.handleProductBuy}
                   />
                 </HeroVideoBackground>
               ) : (
@@ -1812,6 +2030,7 @@ export default class App extends React.Component<{}, State> {
                 onClose={() => this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false })}
                 onPositionChange={this.handleDialogPositionChange}
                 onVariantChange={this.handleDialogVariantChange}
+                onBuy={this.handleProductBuy}
               />
             )
             );

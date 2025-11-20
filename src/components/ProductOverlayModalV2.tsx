@@ -10,6 +10,14 @@ type Props = {
   position?: { x: number; y: number };
   onPositionChange?: (position: { x: number; y: number }) => void;
   onVariantChange?: (variant: any) => void;
+  onBuy?: (payload: {
+    product: Product;
+    variant?: any;
+    priceText?: string;
+    imageUrl?: string;
+    variantLabel?: string;
+    quantity?: number;
+  }) => void;
 };
 
 interface ParsedFeature {
@@ -22,7 +30,7 @@ interface ParsedFeature {
  * Product Overlay Modal V2 - HALF WIDTH VERSION (240px)
  * Same design as V1, but with compact half-width layout
  */
-export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange }) => {
+export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onBuy }) => {
   const DIALOG_WIDTH = 240; // Half of original 480px
 
   // Extract variants
@@ -347,7 +355,33 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   // Get product URL
   const productUrl = activeVariant?.url || (product as any).meta?.product_url;
 
-  const handleViewWebsite = () => {
+  const variantLabel = [selectedColor, selectedSize].filter(Boolean).join(' / ');
+
+  const getCartImageUrl = (): string | undefined => {
+    const storageId = getCurrentStorageId();
+    if (storageId) {
+      return `https://share.arkturian.com/proxy.php?id=${storageId}&width=180&height=180&format=webp&quality=85`;
+    }
+    if (allImages[selectedImageIndex]?.src) {
+      return allImages[selectedImageIndex].src;
+    }
+    const media = product.media || [];
+    return media[0]?.src;
+  };
+
+  const handleAddToCart = () => {
+    if (onBuy) {
+      onBuy({
+        product,
+        variant: activeVariant,
+        priceText,
+        imageUrl: getCartImageUrl(),
+        variantLabel: variantLabel || undefined,
+      });
+    }
+  };
+
+  const handleShowInHP = () => {
     if (productUrl) {
       window.open(productUrl, '_blank', 'noopener');
     }
@@ -632,9 +666,12 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
 
       {/* Buttons - Compact */}
       <div className="pom-actions" style={{ gap: '6px' }}>
+        <button className="pom-button pom-button-primary" onClick={handleAddToCart} style={{ fontSize: '11px', padding: '8px 12px' }}>
+          Add to Cart
+        </button>
         {productUrl && (
-          <button className="pom-button pom-button-primary" onClick={handleViewWebsite} style={{ fontSize: '11px', padding: '8px 12px' }}>
-            Buy
+          <button className="pom-button pom-button-secondary" onClick={handleShowInHP} style={{ fontSize: '11px', padding: '8px 12px' }}>
+            Show in HP
           </button>
         )}
         <button className="pom-button pom-button-secondary" onClick={onClose} style={{ fontSize: '11px', padding: '8px 12px' }}>

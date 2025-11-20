@@ -12,6 +12,7 @@ export interface MediaUrlOptions {
   format?: string;
   quality?: number;
   trim?: boolean;
+  aspectRatio?: number;
 }
 
 /**
@@ -25,6 +26,7 @@ export function buildMediaUrl(options: MediaUrlOptions): string {
     format = 'webp',
     quality = 85,
     trim = APP_CONFIG.media.useTrimmedImages,
+    aspectRatio,
   } = options;
 
   const params = new URLSearchParams();
@@ -35,9 +37,8 @@ export function buildMediaUrl(options: MediaUrlOptions): string {
   params.set('format', format);
   params.set('quality', quality.toString());
 
-  if (trim) {
-    params.set('trim', 'true');
-  }
+  if (trim) params.set('trim', 'true');
+  if (aspectRatio) params.set('aspect_ratio', aspectRatio.toString());
 
   return `https://share.arkturian.com/proxy.php?${params.toString()}`;
 }
@@ -61,7 +62,6 @@ export function buildHighResUrl(storageId: number, size: number = 1300): string 
   return buildMediaUrl({
     storageId,
     width: size,
-    height: size,
     quality: 85,
   });
 }

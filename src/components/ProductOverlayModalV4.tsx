@@ -10,6 +10,14 @@ type Props = {
   position?: { x: number; y: number };
   onPositionChange?: (position: { x: number; y: number }) => void;
   onVariantChange?: (variant: any) => void;
+  onBuy?: (payload: {
+    product: Product;
+    variant?: any;
+    priceText?: string;
+    imageUrl?: string;
+    variantLabel?: string;
+    quantity?: number;
+  }) => void;
 };
 
 interface ParsedFeature {
@@ -24,7 +32,7 @@ interface ParsedFeature {
  * Layout: Product image LEFT | Product info RIGHT
  * Light glassmorphism theme with blur background
  */
-export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange }) => {
+export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onBuy }) => {
   const DIALOG_WIDTH = 1100; // Wider for horizontal layout
 
   // Extract variants
@@ -230,7 +238,64 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
   // Get product URL
   const productUrl = activeVariant?.url || (product as any).meta?.product_url;
 
-  const handleViewWebsite = () => {
+  const variantLabel = [selectedColor, selectedSize].filter(Boolean).join(' / ');
+  const [quantity, setQuantity] = useState(1);
+
+  const getCartImageUrl = (): string | undefined => {
+    const heroImage = allImages[0];
+    if (heroImage?.storageId) {
+      return `https://share.arkturian.com/proxy.php?id=${heroImage.storageId}&width=220&format=webp&quality=85&trim=true`;
+    }
+    if (heroImage?.src) {
+      return heroImage.src;
+    }
+    const media = product.media || [];
+    const fallback = media.find(m => (m as any).storage_id) || media[0];
+    if (fallback && (fallback as any).storage_id) {
+      return `https://share.arkturian.com/proxy.php?id=${(fallback as any).storage_id}&width=220&format=webp&quality=85&trim=true`;
+    }
+    return fallback?.src;
+  };
+
+  const [quantity, setQuantity] = useState(0);
+
+  useEffect(() => {
+    setQuantity(0);
+  }, [product.id]);
+
+  const emitCartChange = (delta: number) => {
+    if (!onBuy || delta === 0) return;
+    onBuy({
+      product,
+      variant: activeVariant,
+      priceText,
+      imageUrl: getCartImageUrl(),
+      variantLabel: variantLabel || undefined,
+      quantity: delta,
+    });
+  };
+
+  const handleAddToCartClick = () => {
+    emitCartChange(1);
+    setQuantity(1);
+  };
+
+  const handleIncreaseQuantity = () => {
+    emitCartChange(1);
+    setQuantity((prev) => prev + 1);
+  };
+
+  const handleDecreaseQuantity = () => {
+    setQuantity((prev) => {
+      if (prev <= 0) {
+        return 0;
+      }
+      emitCartChange(-1);
+      return prev - 1;
+    });
+  };
+
+  const handleShowOnOneal = () => {
     if (productUrl) {
       window.open(productUrl, '_blank', 'noopener');
     }
@@ -516,11 +581,11 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
           </div>
         )}
 
-        {/* PRE ORDER Button */}
-        <div style={{ paddingTop: '20px' }}>
-          {productUrl && (
+        {/* CTA Buttons */}
+        <div style={{ paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'flex-start', width: '100%' }}>
+          {quantity === 0 ? (
             <button
-              onClick={handleViewWebsite}
+              onClick={handleAddToCartClick}
               style={{
                 fontSize: '15px',
                 fontWeight: '700',
@@ -528,10 +593,10 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
                 letterSpacing: '0.05em',
                 padding: '16px 48px',
                 width: '100%',
-                maxWidth: '300px',
-                background: '#1a1a1a',
+                maxWidth: '360px',
+                background: '#111827',
                 border: 'none',
-                borderRadius: '8px',
+                borderRadius: '10px',
                 color: 'white',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
@@ -540,10 +605,48 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
                 e.currentTarget.style.background = '#000000';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = '#1a1a1a';
+                e.currentTarget.style.background = '#111827';
               }}
             >
-              PRE ORDER
+              Add to Cart
+            </button>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <span style={{ fontSize: '13px', fontWeight: 600, letterSpacing: '0.05em', color: 'rgba(17, 24, 39, 0.6)' }}>
+                Quantity
+              </span>
+              <div className="pf-cart-qty" style={{ padding: '6px 8px', background: 'rgba(248, 250, 252, 1)' }}>
+                <button type="button" onClick={handleDecreaseQuantity} aria-label="Decrease quantity">−</button>
+                <span>{quantity}</span>
+                <button type="button" onClick={handleIncreaseQuantity} aria-label="Increase quantity">+</button>
+              </div>
+            </div>
+          )}
+
+          {productUrl && (
+            <button
+              onClick={handleShowOnOneal}
+              style={{
+                fontSize: '14px',
+                fontWeight: '600',
+                padding: '14px 40px',
+                width: '100%',
+                maxWidth: '320px',
+                background: 'transparent',
+                border: '1px solid rgba(0, 0, 0, 0.15)',
+                borderRadius: '10px',
+                color: '#111827',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(0, 0, 0, 0.03)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+              }}
+            >
+              Show on Oneal.eu
             </button>
           )}
         </div>

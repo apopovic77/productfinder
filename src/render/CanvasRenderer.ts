@@ -379,7 +379,6 @@ export class CanvasRenderer<T> {
           const imageUrl = buildMediaUrl({
             storageId,
             width: requiredSize,
-            height: requiredSize,
             quality,
             trim: false, // Always NO trim for consistent aspect ratio (no visual jump during LOD updates)
           });
@@ -456,7 +455,6 @@ export class CanvasRenderer<T> {
             const imageUrl = buildMediaUrl({
               storageId,
               width: requiredSize,
-              height: requiredSize,
               quality,
               trim: false, // Always NO trim for consistent aspect ratio (no visual jump)
             });
