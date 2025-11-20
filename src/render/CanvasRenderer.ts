@@ -1296,6 +1296,7 @@ export class CanvasRenderer<T> {
       // Check if we're in color pivot mode
       const isColorDimension = currentDimension === 'attribute:variant_colors';
       let isTruncated = false;
+      let transformedLines: string[] = [];
 
       if (isColorDimension) {
         // Render color swatches instead of text
@@ -1401,8 +1402,9 @@ export class CanvasRenderer<T> {
         this.ctx.font = `${fontWeight} ${fontSize}px ${BUCKET_BUTTON_CONFIG.font.family}`;
 
         // Dynamic alignment: if only 2 columns, make second column left-aligned
-        const totalColumns = this.pivotGroupHeaders?.length || 0;
-        const columnIndex = this.pivotGroupHeaders?.indexOf(header) || 0;
+        const allHeaders = this.getGroupHeaders();
+        const totalColumns = allHeaders.length;
+        const columnIndex = allHeaders.indexOf(header);
         const textAlign = (totalColumns === 2 && columnIndex === 1)
           ? 'left'
           : BUCKET_BUTTON_CONFIG.font.alignHorizontal;
@@ -1413,7 +1415,7 @@ export class CanvasRenderer<T> {
 
         // Apply text transform to all lines
         const textTransform = BUCKET_BUTTON_CONFIG.font.textTransform;
-        const transformedLines = lines.map(line => {
+        transformedLines = lines.map(line => {
           if (textTransform === 'uppercase') {
             return line.toUpperCase();
           } else if (textTransform === 'lowercase') {
