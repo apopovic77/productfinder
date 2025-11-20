@@ -1781,21 +1781,31 @@ export default class App extends React.Component<{}, State> {
 
         {/* React Product Info Panel (fixed right side OR zoom-based V4 Dialog with Video) */}
         <AnimatePresence>
-          {this.state.overlayMode === 'react' && selectedProduct && (
-            // V4 Dialog (zoom-based): Shown when product occupies >65% of screen height
-            this.state.shouldShowV4Dialog ? (
-              <HeroVideoBackground
-                storageId={6550}
-                onClose={() => this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false })}
-              >
-                <ProductOverlayModalV4
-                  product={selectedProduct}
+          {this.state.overlayMode === 'react' && selectedProduct && (() => {
+            // Determine video based on product sport (MTB vs MX)
+            const derivedTaxonomy = (selectedProduct as any).derived_taxonomy || (selectedProduct as any).raw?.derived_taxonomy;
+            const sport = derivedTaxonomy?.sport || '';
+
+            // Video IDs:
+            // - Mountainbike (MTB): 6550
+            // - Motocross (MX): 13873
+            const videoStorageId = sport === 'motocross' ? 13873 : 6550;
+
+            return (
+              // V4 Dialog (zoom-based): Shown when product occupies >65% of screen height
+              this.state.shouldShowV4Dialog ? (
+                <HeroVideoBackground
+                  storageId={videoStorageId}
                   onClose={() => this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false })}
-                  onPositionChange={this.handleDialogPositionChange}
-                  onVariantChange={this.handleDialogVariantChange}
-                />
-              </HeroVideoBackground>
-            ) : (
+                >
+                  <ProductOverlayModalV4
+                    product={selectedProduct}
+                    onClose={() => this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false })}
+                    onPositionChange={this.handleDialogPositionChange}
+                    onVariantChange={this.handleDialogVariantChange}
+                  />
+                </HeroVideoBackground>
+              ) : (
               // V2 Dialog: Default dialog for normal zoom levels
               <ProductOverlayModal
                 product={selectedProduct}
@@ -1804,7 +1814,8 @@ export default class App extends React.Component<{}, State> {
                 onVariantChange={this.handleDialogVariantChange}
               />
             )
-          )}
+            );
+          })()}
         </AnimatePresence>
         
         {hoveredProduct && mousePos && (
