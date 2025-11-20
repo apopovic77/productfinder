@@ -514,7 +514,7 @@ export class CanvasRenderer<T> {
    * Update hero mode offsets for products (makes them move aside when alternative images spread)
    */
   private updateHeroModeOffsets() {
-    if (!this.selectedProduct || !this.alternativeImages || this.alternativeImages.length === 0) {
+    if (!this.isHeroMode || !this.selectedProduct || !this.alternativeImages || this.alternativeImages.length === 0) {
       // No selected product or no alternative images - reset all offsets to 0
       const nodes = this.getNodes();
       for (const n of nodes) {
@@ -1028,7 +1028,7 @@ export class CanvasRenderer<T> {
       this.ctx.translate(-centerX, -centerY);
 
       // Draw alternative images stacked behind (only for selected product with dialog open)
-      if (isSelectedProduct && this.alternativeImages && this.alternativeImages.length > 0) {
+      if (this.isHeroMode && isSelectedProduct && this.alternativeImages && this.alternativeImages.length > 0) {
         // Count loaded images
         const loadedImages = this.alternativeImages.filter(img => img.loadedImage);
         const imageCount = loadedImages.length;
@@ -1045,7 +1045,7 @@ export class CanvasRenderer<T> {
 
           // Overlap factor: how much images overlap (0.4 = 40% overlap, so 60% of next image visible)
           // Lower value = more spread, more space between images
-          const overlapFactor = 0.4;
+          const overlapFactor = 0.7;
 
           // Calculate scale factor so all images fit in the cell
           const spreadFactor = 1 + (totalImages - 1) * (1 - overlapFactor);
@@ -1078,7 +1078,7 @@ export class CanvasRenderer<T> {
           // Calculate offset between images based on spread direction
           // Vertical spreading uses smaller offset (0.35) to keep images very tight
           const axisSize = shouldSpreadVertically ? boundingHeight : boundingWidth;
-          const baseOffset = shouldSpreadVertically ? axisSize * 0.35 : axisSize * (1 - overlapFactor);
+          const baseOffset = shouldSpreadVertically ? axisSize * 0.18 : axisSize * (1 - overlapFactor);
 
           // Initialize InterpolatedProperty for each image if needed
           // Pivot Mode: Spread symmetrically (left, right, left, right...)
@@ -1104,7 +1104,8 @@ export class CanvasRenderer<T> {
                 // i=3: +2*baseOffset (further right)
                 const side = i % 2 === 0 ? -1 : 1; // Alternate left (-1) and right (+1)
                 const distance = Math.floor(i / 2) + 1; // Distance multiplier (1, 1, 2, 2, 3, 3, ...)
-                altImg.spreadOffset.targetValue = side * distance * baseOffset;
+                const easing = distance === 1 ? 0.6 : 0.9;
+                altImg.spreadOffset.targetValue = side * distance * baseOffset * easing;
               }
             }
           }
@@ -1167,7 +1168,7 @@ export class CanvasRenderer<T> {
       // Draw main image (scaled same as alternative images if they exist)
       this.ctx.globalAlpha = opacity;
 
-      if (isSelectedProduct && this.alternativeImages && this.alternativeImages.length > 0) {
+      if (this.isHeroMode && isSelectedProduct && this.alternativeImages && this.alternativeImages.length > 0) {
         const loadedImages = this.alternativeImages.filter(img => img.loadedImage);
         if (loadedImages.length > 0) {
           // Use animated scale value (already set above in alternative images section)
