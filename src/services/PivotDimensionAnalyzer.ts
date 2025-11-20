@@ -81,13 +81,6 @@ const ATTRIBUTE_HINTS: Record<string, AttributeHint> = {
     priorityBoost: 0.2,
     source: { type: 'attribute', key: 'presentation_category' },
   },
-  poster_group: {
-    candidateKey: 'poster:group',
-    label: 'Poster Gruppe',
-    role: 'category',
-    priorityBoost: 0.15,
-    source: { type: 'attribute', key: 'poster_group' },
-  },
   sport: {
     label: 'Sport',
     role: 'category',

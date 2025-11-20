@@ -1482,6 +1482,7 @@ export default class App extends React.Component<{}, State> {
     const cats = this.controller.getUniqueCategories();
     const seasons = this.controller.getUniqueSeasons();
     const totalCartQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+    const isSidebarFooter = this.state.footerPosition === 'left' || this.state.footerPosition === 'right';
 
     const getDimensionLabel = (dim: GroupDimension) => pivotDefinitions.find(d => d.key === dim)?.label ?? dim;
     const footerSearchResults = this.filterFooterSearchResults(footerSearchTerm);
@@ -1725,9 +1726,9 @@ export default class App extends React.Component<{}, State> {
             ) : (
               <>
                 <span className="pf-bottom-label">Dimensions</span>
-                <div className="pf-bottom-dimensions">
+                <div className={`pf-bottom-dimensions ${isSidebarFooter ? 'pf-bottom-dimensions-horizontal' : ''}`}>
                   {layoutMode === 'pivot' ? (
-                    <div className="pf-bottom-dimension-row">
+                    <div className={`pf-bottom-dimension-row ${isSidebarFooter ? 'pf-bottom-dimension-row-horizontal' : ''}`}>
                       {pivotDimensions
                         .filter(dim => availableDimsNow.includes(dim))
                         .map(dim => (
@@ -1737,6 +1738,7 @@ export default class App extends React.Component<{}, State> {
                             className={`pf-pivot-chip ${dim === pivotDimension ? 'active' : ''}`}
                             onClick={() => this.handleDimensionClick(dim)}
                             aria-current={dim === pivotDimension}
+                            style={!isSidebarFooter ? { width: '100%' } : undefined}
                           >
                             {getDimensionLabel(dim)}
                           </button>
@@ -1813,27 +1815,35 @@ export default class App extends React.Component<{}, State> {
             <button
               className="pf-reset-button"
               onClick={() => {
-                const initialState = createInitialState();
-                this.setState({
-                  sortMode: initialState.sortMode,
-                  pivotBreadcrumbs: initialState.pivotBreadcrumbs,
-                  selectedProduct: null,
-                  selectedVariant: null,
-                  dialogPosition: null,
-                  shouldShowV4Dialog: false,
-                  aiFilterProductIds: [],
-                  aiLastResultCount: null,
-                  aiPrompt: '',
-                });
-                this.controller.resetPivot();
+                // Navigate back one level in breadcrumbs
+                if (pivotBreadcrumbs.length > 1) {
+                  this.handleBreadcrumbClick(pivotBreadcrumbs.length - 2);
+                } else {
+                  // Already at start - reset everything
+                  const initialState = createInitialState();
+                  this.setState({
+                    sortMode: initialState.sortMode,
+                    pivotBreadcrumbs: initialState.pivotBreadcrumbs,
+                    selectedProduct: null,
+                    selectedVariant: null,
+                    dialogPosition: null,
+                    shouldShowV4Dialog: false,
+                    aiFilterProductIds: [],
+                    aiLastResultCount: null,
+                    aiPrompt: '',
+                  });
+                  this.controller.resetPivot();
+                }
               }}
-              title="Reset to start view"
+              title={pivotBreadcrumbs.length > 1 ? `Zurück zu ${pivotBreadcrumbs[pivotBreadcrumbs.length - 2]}` : 'Reset to start view'}
             >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M2 8a6 6 0 1 1 0 .01" />
-                <path d="M2 4v4h4" />
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                <polyline points="9 22 9 12 15 12 15 22"></polyline>
               </svg>
-              Start
+              {pivotBreadcrumbs.length > 1
+                ? `Zurück zu ${pivotBreadcrumbs[pivotBreadcrumbs.length - 2]}`
+                : 'START'}
             </button>
           </div>
 
@@ -2000,17 +2010,17 @@ export default class App extends React.Component<{}, State> {
         <AnimatePresence>
           {this.state.overlayMode === 'react' && selectedProduct && (() => {
             // Determine video based on product sport (MTB vs MX)
-            const derivedTaxonomy = (selectedProduct as any).derived_taxonomy || (selectedProduct as any).raw?.derived_taxonomy;
-            const sport = derivedTaxonomy?.sport || '';
+            const sportValue = this.getProductSport(selectedProduct).toLowerCase();
+            const isMotocross = sportValue.includes('motocross') || sportValue.includes('mx') || sportValue.includes('moto');
 
             // Video IDs:
             // - Mountainbike (MTB): 6550
-            // - Motocross (MX): 13873
-            const videoStorageId = sport === 'motocross' ? 13873 : 6550;
+            // - Motocross (MX): 14074
+            const videoStorageId = isMotocross ? 14074 : 6550;
 
             return (
               // V4 Dialog (zoom-based): Shown when product occupies >65% of screen height
-              this.state.shouldShowV4Dialog ? (
+              this.state.shouldShowV4Dialog && !this.state.isPivotHeroMode ? (
                 <HeroVideoBackground
                   storageId={videoStorageId}
                   onClose={() => this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false })}
@@ -2037,27 +2047,34 @@ export default class App extends React.Component<{}, State> {
           })()}
         </AnimatePresence>
         
-        {hoveredProduct && mousePos && (
-          <div 
-            className="pf-tooltip"
-            style={{
-              position: 'fixed',
-              left: mousePos.x + 15,
-              top: mousePos.y + 15,
-            }}
-          >
-            <div className="pf-tooltip-content">
-              <div className="pf-tooltip-name">{hoveredProduct.name}</div>
-              {hoveredProduct.price && (
-                <div className="pf-tooltip-price">{hoveredProduct.price.formatted}</div>
-              )}
-              {hoveredProduct.brand && (
-                <div className="pf-tooltip-brand">{hoveredProduct.brand}</div>
-              )}
-              <div className="pf-tooltip-hint">Click for details</div>
+        {hoveredProduct && mousePos && (() => {
+          const hoverDiscipline = this.getSportBadge(hoveredProduct);
+
+          return (
+            <div 
+              className="pf-tooltip"
+              style={{
+                position: 'fixed',
+                left: mousePos.x + 15,
+                top: mousePos.y + 15,
+              }}
+            >
+              <div className="pf-tooltip-content">
+                <div className="pf-tooltip-name">{hoveredProduct.name}</div>
+                {hoverDiscipline && hoverDiscipline !== 'UNKNOWN' && (
+                  <div className="pf-tooltip-discipline">{hoverDiscipline}</div>
+                )}
+                {hoveredProduct.price && (
+                  <div className="pf-tooltip-price">{hoveredProduct.price.formatted}</div>
+                )}
+                {hoveredProduct.brand && (
+                  <div className="pf-tooltip-brand">{hoveredProduct.brand}</div>
+                )}
+                <div className="pf-tooltip-hint">Click for details</div>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         <DeveloperOverlay
           settings={this.state.devSettings}
@@ -2084,6 +2101,41 @@ export default class App extends React.Component<{}, State> {
     const media = product.media || [];
     const heroMedia = media.find((m) => m.type === 'hero') || media[0];
     return (heroMedia as any)?.storage_id || null;
+  }
+
+  private getProductSport(product?: Product | null): string {
+    if (!product) return '';
+    const attributes = product.attributes || {};
+    const sportAttr = attributes['sport'];
+    const taxonomyAttr = attributes['taxonomy_sport'];
+    const attributeValue = [sportAttr, taxonomyAttr]
+      .map((attr) => (typeof attr?.value === 'string' ? attr.value.trim() : ''))
+      .find((val) => Boolean(val));
+    if (attributeValue) {
+      return attributeValue;
+    }
+
+    const rawTaxonomy = (product as any)?.derived_taxonomy || product.raw?.derived_taxonomy;
+    if (rawTaxonomy?.sport && typeof rawTaxonomy.sport === 'string') {
+      return rawTaxonomy.sport.trim();
+    }
+
+    const meta = (product.meta || {}) as Record<string, unknown>;
+    const metaSport = typeof meta?.sport === 'string' ? meta.sport : undefined;
+    const metaSource = typeof meta?.source === 'string' ? meta.source : undefined;
+    return (metaSport || metaSource || '').toString().trim();
+  }
+
+  private getSportBadge(product?: Product | null): string {
+    const sportValue = this.getProductSport(product).toLowerCase();
+    if (!sportValue) return '';
+    if (sportValue.includes('motocross') || sportValue.includes('mx') || sportValue.includes('moto')) {
+      return 'MX';
+    }
+    if (sportValue.includes('mountain') || sportValue.includes('bike') || sportValue.includes('mtb')) {
+      return 'MTB';
+    }
+    return sportValue.toUpperCase();
   }
 
   /**

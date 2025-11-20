@@ -22,7 +22,11 @@ createRoot(document.getElementById('root')!).render(
       }}
       autoStart={false}
     >
-      <PreloaderOverlay message="Loading Product Images..." />
+      <PreloaderOverlay
+        message="Loading Product Images..."
+        backgroundVideoStorageId={14074}
+        logoStorageId={7235}
+      />
       <AppPreloaderWrapper>
         {isAnnot ? <AnnotationTester /> : <App />}
       </AppPreloaderWrapper>

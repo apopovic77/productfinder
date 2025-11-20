@@ -239,7 +239,6 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
   const productUrl = activeVariant?.url || (product as any).meta?.product_url;
 
   const variantLabel = [selectedColor, selectedSize].filter(Boolean).join(' / ');
-  const [quantity, setQuantity] = useState(1);
 
   const getCartImageUrl = (): string | undefined => {
     const heroImage = allImages[0];
@@ -258,10 +257,14 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
   };
 
   const [quantity, setQuantity] = useState(0);
+  const mxVideoUrl = 'https://share.arkturian.com/proxy.php?id=14074&format=mp4';
+  const mxVideoPoster = 'https://share.arkturian.com/proxy.php?id=14074&width=1200&format=webp&quality=85';
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
 
   useEffect(() => {
     setQuantity(0);
-  }, [product.id]);
+    setIsVideoPlaying(false);
+  }, [product.id, activeVariant?.sku, variantLabel]);
 
   const emitCartChange = (delta: number) => {
     if (!onBuy || delta === 0) return;
@@ -299,6 +302,10 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
     if (productUrl) {
       window.open(productUrl, '_blank', 'noopener');
     }
+  };
+
+  const handlePlayVideo = () => {
+    setIsVideoPlaying(true);
   };
 
   // Extract category/subtitle from taxonomy
@@ -608,17 +615,19 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
                 e.currentTarget.style.background = '#111827';
               }}
             >
-              Add to Cart
+              ADD TO CART
             </button>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <span style={{ fontSize: '13px', fontWeight: 600, letterSpacing: '0.05em', color: 'rgba(17, 24, 39, 0.6)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(17, 24, 39, 0.6)' }}>
                 Quantity
               </span>
-              <div className="pf-cart-qty" style={{ padding: '6px 8px', background: 'rgba(248, 250, 252, 1)' }}>
-                <button type="button" onClick={handleDecreaseQuantity} aria-label="Decrease quantity">−</button>
-                <span>{quantity}</span>
-                <button type="button" onClick={handleIncreaseQuantity} aria-label="Increase quantity">+</button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div className="pf-cart-qty" style={{ padding: '6px 8px', background: 'rgba(248, 250, 252, 1)' }}>
+                  <button type="button" onClick={handleDecreaseQuantity} aria-label="Decrease quantity">−</button>
+                  <span>{quantity}</span>
+                  <button type="button" onClick={handleIncreaseQuantity} aria-label="Increase quantity">+</button>
+                </div>
               </div>
             </div>
           )}
@@ -628,25 +637,27 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
               onClick={handleShowOnOneal}
               style={{
                 fontSize: '14px',
-                fontWeight: '600',
+                fontWeight: '700',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
                 padding: '14px 40px',
                 width: '100%',
-                maxWidth: '320px',
+                maxWidth: '360px',
                 background: 'transparent',
-                border: '1px solid rgba(0, 0, 0, 0.15)',
+                border: '1px solid rgba(17, 24, 39, 0.9)',
                 borderRadius: '10px',
                 color: '#111827',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(0, 0, 0, 0.03)';
+                e.currentTarget.style.background = 'rgba(17, 24, 39, 0.04)';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = 'transparent';
               }}
             >
-              Show on Oneal.eu
+              SHOW ON ONEAL.EU
             </button>
           )}
         </div>
@@ -737,7 +748,86 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
           </div>
         )}
 
-        {/* DUMMY CONTENT - To test scroll behavior (like Apple product pages) */}
+        {/* MX Video */}
+        <div
+          style={{
+            marginTop: '32px',
+            paddingTop: '40px',
+            borderTop: '1px solid rgba(0, 0, 0, 0.1)',
+            width: '100%',
+          }}
+        >
+          <h3 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '12px', color: '#1a1a1a' }}>
+            MX VIDEO
+          </h3>
+          <p style={{ fontSize: '14px', color: 'rgba(0, 0, 0, 0.6)', marginBottom: '16px' }}>
+            Press play to watch the MX experience with full audio.
+          </p>
+          <div
+            style={{
+              width: '100%',
+              borderRadius: '20px',
+              background: 'rgba(0, 0, 0, 0.04)',
+              padding: '24px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: '300px',
+            }}
+          >
+            {isVideoPlaying ? (
+              <video
+                controls
+                autoPlay
+                playsInline
+                style={{ width: '100%', borderRadius: '16px', background: '#000', maxWidth: '720px' }}
+                src={mxVideoUrl}
+                poster={mxVideoPoster}
+              />
+            ) : (
+              <div
+                style={{
+                  width: '90%',
+                  maxWidth: '700px',
+                  minHeight: '260px',
+                  borderRadius: '16px',
+                  backgroundImage: `url(${mxVideoPoster})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  position: 'relative',
+                  boxShadow: '0 12px 30px rgba(0, 0, 0, 0.12)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={handlePlayVideo}
+                  style={{
+                    width: '72px',
+                    height: '72px',
+                    borderRadius: '999px',
+                    border: 'none',
+                    background: 'rgba(17, 24, 39, 0.9)',
+                    color: 'white',
+                    cursor: 'pointer',
+                    fontSize: '26px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.25)',
+                  }}
+                  aria-label="Play MX video"
+                >
+                  ▶
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Product Details (restored content) */}
         <div style={{
           marginTop: '40px',
           paddingTop: '40px',
@@ -800,23 +890,6 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
             performance that stands the test of time.
           </p>
 
-          {/* Dummy Image Placeholder */}
-          <div style={{
-            width: '100%',
-            height: '300px',
-            background: 'rgba(0, 0, 0, 0.05)',
-            borderRadius: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'rgba(0, 0, 0, 0.4)',
-            fontSize: '14px',
-            marginTop: '32px',
-            marginBottom: '32px',
-          }}>
-            [Product Detail Image]
-          </div>
-
           <h3 style={{
             fontSize: '24px',
             fontWeight: '700',
@@ -836,72 +909,6 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
             From the ergonomic design to the high-performance materials, nothing has
             been left to chance.
           </p>
-
-          {/* Another Dummy Image */}
-          <div style={{
-            width: '100%',
-            height: '300px',
-            background: 'rgba(0, 0, 0, 0.05)',
-            borderRadius: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'rgba(0, 0, 0, 0.4)',
-            fontSize: '14px',
-            marginTop: '32px',
-            marginBottom: '32px',
-          }}>
-            [Video Placeholder]
-          </div>
-
-          <h3 style={{
-            fontSize: '24px',
-            fontWeight: '700',
-            marginTop: '40px',
-            marginBottom: '16px',
-            color: '#1a1a1a',
-          }}>
-            Technical Specifications
-          </h3>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '16px',
-            fontSize: '13px',
-            color: 'rgba(0, 0, 0, 0.6)',
-            marginBottom: '40px',
-          }}>
-            <div><strong>Weight:</strong> 850g</div>
-            <div><strong>Volume:</strong> 25L</div>
-            <div><strong>Dimensions:</strong> 50 x 30 x 20 cm</div>
-            <div><strong>Material:</strong> Ripstop Nylon</div>
-            <div><strong>Waterproof:</strong> 10,000mm</div>
-            <div><strong>Breathability:</strong> 8,000g/m²</div>
-            <div><strong>Back Length:</strong> 48cm</div>
-            <div><strong>Body Height:</strong> 65cm</div>
-          </div>
-
-          <h3 style={{
-            fontSize: '24px',
-            fontWeight: '700',
-            marginTop: '40px',
-            marginBottom: '16px',
-            color: '#1a1a1a',
-          }}>
-            What's in the Box
-          </h3>
-          <ul style={{
-            fontSize: '14px',
-            lineHeight: '2',
-            color: 'rgba(0, 0, 0, 0.7)',
-            paddingLeft: '20px',
-            marginBottom: '60px',
-          }}>
-            <li>1x Product</li>
-            <li>1x User Manual</li>
-            <li>1x Warranty Card</li>
-            <li>1x Care Instructions</li>
-          </ul>
         </div>
       </div>
     </motion.div>

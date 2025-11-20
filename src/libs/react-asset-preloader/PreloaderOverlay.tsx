@@ -8,6 +8,7 @@ interface PreloaderOverlayProps {
   logo?: ReactNode;
   message?: string;
   backgroundVideoStorageId?: number; // Optional background video from Storage API
+  logoStorageId?: number; // Optional logo from Storage API
 }
 
 export const PreloaderOverlay: FC<PreloaderOverlayProps> = ({
@@ -15,6 +16,7 @@ export const PreloaderOverlay: FC<PreloaderOverlayProps> = ({
   logo,
   message = 'Loading...',
   backgroundVideoStorageId = 6550, // Default: O'Neal background video
+  logoStorageId, // Optional O'Neal logo
 }) => {
   const { state } = usePreloader();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -58,6 +60,9 @@ export const PreloaderOverlay: FC<PreloaderOverlayProps> = ({
     logoUrl,
   } = config;
 
+  // Calculate animated logo scale (100% at start -> 50% at end)
+  const logoScale = 1 - (state.progress / 100) * 0.5; // 1.0 -> 0.5
+
   const overlayStyle: CSSProperties = {
     position: 'fixed',
     inset: 0,
@@ -65,29 +70,32 @@ export const PreloaderOverlay: FC<PreloaderOverlayProps> = ({
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: blurBackdrop ? 'rgba(0, 0, 0, 0.4)' : backgroundColor,
-    backdropFilter: blurBackdrop ? 'blur(10px) saturate(180%)' : undefined,
-    WebkitBackdropFilter: blurBackdrop ? 'blur(10px) saturate(180%)' : undefined,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     zIndex: 999999,
     opacity: state.isLoading ? 1 : 0,
     transition: 'opacity 0.3s ease-out',
     pointerEvents: state.isLoading ? 'auto' : 'none',
   };
 
+  // Loading dialog in lower third - smaller and compact
   const containerStyle: CSSProperties = {
+    position: 'absolute',
+    bottom: '10vh',
+    left: '50%',
+    transform: 'translateX(-50%)',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: '32px',
-    padding: '40px',
-    maxWidth: '500px',
-    width: '100%',
-    backgroundColor: blurBackdrop ? 'rgba(255, 255, 255, 0.05)' : 'transparent',
-    borderRadius: '24px',
-    border: blurBackdrop ? '1px solid rgba(255, 255, 255, 0.1)' : undefined,
-    boxShadow: blurBackdrop ? '0 8px 32px 0 rgba(0, 0, 0, 0.37)' : undefined,
-    backdropFilter: blurBackdrop ? 'blur(20px)' : undefined,
-    WebkitBackdropFilter: blurBackdrop ? 'blur(20px)' : undefined,
+    gap: '16px',
+    padding: '24px 32px',
+    maxWidth: '400px',
+    width: 'auto',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: '16px',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
+    boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.5)',
+    backdropFilter: 'blur(20px)',
+    WebkitBackdropFilter: 'blur(20px)',
   };
 
   const contentStyle: CSSProperties = {
@@ -169,6 +177,27 @@ export const PreloaderOverlay: FC<PreloaderOverlayProps> = ({
     zIndex: -1,
   };
 
+  // Central large logo with blend mode and scale animation
+  const centralLogoStyle: CSSProperties = {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: `translate(-50%, -50%) scale(${logoScale})`,
+    maxWidth: '600px',
+    width: '50vw',
+    height: 'auto',
+    objectFit: 'contain',
+    mixBlendMode: 'screen', // Cool blend mode
+    opacity: 0.9,
+    transition: 'transform 0.3s ease-out',
+    filter: 'drop-shadow(0 0 40px rgba(255, 255, 255, 0.3))',
+  };
+
+  // Build logo URL from Storage API
+  const onealLogoUrl = logoStorageId
+    ? `https://share.arkturian.com/proxy.php?id=${logoStorageId}&format=png&width=1200`
+    : null;
+
   return (
     <div style={overlayStyle}>
       {/* Background Video */}
@@ -187,24 +216,35 @@ export const PreloaderOverlay: FC<PreloaderOverlayProps> = ({
         </>
       )}
 
+      {/* Central Large Animated Logo */}
+      {onealLogoUrl && (
+        <img
+          src={onealLogoUrl}
+          alt="O'Neal Logo"
+          style={centralLogoStyle}
+        />
+      )}
+
+      {/* Loading Dialog - Lower Third */}
       <div style={containerStyle}>
+        {/* Thumbnail Row - Smaller */}
         <div
           style={{
             display: 'flex',
-            gap: '12px',
+            gap: '8px',
             justifyContent: 'center',
             alignItems: 'center',
           }}
         >
-          {state.recentAssets?.map(asset => (
+          {state.recentAssets?.slice(-3).map(asset => (
             <div
               key={asset.id}
               style={{
-                width: '80px',
-                height: '80px',
-                borderRadius: '8px',
+                width: '48px',
+                height: '48px',
+                borderRadius: '6px',
                 overflow: 'hidden',
-                border: '2px solid rgba(255, 255, 255, 0.2)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
                 backgroundColor: 'rgba(0, 0, 0, 0.3)',
                 flexShrink: 0,
               }}
@@ -226,9 +266,9 @@ export const PreloaderOverlay: FC<PreloaderOverlayProps> = ({
           {state.currentAsset && (
             <div
               style={{
-                width: '80px',
-                height: '80px',
-                borderRadius: '8px',
+                width: '48px',
+                height: '48px',
+                borderRadius: '6px',
                 overflow: 'hidden',
                 border: '2px solid rgba(255, 255, 255, 0.5)',
                 backgroundColor: 'rgba(0, 0, 0, 0.3)',
@@ -259,10 +299,10 @@ export const PreloaderOverlay: FC<PreloaderOverlayProps> = ({
                   >
                     <div
                       style={{
-                        width: '32px',
-                        height: '32px',
+                        width: '20px',
+                        height: '20px',
                         borderRadius: '50%',
-                        border: `3px solid ${textColor}`,
+                        border: `2px solid ${textColor}`,
                         borderTopColor: 'transparent',
                         animation: 'spin 1s linear infinite',
                       }}
@@ -275,22 +315,6 @@ export const PreloaderOverlay: FC<PreloaderOverlayProps> = ({
         </div>
 
         <div style={contentStyle}>
-          {logoUrl ? (
-            <img
-              src={logoUrl}
-              alt="Preloader logo"
-              style={{
-                width: '120px',
-                height: '120px',
-                objectFit: 'contain',
-              }}
-            />
-          ) : (
-            logo
-          )}
-
-          <h2 style={messageStyle}>{message}</h2>
-
           <div style={progressContainerStyle}>
             <div style={progressBarStyle}>
               <div style={progressFillStyle} />

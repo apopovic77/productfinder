@@ -165,7 +165,9 @@ export class Product {
   }
 
   get primaryImage(): MediaItem | undefined {
-    return this.media?.[0];
+    // Prioritize hero images, fallback to first image
+    const heroImage = this.media?.find(m => m.role === 'hero');
+    return heroImage || this.media?.[0];
   }
 
   get imageUrl(): string {

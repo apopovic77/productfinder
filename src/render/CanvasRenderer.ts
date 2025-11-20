@@ -653,6 +653,151 @@ export class CanvasRenderer<T> {
    * Truncate text to fit within maxWidth, adding ellipsis if needed
    * Returns the truncated text
    */
+  /**
+   * Calculate optimal font size and determine if line breaks are needed
+   * Returns: { fontSize, lines }
+   */
+  private calculateOptimalTextLayout(
+    text: string,
+    maxWidth: number,
+    maxHeight: number,
+    maxSize: number,
+    minSize: number,
+    fontWeight: string | number
+  ): { fontSize: number; lines: string[] } {
+    // Try at max font size first - single line
+    this.ctx.font = `${fontWeight} ${maxSize}px ${BUCKET_BUTTON_CONFIG.font.family}`;
+    const singleLineWidth = this.ctx.measureText(text).width;
+
+    if (singleLineWidth <= maxWidth) {
+      return { fontSize: maxSize, lines: [text] };
+    }
+
+    // Single line doesn't fit - try line breaks at max size
+    const breakableLines = this.breakTextIntoLines(text, maxWidth, maxSize, fontWeight);
+    const lineHeight = maxSize * 1.2;
+
+    if (breakableLines.length * lineHeight <= maxHeight) {
+      // Multi-line fits at max size!
+      return { fontSize: maxSize, lines: breakableLines };
+    }
+
+    // Multi-line doesn't fit either - reduce font size
+    let fontSize = maxSize - 0.5;
+
+    while (fontSize >= minSize) {
+      this.ctx.font = `${fontWeight} ${fontSize}px ${BUCKET_BUTTON_CONFIG.font.family}`;
+      const lines = this.breakTextIntoLines(text, maxWidth, fontSize, fontWeight);
+      const currentLineHeight = fontSize * 1.2;
+
+      if (lines.length * currentLineHeight <= maxHeight) {
+        return { fontSize, lines };
+      }
+
+      fontSize -= 0.5;
+    }
+
+    // Last resort: use min size
+    const lines = this.breakTextIntoLines(text, maxWidth, minSize, fontWeight);
+    return { fontSize: minSize, lines };
+  }
+
+  /**
+   * Break text into multiple lines at natural break points (-, /, spaces)
+   */
+  private breakTextIntoLines(
+    text: string,
+    maxWidth: number,
+    fontSize: number,
+    fontWeight: string | number
+  ): string[] {
+    this.ctx.font = `${fontWeight} ${fontSize}px ${BUCKET_BUTTON_CONFIG.font.family}`;
+
+    // Check if single line fits
+    if (this.ctx.measureText(text).width <= maxWidth) {
+      return [text];
+    }
+
+    // Try breaking at natural separators: -, /, space
+    const separators = ['-', '/', ' '];
+    let bestLines: string[] | null = null;
+    let bestScore = Infinity; // Lower is better (fewer lines)
+
+    for (const sep of separators) {
+      if (!text.includes(sep)) continue;
+
+      const parts = text.split(sep);
+      const lines: string[] = [];
+      let currentLine = '';
+
+      for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        const testLine = currentLine
+          ? currentLine + sep + part
+          : part;
+
+        const testWidth = this.ctx.measureText(testLine).width;
+
+        if (testWidth <= maxWidth) {
+          currentLine = testLine;
+        } else {
+          // Current line doesn't fit anymore
+          if (currentLine) {
+            lines.push(currentLine);
+            currentLine = part;
+          } else {
+            // Even the part alone is too long - force it anyway (will be handled by word wrapping)
+            currentLine = part;
+          }
+        }
+      }
+
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+
+      // Check if all lines fit
+      const allFit = lines.every(line =>
+        this.ctx.measureText(line).width <= maxWidth
+      );
+
+      if (allFit && lines.length < bestScore) {
+        bestLines = lines;
+        bestScore = lines.length;
+      }
+    }
+
+    // If separator-based breaking worked, use it
+    if (bestLines) {
+      return bestLines;
+    }
+
+    // Fallback: force word-wrapping at character boundaries
+    const lines: string[] = [];
+    let currentLine = '';
+
+    for (let i = 0; i < text.length; i++) {
+      const char = text[i];
+      const testLine = currentLine + char;
+      const testWidth = this.ctx.measureText(testLine).width;
+
+      if (testWidth <= maxWidth) {
+        currentLine = testLine;
+      } else {
+        if (currentLine) {
+          lines.push(currentLine);
+        }
+        currentLine = char;
+      }
+    }
+
+    if (currentLine) {
+      lines.push(currentLine);
+    }
+
+    return lines.length > 0 ? lines : [text];
+  }
+
   private truncateText(text: string, maxWidth: number): string {
     const metrics = this.ctx.measureText(text);
     if (metrics.width <= maxWidth) {
@@ -1232,40 +1377,59 @@ export class CanvasRenderer<T> {
       } else {
         // Regular text rendering (non-color dimensions)
         this.ctx.fillStyle = BUCKET_BUTTON_CONFIG.font.color;
-        const fontSize = isHovered ? BUCKET_BUTTON_CONFIG.font.sizeHover : BUCKET_BUTTON_CONFIG.font.sizeNormal;
         const fontWeight = isHovered ? BUCKET_BUTTON_CONFIG.font.weightHover : BUCKET_BUTTON_CONFIG.font.weightNormal;
-        this.ctx.font = `${fontWeight} ${fontSize}px ${BUCKET_BUTTON_CONFIG.font.family}`;
-        this.ctx.textAlign = BUCKET_BUTTON_CONFIG.font.alignHorizontal;
-        // Convert 'center' to 'middle' for canvas textBaseline
-        const verticalAlign = BUCKET_BUTTON_CONFIG.font.alignVertical;
-        this.ctx.textBaseline = verticalAlign === 'center' ? 'middle' : verticalAlign;
 
         // Get individual padding values
         const { paddingTop, paddingRight, paddingBottom, paddingLeft } = BUCKET_BUTTON_CONFIG.spacing;
 
-        // Calculate available width for text (subtract left and right padding)
+        // Calculate available width and height for text
         const maxTextWidth = header.width - paddingLeft - paddingRight;
+        const maxTextHeight = BUCKET_BUTTON_CONFIG.height - paddingTop - paddingBottom;
 
-        // Truncate text if needed
-        let displayText = this.truncateText(header.label, maxTextWidth);
-        const isTruncated = displayText !== header.label;
+        // Calculate optimal text layout (with intelligent line breaking)
+        const maxFontSize = isHovered ? BUCKET_BUTTON_CONFIG.font.sizeHover : BUCKET_BUTTON_CONFIG.font.sizeNormal;
+        const minFontSize = 4; // Minimum readable size
+        const { fontSize, lines } = this.calculateOptimalTextLayout(
+          header.label,
+          maxTextWidth,
+          maxTextHeight,
+          maxFontSize,
+          minFontSize,
+          fontWeight
+        );
 
-        // Apply text transform
+        this.ctx.font = `${fontWeight} ${fontSize}px ${BUCKET_BUTTON_CONFIG.font.family}`;
+
+        // Dynamic alignment: if only 2 columns, make second column left-aligned
+        const totalColumns = this.pivotGroupHeaders?.length || 0;
+        const columnIndex = this.pivotGroupHeaders?.indexOf(header) || 0;
+        const textAlign = (totalColumns === 2 && columnIndex === 1)
+          ? 'left'
+          : BUCKET_BUTTON_CONFIG.font.alignHorizontal;
+
+        this.ctx.textAlign = textAlign;
+        const verticalAlign = BUCKET_BUTTON_CONFIG.font.alignVertical;
+        this.ctx.textBaseline = verticalAlign === 'center' ? 'middle' : verticalAlign;
+
+        // Apply text transform to all lines
         const textTransform = BUCKET_BUTTON_CONFIG.font.textTransform;
-        if (textTransform === 'uppercase') {
-          displayText = displayText.toUpperCase();
-        } else if (textTransform === 'lowercase') {
-          displayText = displayText.toLowerCase();
-        } else if (textTransform === 'capitalize') {
-          displayText = displayText.charAt(0).toUpperCase() + displayText.slice(1).toLowerCase();
-        }
+        const transformedLines = lines.map(line => {
+          if (textTransform === 'uppercase') {
+            return line.toUpperCase();
+          } else if (textTransform === 'lowercase') {
+            return line.toLowerCase();
+          } else if (textTransform === 'capitalize') {
+            return line.charAt(0).toUpperCase() + line.slice(1).toLowerCase();
+          }
+          return line;
+        });
 
         // Calculate text position based on alignment
         let textX: number;
         let textY: number;
 
-        // Horizontal alignment
-        switch (BUCKET_BUTTON_CONFIG.font.alignHorizontal) {
+        // Horizontal alignment (use dynamic textAlign)
+        switch (textAlign) {
           case 'left':
             textX = header.x + paddingLeft;
             break;
@@ -1278,28 +1442,47 @@ export class CanvasRenderer<T> {
             break;
         }
 
-        // Vertical alignment
+        // Draw multi-line text
+        const lineHeight = fontSize * 1.2;
+        const totalTextHeight = transformedLines.length * lineHeight;
+
+        // Calculate starting Y position based on vertical alignment
+        let startY: number;
         switch (BUCKET_BUTTON_CONFIG.font.alignVertical) {
           case 'top':
-            textY = header.y + yOffset + paddingTop;
+            startY = header.y + yOffset + paddingTop;
             break;
           case 'bottom':
-            textY = header.y + yOffset + header.height - paddingBottom;
+            startY = header.y + yOffset + header.height - paddingBottom - totalTextHeight;
             break;
           case 'center':
           default:
-            textY = header.y + yOffset + paddingTop + (header.height - paddingTop - paddingBottom) / 2;
+            startY = header.y + yOffset + paddingTop + (header.height - paddingTop - paddingBottom - totalTextHeight) / 2;
             break;
         }
 
-        this.ctx.fillText(displayText, textX, textY);
+        // Apply clipping region to prevent text overflow into adjacent columns
+        this.ctx.save();
+        this.ctx.beginPath();
+        this.ctx.rect(header.x, header.y + yOffset, header.width, header.height);
+        this.ctx.clip();
+
+        // Draw each line
+        transformedLines.forEach((line, index) => {
+          const lineY = startY + index * lineHeight;
+          this.ctx.fillText(line, textX, lineY);
+        });
+
+        // Restore context (remove clipping)
+        this.ctx.restore();
       }
 
       // Draw click hint or full text tooltip on hover
       if (isHovered) {
         // For color dimensions, always show the color name as tooltip
-        // For other dimensions, show tooltip only if text is truncated
-        if (isColorDimension || isTruncated) {
+        // For other dimensions, show tooltip only if text is on multiple lines
+        const isMultiLine = transformedLines && transformedLines.length > 1;
+        if (isColorDimension || isMultiLine) {
           // Show full text as tooltip above the button
           const tooltipPadding = 12;
           const tooltipFont = '14px system-ui';

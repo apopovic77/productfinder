@@ -173,6 +173,13 @@ function sanitizePosterGroup(value: string): PosterGroup {
   }
 }
 
+// Helper function to format category path for display
+function formatCategoryPath(categoryId: string): string {
+  // "cat:mountainbike/mtb-helme" → "mtb-helme"
+  // "cat:mountainbike" → "mountainbike"
+  return categoryId.split('/').pop()?.replace(/^cat:/, '') || categoryId;
+}
+
 function mapProduct(p: OnealProduct): Product | null {
   const attributes: Record<string, ProductAttribute> = {};
   const originalCategories = Array.isArray(p.category) ? p.category.filter(Boolean) : [];
@@ -250,7 +257,7 @@ function mapProduct(p: OnealProduct): Product | null {
         key: 'category_path',
         label: 'Category Path',
         type: 'enum',
-        value: categoryIds[0],
+        value: formatCategoryPath(categoryIds[0]),
         sourcePath: 'category_ids[0]',
       }
     : undefined);
