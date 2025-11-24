@@ -179,6 +179,9 @@ export class ProductFinderController {
       this.viewportService.setLockVerticalPan(true);  // Lock vertical panning
       // Keep camera at scale 1.0 - don't call resetToFitContent()!
       // Product sizes are handled by HeroLayouter, not by camera zoom
+      const centerX = bounds.minX + bounds.width / 2;
+      const centerY = bounds.minY + bounds.height / 2;
+      this.viewportService.centerOn(centerX, centerY, 1);
     } else {
       // Normal mode: Enable vertical panning, fit all content
       this.viewportService.setLockVerticalPan(false);  // Enable vertical panning

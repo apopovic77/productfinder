@@ -3,7 +3,9 @@
  * Fetches AI-generated annotations from Storage API
  */
 
-const STORAGE_API_BASE = 'https://api-storage.arkturian.com/storage';
+const STORAGE_API_BASE = import.meta.env.VITE_STORAGE_API_URL
+  ? `${import.meta.env.VITE_STORAGE_API_URL}/storage`
+  : 'https://api-storage.arkserver.arkturian.com/storage';
 const STORAGE_API_KEY = import.meta.env.VITE_STORAGE_API_KEY || 'oneal_demo_token';
 
 export interface AnnotationAnchor {

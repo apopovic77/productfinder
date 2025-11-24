@@ -512,11 +512,13 @@ export default class App extends React.Component<{}, State> {
                   // No need to set it here, LOD will pick it up
 
                   // Fetch trim bounds for text positioning
-                  const trimBoundsUrl = `https://api-storage.arkturian.com/storage/media/${heroStorageId}/trim-bounds`;
+                  const STORAGE_API_BASE = import.meta.env.VITE_STORAGE_API_URL || 'https://api-storage.arkserver.arkturian.com';
+                  const STORAGE_API_KEY = import.meta.env.VITE_STORAGE_API_KEY || 'oneal_demo_token';
+                  const trimBoundsUrl = `${STORAGE_API_BASE}/storage/media/${heroStorageId}/trim-bounds`;
                   console.log('[App] Fetching trim bounds for storage ID:', heroStorageId, 'URL:', trimBoundsUrl);
                   fetch(trimBoundsUrl, {
                     headers: {
-                      'X-API-Key': 'oneal_demo_token'
+                      'X-API-Key': STORAGE_API_KEY
                     }
                   })
                     .then(async res => {
@@ -1487,6 +1489,10 @@ export default class App extends React.Component<{}, State> {
     const getDimensionLabel = (dim: GroupDimension) => pivotDefinitions.find(d => d.key === dim)?.label ?? dim;
     const footerSearchResults = this.filterFooterSearchResults(footerSearchTerm);
 
+    // Storage URLs from environment
+    const STORAGE_PROXY_BASE = import.meta.env.VITE_STORAGE_PROXY_URL || 'https://share.arkserver.arkturian.com/proxy.php';
+    const logoUrl = `${STORAGE_PROXY_BASE}?id=7235&variant=thumbnail&height=25&trim=true`;
+
     if (error) return <div className="container"><div className="error">{error}</div></div>;
 
     return (
@@ -1516,7 +1522,7 @@ export default class App extends React.Component<{}, State> {
         <div className="pf-header">
           <div className="pf-header-left">
             <div className="pf-header-logo">
-              <img src="https://api-storage.arkturian.com/storage/media/7235?variant=thumbnail&height=25&trim=true" alt="O'NEAL" height="25" />
+              <img src={logoUrl} alt="O'NEAL" height="25" />
             </div>
             <div className="pf-header-breadcrumbs">
               {pivotBreadcrumbs.map((crumb, i) => (

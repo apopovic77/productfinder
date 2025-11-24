@@ -176,9 +176,10 @@ export class Product {
 
     // Prefer Storage API for optimized images (via proxy for better caching)
     if (media.storage_id) {
+      const STORAGE_PROXY_BASE = (import.meta as any).env?.VITE_STORAGE_PROXY_URL || 'https://share.arkserver.arkturian.com/proxy.php';
       const size = 130;
       const quality = 75;
-      return `https://share.arkturian.com/proxy.php?id=${media.storage_id}&width=${size}&format=webp&quality=${quality}`;
+      return `${STORAGE_PROXY_BASE}?id=${media.storage_id}&width=${size}&format=webp&quality=${quality}`;
     }
 
     // Fallback to Shopify CDN
@@ -191,7 +192,8 @@ export class Product {
 
     // Prefer Storage API for optimized images (800px max dimension WebP, via proxy)
     if (media.storage_id) {
-      return `https://share.arkturian.com/proxy.php?id=${media.storage_id}&width=800&format=webp&quality=85`;
+      const STORAGE_PROXY_BASE = (import.meta as any).env?.VITE_STORAGE_PROXY_URL || 'https://share.arkserver.arkturian.com/proxy.php';
+      return `${STORAGE_PROXY_BASE}?id=${media.storage_id}&width=800&format=webp&quality=85`;
     }
 
     // Fallback to Shopify CDN

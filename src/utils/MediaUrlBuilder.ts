@@ -5,6 +5,9 @@
 
 import { APP_CONFIG } from '../config/AppConfig';
 
+// Get storage proxy URL from environment or use default
+const STORAGE_PROXY_BASE = import.meta.env.VITE_STORAGE_PROXY_URL || 'https://share.arkserver.arkturian.com/proxy.php';
+
 export interface MediaUrlOptions {
   storageId: number;
   width?: number;
@@ -40,7 +43,7 @@ export function buildMediaUrl(options: MediaUrlOptions): string {
   if (trim) params.set('trim', 'true');
   if (aspectRatio) params.set('aspect_ratio', aspectRatio.toString());
 
-  return `https://share.arkturian.com/proxy.php?${params.toString()}`;
+  return `${STORAGE_PROXY_BASE}?${params.toString()}`;
 }
 
 /**
