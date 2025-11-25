@@ -30,6 +30,7 @@ jobs:
           VITE_ONEAL_API_BASE: ${{ secrets.VITE_ONEAL_API_BASE }}
           VITE_ONEAL_API_KEY: ${{ secrets.VITE_ONEAL_API_KEY }}
           VITE_STORAGE_API_URL: ${{ secrets.VITE_STORAGE_API_URL }}
+          VITE_STORAGE_PROXY_URL: ${{ secrets.VITE_STORAGE_PROXY_URL }}
           VITE_STORAGE_API_KEY: ${{ secrets.VITE_STORAGE_API_KEY }}
           VITE_ARTRACK_API_BASE: ${{ secrets.VITE_ARTRACK_API_BASE }}
 
