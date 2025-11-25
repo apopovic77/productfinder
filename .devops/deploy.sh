@@ -30,7 +30,7 @@ git fetch origin main
 git reset --hard origin/main
 
 echo -e "${YELLOW}📦 Installing dependencies...${NC}"
-npm ci
+npm ci --production=false
 
 echo -e "${YELLOW}🏗️  Building application...${NC}"
 npm run build

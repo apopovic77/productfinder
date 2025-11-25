@@ -1,0 +1,68 @@
+name: Test After API Deployment
+
+on:
+  repository_dispatch:
+    types:
+      - api-deployed
+      - storage-api-deployed
+      - oneal-api-deployed
+      - artrack-api-deployed
+
+jobs:
+  test-after-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --production=false
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Wait for deployment to settle
+        run: sleep 10
+
+      - name: Run all tests
+        env:
+          STORAGE_API_KEY: ${{ secrets.STORAGE_API_KEY }}
+          ARTRACK_API_KEY: ${{ secrets.ARTRACK_API_KEY }}
+        run: npm run build
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ github.event.client_payload.api || 'all' }}
+          path: playwright-report/
+          retention-days: 30
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ github.event.client_payload.api || 'all' }}
+          path: test-results/
+          retention-days: 7
+
+      - name: Comment on triggering commit
+        if: always() && github.event.client_payload.sha
+        run: |
+          echo "Post-deployment tests completed for ${{ github.event.client_payload.api }}"
+          echo "Commit: ${{ github.event.client_payload.sha }}"
+          echo "Status: ${{ job.status }}"
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Post-deployment tests failed for ${{ github.event.client_payload.api }}!"
+          echo "Dashboard: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

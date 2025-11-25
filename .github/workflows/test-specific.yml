@@ -1,0 +1,63 @@
+name: Test Specific API
+
+on:
+  workflow_dispatch:
+    inputs:
+      api:
+        description: 'API to test'
+        required: true
+        type: choice
+        options:
+          - all
+          - storage
+          - oneal
+          - artrack
+          - mcp
+
+jobs:
+  test-specific:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --production=false
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run tests for ${{ inputs.api }}
+        env:
+          STORAGE_API_KEY: ${{ secrets.STORAGE_API_KEY }}
+          ARTRACK_API_KEY: ${{ secrets.ARTRACK_API_KEY }}
+        run: |
+          if [ "${{ inputs.api }}" = "all" ]; then
+            npm run build
+          else
+            npm run test:${{ inputs.api }}
+          fi
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ inputs.api }}
+          path: playwright-report/
+          retention-days: 30
+
+      - name: Upload test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ inputs.api }}
+          path: test-results/
+          retention-days: 7
