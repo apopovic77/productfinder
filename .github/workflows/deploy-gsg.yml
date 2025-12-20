@@ -43,34 +43,27 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
           script: |
-            # Deploy to GSG server via SSH tunnel
-            ssh -o StrictHostKeyChecking=no gsgbot@aiserver.oneal.eu "
+            # Deploy to GSG server using the configured SSH key
+            ssh -i /root/.ssh/oneal_aiserver -o StrictHostKeyChecking=no gsgbot@aiserver.oneal.eu '
+              cd /var/www/productfinder/repo
+              git fetch origin main
+              git reset --hard origin/main
+
+              # Create .env with GSG config
+              cat > .env << EOF
+            VITE_ONEAL_API_BASE=https://gsgbot.arkturian.com/oneal-api/v1
+            VITE_ONEAL_API_KEY=oneal_api_key_2024
+            VITE_STORAGE_API_URL=https://gsgbot.arkturian.com/storage-api
+            VITE_STORAGE_PROXY_URL=https://gsgbot.arkturian.com/share/proxy.php
+            VITE_STORAGE_API_KEY=gsg_storage_key_2024
+            EOF
+
+              npm install
+              npm run build
               mkdir -p /var/www/productfinder/site
-            "
-
-      - name: Upload build via arkturian
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: arkturian.com
-          username: root
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: 22
-          source: "dist/*"
-          target: "/tmp/productfinder-build/"
-          strip_components: 1
-
-      - name: Sync to GSG server
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: arkturian.com
-          username: root
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          port: 22
-          script: |
-            # Sync build to GSG server
-            rsync -avz --delete /tmp/productfinder-build/ gsgbot@aiserver.oneal.eu:/var/www/productfinder/site/
-            rm -rf /tmp/productfinder-build
-            echo "Deployment to GSG server completed!"
+              rsync -av --delete dist/ /var/www/productfinder/site/
+              echo "Deployment completed!"
+            '
 
       - name: Notify on success
         if: success()
