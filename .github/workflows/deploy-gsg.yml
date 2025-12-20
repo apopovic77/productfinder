@@ -21,7 +21,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Build application for GSG
         run: npm run build
@@ -36,46 +36,15 @@ jobs:
           VITE_ARTRACK_API_BASE: ${{ secrets.VITE_ARTRACK_API_BASE }}
 
       - name: Deploy to GSG server
-        uses: appleboy/ssh-action@v1.0.3
+        uses: easingthemes/ssh-deploy@main
         with:
-          host: ${{ secrets.GSG_DEPLOY_HOST }}
-          username: ${{ secrets.GSG_DEPLOY_USER }}
-          key: ${{ secrets.GSG_DEPLOY_SSH_KEY }}
-          port: ${{ secrets.GSG_DEPLOY_PORT || 22 }}
-          script: |
-            set -e
-
-            REPO_PATH="/var/www/productfinder/repo"
-            DEPLOY_PATH="/var/www/productfinder/site"
-            BACKUP_DIR="/var/backups"
-            BACKUP_PREFIX="productfinder"
-            TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-            BACKUP_PATH="$BACKUP_DIR/${BACKUP_PREFIX}-${TIMESTAMP}"
-
-            cd "$REPO_PATH"
-
-            git fetch origin main
-            git reset --hard origin/main
-
-            npm ci
-
-            npm run build
-
-            if [ -d "$DEPLOY_PATH" ] && [ "$(ls -A $DEPLOY_PATH 2>/dev/null)" ]; then
-              echo "Creating backup..."
-              mkdir -p "$BACKUP_DIR"
-              cp -r "$DEPLOY_PATH" "$BACKUP_PATH"
-            fi
-
-            echo "Deploying new build..."
-            mkdir -p "$DEPLOY_PATH"
-            rsync -av --delete "$REPO_PATH/dist/" "$DEPLOY_PATH/"
-
-            chown -R gsgbot:gsgbot "$DEPLOY_PATH"
-            chmod -R 755 "$DEPLOY_PATH"
-
-            echo "Deployment to GSG server completed successfully!"
-            echo "Backup saved to: $BACKUP_PATH"
+          SSH_PRIVATE_KEY: ${{ secrets.GSG_DEPLOY_SSH_KEY }}
+          REMOTE_HOST: ${{ secrets.GSG_DEPLOY_HOST }}
+          REMOTE_USER: ${{ secrets.GSG_DEPLOY_USER }}
+          REMOTE_PORT: ${{ secrets.GSG_DEPLOY_PORT }}
+          SOURCE: "dist/"
+          TARGET: "/var/www/productfinder/site/"
+          ARGS: "-avz --delete"
 
       - name: Notify on success
         if: success()
