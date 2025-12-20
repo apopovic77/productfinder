@@ -60,7 +60,7 @@ jobs:
             EOF
 
               npm install
-              npm run build
+              VITE_BASE_PATH=/productfinder/ npm run build
               mkdir -p /var/www/productfinder/site
               rsync -av --delete dist/ /var/www/productfinder/site/
               echo "Deployment completed!"
