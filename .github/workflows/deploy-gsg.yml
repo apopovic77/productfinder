@@ -35,16 +35,42 @@ jobs:
           VITE_STORAGE_API_KEY: ${{ secrets.GSG_VITE_STORAGE_API_KEY }}
           VITE_ARTRACK_API_BASE: ${{ secrets.VITE_ARTRACK_API_BASE }}
 
-      - name: Deploy to GSG server
-        uses: easingthemes/ssh-deploy@main
+      - name: Deploy to GSG server via arkturian jump host
+        uses: appleboy/ssh-action@v1.0.3
         with:
-          SSH_PRIVATE_KEY: ${{ secrets.GSG_DEPLOY_SSH_KEY }}
-          REMOTE_HOST: ${{ secrets.GSG_DEPLOY_HOST }}
-          REMOTE_USER: ${{ secrets.GSG_DEPLOY_USER }}
-          REMOTE_PORT: ${{ secrets.GSG_DEPLOY_PORT }}
-          SOURCE: "dist/"
-          TARGET: "/var/www/productfinder/site/"
-          ARGS: "-avz --delete"
+          host: arkturian.com
+          username: root
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          script: |
+            # Deploy to GSG server via SSH tunnel
+            ssh -o StrictHostKeyChecking=no gsgbot@aiserver.oneal.eu "
+              mkdir -p /var/www/productfinder/site
+            "
+
+      - name: Upload build via arkturian
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: arkturian.com
+          username: root
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          source: "dist/*"
+          target: "/tmp/productfinder-build/"
+          strip_components: 1
+
+      - name: Sync to GSG server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: arkturian.com
+          username: root
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          script: |
+            # Sync build to GSG server
+            rsync -avz --delete /tmp/productfinder-build/ gsgbot@aiserver.oneal.eu:/var/www/productfinder/site/
+            rm -rf /tmp/productfinder-build
+            echo "Deployment to GSG server completed!"
 
       - name: Notify on success
         if: success()
