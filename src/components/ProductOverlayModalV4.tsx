@@ -94,8 +94,15 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
     }
   }, [dialogTop]);
 
-  // Helper functions to parse variant name
+  // Helper functions to parse variant attributes
+  // V2 API has direct color/size fields, fallback to option1/option2 for legacy
   const getColor = useCallback((variant: any): string => {
+    // V2 API: description_short contains the actual color/graphic variant name
+    // e.g., "PRODIGY black", "RACE Carbon" - this distinguishes variants
+    if (variant.description_short) return String(variant.description_short);
+    // V2 API: direct color field (fallback, often just base color like "black")
+    if (variant.color) return String(variant.color);
+    // Legacy Shopify-style
     if (variant.option2) return String(variant.option2);
     if (variant.option1) return String(variant.option1);
     const parts = (variant.name || '').split(' / ').map((s: string) => s.trim());
@@ -103,6 +110,9 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
   }, []);
 
   const getSize = useCallback((variant: any): string => {
+    // V2 API: direct size field
+    if (variant.size) return String(variant.size);
+    // Legacy Shopify-style
     if (variant.option1 && !variant.option2) return String(variant.option1);
     if (variant.option1 && variant.option2) {
       const opt1 = String(variant.option1);
