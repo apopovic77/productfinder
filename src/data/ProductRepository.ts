@@ -508,6 +508,15 @@ function mapProduct(p: OnealProduct): Product | null {
         image_storage_id: imageStorageId,
         option1: v.option1,
         option2: v.option2,
+        // V2 API fields
+        color: v.color,
+        size: v.size,
+        description_short: v.description_short,
+        storage: v.storage,
+        images: v.images,
+        weight_grams: v.weight_grams,
+        ean: v.ean,
+        is_available: v.is_available,
       };
     }),
     raw: p as any
