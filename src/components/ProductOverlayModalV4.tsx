@@ -4,8 +4,18 @@ import type { Product } from '../types/Product';
 import { useImageQueue } from '../hooks/useImageQueue';
 import './ProductOverlayModal.css';
 
-// Storage proxy URL from environment
-const STORAGE_PROXY_URL = import.meta.env.VITE_STORAGE_PROXY_URL || 'https://share.arkturian.com/proxy.php';
+// Storage API base URL from environment
+const STORAGE_API_URL = import.meta.env.VITE_STORAGE_API_URL || 'https://gsgbot.arkturian.com/storage-api';
+
+// Helper to build storage media URL
+const getStorageMediaUrl = (storageId: number, params: Record<string, string | number> = {}) => {
+  const queryParams = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    queryParams.set(key, String(value));
+  });
+  const queryString = queryParams.toString();
+  return `${STORAGE_API_URL}/storage/media/${storageId}${queryString ? '?' + queryString : ''}`;
+};
 
 type Props = {
   product: Product;
@@ -178,7 +188,7 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
           const storageId = img.storage?.id || null;
           if (storageId && !seenStorageIds.has(storageId)) {
             seenStorageIds.add(storageId);
-            const imageUrl = `${STORAGE_PROXY_URL}?id=${storageId}&width=130&format=webp&quality=80&trim=false`;
+            const imageUrl = getStorageMediaUrl(storageId, { width: 130, format: 'webp', quality: 80 });
             images.push({
               storageId,
               src: imageUrl,
@@ -194,7 +204,7 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
         const storageId = activeColorVariant.storage.id;
         if (!seenStorageIds.has(storageId)) {
           seenStorageIds.add(storageId);
-          const imageUrl = `${STORAGE_PROXY_URL}?id=${storageId}&width=130&format=webp&quality=80&trim=false`;
+          const imageUrl = getStorageMediaUrl(storageId, { width: 130, format: 'webp', quality: 80 });
           images.push({
             storageId,
             src: imageUrl,
@@ -233,7 +243,7 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
   const imageUrls = useMemo(() => {
     return allImages.map(img => {
       if (img.storageId) {
-        return `${STORAGE_PROXY_URL}?id=${img.storageId}&width=800&format=webp&quality=85&trim=true`;
+        return getStorageMediaUrl(img.storageId, { width: 800, format: 'webp', quality: 85 });
       }
       return img.src;
     });
@@ -271,7 +281,7 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
   const getCartImageUrl = (): string | undefined => {
     const heroImage = allImages[0];
     if (heroImage?.storageId) {
-      return `${STORAGE_PROXY_URL}?id=${heroImage.storageId}&width=220&format=webp&quality=85&trim=true`;
+      return getStorageMediaUrl(heroImage.storageId, { width: 220, format: 'webp', quality: 85 });
     }
     if (heroImage?.src) {
       return heroImage.src;
@@ -279,14 +289,14 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
     const media = product.media || [];
     const fallback = media.find(m => (m as any).storage_id) || media[0];
     if (fallback && (fallback as any).storage_id) {
-      return `${STORAGE_PROXY_URL}?id=${(fallback as any).storage_id}&width=220&format=webp&quality=85&trim=true`;
+      return getStorageMediaUrl((fallback as any).storage_id, { width: 220, format: 'webp', quality: 85 });
     }
     return fallback?.src;
   };
 
   const [quantity, setQuantity] = useState(0);
-  const mxVideoUrl = `${STORAGE_PROXY_URL}?id=6629&format=mp4`;
-  const mxVideoPoster = `${STORAGE_PROXY_URL}?id=6629&width=1200&format=webp&quality=85`;
+  const mxVideoUrl = getStorageMediaUrl(6629, { format: 'mp4' });
+  const mxVideoPoster = getStorageMediaUrl(6629, { width: 1200, format: 'webp', quality: 85 });
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
 
   useEffect(() => {
@@ -453,7 +463,7 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
         {allImages.length > 0 ? (
           allImages.map((img, idx) => {
             const imageUrl = img.storageId
-              ? `${STORAGE_PROXY_URL}?id=${img.storageId}&width=800&format=webp&quality=85&trim=true`
+              ? getStorageMediaUrl(img.storageId, { width: 800, format: 'webp', quality: 85 })
               : img.src;
             const loadedImage = loadedImages.get(imageUrl);
 
