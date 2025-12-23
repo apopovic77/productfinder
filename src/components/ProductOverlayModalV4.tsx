@@ -322,9 +322,23 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
 
   // No drag handlers - dialog is fixed and expands on scroll
 
-  // Get price
+  // Get price - handle both v1 (number) and v2 (object with gross/net) formats
+  const getVariantPrice = (variant: any): string => {
+    if (!variant?.price) return '';
+    // V2 API: price is object { gross, net, currency }
+    if (typeof variant.price === 'object' && variant.price.gross !== undefined) {
+      const currency = variant.price.currency === 'EUR' ? '€' : variant.price.currency || '€';
+      return `${currency} ${variant.price.gross.toFixed(2)}`;
+    }
+    // V1 API: price is number
+    if (typeof variant.price === 'number') {
+      return `${variant.currency || '€'} ${variant.price.toFixed(2)}`;
+    }
+    return '';
+  };
+
   const priceText = activeVariant?.price
-    ? `${activeVariant.currency || '€'} ${activeVariant.price.toFixed(2)}`
+    ? getVariantPrice(activeVariant)
     : (product.price?.formatted || `€ ${product.price?.value?.toFixed(2) || '0.00'}`);
 
   // Get availability
