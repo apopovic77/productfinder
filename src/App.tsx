@@ -512,7 +512,7 @@ export default class App extends React.Component<{}, State> {
                   // No need to set it here, LOD will pick it up
 
                   // Fetch trim bounds for text positioning
-                  const STORAGE_API_BASE = import.meta.env.VITE_STORAGE_API_URL || 'https://api-storage.arkserver.arkturian.com';
+                  const STORAGE_API_BASE = import.meta.env.VITE_STORAGE_API_URL || 'https://gsgbot.arkturian.com/storage-api';
                   const STORAGE_API_KEY = import.meta.env.VITE_STORAGE_API_KEY || 'oneal_demo_token';
                   const trimBoundsUrl = `${STORAGE_API_BASE}/storage/media/${heroStorageId}/trim-bounds`;
                   console.log('[App] Fetching trim bounds for storage ID:', heroStorageId, 'URL:', trimBoundsUrl);
@@ -1490,8 +1490,8 @@ export default class App extends React.Component<{}, State> {
     const footerSearchResults = this.filterFooterSearchResults(footerSearchTerm);
 
     // Storage URLs from environment
-    const STORAGE_PROXY_BASE = import.meta.env.VITE_STORAGE_PROXY_URL || 'https://share.arkserver.arkturian.com/proxy.php';
-    const logoUrl = `${STORAGE_PROXY_BASE}?id=6615&variant=thumbnail&height=25&trim=true`;
+    const STORAGE_API_BASE = import.meta.env.VITE_STORAGE_API_URL || 'https://gsgbot.arkturian.com/storage-api';
+    const logoUrl = `${STORAGE_API_BASE}/storage/media/6615?variant=thumbnail&height=25&trim=true`;
 
     if (error) return <div className="container"><div className="error">{error}</div></div>;
 

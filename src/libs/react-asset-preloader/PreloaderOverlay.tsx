@@ -3,8 +3,8 @@ import { useRef, useEffect } from 'react';
 import { usePreloader } from './PreloaderContext';
 import type { PreloaderConfig } from './types';
 
-// Storage proxy URL from environment
-const STORAGE_PROXY_URL = import.meta.env.VITE_STORAGE_PROXY_URL || 'https://share.arkturian.com/proxy.php';
+// Storage API URL from environment
+const STORAGE_API_URL = import.meta.env.VITE_STORAGE_API_URL || 'https://gsgbot.arkturian.com/storage-api';
 
 interface PreloaderOverlayProps {
   config?: PreloaderConfig;
@@ -29,7 +29,7 @@ export const PreloaderOverlay: FC<PreloaderOverlayProps> = ({
 
   // Build video URL from Storage API
   const videoUrl = backgroundVideoStorageId
-    ? `${STORAGE_PROXY_URL}?id=${backgroundVideoStorageId}&format=mp4`
+    ? `${STORAGE_API_URL}/storage/media/${backgroundVideoStorageId}?format=mp4`
     : null;
 
   // Start video playback when loaded
@@ -198,7 +198,7 @@ export const PreloaderOverlay: FC<PreloaderOverlayProps> = ({
 
   // Build logo URL from Storage API
   const onealLogoUrl = logoStorageId
-    ? `${STORAGE_PROXY_URL}?id=${logoStorageId}&format=png&width=1200`
+    ? `${STORAGE_API_URL}/storage/media/${logoStorageId}?format=png&width=1200`
     : null;
 
   return (

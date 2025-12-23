@@ -1,9 +1,9 @@
 import type { CategoryMedia, CategoryMediaData, MediaLookupKey } from '../types/CategoryMedia';
 
 // API Configuration
-const API_BASE = import.meta.env.VITE_ONEAL_API_BASE || 'https://oneal-api.arkturian.com/v1';
+const API_BASE = import.meta.env.VITE_ONEAL_API_BASE || 'https://gsgbot.arkturian.com/oneal-api/v1';
 const API_KEY = import.meta.env.VITE_ONEAL_API_KEY || 'oneal_demo_token';
-const STORAGE_PROXY_URL = import.meta.env.VITE_STORAGE_PROXY_URL || 'https://share.arkturian.com/proxy.php';
+const STORAGE_API_URL = import.meta.env.VITE_STORAGE_API_URL || 'https://gsgbot.arkturian.com/storage-api';
 
 /**
  * Service for loading and managing category/group media assets
@@ -87,7 +87,7 @@ export class CategoryMediaService {
     const { width = 400, height = 200, quality = 85, format = 'webp' } = options ?? {};
 
     // Use the same proxy.php as products for consistent caching
-    return `${STORAGE_PROXY_URL}?id=${storageId}&width=${width}&height=${height}&format=${format}&quality=${quality}`;
+    return `${STORAGE_API_URL}/storage/media/${storageId}?width=${width}&height=${height}&format=${format}&quality=${quality}`;
   }
 
   /**
@@ -121,7 +121,7 @@ export class CategoryMediaService {
 
     const { width = 400, height = 200, quality = 85, format = 'webp' } = options ?? {};
 
-    return `${STORAGE_PROXY_URL}?id=${fallbackStorageId}&width=${width}&height=${height}&format=${format}&quality=${quality}`;
+    return `${STORAGE_API_URL}/storage/media/${fallbackStorageId}?width=${width}&height=${height}&format=${format}&quality=${quality}`;
   }
 
   /**

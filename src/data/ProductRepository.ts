@@ -2,7 +2,7 @@ import { DefaultApi, Configuration, type Product as OnealProduct } from 'arkturi
 import { Product, type ProductData, ProductAttribute, type PrimitiveAttributeValue, type AttributeType } from '../types/Product';
 import { ACTIVE_PIVOT_PROFILE } from '../config/pivot';
 
-const API_BASE = import.meta.env.VITE_ONEAL_API_BASE || 'https://oneal-api.arkturian.com/v1';
+const API_BASE = import.meta.env.VITE_ONEAL_API_BASE || 'https://gsgbot.arkturian.com/oneal-api/v1';
 const API_KEY = import.meta.env.VITE_ONEAL_API_KEY || 'oneal_demo_token';
 
 // Initialize SDK

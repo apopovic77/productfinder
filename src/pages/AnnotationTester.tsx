@@ -17,7 +17,7 @@ type AnnotationsResponse = {
   updated_at?: string | null;
 };
 
-const STORAGE_API_BASE = import.meta.env.VITE_STORAGE_API_URL || 'https://api-storage.arkturian.com';
+const STORAGE_API_BASE = import.meta.env.VITE_STORAGE_API_URL || 'https://gsgbot.arkturian.com/storage-api';
 // Fallback to well-known demo key if env not provided
 const DEFAULT_API_KEY = import.meta.env.VITE_STORAGE_API_KEY || 'oneal_demo_token';
 

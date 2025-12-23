@@ -174,12 +174,12 @@ export class Product {
     const media = this.primaryImage;
     if (!media?.src) return 'https://via.placeholder.com/256?text=No+Image';
 
-    // Prefer Storage API for optimized images (via proxy for better caching)
+    // Prefer Storage API for optimized images
     if (media.storage_id) {
-      const STORAGE_PROXY_BASE = (import.meta as any).env?.VITE_STORAGE_PROXY_URL || 'https://share.arkserver.arkturian.com/proxy.php';
+      const STORAGE_API_BASE = (import.meta as any).env?.VITE_STORAGE_API_URL || 'https://gsgbot.arkturian.com/storage-api';
       const size = 130;
       const quality = 75;
-      return `${STORAGE_PROXY_BASE}?id=${media.storage_id}&width=${size}&format=webp&quality=${quality}`;
+      return `${STORAGE_API_BASE}/storage/media/${media.storage_id}?width=${size}&format=webp&quality=${quality}`;
     }
 
     // Fallback to Shopify CDN
@@ -190,10 +190,10 @@ export class Product {
     const media = this.primaryImage;
     if (!media?.src) return 'https://via.placeholder.com/800?text=No+Image';
 
-    // Prefer Storage API for optimized images (800px max dimension WebP, via proxy)
+    // Prefer Storage API for optimized images (800px max dimension WebP)
     if (media.storage_id) {
-      const STORAGE_PROXY_BASE = (import.meta as any).env?.VITE_STORAGE_PROXY_URL || 'https://share.arkserver.arkturian.com/proxy.php';
-      return `${STORAGE_PROXY_BASE}?id=${media.storage_id}&width=800&format=webp&quality=85`;
+      const STORAGE_API_BASE = (import.meta as any).env?.VITE_STORAGE_API_URL || 'https://gsgbot.arkturian.com/storage-api';
+      return `${STORAGE_API_BASE}/storage/media/${media.storage_id}?width=800&format=webp&quality=85`;
     }
 
     // Fallback to Shopify CDN
