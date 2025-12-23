@@ -24,8 +24,8 @@ createRoot(document.getElementById('root')!).render(
     >
       <PreloaderOverlay
         message="Loading Product Images..."
-        backgroundVideoStorageId={14074}
-        logoStorageId={7235}
+        backgroundVideoStorageId={6617}
+        logoStorageId={6615}
       />
       <AppPreloaderWrapper>
         {isAnnot ? <AnnotationTester /> : <App />}

@@ -1,5 +1,8 @@
 import type { Product } from '../types/Product';
 
+// Storage proxy URL from environment
+const STORAGE_PROXY_URL = import.meta.env.VITE_STORAGE_PROXY_URL || 'https://share.arkturian.com/proxy.php';
+
 /**
  * Modern Product Overlay Style (Blue gradient design)
  */
@@ -114,7 +117,7 @@ export class ProductOverlayCanvasV2 {
     let imageUrl = heroMedia.src;
 
     if (storageId) {
-      imageUrl = `https://share.arkturian.com/proxy.php?id=${storageId}&width=800&height=800&format=webp&quality=85`;
+      imageUrl = `${STORAGE_PROXY_URL}?id=${storageId}&width=800&height=800&format=webp&quality=85`;
     }
 
     if (this.imageCache.has(imageUrl)) {

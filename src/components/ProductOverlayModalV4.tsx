@@ -4,6 +4,9 @@ import type { Product } from '../types/Product';
 import { useImageQueue } from '../hooks/useImageQueue';
 import './ProductOverlayModal.css';
 
+// Storage proxy URL from environment
+const STORAGE_PROXY_URL = import.meta.env.VITE_STORAGE_PROXY_URL || 'https://share.arkturian.com/proxy.php';
+
 type Props = {
   product: Product;
   onClose: () => void;
@@ -159,45 +162,70 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
     setThumbnailImages([]);
   }, [product.id]);
 
-  // Load new thumbnails - filtered by selected color
+  // Load new thumbnails - filtered by selected color (v2 API structure)
   useEffect(() => {
     const timer = setTimeout(() => {
-      const images: Array<{ storageId: number | null; src: string; label: string }> = [];
+      const images: Array<{ storageId: number | null; src: string; label: string; role?: string }> = [];
+      const seenStorageIds = new Set<number>();
 
-      // Add product media images
-      const media = product.media || [];
-      media.forEach((m, idx) => {
-        const storageId = (m as any).storage_id || null;
-        const src = m.src || '';
-        const label = m.type || `Image ${idx + 1}`;
-        images.push({ storageId, src, label });
-      });
-
-      // Add variant images for selected color
+      // Find the active variant for selected color (use first size)
       const colorVariants = variants.filter((v: any) => getColor(v) === selectedColor);
-      const variantImageIds = new Set<number>();
+      const activeColorVariant = colorVariants[0];
 
-      colorVariants.forEach((v: any) => {
-        if (v.image_storage_id && !images.some(img => img.storageId === v.image_storage_id)) {
-          variantImageIds.add(v.image_storage_id);
-        }
-      });
-
-      variantImageIds.forEach((storageId) => {
-        const imageUrl = `https://share.arkturian.com/proxy.php?id=${storageId}&width=130&format=webp&quality=80&trim=false`;
-        images.push({
-          storageId,
-          src: imageUrl,
-          label: 'Variant'
+      // V2 API: Get images from variant.images[] array
+      if (activeColorVariant?.images && Array.isArray(activeColorVariant.images)) {
+        activeColorVariant.images.forEach((img: any, idx: number) => {
+          const storageId = img.storage?.id || null;
+          if (storageId && !seenStorageIds.has(storageId)) {
+            seenStorageIds.add(storageId);
+            const imageUrl = `${STORAGE_PROXY_URL}?id=${storageId}&width=130&format=webp&quality=80&trim=false`;
+            images.push({
+              storageId,
+              src: imageUrl,
+              label: img.image_path || img.role || `View ${idx + 1}`,
+              role: img.role
+            });
+          }
         });
-      });
+      }
+
+      // Fallback: If no images array, try variant.storage.id (hero image)
+      if (images.length === 0 && activeColorVariant?.storage?.id) {
+        const storageId = activeColorVariant.storage.id;
+        if (!seenStorageIds.has(storageId)) {
+          seenStorageIds.add(storageId);
+          const imageUrl = `${STORAGE_PROXY_URL}?id=${storageId}&width=130&format=webp&quality=80&trim=false`;
+          images.push({
+            storageId,
+            src: imageUrl,
+            label: 'Hero',
+            role: 'hero'
+          });
+        }
+      }
+
+      // Legacy fallback: product.media (for old API compatibility)
+      if (images.length === 0) {
+        const media = (product as any).media || [];
+        media.forEach((m: any, idx: number) => {
+          const storageId = m.storage_id || null;
+          const src = m.src || '';
+          const label = m.type || `Image ${idx + 1}`;
+          if (storageId && !seenStorageIds.has(storageId)) {
+            seenStorageIds.add(storageId);
+            images.push({ storageId, src, label });
+          } else if (src) {
+            images.push({ storageId: null, src, label });
+          }
+        });
+      }
 
       setThumbnailImages(images);
       setThumbnailsLoading(false);
     }, 10);
 
     return () => clearTimeout(timer);
-  }, [product.id, product.media, variants, selectedColor, getColor]);
+  }, [product.id, variants, selectedColor, getColor]);
 
   const allImages = thumbnailsLoading ? [] : thumbnailImages;
 
@@ -205,7 +233,7 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
   const imageUrls = useMemo(() => {
     return allImages.map(img => {
       if (img.storageId) {
-        return `https://share.arkturian.com/proxy.php?id=${img.storageId}&width=800&format=webp&quality=85&trim=true`;
+        return `${STORAGE_PROXY_URL}?id=${img.storageId}&width=800&format=webp&quality=85&trim=true`;
       }
       return img.src;
     });
@@ -243,7 +271,7 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
   const getCartImageUrl = (): string | undefined => {
     const heroImage = allImages[0];
     if (heroImage?.storageId) {
-      return `https://share.arkturian.com/proxy.php?id=${heroImage.storageId}&width=220&format=webp&quality=85&trim=true`;
+      return `${STORAGE_PROXY_URL}?id=${heroImage.storageId}&width=220&format=webp&quality=85&trim=true`;
     }
     if (heroImage?.src) {
       return heroImage.src;
@@ -251,14 +279,14 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
     const media = product.media || [];
     const fallback = media.find(m => (m as any).storage_id) || media[0];
     if (fallback && (fallback as any).storage_id) {
-      return `https://share.arkturian.com/proxy.php?id=${(fallback as any).storage_id}&width=220&format=webp&quality=85&trim=true`;
+      return `${STORAGE_PROXY_URL}?id=${(fallback as any).storage_id}&width=220&format=webp&quality=85&trim=true`;
     }
     return fallback?.src;
   };
 
   const [quantity, setQuantity] = useState(0);
-  const mxVideoUrl = 'https://share.arkturian.com/proxy.php?id=14074&format=mp4';
-  const mxVideoPoster = 'https://share.arkturian.com/proxy.php?id=14074&width=1200&format=webp&quality=85';
+  const mxVideoUrl = `${STORAGE_PROXY_URL}?id=6629&format=mp4`;
+  const mxVideoPoster = `${STORAGE_PROXY_URL}?id=6629&width=1200&format=webp&quality=85`;
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
 
   useEffect(() => {
@@ -425,7 +453,7 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
         {allImages.length > 0 ? (
           allImages.map((img, idx) => {
             const imageUrl = img.storageId
-              ? `https://share.arkturian.com/proxy.php?id=${img.storageId}&width=800&format=webp&quality=85&trim=true`
+              ? `${STORAGE_PROXY_URL}?id=${img.storageId}&width=800&format=webp&quality=85&trim=true`
               : img.src;
             const loadedImage = loadedImages.get(imageUrl);
 

@@ -4,6 +4,9 @@ import type { Product } from '../types/Product';
 import { useImageQueue } from '../hooks/useImageQueue';
 import './ProductOverlayModal.css';
 
+// Storage proxy URL from environment
+const STORAGE_PROXY_URL = import.meta.env.VITE_STORAGE_PROXY_URL || 'https://share.arkturian.com/proxy.php';
+
 type Props = {
   product: Product;
   onClose: () => void;
@@ -153,7 +156,7 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
 
       variantImageIds.forEach((storageId) => {
         // Build proxy URL for variant images (130px)
-        const imageUrl = `https://share.arkturian.com/proxy.php?id=${storageId}&width=130&height=130&format=webp&quality=80`;
+        const imageUrl = `${STORAGE_PROXY_URL}?id=${storageId}&width=130&height=130&format=webp&quality=80`;
         images.push({
           storageId,
           src: imageUrl,
@@ -175,7 +178,7 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
   const thumbnailUrls = useMemo(() => {
     return allImages.map(img => {
       if (img.storageId) {
-        return `https://share.arkturian.com/proxy.php?id=${img.storageId}&width=130&height=130&format=webp&quality=80`;
+        return `${STORAGE_PROXY_URL}?id=${img.storageId}&width=130&height=130&format=webp&quality=80`;
       }
       return img.src;
     });
@@ -283,7 +286,7 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
     const storageId = getCurrentStorageId();
 
     if (storageId) {
-      return `https://share.arkturian.com/proxy.php?id=${storageId}&width=130&height=130&format=webp&quality=75`;
+      return `${STORAGE_PROXY_URL}?id=${storageId}&width=130&height=130&format=webp&quality=75`;
     }
 
     // Fallback to src if no storage_id
@@ -297,7 +300,7 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
     const storageId = getCurrentStorageId();
 
     if (storageId) {
-      return `https://share.arkturian.com/proxy.php?id=${storageId}&width=1300&height=1300&format=webp&quality=85`;
+      return `${STORAGE_PROXY_URL}?id=${storageId}&width=1300&height=1300&format=webp&quality=85`;
     }
 
     // Fallback to src if no storage_id
@@ -470,7 +473,7 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
             }}>
               {allImages.map((img, idx) => {
                 const thumbnailUrl = img.storageId
-                  ? `https://share.arkturian.com/proxy.php?id=${img.storageId}&width=130&height=130&format=webp&quality=80`
+                  ? `${STORAGE_PROXY_URL}?id=${img.storageId}&width=130&height=130&format=webp&quality=80`
                   : img.src;
                 const loadedImage = loadedThumbnails.get(thumbnailUrl);
                 const isActive = idx === selectedImageIndex;
@@ -825,7 +828,7 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
               }}>
                 {allImages.map((img, idx) => {
                   const thumbnailUrl = img.storageId
-                    ? `https://share.arkturian.com/proxy.php?id=${img.storageId}&width=130&height=130&format=webp&quality=80`
+                    ? `${STORAGE_PROXY_URL}?id=${img.storageId}&width=130&height=130&format=webp&quality=80`
                     : img.src;
                   const loadedImage = loadedThumbnails.get(thumbnailUrl);
                   const isActive = idx === selectedImageIndex;

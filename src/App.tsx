@@ -1491,7 +1491,7 @@ export default class App extends React.Component<{}, State> {
 
     // Storage URLs from environment
     const STORAGE_PROXY_BASE = import.meta.env.VITE_STORAGE_PROXY_URL || 'https://share.arkserver.arkturian.com/proxy.php';
-    const logoUrl = `${STORAGE_PROXY_BASE}?id=7235&variant=thumbnail&height=25&trim=true`;
+    const logoUrl = `${STORAGE_PROXY_BASE}?id=6615&variant=thumbnail&height=25&trim=true`;
 
     if (error) return <div className="container"><div className="error">{error}</div></div>;
 
@@ -2020,9 +2020,9 @@ export default class App extends React.Component<{}, State> {
             const isMotocross = sportValue.includes('motocross') || sportValue.includes('mx') || sportValue.includes('moto');
 
             // Video IDs:
-            // - Mountainbike (MTB): 6550
-            // - Motocross (MX): 14074
-            const videoStorageId = isMotocross ? 14074 : 6550;
+            // - Mountainbike (MTB): 6623
+            // - Motocross (MX): 6629
+            const videoStorageId = isMotocross ? 6629 : 6623;
 
             return (
               // V4 Dialog (zoom-based): Shown when product occupies >65% of screen height

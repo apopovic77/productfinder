@@ -4,6 +4,9 @@ import type { Product } from '../types/Product';
 import { useImageQueue } from '../hooks/useImageQueue';
 import './ProductOverlayModal.css';
 
+// Storage proxy URL from environment
+const STORAGE_PROXY_URL = import.meta.env.VITE_STORAGE_PROXY_URL || 'https://share.arkturian.com/proxy.php';
+
 type Props = {
   product: Product;
   onClose: () => void;
@@ -192,7 +195,7 @@ export const ProductOverlayModalV3: React.FC<Props> = ({ product, onClose, posit
       });
 
       variantImageIds.forEach((storageId) => {
-        const imageUrl = `https://share.arkturian.com/proxy.php?id=${storageId}&width=130&format=webp&quality=80&trim=false`;
+        const imageUrl = `${STORAGE_PROXY_URL}?id=${storageId}&width=130&format=webp&quality=80&trim=false`;
         images.push({
           storageId,
           src: imageUrl,
@@ -213,7 +216,7 @@ export const ProductOverlayModalV3: React.FC<Props> = ({ product, onClose, posit
   const thumbnailUrls = useMemo(() => {
     return allImages.map(img => {
       if (img.storageId) {
-        return `https://share.arkturian.com/proxy.php?id=${img.storageId}&width=130&format=webp&quality=80&trim=false`;
+        return `${STORAGE_PROXY_URL}?id=${img.storageId}&width=130&format=webp&quality=80&trim=false`;
       }
       return img.src;
     });
@@ -318,7 +321,7 @@ export const ProductOverlayModalV3: React.FC<Props> = ({ product, onClose, posit
 
     if (storageId) {
       // Main dialog image: NO trim (consistent aspect ratio with thumbnail - prevents visual jump during LOD update)
-      return `https://share.arkturian.com/proxy.php?id=${storageId}&width=1300&format=webp&quality=85&trim=false`;
+      return `${STORAGE_PROXY_URL}?id=${storageId}&width=1300&format=webp&quality=85&trim=false`;
     }
 
     const media = product.media || [];
@@ -525,7 +528,7 @@ export const ProductOverlayModalV3: React.FC<Props> = ({ product, onClose, posit
         }}>
           {allImages.map((img, idx) => {
             const thumbnailUrl = img.storageId
-              ? `https://share.arkturian.com/proxy.php?id=${img.storageId}&width=130&format=webp&quality=80&trim=false`
+              ? `${STORAGE_PROXY_URL}?id=${img.storageId}&width=130&format=webp&quality=80&trim=false`
               : img.src;
             const loadedImage = loadedThumbnails.get(thumbnailUrl);
             const isActive = idx === selectedImageIndex;

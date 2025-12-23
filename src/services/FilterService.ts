@@ -80,7 +80,7 @@ export class FilterService {
     return products.filter(p => {
       const q = search.trim().toLowerCase();
       if (q) {
-        const inName = p.name.toLowerCase().includes(q);
+        const inName = (p.name ?? '').toLowerCase().includes(q);
         const inCat = p.category?.some(c => c.toLowerCase().includes(q));
         if (!inName && !inCat) return false;
       }

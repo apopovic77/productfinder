@@ -3,6 +3,9 @@ import { useRef, useEffect } from 'react';
 import { usePreloader } from './PreloaderContext';
 import type { PreloaderConfig } from './types';
 
+// Storage proxy URL from environment
+const STORAGE_PROXY_URL = import.meta.env.VITE_STORAGE_PROXY_URL || 'https://share.arkturian.com/proxy.php';
+
 interface PreloaderOverlayProps {
   config?: PreloaderConfig;
   logo?: ReactNode;
@@ -26,7 +29,7 @@ export const PreloaderOverlay: FC<PreloaderOverlayProps> = ({
 
   // Build video URL from Storage API
   const videoUrl = backgroundVideoStorageId
-    ? `https://share.arkturian.com/proxy.php?id=${backgroundVideoStorageId}&format=mp4`
+    ? `${STORAGE_PROXY_URL}?id=${backgroundVideoStorageId}&format=mp4`
     : null;
 
   // Start video playback when loaded
@@ -195,7 +198,7 @@ export const PreloaderOverlay: FC<PreloaderOverlayProps> = ({
 
   // Build logo URL from Storage API
   const onealLogoUrl = logoStorageId
-    ? `https://share.arkturian.com/proxy.php?id=${logoStorageId}&format=png&width=1200`
+    ? `${STORAGE_PROXY_URL}?id=${logoStorageId}&format=png&width=1200`
     : null;
 
   return (

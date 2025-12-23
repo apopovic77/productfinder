@@ -241,7 +241,7 @@ function formatTokenPath(tokens?: string[]): string | undefined {
 function derivePresentationCategory(args: DerivePresentationCategoryArgs): PresentationCategory {
   const primary = args.primaryCategory?.toLowerCase().trim() ?? '';
   const secondary = args.secondaryCategory?.toLowerCase().trim() ?? '';
-  const name = args.productName.toLowerCase();
+  const name = (args.productName ?? '').toLowerCase();
   const url = args.productUrl?.toLowerCase() ?? '';
   const taxonomy = args.taxonomy;
   const family = taxonomy?.product_family?.toLowerCase() ?? '';
@@ -325,7 +325,7 @@ function derivePresentationCategory(args: DerivePresentationCategoryArgs): Prese
 
 function normalizeProductFamily(args: NormalizeProductFamilyArgs): string | undefined {
   const { presentationCategory, rawFamily, taxonomyPath, productName } = args;
-  const lowerName = productName.toLowerCase();
+  const lowerName = (productName ?? '').toLowerCase();
   const lowerPath = (taxonomyPath ?? []).map(token => token.toLowerCase());
   const trimmedFamily = rawFamily?.trim() ?? '';
   const lowerFamily = trimmedFamily.toLowerCase();

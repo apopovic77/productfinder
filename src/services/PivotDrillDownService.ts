@@ -611,7 +611,7 @@ export class PivotDrillDownService {
     ) {
       const family = (product.getAttributeValue<string>('product_family') || '').toLowerCase();
       const taxonomyPath = (product.getAttributeValue<string>('taxonomy_path') || '').toLowerCase();
-      const name = product.displayName.toLowerCase();
+      const name = (product.displayName ?? '').toLowerCase();
       const haystack = `${name} ${family} ${taxonomyPath}`;
       if (this.profile.isClothingContext(haystack)) {
         value = 'Kleidung';

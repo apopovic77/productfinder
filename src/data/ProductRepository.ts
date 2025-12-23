@@ -105,7 +105,7 @@ function derivePosterGroup(args: {
 
   const category = (args.presentationCategory ?? '').toLowerCase();
   const family = (args.productFamily ?? '').toLowerCase();
-  const name = args.productName.toLowerCase();
+  const name = (args.productName ?? '').toLowerCase();
   const tags = new Set((args.aiTags ?? []).map(tag => tag.toLowerCase()));
 
   if (category.includes('brillen') || tags.has('goggle')) {
@@ -434,7 +434,27 @@ function mapProduct(p: OnealProduct): Product | null {
       }
     : undefined;
 
-  const filteredMedia = (p.media ?? []).filter(isRealMedia);
+  // Support v2 API format: synthesize media from storage object if no media array
+  let mediaArray = p.media ?? [];
+  const anyP = p as any;
+  if (!mediaArray.length && anyP.storage?.id) {
+    // Create synthetic media entry from storage object
+    mediaArray = [{
+      src: anyP.storage.media_url || '',
+      storage_id: anyP.storage.id,
+      role: 'hero',
+    } as any];
+  }
+  // Also check for images array (v2 product detail format)
+  if (!mediaArray.length && Array.isArray(anyP.images)) {
+    mediaArray = anyP.images.map((img: any) => ({
+      src: img.image_path || '',
+      storage_id: img.storage?.id,
+      role: img.role || 'gallery',
+    }));
+  }
+
+  const filteredMedia = mediaArray.filter(isRealMedia);
   if (!filteredMedia.length) {
     return null;
   }
@@ -449,12 +469,18 @@ function mapProduct(p: OnealProduct): Product | null {
     price: p.price,
     media: filteredMedia.map(item => {
       const anyItem = item as any;
+      // Support both v1 format (storage_id) and v2 format (storage.id)
+      const storageId = typeof anyItem?.storage_id === 'number'
+        ? anyItem.storage_id
+        : typeof anyItem?.storage?.id === 'number'
+          ? anyItem.storage.id
+          : undefined;
       return {
         src: item.src,
         alt: item.alt ?? undefined,
         type: typeof anyItem?.type === 'string' ? anyItem.type : undefined,
         role: typeof anyItem?.role === 'string' ? anyItem.role as any : undefined,
-        storage_id: typeof anyItem?.storage_id === 'number' ? anyItem.storage_id : undefined,
+        storage_id: storageId,
       };
     }),
     specifications: p.specifications,
@@ -464,18 +490,26 @@ function mapProduct(p: OnealProduct): Product | null {
     attributes,
     aiTags,
     aiAnalysis,
-    variants: variants.map((v: any) => ({
-      name: v.name || '',
-      sku: v.sku,
-      gtin13: v.gtin13,
-      price: v.price,
-      currency: v.currency,
-      availability: v.availability,
-      url: v.url,
-      image_storage_id: v.image_storage_id,
-      option1: v.option1,
-      option2: v.option2,
-    })),
+    variants: variants.map((v: any) => {
+      // Support both v1 format (image_storage_id) and v2 format (storage.id)
+      const imageStorageId = typeof v.image_storage_id === 'number'
+        ? v.image_storage_id
+        : typeof v.storage?.id === 'number'
+          ? v.storage.id
+          : undefined;
+      return {
+        name: v.name || '',
+        sku: v.sku,
+        gtin13: v.gtin13,
+        price: v.price,
+        currency: v.currency,
+        availability: v.availability,
+        url: v.url,
+        image_storage_id: imageStorageId,
+        option1: v.option1,
+        option2: v.option2,
+      };
+    }),
     raw: p as any
   };
 

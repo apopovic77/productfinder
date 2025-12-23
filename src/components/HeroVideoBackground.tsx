@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import './HeroVideoBackground.css';
 
+// Storage proxy URL from environment
+const STORAGE_PROXY_URL = import.meta.env.VITE_STORAGE_PROXY_URL || 'https://share.arkturian.com/proxy.php';
+
 interface HeroVideoBackgroundProps {
   storageId: number;
   onClose: () => void;
@@ -25,7 +28,7 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   // Build video URL from Storage API
-  const videoUrl = `https://share.arkturian.com/proxy.php?id=${storageId}&format=mp4`;
+  const videoUrl = `${STORAGE_PROXY_URL}?id=${storageId}&format=mp4`;
 
   useEffect(() => {
     const video = videoRef.current;
