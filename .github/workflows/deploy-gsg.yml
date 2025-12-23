@@ -53,7 +53,7 @@ jobs:
               cat > .env << EOF
             VITE_BASE_PATH=/productfinder/
             VITE_ONEAL_API_BASE=https://gsgbot.arkturian.com/oneal-api/v1
-            VITE_ONEAL_API_KEY=oneal_api_key_2024
+            VITE_ONEAL_API_KEY=oneal_demo_token
             VITE_STORAGE_API_URL=https://gsgbot.arkturian.com/storage-api
             VITE_STORAGE_API_KEY=gsg_storage_key_2024
             EOF
