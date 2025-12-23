@@ -553,3 +553,25 @@ export async function fetchFacets(): Promise<any> {
   const response = await api.facetsGet();
   return response.data;
 }
+
+/**
+ * Fetch a single product by ID with full details (including variants with images)
+ */
+export async function fetchProductById(productId: number | string): Promise<Product | null> {
+  try {
+    const response = await fetch(`${API_BASE}/products/${productId}`, {
+      headers: {
+        'X-API-Key': API_KEY,
+      },
+    });
+    if (!response.ok) {
+      console.error('[ProductRepository] Failed to fetch product:', response.status);
+      return null;
+    }
+    const data = await response.json();
+    return mapProduct(data as OnealProduct);
+  } catch (error) {
+    console.error('[ProductRepository] Error fetching product:', error);
+    return null;
+  }
+}

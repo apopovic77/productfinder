@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Product } from '../types/Product';
 import { useImageQueue } from '../hooks/useImageQueue';
+import { fetchProductById } from '../data/ProductRepository';
 import './ProductOverlayModal.css';
 
 // Storage API base URL from environment
@@ -48,9 +49,47 @@ interface ParsedFeature {
 export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onBuy }) => {
   const DIALOG_WIDTH = 1100; // Wider for horizontal layout
 
-  // Extract variants
-  const variants = (product as any).variants || [];
-  const rawProduct = (product as any).raw || {};
+  // State for full product details (fetched from API with variants)
+  const [fullProduct, setFullProduct] = useState<Product | null>(null);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+
+  // Fetch full product details when modal opens (list API doesn't include variants)
+  useEffect(() => {
+    const loadFullDetails = async () => {
+      // Check if we already have variants with images
+      const existingVariants = (product as any).variants || [];
+      const hasVariantsWithImages = existingVariants.some((v: any) => v.images?.length > 0);
+
+      if (hasVariantsWithImages) {
+        console.log('[V4 Modal] Product already has variants with images, skipping fetch');
+        setFullProduct(null);
+        return;
+      }
+
+      console.log('[V4 Modal] Fetching full product details for:', product.id);
+      setIsLoadingDetails(true);
+      try {
+        const details = await fetchProductById(product.id);
+        if (details) {
+          console.log('[V4 Modal] Got full product with variants:', (details as any).variants?.length);
+          setFullProduct(details);
+        }
+      } catch (error) {
+        console.error('[V4 Modal] Failed to fetch product details:', error);
+      } finally {
+        setIsLoadingDetails(false);
+      }
+    };
+
+    loadFullDetails();
+  }, [product.id]);
+
+  // Use full product if available, otherwise use the passed product
+  const activeProduct = fullProduct || product;
+
+  // Extract variants from the active product
+  const variants = (activeProduct as any).variants || [];
+  const rawProduct = (activeProduct as any).raw || {};
   const derivedTaxonomy = (product as any).derived_taxonomy || rawProduct?.derived_taxonomy;
   const metaInfo = (product.meta && Object.keys(product.meta).length ? product.meta : rawProduct?.meta) || {};
   const taxonomyPath = Array.isArray(derivedTaxonomy?.path) ? derivedTaxonomy.path : [];
@@ -191,6 +230,14 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
       // Find the active variant for selected color (use first size)
       const colorVariants = variants.filter((v: any) => getColor(v) === selectedColor);
       const activeColorVariant = colorVariants[0];
+
+      // DEBUG: Log variant data to understand the structure
+      console.log('[V4 Modal] variants count:', variants.length);
+      console.log('[V4 Modal] selectedColor:', selectedColor);
+      console.log('[V4 Modal] colorVariants count:', colorVariants.length);
+      console.log('[V4 Modal] activeColorVariant:', activeColorVariant);
+      console.log('[V4 Modal] activeColorVariant.images:', activeColorVariant?.images);
+      console.log('[V4 Modal] activeColorVariant.storage:', activeColorVariant?.storage);
 
       // V2 API: Get images from variant.images[] array
       if (activeColorVariant?.images && Array.isArray(activeColorVariant.images)) {
