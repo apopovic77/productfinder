@@ -18,6 +18,8 @@ export type ControllerState = {
   products: Product[];
   filteredProducts: Product[];
   pivotGroups: PivotGroup[];
+  familyGrouped: boolean;
+  expandedFamilyCode: string | null;
 };
 
 export type StateChangeListener = (state: ControllerState) => void;
@@ -42,6 +44,11 @@ export class ProductFinderController {
   private loading = true;
   private error: string | null = null;
   private listeners: StateChangeListener[] = [];
+
+  // Family grouping
+  private _familyGrouped = true;
+  private _expandedFamilyCode: string | null = null;
+  private _familyMap: Map<string, Product[]> = new Map();
 
   // Canvas
   private canvas: HTMLCanvasElement | null = null;
@@ -123,6 +130,17 @@ export class ProductFinderController {
   private onDataChanged(): void {
     let filtered = this.filterService.filterAndSort(this.products);
     filtered = this.favoritesService.filter(filtered);
+
+    // Apply family grouping: collapse products with same product_code into one representative
+    if (this._familyGrouped && !this._expandedFamilyCode) {
+      filtered = this.collapseByFamily(filtered);
+    } else if (this._expandedFamilyCode) {
+      // Show only products from the expanded family
+      filtered = filtered.filter(p => {
+        const code = p.getAttributeValue<string>('product_code');
+        return code === this._expandedFamilyCode;
+      });
+    }
 
     const analyzerSource = filtered.length > 0 ? filtered : this.products;
     this.pivotModel = this.pivotAnalyzer.analyze(analyzerSource);
@@ -419,6 +437,8 @@ export class ProductFinderController {
       products: this.products,
       filteredProducts: this.getFilteredProducts(),
       pivotGroups: this.layoutService.getPivotGroups(),
+      familyGrouped: this._familyGrouped,
+      expandedFamilyCode: this._expandedFamilyCode,
     };
     this.listeners.forEach(l => l(state));
   }
@@ -669,6 +689,76 @@ export class ProductFinderController {
     return false;
   }
   
+  // === Family Grouping Methods ===
+
+  /**
+   * Collapse products by product_code: keep one representative per family.
+   * The representative is the product with the best image (has storage_id).
+   */
+  private collapseByFamily(products: Product[]): Product[] {
+    this._familyMap.clear();
+
+    // Group by product_code
+    for (const p of products) {
+      const code = p.getAttributeValue<string>('product_code') || p.id;
+      if (!this._familyMap.has(code)) {
+        this._familyMap.set(code, []);
+      }
+      this._familyMap.get(code)!.push(p);
+    }
+
+    // Pick one representative per family (prefer one with image)
+    const representatives: Product[] = [];
+    for (const [, family] of this._familyMap) {
+      const withImage = family.find(p => p.primaryImage?.storage_id);
+      representatives.push(withImage || family[0]);
+    }
+
+    return representatives;
+  }
+
+  setFamilyGrouped(enabled: boolean): void {
+    this._familyGrouped = enabled;
+    this._expandedFamilyCode = null;
+    this.onDataChanged();
+  }
+
+  isFamilyGrouped(): boolean {
+    return this._familyGrouped;
+  }
+
+  /**
+   * Expand a product family: show all color variants for a product_code.
+   * Called when user clicks a grouped product.
+   */
+  expandFamily(productCode: string): void {
+    this._expandedFamilyCode = productCode;
+    this.onDataChanged();
+  }
+
+  /**
+   * Collapse back to grouped view.
+   */
+  collapseFamily(): void {
+    this._expandedFamilyCode = null;
+    this.onDataChanged();
+  }
+
+  isExpandedFamily(): boolean {
+    return this._expandedFamilyCode !== null;
+  }
+
+  getExpandedFamilyCode(): string | null {
+    return this._expandedFamilyCode;
+  }
+
+  /**
+   * Get family members for a product code.
+   */
+  getFamilyMembers(productCode: string): Product[] {
+    return this._familyMap.get(productCode) || [];
+  }
+
   /**
    * Handle mouse move - check for group header hover
    */

@@ -232,6 +232,35 @@ body {
   letter-spacing: 0.02em;
 }
 
+.pf-header-actions {
+  display: flex;
+  gap: 6px;
+  margin-right: 12px;
+}
+
+.pf-header-btn {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pf-header-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.pf-header-btn.active {
+  background: rgba(255, 140, 0, 0.3);
+  border-color: rgba(255, 140, 0, 0.6);
+  color: #ff8c00;
+}
+
 .pf-header-breadcrumbs {
   display: flex;
   align-items: center;
