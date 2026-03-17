@@ -19,7 +19,6 @@ export type ControllerState = {
   filteredProducts: Product[];
   pivotGroups: PivotGroup[];
   familyGrouped: boolean;
-  expandedFamilyCode: string | null;
 };
 
 export type StateChangeListener = (state: ControllerState) => void;
@@ -47,7 +46,6 @@ export class ProductFinderController {
 
   // Family grouping
   private _familyGrouped = false;
-  private _expandedFamilyCode: string | null = null;
   private _familyMap: Map<string, Product[]> = new Map();
 
   // Canvas
@@ -132,14 +130,8 @@ export class ProductFinderController {
     filtered = this.favoritesService.filter(filtered);
 
     // Apply family grouping: collapse products with same product_code into one representative
-    if (this._familyGrouped && !this._expandedFamilyCode) {
+    if (this._familyGrouped) {
       filtered = this.collapseByFamily(filtered);
-    } else if (this._expandedFamilyCode) {
-      // Show only products from the expanded family
-      filtered = filtered.filter(p => {
-        const code = p.getAttributeValue<string>('product_code');
-        return code === this._expandedFamilyCode;
-      });
     }
 
     const analyzerSource = filtered.length > 0 ? filtered : this.products;
@@ -438,7 +430,6 @@ export class ProductFinderController {
       filteredProducts: this.getFilteredProducts(),
       pivotGroups: this.layoutService.getPivotGroups(),
       familyGrouped: this._familyGrouped,
-      expandedFamilyCode: this._expandedFamilyCode,
     };
     this.listeners.forEach(l => l(state));
   }
@@ -719,44 +710,11 @@ export class ProductFinderController {
 
   setFamilyGrouped(enabled: boolean): void {
     this._familyGrouped = enabled;
-    this._expandedFamilyCode = null;
     this.onDataChanged();
   }
 
   isFamilyGrouped(): boolean {
     return this._familyGrouped;
-  }
-
-  /**
-   * Expand a product family: show all color variants for a product_code.
-   * Called when user clicks a grouped product.
-   */
-  expandFamily(productCode: string): void {
-    this._expandedFamilyCode = productCode;
-    this.onDataChanged();
-  }
-
-  /**
-   * Collapse back to grouped view.
-   */
-  collapseFamily(): void {
-    this._expandedFamilyCode = null;
-    this.onDataChanged();
-  }
-
-  isExpandedFamily(): boolean {
-    return this._expandedFamilyCode !== null;
-  }
-
-  getExpandedFamilyCode(): string | null {
-    return this._expandedFamilyCode;
-  }
-
-  /**
-   * Get family members for a product code.
-   */
-  getFamilyMembers(productCode: string): Product[] {
-    return this._familyMap.get(productCode) || [];
   }
 
   /**

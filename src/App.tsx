@@ -1097,36 +1097,19 @@ export default class App extends React.Component<{}, State> {
       // If overlayClick is null, continue with normal click handling
     }
 
-    // Check for product click FIRST (before group headers, so family expansion works)
-    const product = this.controller.hitTest(x, y);
-    if (product) {
-      // Family grouping: if grouped and product has siblings, expand the family
-      if (this.controller.isFamilyGrouped() && !this.controller.isExpandedFamily()) {
-        const familySize = product.getAttributeValue<number>('family_size') || 1;
-        const productCode = product.getAttributeValue<string>('product_code');
-        if (familySize > 1 && productCode) {
-          this.controller.expandFamily(productCode);
-          this.syncPivotUI();
-          return;
-        }
-      }
-      this.openProductDetails(product);
-      return;
-    }
-
-    // Check for group header click (in pivot mode) - only if no product was hit
+    // Check for group header click (in pivot mode)
     const groupHeaderClicked = this.controller.handleGroupHeaderClick(x, y);
     if (groupHeaderClicked) {
       this.syncPivotUI();
       return;
     }
 
-    // Clicked on empty space
-    if (this.controller.isExpandedFamily()) {
-      // Collapse back to grouped view
-      this.controller.collapseFamily();
-      this.syncPivotUI();
+    // Otherwise check for product click
+    const product = this.controller.hitTest(x, y);
+    if (product) {
+      this.openProductDetails(product);
     } else {
+      // Clicked on empty space - deselect product
       this.setState({ selectedProduct: null, selectedVariant: null, shouldShowV4Dialog: false });
     }
   };
@@ -1608,18 +1591,6 @@ export default class App extends React.Component<{}, State> {
             >
               {this.controller.isFamilyGrouped() ? 'Grouped' : 'All Colors'}
             </button>
-            {this.controller.isExpandedFamily() && (
-              <button
-                type="button"
-                className="pf-header-btn"
-                onClick={() => {
-                  this.controller.collapseFamily();
-                  this.syncPivotUI();
-                }}
-              >
-                Back
-              </button>
-            )}
           </div>
           <div className="pf-header-title">Product Finder</div>
         </div>
