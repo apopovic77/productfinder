@@ -88,7 +88,7 @@ export class ProductFinderController {
 
     // Load products
     try {
-      const results = await fetchProducts({ limit: 3000 });
+      const results = await fetchProducts({ limit: 5000 });
       this.products = results || [];
       this.pivotModel = this.pivotAnalyzer.analyze(this.products);
       this.layoutService.setPivotModel(this.pivotModel);

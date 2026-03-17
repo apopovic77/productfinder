@@ -25,7 +25,7 @@ export function useProductPreloader() {
 
         // Fetch all products
         console.log('[Preloader] 📦 Fetching products from API...');
-        const products = await fetchProducts({ limit: 3000 });
+        const products = await fetchProducts({ limit: 5000 });
         const fetchTime = performance.now() - startTime;
         console.log(`[Preloader] ✅ Fetched ${products.length} products in ${fetchTime.toFixed(0)}ms`);
 
