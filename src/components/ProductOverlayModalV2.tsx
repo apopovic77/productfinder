@@ -648,9 +648,9 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
 
       {/* Color Siblings - other colors of the same product */}
       {(() => {
-        const raw = (fullProduct as any)?.raw || {};
-        const siblings = raw?.siblings || [];
-        const currentColor = raw?.color_name;
+        const activeRaw = (activeProduct as any)?.raw || {};
+        const siblings = activeRaw?.siblings || [];
+        const currentColor = activeRaw?.color_name;
         if (siblings.length === 0) return null;
 
         return (
