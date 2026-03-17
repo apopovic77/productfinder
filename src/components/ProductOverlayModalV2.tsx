@@ -646,6 +646,58 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         )}
       </div>
 
+      {/* Color Siblings - other colors of the same product */}
+      {(() => {
+        const raw = (fullProduct as any)?.raw || {};
+        const siblings = raw?.siblings || [];
+        const currentColor = raw?.color_name;
+        if (siblings.length === 0) return null;
+
+        return (
+          <div style={{ marginBottom: '10px' }}>
+            <label style={{ display: 'block', fontSize: '9px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.8, marginBottom: '4px' }}>
+              Color: {currentColor || 'default'}
+            </label>
+            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+              {/* Current color (active) */}
+              {currentColor && (
+                <div style={{
+                  padding: '3px 8px', fontSize: '10px', borderRadius: '4px',
+                  border: '2px solid #ff6b00', background: 'rgba(255, 107, 0, 0.2)',
+                  color: 'white', fontWeight: '600'
+                }}>
+                  {currentColor}
+                </div>
+              )}
+              {/* Sibling colors */}
+              {siblings.map((sib: any) => (
+                <button
+                  key={sib.id}
+                  type="button"
+                  onClick={async () => {
+                    // Load sibling product
+                    const sibProduct = await fetchProductById(sib.id);
+                    if (sibProduct) {
+                      setFullProduct(sibProduct);
+                      setSelectedImageIndex(0);
+                    }
+                  }}
+                  style={{
+                    padding: '3px 8px', fontSize: '10px', borderRadius: '4px',
+                    border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.1)',
+                    color: 'rgba(255,255,255,0.8)', cursor: 'pointer',
+                    transition: 'all 0.15s ease'
+                  }}
+                  title={sib.color_name}
+                >
+                  {sib.color_name}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Dropdowns - Compact (2 per row) */}
       {variants.length > 0 && (
         <div className="pom-dropdowns" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px', marginBottom: '12px' }}>
