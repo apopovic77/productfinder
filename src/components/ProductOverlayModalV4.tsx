@@ -657,15 +657,64 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
           <span>(4.0) 1 review</span>
         </div>
 
-        {/* Color Info */}
-        {selectedColor && (
-          <div style={{
-            fontSize: '13px',
-            color: 'rgba(0, 0, 0, 0.6)',
-          }}>
-            Color: <span style={{ fontWeight: '600', color: '#1a1a1a' }}>{selectedColor}</span>
-          </div>
-        )}
+        {/* Color Siblings - switch between color variants of same design */}
+        {(() => {
+          const activeRaw = (activeProduct as any)?.raw || {};
+          const siblings = activeRaw?.siblings || [];
+          const currentColor = activeRaw?.color_name;
+
+          if (siblings.length > 0) {
+            return (
+              <div>
+                <div style={{ fontSize: '12px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'rgba(0,0,0,0.5)', marginBottom: '8px' }}>
+                  Color: <span style={{ color: '#1a1a1a' }}>{currentColor || selectedColor}</span>
+                </div>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                  {currentColor && (
+                    <div style={{
+                      padding: '6px 14px', fontSize: '12px', borderRadius: '6px',
+                      border: '2px solid #1a1a1a', background: '#1a1a1a', color: 'white', fontWeight: '600'
+                    }}>
+                      {currentColor}
+                    </div>
+                  )}
+                  {siblings.map((sib: any) => (
+                    <button
+                      key={sib.id}
+                      type="button"
+                      onClick={async () => {
+                        const sibProduct = await fetchProductById(sib.id);
+                        if (sibProduct) {
+                          setFullProduct(sibProduct);
+                          // Images will reload via useEffect
+                        }
+                      }}
+                      style={{
+                        padding: '6px 14px', fontSize: '12px', borderRadius: '6px',
+                        border: '1px solid rgba(0,0,0,0.2)', background: 'rgba(0,0,0,0.03)',
+                        color: '#1a1a1a', cursor: 'pointer', transition: 'all 0.15s ease'
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(0,0,0,0.08)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(0,0,0,0.03)'; }}
+                    >
+                      {sib.color_name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          }
+
+          // Fallback: just show color from variant
+          if (selectedColor) {
+            return (
+              <div style={{ fontSize: '13px', color: 'rgba(0, 0, 0, 0.6)' }}>
+                Color: <span style={{ fontWeight: '600', color: '#1a1a1a' }}>{selectedColor}</span>
+              </div>
+            );
+          }
+          return null;
+        })()}
 
         {/* Specifications Section */}
         {Object.keys(specs).length > 0 && (
