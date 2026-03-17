@@ -1097,14 +1097,7 @@ export default class App extends React.Component<{}, State> {
       // If overlayClick is null, continue with normal click handling
     }
 
-    // Check for group header click (in pivot mode)
-    const groupHeaderClicked = this.controller.handleGroupHeaderClick(x, y);
-    if (groupHeaderClicked) {
-      this.syncPivotUI();
-      return;
-    }
-
-    // Otherwise check for product click
+    // Check for product click FIRST (before group headers, so family expansion works)
     const product = this.controller.hitTest(x, y);
     if (product) {
       // Family grouping: if grouped and product has siblings, expand the family
@@ -1118,15 +1111,23 @@ export default class App extends React.Component<{}, State> {
         }
       }
       this.openProductDetails(product);
+      return;
+    }
+
+    // Check for group header click (in pivot mode) - only if no product was hit
+    const groupHeaderClicked = this.controller.handleGroupHeaderClick(x, y);
+    if (groupHeaderClicked) {
+      this.syncPivotUI();
+      return;
+    }
+
+    // Clicked on empty space
+    if (this.controller.isExpandedFamily()) {
+      // Collapse back to grouped view
+      this.controller.collapseFamily();
+      this.syncPivotUI();
     } else {
-      // Clicked on empty space
-      if (this.controller.isExpandedFamily()) {
-        // Collapse back to grouped view
-        this.controller.collapseFamily();
-        this.syncPivotUI();
-      } else {
-        this.setState({ selectedProduct: null, selectedVariant: null, shouldShowV4Dialog: false });
-      }
+      this.setState({ selectedProduct: null, selectedVariant: null, shouldShowV4Dialog: false });
     }
   };
 
