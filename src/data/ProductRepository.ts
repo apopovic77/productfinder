@@ -362,6 +362,48 @@ function mapProduct(p: OnealProduct): Product | null {
     sourcePath: 'storage.id',
   });
 
+  // Product code (for grouping)
+  addAttribute(attributes, apiAny.product_code
+    ? {
+        key: 'product_code',
+        label: 'Produktcode',
+        type: 'string',
+        value: apiAny.product_code,
+        sourcePath: 'product_code',
+      }
+    : undefined);
+
+  // Family name (for grouped display)
+  addAttribute(attributes, apiAny.family_name
+    ? {
+        key: 'family_name',
+        label: 'Produktfamilie',
+        type: 'string',
+        value: apiAny.family_name,
+        sourcePath: 'family_name',
+      }
+    : undefined);
+
+  // Family size (sibling count)
+  addAttribute(attributes, typeof apiAny.family_size === 'number'
+    ? {
+        key: 'family_size',
+        label: 'Farbvarianten',
+        type: 'number',
+        value: apiAny.family_size,
+        sourcePath: 'family_size',
+      }
+    : undefined);
+
+  // Is spare part
+  addAttribute(attributes, {
+    key: 'is_spare',
+    label: 'Ersatzteil',
+    type: 'boolean',
+    value: apiAny.is_spare === true,
+    sourcePath: 'is_spare',
+  });
+
   const aiTags = Array.isArray(apiAny.ai_tags)
     ? apiAny.ai_tags.filter((tag: unknown) => typeof tag === 'string' && tag.trim().length)
     : [];
@@ -519,6 +561,11 @@ function mapProduct(p: OnealProduct): Product | null {
         weight_grams: v.weight_grams,
         ean: v.ean,
         is_available: v.is_available,
+        material: v.material,
+        customs_tariff: v.customs_tariff,
+        model_year: v.model_year,
+        stock_available: v.stock_available,
+        is_nos: v.is_nos,
       };
     }),
     raw: p as any

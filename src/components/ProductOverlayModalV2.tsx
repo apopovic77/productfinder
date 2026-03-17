@@ -169,8 +169,8 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   // Extract data
   const keyFeatures = (product as any).key_features || [];
   const specs = product.specifications || {};
-  // Material from specs, or derive from variant description
-  const material = specs.shell_material || specs.materials || null;
+  // Material from variant data or specs
+  const material = activeVariant?.material || specs.shell_material || specs.materials || null;
 
   // State for thumbnail images
   const [thumbnailImages, setThumbnailImages] = useState<Array<{ storageId: number | null; src: string; label: string }>>([]);
