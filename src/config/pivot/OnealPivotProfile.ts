@@ -309,17 +309,6 @@ function derivePresentationCategory(args: DerivePresentationCategoryArgs): Prese
   return 'Accessoires';
   })();
 
-  // DEBUG: Log if product is categorized as Helme
-  if (result === 'Helme') {
-    console.log('[CATEGORY DEBUG] Helme:', {
-      name: args.productName,
-      primary,
-      secondary,
-      family,
-      reason: primary === 'helmets' ? 'primary=helmets' : name.includes('helm') ? 'name contains helm' : 'unknown'
-    });
-  }
-
   return result;
 }
 

@@ -172,7 +172,7 @@ export class Product {
 
   get imageUrl(): string {
     const media = this.primaryImage;
-    if (!media?.src) return 'https://via.placeholder.com/256?text=No+Image';
+    if (!media?.src) return 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="256" height="256"%3E%3Crect fill="%23e0e0e0" width="256" height="256"/%3E%3Ctext x="128" y="128" text-anchor="middle" fill="%23999" font-size="14"%3ENo Image%3C/text%3E%3C/svg%3E';
 
     // Prefer Storage API for optimized images
     if (media.storage_id) {
@@ -188,7 +188,7 @@ export class Product {
 
   get fullImageUrl(): string {
     const media = this.primaryImage;
-    if (!media?.src) return 'https://via.placeholder.com/800?text=No+Image';
+    if (!media?.src) return 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="800"%3E%3Crect fill="%23e0e0e0" width="800" height="800"/%3E%3Ctext x="400" y="400" text-anchor="middle" fill="%23999" font-size="24"%3ENo Image%3C/text%3E%3C/svg%3E';
 
     // Prefer Storage API for optimized images (800px max dimension WebP)
     if (media.storage_id) {
@@ -211,7 +211,7 @@ export class Product {
 
   get priceText(): string {
     if (this.price?.formatted) return this.price.formatted;
-    if (this.price) {
+    if (this.price?.value != null) {
       const unit = this.price.currency ?? '';
       return unit ? `${this.price.value.toFixed(2)} ${unit}` : this.price.value.toFixed(2);
     }

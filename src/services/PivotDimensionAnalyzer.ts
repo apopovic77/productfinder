@@ -74,6 +74,7 @@ type AttributeHint = {
 };
 
 const ATTRIBUTE_HINTS: Record<string, AttributeHint> = {
+  // === V2 API Properties ===
   presentation_category: {
     candidateKey: 'category:presentation',
     label: 'Produktkategorie',
@@ -84,9 +85,45 @@ const ATTRIBUTE_HINTS: Record<string, AttributeHint> = {
   sport: {
     label: 'Sport',
     role: 'category',
+    priorityBoost: 0.15,
+  },
+  target_group: {
+    label: 'Zielgruppe',
+    role: 'class',
     priorityBoost: 0.05,
   },
-  // category_primary: REMOVED - redundant with presentation_category
+  body_part: {
+    label: 'Körperteil',
+    role: 'class',
+    parentKey: 'category:presentation',
+    priorityBoost: 0.08,
+  },
+  product_function: {
+    label: 'Funktion',
+    role: 'class',
+    priorityBoost: 0.06,
+  },
+  product_type: {
+    candidateKey: 'attribute:product_type',
+    label: 'Produkttyp',
+    role: 'class',
+    parentKey: 'category:presentation',
+    priorityBoost: 0.1,
+  },
+  product_line: {
+    candidateKey: 'attribute:product_family',
+    label: 'Produktlinie',
+    role: 'class',
+    parentKey: 'category:presentation',
+    priorityBoost: 0.12,
+  },
+  // === Internal/Display Attributes ===
+  poster_group: {
+    label: 'Poster Gruppe',
+    role: 'metadata',  // Demote from category - only used for poster layout
+    priorityBoost: -0.5,
+  },
+  // === Legacy/Compatibility ===
   category_secondary: {
     candidateKey: 'category:secondary',
     label: 'Unterkategorie',
@@ -113,12 +150,22 @@ const ATTRIBUTE_HINTS: Record<string, AttributeHint> = {
     role: 'class',
   },
   price: {
-    label: 'Price',
+    label: 'Preis',
     role: 'variation',
+    priorityBoost: 0.1,
   },
   weight: {
-    label: 'Weight',
+    label: 'Gewicht',
     role: 'variation',
+  },
+  variant_count: {
+    label: 'Varianten',
+    role: 'variation',
+    priorityBoost: 0.05,
+  },
+  has_image: {
+    label: 'Hat Bild',
+    role: 'metadata',
   },
   variant_colors: {
     label: 'Farben',
@@ -129,10 +176,6 @@ const ATTRIBUTE_HINTS: Record<string, AttributeHint> = {
     label: 'Größen',
     role: 'metadata',
     delimiter: '|',
-  },
-  variant_count: {
-    label: 'Variantenanzahl',
-    role: 'metadata',
   },
 };
 
@@ -166,8 +209,16 @@ export class PivotDimensionAnalyzer {
     this.assignRoles(candidates, products.length);
     this.computeNumericBuckets(candidates);
 
-    const epsilon = 1e-6;
-    let filtered = candidates.filter(c => c.cardinality > 1 && c.coverage >= 1 - epsilon);
+    // Filter dimensions: require >50% coverage for variation dimensions, >80% for others
+    let filtered = candidates.filter(c => {
+      if (c.cardinality <= 1) return false;
+      // Numeric/variation dimensions need less coverage
+      if (c.type === 'number' || c.role === 'variation') {
+        return c.coverage >= 0.5;
+      }
+      // Other dimensions need high coverage
+      return c.coverage >= 0.8;
+    });
     if (!filtered.length) {
       filtered = candidates.filter(c => c.cardinality > 1 && c.coverage >= this.options.minCoverage);
     }

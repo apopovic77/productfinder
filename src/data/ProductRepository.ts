@@ -182,130 +182,114 @@ function formatCategoryPath(categoryId: string): string {
 
 function mapProduct(p: OnealProduct): Product | null {
   const attributes: Record<string, ProductAttribute> = {};
-  const originalCategories = Array.isArray(p.category) ? p.category.filter(Boolean) : [];
-  const originalPrimary = originalCategories[0];
-  const originalSecondary = originalCategories[1];
-  const taxonomy = (p as any)?.derived_taxonomy ?? {};
-  const categoryIds = Array.isArray((p as any).category_ids) ? (p as any).category_ids : [];
-  const source = (p.meta as any)?.source ?? taxonomy?.sport ?? null;
-  const path = Array.isArray(taxonomy?.path) ? taxonomy.path : undefined;
   const variants = Array.isArray((p as any)?.variants) ? (p as any).variants : [];
+  const apiAny = p as any;
 
-  const productUrl = typeof (p.meta as any)?.product_url === 'string' ? (p.meta as any).product_url : null;
-  const presentationCategory = PIVOT_PROFILE.derivePresentationCategory({
-    primaryCategory: originalPrimary,
-    secondaryCategory: originalSecondary,
-    productName: p.name,
-    productUrl,
-    taxonomy,
-  });
-  const sportLabel = PIVOT_PROFILE.formatTokenLabel(source);
-  const taxonomySportLabel = taxonomy?.sport ? PIVOT_PROFILE.formatTokenLabel(taxonomy.sport) : undefined;
-  const formattedTaxonomyPath = PIVOT_PROFILE.formatTokenPath(path);
+  // === V2 API: Use flat properties from API ===
+  const props = apiAny.properties ?? {};
+  const sport = Array.isArray(props.sport) ? props.sport : [];
+  const targetGroup = props.target_group ?? 'Erwachsene';
+  const bodyPart = props.body_part ?? null;
+  const productFunction = props.product_function ?? null;
+  const productType = props.product_type ?? null;
+  const productLine = props.product_line ?? null;
 
-  const categories = [...originalCategories];
-  if (presentationCategory) {
-    if (!categories.length) {
-      categories.push(presentationCategory);
-    } else {
-      categories[0] = presentationCategory;
-    }
-  }
+  // Derive presentation category from product_type or category
+  const presentationCategory = productType
+    ?? (typeof apiAny.category === 'string' ? apiAny.category : null)
+    ?? 'Sonstiges';
 
-  addAttribute(attributes, categories[0]
+  // Build category array for compatibility
+  const categories = [presentationCategory];
+  if (productLine) categories.push(productLine);
+
+  // === Add V2 Properties as Attributes ===
+
+  // Sport (can be multiple: MX, MTB)
+  addAttribute(attributes, sport.length
     ? {
-        key: 'category_primary',
-        label: 'Category',
+        key: 'sport',
+        label: 'Sport',
         type: 'enum',
-        value: categories[0],
-        sourcePath: 'category[0]',
+        value: sport.join(', '),
+        sourcePath: 'properties.sport',
       }
     : undefined);
 
-  addAttribute(attributes, originalPrimary && originalPrimary !== categories[0]
+  // Target Group (Erwachsene, Jugendliche)
+  addAttribute(attributes, targetGroup
     ? {
-        key: 'legacy_category_primary',
-        label: 'Legacy Category',
+        key: 'target_group',
+        label: 'Zielgruppe',
         type: 'enum',
-        value: originalPrimary,
-        sourcePath: 'category_original[0]',
+        value: targetGroup,
+        sourcePath: 'properties.target_group',
       }
     : undefined);
 
-  addAttribute(attributes, categories[1]
+  // Body Part (Kopf, Oberkörper, Hände, Beine, Füße)
+  addAttribute(attributes, bodyPart
     ? {
-        key: 'category_secondary',
-        label: 'Subcategory',
+        key: 'body_part',
+        label: 'Körperteil',
         type: 'enum',
-        value: categories[1],
-        sourcePath: 'category[1]',
+        value: bodyPart,
+        sourcePath: 'properties.body_part',
       }
     : undefined);
 
+  // Product Function (Schutz, Bekleidung, Sicht, Transport, Accessoire)
+  addAttribute(attributes, productFunction
+    ? {
+        key: 'product_function',
+        label: 'Funktion',
+        type: 'enum',
+        value: productFunction,
+        sourcePath: 'properties.product_function',
+      }
+    : undefined);
+
+  // Product Type (Helm, Brille, Jersey, Hose, Handschuh, Protektor, Stiefel)
+  addAttribute(attributes, productType
+    ? {
+        key: 'product_type',
+        label: 'Produkttyp',
+        type: 'enum',
+        value: productType,
+        sourcePath: 'properties.product_type',
+      }
+    : undefined);
+
+  // Product Line (10SRS, B-55, Matrix, Element)
+  addAttribute(attributes, productLine
+    ? {
+        key: 'product_line',
+        label: 'Produktlinie',
+        type: 'enum',
+        value: productLine,
+        sourcePath: 'properties.product_line',
+      }
+    : undefined);
+
+  // Presentation Category (main pivot dimension)
   addAttribute(attributes, presentationCategory
     ? {
         key: 'presentation_category',
         label: 'Produktkategorie',
         type: 'enum',
         value: presentationCategory,
-        sourcePath: 'presentation.category',
+        sourcePath: 'properties.product_type',
       }
     : undefined);
 
-  addAttribute(attributes, categoryIds[0]
+  // Category from API (for backwards compatibility)
+  addAttribute(attributes, apiAny.category
     ? {
-        key: 'category_path',
-        label: 'Category Path',
+        key: 'category_primary',
+        label: 'Category',
         type: 'enum',
-        value: formatCategoryPath(categoryIds[0]),
-        sourcePath: 'category_ids[0]',
-      }
-    : undefined);
-
-  addAttribute(attributes, source
-    ? {
-        key: 'sport',
-        label: 'Sport',
-        type: 'enum',
-        value: sportLabel ?? source,
-        sourcePath: 'meta.source',
-      }
-    : undefined);
-
-  addAttribute(attributes, taxonomy?.sport && taxonomy.sport !== source
-    ? {
-        key: 'taxonomy_sport',
-        label: 'Taxonomy Sport',
-        type: 'enum',
-        value: taxonomySportLabel ?? taxonomy.sport,
-        sourcePath: 'derived_taxonomy.sport',
-      }
-    : undefined);
-
-  const normalizedFamily = PIVOT_PROFILE.normalizeProductFamily({
-    presentationCategory,
-    rawFamily: taxonomy?.product_family ?? null,
-    taxonomyPath: path,
-    productName: p.name,
-  });
-
-  addAttribute(attributes, normalizedFamily ?? taxonomy?.product_family
-    ? {
-        key: 'product_family',
-        label: 'Product Family',
-        type: 'enum',
-        value: normalizedFamily ?? taxonomy?.product_family ?? undefined,
-        sourcePath: 'derived_taxonomy.product_family',
-      }
-    : undefined);
-
-  addAttribute(attributes, path && path.length
-    ? {
-        key: 'taxonomy_path',
-        label: 'Taxonomy Path',
-        type: 'enum',
-        value: formattedTaxonomyPath ?? path.join('>'),
-        sourcePath: 'derived_taxonomy.path',
+        value: apiAny.category,
+        sourcePath: 'category',
       }
     : undefined);
 
@@ -319,32 +303,37 @@ function mapProduct(p: OnealProduct): Product | null {
       }
     : undefined);
 
-  addAttribute(attributes, typeof p.season === 'number'
+  // Season - handle v2 API format
+  const seasonValue = apiAny.season ?? p.season ?? null;
+  addAttribute(attributes, typeof seasonValue === 'number'
     ? {
         key: 'season',
-        label: 'Season',
+        label: 'Saison',
         type: 'number',
-        value: p.season,
+        value: seasonValue,
         sourcePath: 'season',
       }
     : undefined);
 
-  addAttribute(attributes, p.price
+  // Price - handle v2 API format (price_from number)
+  const priceValue = apiAny.price_from ?? (p.price?.value) ?? null;
+  addAttribute(attributes, typeof priceValue === 'number'
     ? {
         key: 'price',
-        label: 'Price',
+        label: 'Preis',
         type: 'number',
-        value: p.price.value,
-        unit: p.price.currency,
-        normalizedValue: p.price.value,
-        sourcePath: 'price.value',
+        value: priceValue,
+        unit: '€',
+        normalizedValue: priceValue,
+        sourcePath: 'price_from',
       }
     : undefined);
 
+  // Weight from specifications
   addAttribute(attributes, p.specifications?.weight !== undefined
     ? {
         key: 'weight',
-        label: 'Weight',
+        label: 'Gewicht',
         type: 'number',
         value: p.specifications!.weight ?? null,
         unit: 'g',
@@ -353,34 +342,39 @@ function mapProduct(p: OnealProduct): Product | null {
       }
     : undefined);
 
+  // Variant count
+  const variantCount = apiAny.variant_count ?? variants.length;
   addAttribute(attributes, {
     key: 'variant_count',
-    label: 'Variant Count',
+    label: 'Varianten',
     type: 'number',
-    value: variants.length,
-    sourcePath: 'variants.length',
+    value: variantCount,
+    sourcePath: 'variant_count',
   });
 
-  const apiAny = p as any;
+  // Image count (has image or not)
+  const hasImage = apiAny.storage?.id ? 1 : 0;
+  addAttribute(attributes, {
+    key: 'has_image',
+    label: 'Hat Bild',
+    type: 'number',
+    value: hasImage,
+    sourcePath: 'storage.id',
+  });
+
   const aiTags = Array.isArray(apiAny.ai_tags)
     ? apiAny.ai_tags.filter((tag: unknown) => typeof tag === 'string' && tag.trim().length)
     : [];
 
   const posterGroup = derivePosterGroup({
     presentationCategory,
-    productFamily: normalizedFamily ?? taxonomy?.product_family ?? undefined,
+    productFamily: productLine ?? productType ?? undefined,
     productName: p.name,
     meta: p.meta as Record<string, unknown>,
     aiTags,
   });
 
-  addAttribute(attributes, {
-    key: 'poster_group',
-    label: 'Poster Gruppe',
-    type: 'enum',
-    value: posterGroup,
-    sourcePath: 'poster.group',
-  });
+  // poster_group removed - not needed as pivot dimension
 
   const colorTokens = new Set<string>();
   const sizeTokens = new Set<string>();
@@ -455,18 +449,26 @@ function mapProduct(p: OnealProduct): Product | null {
   }
 
   const filteredMedia = mediaArray.filter(isRealMedia);
-  if (!filteredMedia.length) {
-    return null;
-  }
 
   const data: ProductData = {
     id: p.id,
     sku: p.sku,
     name: p.name,
     brand: p.brand,
-    category: categories.length ? categories : originalCategories,
+    category: categories,
     season: p.season,
-    price: p.price,
+    price: (() => {
+      // Handle v2 API format (price_from/price_to numbers)
+      const priceValue = (p as any).price_from ?? (p as any).price ?? null;
+      if (typeof priceValue === 'number') {
+        return { value: priceValue, currency: '€', formatted: `€ ${priceValue.toFixed(2)}` };
+      }
+      // Handle v1 API format (price object)
+      if (priceValue && typeof priceValue === 'object' && 'value' in priceValue) {
+        return priceValue;
+      }
+      return null;
+    })(),
     media: filteredMedia.map(item => {
       const anyItem = item as any;
       // Support both v1 format (storage_id) and v2 format (storage.id)
@@ -540,12 +542,14 @@ export async function fetchProducts(query: Query = {}): Promise<Product[]> {
   
   const results = (response.data as any).results || [];
   const products = results
+    // Filter: Only include products that have storage (images)
+    .filter((p: any) => p.storage?.id || p.storage?.media_url)
     .map(mapProduct)
     .filter((product: Product | null): product is Product => Boolean(product));
-  
+
   // Preload images for better UX (non-blocking)
   Product.preloadImages(products);
-  
+
   return products;
 }
 

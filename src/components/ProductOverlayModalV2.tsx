@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Product } from '../types/Product';
 import { useImageQueue } from '../hooks/useImageQueue';
+import { fetchProductById } from '../data/ProductRepository';
 import './ProductOverlayModal.css';
 
 // Storage API URL from environment
@@ -36,8 +37,35 @@ interface ParsedFeature {
 export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onBuy }) => {
   const DIALOG_WIDTH = 240; // Half of original 480px
 
-  // Extract variants
-  const variants = (product as any).variants || [];
+  // State for full product details (fetched from API with variants)
+  const [fullProduct, setFullProduct] = useState<Product | null>(null);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+
+  // Always fetch full product details when modal opens
+  // List API doesn't include variants with images array
+  useEffect(() => {
+    const loadFullDetails = async () => {
+      setIsLoadingDetails(true);
+      setFullProduct(null);
+      try {
+        const details = await fetchProductById(product.id);
+        if (details) {
+          setFullProduct(details);
+        }
+      } catch (error) {
+        // Silently fail - will use product without full details
+      } finally {
+        setIsLoadingDetails(false);
+      }
+    };
+    loadFullDetails();
+  }, [product.id]);
+
+  // Use full product if available, otherwise use the passed product
+  const activeProduct = fullProduct || product;
+
+  // Extract variants from active product
+  const variants = (activeProduct as any).variants || [];
   const rawProduct = (product as any).raw || {};
   const derivedTaxonomy = (product as any).derived_taxonomy || rawProduct?.derived_taxonomy;
   const metaInfo = (product.meta && Object.keys(product.meta).length ? product.meta : rawProduct?.meta) || {};
@@ -61,35 +89,29 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     }
   }, [dragPosition.x, dragPosition.y, onPositionChange]);
 
-  // Helper functions to parse variant name - memoized to prevent re-creation
+  // Helper functions to extract variant color/size - supports V2 API (color/size fields) and V1 (option1/option2)
   const getColor = useCallback((variant: any): string => {
-    // Try option2 first (some variants have color in option2)
+    // V2 API: direct color field
+    if (variant.color) return String(variant.color);
+    // V1 API: option2 or option1
     if (variant.option2) return String(variant.option2);
-    // Then option1
     if (variant.option1) return String(variant.option1);
-    // Fallback to parsing name: "Color1/Color2/Color3 / Size"
-    // Split by " / " (with spaces) to separate colors from size
-    const parts = (variant.name || '').split(' / ').map((s: string) => s.trim());
+    // Fallback to parsing name
+    const parts = (variant.name || variant.description_short || '').split(' / ').map((s: string) => s.trim());
     return parts[0] || variant.sku || 'Default';
   }, []);
 
   const getSize = useCallback((variant: any): string => {
-    // Try option1 first (some variants have size in option1)
+    // V2 API: direct size field
+    if (variant.size) return String(variant.size);
+    // V1 API: option1/option2 logic
     if (variant.option1 && !variant.option2) return String(variant.option1);
-    // If both exist, option1 is likely the size
     if (variant.option1 && variant.option2) {
-      // Check if option1 looks like a size (contains numbers or is short)
       const opt1 = String(variant.option1);
-      const opt2 = String(variant.option2);
-      // If opt1 is numeric or short (like "XL", "M", "42"), it's likely a size
-      if (/^\d+$/.test(opt1) || opt1.length <= 3) {
-        return opt1;
-      }
-      // Otherwise opt2 is the color, so there's no size
+      if (/^\d+$/.test(opt1) || opt1.length <= 3) return opt1;
       return '';
     }
-    // Fallback to parsing name: "Color1/Color2/Color3 / Size"
-    // Split by " / " (with spaces) to separate colors from size
+    // Fallback to parsing name
     const parts = (variant.name || '').split(' / ').map((s: string) => s.trim());
     return parts[1] || '';
   }, []);
@@ -147,7 +169,8 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   // Extract data
   const keyFeatures = (product as any).key_features || [];
   const specs = product.specifications || {};
-  const material = specs.shell_material || specs.materials || '100% Polyester';
+  // Material from specs, or derive from variant description
+  const material = specs.shell_material || specs.materials || null;
 
   // State for thumbnail images
   const [thumbnailImages, setThumbnailImages] = useState<Array<{ storageId: number | null; src: string; label: string }>>([]);
@@ -159,47 +182,76 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     setThumbnailImages([]);
   }, [product.id]);
 
-  // Load new thumbnails - filtered by selected color
+  // Load new thumbnails - filtered by selected color (supports both V1 and V2 API)
   useEffect(() => {
     const timer = setTimeout(() => {
       const images: Array<{ storageId: number | null; src: string; label: string }> = [];
+      const seenStorageIds = new Set<number>();
 
-      // Add product media images (these are shared across all variants)
-      const media = product.media || [];
-      console.log('[IMAGE DEBUG] product.media:', media);
-      media.forEach((m, idx) => {
-        const storageId = (m as any).storage_id || null;
-        const src = m.src || '';
-        const label = m.type || `Image ${idx + 1}`;
-        images.push({ storageId, src, label });
-      });
-
-      // Add variant images ONLY for the selected color
+      // Find the active variant for selected color (use first size)
       const colorVariants = variants.filter((v: any) => getColor(v) === selectedColor);
-      console.log('[IMAGE DEBUG] selectedColor:', selectedColor);
-      console.log('[IMAGE DEBUG] colorVariants:', colorVariants);
-      console.log('[IMAGE DEBUG] All variants:', variants);
+      const activeColorVariant = colorVariants[0];
 
-      const variantImageIds = new Set<number>();
-
-      colorVariants.forEach((v: any) => {
-        if (v.image_storage_id && !images.some(img => img.storageId === v.image_storage_id)) {
-          variantImageIds.add(v.image_storage_id);
-        }
-      });
-
-      console.log('[IMAGE DEBUG] variantImageIds:', Array.from(variantImageIds));
-
-      variantImageIds.forEach((storageId) => {
-        const imageUrl = `${STORAGE_API_URL}/storage/media/${storageId}?width=130&height=130&format=webp&quality=80`;
-        images.push({
-          storageId,
-          src: imageUrl,
-          label: 'Variant'
+      // V2 API: Get images from variant.images[] array (all perspectives)
+      if (activeColorVariant?.images && Array.isArray(activeColorVariant.images)) {
+        activeColorVariant.images.forEach((img: any, idx: number) => {
+          const storageId = img.storage?.id || null;
+          if (storageId && !seenStorageIds.has(storageId)) {
+            seenStorageIds.add(storageId);
+            const imageUrl = `${STORAGE_API_URL}/storage/media/${storageId}?width=130&format=webp&quality=80`;
+            images.push({
+              storageId,
+              src: imageUrl,
+              label: img.image_path || img.role || `View ${idx + 1}`
+            });
+          }
         });
-      });
+      }
 
-      console.log('[IMAGE DEBUG] Final images:', images);
+      // Fallback: V2 API variant.storage.id (single hero image)
+      if (images.length === 0 && activeColorVariant?.storage?.id) {
+        const storageId = activeColorVariant.storage.id;
+        if (!seenStorageIds.has(storageId)) {
+          seenStorageIds.add(storageId);
+          const imageUrl = `${STORAGE_API_URL}/storage/media/${storageId}?width=130&format=webp&quality=80`;
+          images.push({
+            storageId,
+            src: imageUrl,
+            label: 'Hero'
+          });
+        }
+      }
+
+      // Fallback: V1 API image_storage_id
+      if (images.length === 0) {
+        colorVariants.forEach((v: any) => {
+          if (v.image_storage_id && !seenStorageIds.has(v.image_storage_id)) {
+            seenStorageIds.add(v.image_storage_id);
+            const imageUrl = `${STORAGE_API_URL}/storage/media/${v.image_storage_id}?width=130&format=webp&quality=80`;
+            images.push({
+              storageId: v.image_storage_id,
+              src: imageUrl,
+              label: 'Variant'
+            });
+          }
+        });
+      }
+
+      // Final fallback: product.media (shared images)
+      if (images.length === 0) {
+        const media = product.media || [];
+        media.forEach((m, idx) => {
+          const storageId = (m as any).storage_id || null;
+          const src = m.src || '';
+          if (storageId && !seenStorageIds.has(storageId)) {
+            seenStorageIds.add(storageId);
+            images.push({ storageId, src, label: m.type || `Image ${idx + 1}` });
+          } else if (src) {
+            images.push({ storageId: null, src, label: m.type || `Image ${idx + 1}` });
+          }
+        });
+      }
+
       setThumbnailImages(images);
       setThumbnailsLoading(false);
     }, 10);
@@ -346,14 +398,34 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
 
   const features = parseFeatures();
 
-  // Get price
+  // Get price - handle both V1 (number) and V2 (object with gross/net) formats
+  const getVariantPrice = (variant: any): string => {
+    if (!variant?.price) return '';
+    // V2 API: price is object { gross, net, currency }
+    if (typeof variant.price === 'object' && variant.price.gross !== undefined) {
+      const currency = variant.price.currency === 'EUR' ? '€' : variant.price.currency || '€';
+      return `${currency} ${variant.price.gross.toFixed(2)}`;
+    }
+    // V1 API: price is number
+    if (typeof variant.price === 'number') {
+      return `${variant.currency || '€'} ${variant.price.toFixed(2)}`;
+    }
+    return '';
+  };
+
   const priceText = activeVariant?.price
-    ? `${activeVariant.currency || '€'} ${activeVariant.price.toFixed(2)}`
+    ? getVariantPrice(activeVariant)
     : (product.price?.formatted || `€ ${product.price?.value?.toFixed(2) || '0.00'}`);
 
-  // Get availability
-  const availability = activeVariant?.availability || 'Unknown';
-  const availabilityColor = availability === 'InStock' ? '#10b981' : (availability === 'OutOfStock' ? '#ef4444' : '#f59e0b');
+  // Get availability - supports V2 (is_available: bool) and V1 (availability: string)
+  const availability = activeVariant?.is_available != null
+    ? (activeVariant.is_available ? 'In Stock' : 'Out of Stock')
+    : (activeVariant?.availability || 'Unknown');
+  const availabilityColor = (activeVariant?.is_available === true || availability === 'InStock' || availability === 'In Stock')
+    ? '#10b981'
+    : (activeVariant?.is_available === false || availability === 'OutOfStock' || availability === 'Out of Stock')
+      ? '#ef4444'
+      : '#f59e0b';
 
   // Get product URL
   const productUrl = activeVariant?.url || (product as any).meta?.product_url;
@@ -654,16 +726,20 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         </div>
       )}
 
-      {/* Material Info - Compact */}
+      {/* Product Info - Compact */}
       <div className="pom-material" style={{ fontSize: '10px', gap: '4px', marginBottom: '12px' }}>
-        <div className="pom-material-item">{material}</div>
+        {material && <div className="pom-material-item">{material}</div>}
+        {activeVariant?.weight_grams && (
+          <div className="pom-material-item">Weight: {activeVariant.weight_grams}g</div>
+        )}
         {activeVariant?.sku && (
           <div className="pom-material-item">SKU: {activeVariant.sku}</div>
         )}
-        {getCurrentStorageId() && (
-          <div className="pom-material-item">
-            ID: {getCurrentStorageId()}
-          </div>
+        {activeVariant?.ean && (
+          <div className="pom-material-item">EAN: {activeVariant.ean}</div>
+        )}
+        {activeVariant?.description_short && (
+          <div className="pom-material-item">{activeVariant.description_short}</div>
         )}
       </div>
 
