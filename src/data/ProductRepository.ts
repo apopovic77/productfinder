@@ -404,6 +404,28 @@ function mapProduct(p: OnealProduct): Product | null {
     sourcePath: 'is_spare',
   });
 
+  // Design group (for family grouping - same product, different colors)
+  addAttribute(attributes, apiAny.design_group
+    ? {
+        key: 'design_group',
+        label: 'Design',
+        type: 'string',
+        value: apiAny.design_group,
+        sourcePath: 'design_group',
+      }
+    : undefined);
+
+  // Color name
+  addAttribute(attributes, apiAny.color_name
+    ? {
+        key: 'color_name',
+        label: 'Farbe',
+        type: 'string',
+        value: apiAny.color_name,
+        sourcePath: 'color_name',
+      }
+    : undefined);
+
   const aiTags = Array.isArray(apiAny.ai_tags)
     ? apiAny.ai_tags.filter((tag: unknown) => typeof tag === 'string' && tag.trim().length)
     : [];

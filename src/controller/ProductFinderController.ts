@@ -683,19 +683,19 @@ export class ProductFinderController {
   // === Family Grouping Methods ===
 
   /**
-   * Collapse products by product_code: keep one representative per family.
-   * The representative is the product with the best image (has storage_id).
+   * Collapse products by design_group: keep one representative per design.
+   * Products with the same design_group are the same product in different colors.
    */
   private collapseByFamily(products: Product[]): Product[] {
     this._familyMap.clear();
 
-    // Group by product_code
+    // Group by design_group (same product, different colors)
     for (const p of products) {
-      const code = p.getAttributeValue<string>('product_code') || p.id;
-      if (!this._familyMap.has(code)) {
-        this._familyMap.set(code, []);
+      const group = (p.raw as any)?.design_group || p.getAttributeValue<string>('product_code') || p.id;
+      if (!this._familyMap.has(group)) {
+        this._familyMap.set(group, []);
       }
-      this._familyMap.get(code)!.push(p);
+      this._familyMap.get(group)!.push(p);
     }
 
     // Pick one representative per family (prefer one with image)
