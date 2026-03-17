@@ -113,9 +113,6 @@ export function QuickSearchCommandPalette({
   const content = (
     <div className="quicksearch-wrapper" style={dialogStyle}>
       <div className="quicksearch-dialog" ref={dialogRef} role="dialog">
-        <button type="button" className="quicksearch-close" onClick={onClose} aria-label="Schließen">
-          ×
-        </button>
         <div className="quicksearch-content">
           <header
             className="quicksearch-header"
@@ -124,8 +121,16 @@ export function QuickSearchCommandPalette({
             onPointerUp={endDrag}
             onPointerCancel={endDrag}
           >
-            <h2>KI-Schnellsuche</h2>
-            <p>Die KI nutzt produktive MCP-Datenquellen und liefert passende Produkt-IDs.</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2>AI Product Search</h2>
+              <button type="button" className="quicksearch-close" onClick={onClose} aria-label="Close">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+            <p>Beschreibe was du suchst — die KI filtert passende Produkte.</p>
           </header>
           <div className="quicksearch-body">
             <label htmlFor="quicksearch-input" className="quicksearch-label">

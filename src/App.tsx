@@ -111,6 +111,9 @@ type State = {
   aiPromptLoading: boolean;
   aiPromptError: string | null;
 
+  // AI Search History
+  aiSearchHistory: Array<{ query: string; productIds: string[]; resultCount: number }>;
+
   // Footer position
   footerPosition: FooterPosition;
   footerFloatingPosition: { x: number; y: number } | null;
@@ -185,6 +188,7 @@ const createInitialState = (): State => {
     aiPrompt: '',
     aiPromptLoading: false,
     aiPromptError: null,
+    aiSearchHistory: [],
 
     footerPosition: FOOTER_CONFIG.position,
     footerFloatingPosition: null,
@@ -1392,12 +1396,18 @@ export default class App extends React.Component<{}, State> {
         });
         return;
       }
+      // Save to history (deduplicate, max 10)
+      const historyEntry = { query, productIds: matchedIds, resultCount: matchedIds.length };
+      const existingHistory = this.state.aiSearchHistory.filter(h => h.query !== query);
+      const newHistory = [historyEntry, ...existingHistory].slice(0, 10);
+
       this.setState({
         quickSearchLoading: false,
         isQuickSearchOpen: false,
         quickSearchPrompt: '',
         aiFilterProductIds: matchedIds,
         aiLastResultCount: matchedIds.length,
+        aiSearchHistory: newHistory,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Die KI-Suche ist fehlgeschlagen.';
@@ -1663,54 +1673,47 @@ export default class App extends React.Component<{}, State> {
           }
           onMouseDown={this.state.footerPosition === 'floating' ? this.handleFooterDragStart : undefined}
         >
-          {/* Desktop: AI Prompt section (always visible) */}
+          {/* Desktop: AI Search section */}
           <div className="pf-bottom-section pf-bottom-left pf-bottom-desktop-section">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span className="pf-bottom-label">✨ Ask AI</span>
-              {this.state.aiLastResultCount !== null && this.state.aiFilterProductIds.length > 0 && (
-                <span className="pf-ai-result-count">
-                  {this.state.aiLastResultCount} {this.state.aiLastResultCount === 1 ? 'result' : 'results'}
-                </span>
-              )}
-            </div>
-            <div className="pf-ai-prompt-container">
-              <input
-                type="text"
-                className="pf-ai-prompt-input"
-                placeholder="Ask me anything about the products..."
-                value={this.state.aiPrompt || ''}
-                onChange={(e) => this.setState({ aiPrompt: e.target.value, aiPromptError: null })}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && this.state.aiPrompt?.trim() && !this.state.aiPromptLoading) {
-                    this.handleAIPromptSubmit();
-                  }
-                }}
-                disabled={this.state.aiPromptLoading}
-              />
-              <button
-                type="button"
-                className="pf-ai-prompt-submit"
-                onClick={() => this.handleAIPromptSubmit()}
-                disabled={!this.state.aiPrompt?.trim() || this.state.aiPromptLoading}
-                title="Submit prompt"
-              >
-                {this.state.aiPromptLoading ? (
-                  <svg className="pf-ai-spinner" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" opacity="0.25"></circle>
-                    <path d="M12 2 A10 10 0 0 1 22 12" opacity="0.75"></path>
-                  </svg>
-                ) : (
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="22" y1="2" x2="11" y2="13"></line>
-                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                  </svg>
-                )}
+            <button
+              type="button"
+              className="pf-ai-search-btn"
+              onClick={() => this.setState({ isQuickSearchOpen: true })}
+              title="KI-Produktsuche (F3)"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              Ask AI
+            </button>
+            {this.state.aiFilterProductIds.length > 0 && (
+              <button type="button" className="pf-ai-clear-btn" onClick={this.clearAiFilter} title="Filter zurücksetzen">
+                {this.state.aiLastResultCount} Treffer &times;
               </button>
-            </div>
-            {this.state.aiPromptError && (
-              <div className="pf-ai-prompt-error">{this.state.aiPromptError}</div>
             )}
-
+            {this.state.aiSearchHistory.length > 0 && (
+              <div className="pf-ai-history">
+                {this.state.aiSearchHistory.map((entry, idx) => (
+                  <button
+                    key={`ai-hist-${idx}`}
+                    type="button"
+                    className="pf-ai-history-item"
+                    onClick={() => {
+                      this.controller.setAiFilterProductIds(entry.productIds);
+                      this.setState({
+                        aiFilterProductIds: entry.productIds,
+                        aiLastResultCount: entry.resultCount,
+                      });
+                    }}
+                    title={`${entry.resultCount} Treffer`}
+                  >
+                    {entry.query}
+                    <span className="pf-ai-history-count">{entry.resultCount}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Desktop: DIMENSIONS section (always visible) */}

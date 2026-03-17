@@ -524,7 +524,84 @@ body {
   align-items: center;
 }
 
-/* AI Prompt Input */
+/* AI Search Button & History */
+.pf-ai-search-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  background: rgba(255, 140, 0, 0.2);
+  color: #ff8c00;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pf-ai-search-btn:hover {
+  background: rgba(255, 140, 0, 0.35);
+  border-color: rgba(255, 140, 0, 0.5);
+}
+
+.pf-ai-clear-btn {
+  padding: 4px 8px;
+  font-size: 11px;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  border-radius: 4px;
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  cursor: pointer;
+}
+
+.pf-ai-clear-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+}
+
+.pf-ai-history {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.pf-ai-history-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pf-ai-history-item:hover {
+  background: rgba(255, 140, 0, 0.2);
+  border-color: rgba(255, 140, 0, 0.4);
+  color: #ff8c00;
+}
+
+.pf-ai-history-count {
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.6);
+  flex-shrink: 0;
+}
+
+/* AI Prompt Input (legacy) */
 .pf-ai-prompt-container {
   display: flex;
   align-items: center;
@@ -1351,26 +1428,23 @@ body {
 }
 
 .quicksearch-close {
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  width: 36px;
-  height: 36px;
-  border-radius: 18px;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
   border: none;
-  color: rgba(255, 255, 255, 0.92);
-  background: rgba(10, 15, 35, 0.35);
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 26px;
   cursor: pointer;
-  transition: transform 0.18s ease, background 0.2s ease;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
 }
 
 .quicksearch-close:hover {
-  transform: scale(1.1);
-  background: rgba(10, 15, 35, 0.55);
+  background: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.95);
 }
 
 .quicksearch-header h2 {
