@@ -46,7 +46,7 @@ export class ProductFinderController {
   private listeners: StateChangeListener[] = [];
 
   // Family grouping
-  private _familyGrouped = true;
+  private _familyGrouped = false;
   private _expandedFamilyCode: string | null = null;
   private _familyMap: Map<string, Product[]> = new Map();
 
