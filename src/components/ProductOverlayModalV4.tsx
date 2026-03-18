@@ -491,6 +491,8 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
           ease: [0.4, 0, 0.2, 1],
         }}
         onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
       >
       {/* Close button - Top right */}
       <button
