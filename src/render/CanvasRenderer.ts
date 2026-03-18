@@ -887,10 +887,6 @@ export class CanvasRenderer<T> {
     w: number,
     h: number
   ) {
-    if (!this.isHeroMode) {
-      return;
-    }
-
     // Use trim bounds if available, otherwise fallback to node bounds with margin
     const tb = this.heroProductTrimBounds;
     const trimTop = tb ? y + tb.y * h : y + h * 0.05;
@@ -1214,8 +1210,9 @@ export class CanvasRenderer<T> {
       // Restore item transform
       this.ctx.restore();
 
-      // Hero Mode: Render product name and variant color labels (OUTSIDE scale transform)
-      if (this.isHeroMode) {
+      // Render product name and color labels in hero mode OR when zoomed in enough
+      const screenH = h * (this.viewport?.scale ?? 1);
+      if (this.isHeroMode || screenH > 200) {
         this.renderHeroModeLabels(product, x, y, w, h);
       }
     }
