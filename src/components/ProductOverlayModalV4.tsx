@@ -647,17 +647,29 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
           Art. No. {activeVariant?.sku || product.id || '0000000000'}
         </div>
 
-        {/* Star Rating (placeholder) */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          fontSize: '14px',
-          color: 'rgba(0, 0, 0, 0.6)',
-        }}>
-          <span>★★★★☆</span>
-          <span>(4.0) 1 review</span>
-        </div>
+        {/* Material info from variant or descriptions */}
+        {(() => {
+          const activeRaw = (activeProduct as any)?.raw || {};
+          const materialFromVariant = activeVariant?.material;
+          const descriptions = activeRaw?.descriptions || [];
+          // Language 6 = German, 26 = English
+          const descDE = descriptions.find((d: any) => d.language_id === 6);
+          const descEN = descriptions.find((d: any) => d.language_id === 26);
+          const materialText = materialFromVariant || descDE?.material || descEN?.material;
+          const descText = descDE?.short_text || descEN?.short_text || activeVariant?.description_short;
+
+          if (!materialText && !descText) return null;
+          return (
+            <div style={{ fontSize: '13px', lineHeight: '1.5', color: 'rgba(0, 0, 0, 0.6)' }}>
+              {descText && <div style={{ marginBottom: '4px' }}>{descText}</div>}
+              {materialText && (
+                <div style={{ fontSize: '12px', color: 'rgba(0, 0, 0, 0.45)' }}>
+                  {materialText}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Color Siblings - switch between color variants of same design */}
         {(() => {
