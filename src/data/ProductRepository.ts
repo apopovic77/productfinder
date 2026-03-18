@@ -395,13 +395,13 @@ function mapProduct(p: OnealProduct): Product | null {
       }
     : undefined);
 
-  // Model year (Jahrgang)
+  // Model year (Jahrgang) - as enum/string so it becomes discrete buckets, not numeric ranges
   addAttribute(attributes, typeof apiAny.model_year === 'number' && apiAny.model_year > 0
     ? {
         key: 'model_year',
         label: 'Jahrgang',
-        type: 'number',
-        value: apiAny.model_year,
+        type: 'enum',
+        value: String(apiAny.model_year),
         sourcePath: 'model_year',
       }
     : undefined);
