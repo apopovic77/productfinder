@@ -1630,6 +1630,36 @@ export default class App extends React.Component<{}, State> {
         <div className={`pf-stage pf-stage-${this.state.footerPosition}`}>
           <canvas ref={this.canvasRef} className="pf-canvas" />
 
+          {/* Navigation arrows - visible when a product is selected */}
+          {selectedProduct && this.state.modalSequence.length > 1 && (
+            <>
+              {this.state.selectedIndex > 0 && (
+                <button
+                  type="button"
+                  className="pf-nav-arrow pf-nav-prev"
+                  onClick={() => this.showRelativeProduct(-1)}
+                  aria-label="Previous product"
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="15 18 9 12 15 6"></polyline>
+                  </svg>
+                </button>
+              )}
+              {this.state.selectedIndex < this.state.modalSequence.length - 1 && (
+                <button
+                  type="button"
+                  className="pf-nav-arrow pf-nav-next"
+                  onClick={() => this.showRelativeProduct(1)}
+                  aria-label="Next product"
+                >
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 6 15 12 9 18"></polyline>
+                  </svg>
+                </button>
+              )}
+            </>
+          )}
+
           {/* Force labels overlay (only for force-labels mode) - rendered as HTML */}
           {isPivotHeroMode && selectedProduct && this.state.devSettings.heroDisplayMode === 'force-labels' && this.canvasRef.current && (() => {
             const canvas = this.canvasRef.current!;
