@@ -590,6 +590,8 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
         display: 'flex',
         flexDirection: 'column',
         gap: '20px',
+        userSelect: 'text',
+        cursor: 'auto',
       }}>
         {/* Category/Subtitle */}
         <div style={{
