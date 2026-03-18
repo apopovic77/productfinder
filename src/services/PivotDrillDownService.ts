@@ -562,7 +562,7 @@ export class PivotDrillDownService {
 
     // For color dimensions, extract only the PRIMARY (first) color from combinations
     // and normalize to 8 basic color groups: Schwarz, Weiß, Rot, Gelb, Grün, Cyan, Blau, Magenta
-    if (dimension === 'attribute:variant_colors') {
+    if (dimension === 'attribute:variant_colors' || dimension === 'attribute:color_name') {
       const originalValue = value;
       const firstColor = value.split('/')[0].trim().toLowerCase();
 

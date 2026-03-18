@@ -172,6 +172,11 @@ const ATTRIBUTE_HINTS: Record<string, AttributeHint> = {
     role: 'metadata',
     delimiter: '|',
   },
+  color_name: {
+    label: 'Farbe',
+    role: 'class',
+    priorityBoost: 0.05,
+  },
   variant_sizes: {
     label: 'Größen',
     role: 'metadata',
