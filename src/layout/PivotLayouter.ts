@@ -196,11 +196,8 @@ export class PivotLayouter<T> {
         }
 
         // Limit to MAX_COLUMNS rows (same as columns orientation)
-        const MAX_ROWS = 10;
-        const visibleKeys = keys.slice(0, MAX_ROWS);
-
         let offsetY = this.paddingTop;
-        for (const k of visibleKeys) {
+        for (const k of keys) {
           const list = groups.get(k)!;
           if (this.config.itemSort) list.sort((a, b) => this.config.itemSort!(a.data, b.data));
 
@@ -248,9 +245,8 @@ export class PivotLayouter<T> {
         return;
       }
 
-      // Calculate frame width: Limit to max 10 columns for better readability
-      const MAX_COLUMNS = 10;
-      const visibleGroups = Math.min(numGroups, MAX_COLUMNS);
+      // Use all groups - no artificial limit
+      const visibleGroups = numGroups;
       const totalGaps = this.config.frameGap * Math.max(0, visibleGroups - 1);
       const totalPadding = this.paddingLeft + this.paddingRight;
       const availableWidth = view.width - totalGaps - totalPadding;
@@ -331,14 +327,13 @@ export class PivotLayouter<T> {
         globalRows = Math.max(1, Math.floor((matrixHeight + spacing) / (globalCellSize + spacing)));
       }
       
-      // STEP 3: Layout all groups using the SAME cell size (max 10 visible)
+      // STEP 3: Layout ALL groups using the SAME cell size
       let offsetX = this.paddingLeft;
-      const visibleKeys = keys.slice(0, MAX_COLUMNS);
-      for (const k of visibleKeys) {
+      for (const k of keys) {
         const list = groups.get(k)!;
         if (this.config.itemSort) list.sort((a, b) => this.config.itemSort!(a.data, b.data));
         this.config.onGroupLayout?.(k, list);
-        
+
         const productsInThisGroup = list.length;
         const cellSize = globalCellSize;
         

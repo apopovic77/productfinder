@@ -168,8 +168,9 @@ const ATTRIBUTE_HINTS: Record<string, AttributeHint> = {
     role: 'metadata',
   },
   variant_colors: {
-    label: 'Farben',
+    label: 'Farben (Legacy)',
     role: 'metadata',
+    priorityBoost: -1.0,
     delimiter: '|',
   },
   color_name: {
