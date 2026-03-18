@@ -891,54 +891,47 @@ export class CanvasRenderer<T> {
       return;
     }
 
-    // Only render text when trim bounds are available
-    if (!this.heroProductTrimBounds) {
-      return;
-    }
-
-    const variants = (product as any).variants || [];
-    if (variants.length === 0) return;
-
-    // Get primary variant (first with image or just first)
-    const primaryVariant = variants.find((v: any) => v.image_storage_id) || variants[0];
-    if (!primaryVariant) return;
-
-    const variantColor = this.getVariantColor(primaryVariant.name);
-
-    // Calculate trim bounds positions directly (no animation)
+    // Use trim bounds if available, otherwise fallback to node bounds with margin
     const tb = this.heroProductTrimBounds;
-    const trimTop = y + tb.y * h;
-    const trimBottom = y + (tb.y + tb.height) * h;
-    const trimX = x + tb.x * w;
-    const trimWidth = w * tb.width;
+    const trimTop = tb ? y + tb.y * h : y + h * 0.05;
+    const trimBottom = tb ? y + (tb.y + tb.height) * h : y + h * 0.90;
+    const trimX = tb ? x + tb.x * w : x + w * 0.1;
+    const trimWidth = tb ? w * tb.width : w * 0.8;
+    const centerX = trimX + trimWidth / 2;
 
-    // Render product name (centered, above product)
-    this.ctx.save();
-    this.ctx.font = '600 32px "ITC Avant Garde Gothic", -apple-system, sans-serif';
-    this.ctx.fillStyle = '#000000';
-    this.ctx.textAlign = 'center';
-    this.ctx.textBaseline = 'bottom';
-
-    // Remove "O'NEAL" from product name if present (case-insensitive)
+    // Remove "O'NEAL" from product name
     let productName = product.name.toUpperCase();
     productName = productName.replace(/O'NEAL\s*/gi, '').trim();
 
-    const productNameY = trimTop - 50; // 50px above trim bounds (actual product)
-    const maxProductNameWidth = trimWidth;
-    const truncatedProductName = this.truncateText(productName, maxProductNameWidth);
-    this.ctx.fillText(truncatedProductName, trimX + trimWidth / 2, productNameY);
+    // Extract color from raw data
+    const raw = (product as any).raw || {};
+    const colorName = raw.color_name || '';
 
-    // Render variant color (center-bottom, below product)
-    if (variantColor) {
-      this.ctx.font = '300 28px "ITC Avant Garde Gothic", -apple-system, sans-serif';
-      this.ctx.fillStyle = '#666666';
+    // Scale font size relative to product size
+    const fontSize = Math.max(12, Math.min(32, w * 0.06));
+    const subFontSize = Math.max(10, Math.min(28, w * 0.05));
+    const gap = Math.max(8, fontSize * 0.6);
+
+    // Render product name (above product)
+    this.ctx.save();
+    this.ctx.font = `600 ${fontSize}px -apple-system, "Segoe UI", sans-serif`;
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    this.ctx.textAlign = 'center';
+    this.ctx.textBaseline = 'bottom';
+
+    const maxTextWidth = trimWidth;
+    const truncatedName = this.truncateText(productName, maxTextWidth);
+    this.ctx.fillText(truncatedName, centerX, trimTop - gap);
+
+    // Render color name (below product)
+    if (colorName) {
+      this.ctx.font = `300 ${subFontSize}px -apple-system, "Segoe UI", sans-serif`;
+      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
       this.ctx.textAlign = 'center';
       this.ctx.textBaseline = 'top';
 
-      const variantColorY = trimBottom + 50; // 50px below trim bounds (actual product)
-      const maxVariantWidth = trimWidth;
-      const truncatedColor = this.truncateText(variantColor.toUpperCase(), maxVariantWidth);
-      this.ctx.fillText(truncatedColor, trimX + trimWidth / 2, variantColorY);
+      const truncatedColor = this.truncateText(colorName.toUpperCase(), maxTextWidth);
+      this.ctx.fillText(truncatedColor, centerX, trimBottom + gap);
     }
 
     this.ctx.restore();
