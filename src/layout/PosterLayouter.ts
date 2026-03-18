@@ -77,12 +77,12 @@ export class PosterLayouter<T> {
       for (let index = 0; index < rowNodes.length; index++) {
         const node = rowNodes[index];
         const x = margin + index * (cellWidth + columnGap);
-        node.posX.value = x;
-        node.posY.value = rowTop;
-        node.width.value = cellWidth;
-        node.height.value = row.height;
-        node.scale.value = 1;
-        node.opacity.value = 1;
+        node.posX.targetValue = x;
+        node.posY.targetValue = rowTop;
+        node.width.targetValue = cellWidth;
+        node.height.targetValue = row.height;
+        node.scale.targetValue = 1;
+        node.opacity.targetValue = 1;
       }
 
       currentY = rowTop + row.height + rowGap;
@@ -124,12 +124,12 @@ export class PosterLayouter<T> {
     for (let index = 0; index < remainingNodes.length; index++) {
       const node = remainingNodes[index];
       const x = margin + index * (cellWidth + columnGap);
-      node.posX.value = x;
-      node.posY.value = rowTop;
-      node.width.value = cellWidth;
-      node.height.value = cellHeight;
-      node.scale.value = 1;
-      node.opacity.value = 1;
+      node.posX.targetValue = x;
+      node.posY.targetValue = rowTop;
+      node.width.targetValue = cellWidth;
+      node.height.targetValue = cellHeight;
+      node.scale.targetValue = 1;
+      node.opacity.targetValue = 1;
     }
   }
 }

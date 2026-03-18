@@ -233,12 +233,12 @@ export class PivotLayouter<T> {
               const finalSize = cellSize * scale;
               const x = this.paddingLeft + col * (cellSize + spacing);
               const y = baseY + row * (cellSize + spacing);
-              node.posX.value = x;
-              node.posY.value = y;
-              node.width.value = finalSize;
-              node.height.value = finalSize;
-              node.scale.value = 1;
-              node.opacity.value = 1;
+              node.posX.targetValue = x;
+              node.posY.targetValue = y;
+              node.width.targetValue = finalSize;
+              node.height.targetValue = finalSize;
+              node.scale.targetValue = 1;
+              node.opacity.targetValue = 1;
             }
           }
 
@@ -379,12 +379,12 @@ export class PivotLayouter<T> {
             const x = offsetX + col * (cellSize + spacing);
             const y = baseY - row * (cellSize + spacing);
              
-            node.posX.value = x;
-            node.posY.value = y;
-            node.width.value = finalSize;
-            node.height.value = finalSize;
-            node.scale.value = 1;
-            node.opacity.value = 1;
+            node.posX.targetValue = x;
+            node.posY.targetValue = y;
+            node.width.targetValue = finalSize;
+            node.height.targetValue = finalSize;
+            node.scale.targetValue = 1;
+            node.opacity.targetValue = 1;
           }
         }
         
