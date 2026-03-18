@@ -1032,9 +1032,8 @@ export class CanvasRenderer<T> {
           // Total images to draw: main image + alternative images
           const totalImages = imageCount + 1;
 
-          // Overlap factor: how much images overlap (0.3 = 30% overlap, so 70% of next image visible)
-          // Lower value = more spread, more space between images
-          const overlapFactor = 0.3;
+          // Overlap factor: high overlap for card-fan effect
+          const overlapFactor = 0.85;
 
           // Calculate scale factor so all images fit in the cell
           const spreadFactor = 1 + (totalImages - 1) * (1 - overlapFactor);
@@ -1067,7 +1066,7 @@ export class CanvasRenderer<T> {
           // Calculate offset between images based on spread direction
           // Vertical spreading uses smaller offset (0.35) to keep images very tight
           const axisSize = shouldSpreadVertically ? boundingHeight : boundingWidth;
-          const baseOffset = shouldSpreadVertically ? axisSize * 0.35 : axisSize * (1 - overlapFactor);
+          const baseOffset = shouldSpreadVertically ? axisSize * 0.15 : axisSize * (1 - overlapFactor);
 
           // Initialize InterpolatedProperty for each image if needed
           // Pivot Mode: Spread symmetrically (left, right, left, right...)
@@ -1093,8 +1092,7 @@ export class CanvasRenderer<T> {
                 // i=3: +2*baseOffset (further right)
                 const side = i % 2 === 0 ? -1 : 1; // Alternate left (-1) and right (+1)
                 const distance = Math.floor(i / 2) + 1; // Distance multiplier (1, 1, 2, 2, 3, 3, ...)
-                const easing = distance === 1 ? 0.6 : 0.9;
-                altImg.spreadOffset.targetValue = side * distance * baseOffset * easing;
+                altImg.spreadOffset.targetValue = side * distance * baseOffset;
               }
             }
           }
