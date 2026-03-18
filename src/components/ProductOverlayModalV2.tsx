@@ -14,7 +14,7 @@ type Props = {
   position?: { x: number; y: number };
   onPositionChange?: (position: { x: number; y: number }) => void;
   onVariantChange?: (variant: any) => void;
-  onImageSelect?: (storageId: number) => void;
+  onImageSelect?: (storageId: number, thumbnailImage?: HTMLImageElement) => void;
   onBuy?: (payload: {
     product: Product;
     variant?: any;
@@ -591,7 +591,11 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                 onClick={() => {
                   setSelectedImageIndex(idx);
                   if (onImageSelect && allImages[idx]?.storageId) {
-                    onImageSelect(allImages[idx].storageId);
+                    const thumbnailUrl = allImages[idx].storageId
+                      ? `${STORAGE_API_URL}/storage/media/${allImages[idx].storageId}?width=130&height=130&format=webp&quality=80`
+                      : '';
+                    const cachedThumb = loadedThumbnails.get(thumbnailUrl);
+                    onImageSelect(allImages[idx].storageId, cachedThumb || undefined);
                   }
                 }}
                 style={{

@@ -713,10 +713,16 @@ export default class App extends React.Component<{}, State> {
     }
   };
 
-  private handleDialogImageSelect = (storageId: number) => {
+  private handleDialogImageSelect = (storageId: number, thumbnailImage?: HTMLImageElement) => {
     const renderer = this.controller.getRenderer();
     if (!renderer) return;
 
+    // Immediately show thumbnail (already loaded, instant)
+    if (thumbnailImage) {
+      renderer.selectedVariantHeroImage = thumbnailImage;
+    }
+
+    // Then load high-res version in background
     const STORAGE_API_BASE = import.meta.env.VITE_STORAGE_API_URL || '/storage-api';
     const src = `${STORAGE_API_BASE}/storage/media/${storageId}?width=1300&format=webp&quality=85`;
 
