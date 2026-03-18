@@ -1033,7 +1033,7 @@ export class CanvasRenderer<T> {
           const totalImages = imageCount + 1;
 
           // Overlap factor: card-fan effect (lower = more spread)
-          const overlapFactor = 0.1;
+          const overlapFactor = 0.4;
 
           // Calculate scale factor so all images fit in the cell
           const spreadFactor = 1 + (totalImages - 1) * (1 - overlapFactor);
