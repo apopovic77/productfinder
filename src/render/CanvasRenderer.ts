@@ -1220,14 +1220,14 @@ export class CanvasRenderer<T> {
 
         this.ctx.save();
         this.ctx.font = `700 ${labelFontSize}px -apple-system, sans-serif`;
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'bottom';
         this.ctx.fillText(labelName, x + w / 2, y - labelFontSize * 0.3, w);
 
         if (colorLabel) {
           this.ctx.font = `400 ${labelFontSize * 0.8}px -apple-system, sans-serif`;
-          this.ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+          this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
           this.ctx.textBaseline = 'top';
           this.ctx.fillText(colorLabel, x + w / 2, y + h + labelFontSize * 0.3, w);
         }
