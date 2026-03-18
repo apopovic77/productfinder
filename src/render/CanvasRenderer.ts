@@ -514,7 +514,7 @@ export class CanvasRenderer<T> {
    * Update hero mode offsets for products (makes them move aside when alternative images spread)
    */
   private updateHeroModeOffsets() {
-    if (!this.isHeroMode || !this.selectedProduct || !this.alternativeImages || this.alternativeImages.length === 0) {
+    if (!this.selectedProduct || !this.alternativeImages || this.alternativeImages.length === 0) {
       // No selected product or no alternative images - reset all offsets to 0
       const nodes = this.getNodes();
       for (const n of nodes) {
@@ -1016,8 +1016,8 @@ export class CanvasRenderer<T> {
       this.ctx.scale(scale, scale);
       this.ctx.translate(-centerX, -centerY);
 
-      // Draw alternative images stacked behind (only for selected product with dialog open)
-      if (this.isHeroMode && isSelectedProduct && this.alternativeImages && this.alternativeImages.length > 0) {
+      // Draw alternative images stacked behind (for selected product in any mode)
+      if (isSelectedProduct && this.alternativeImages && this.alternativeImages.length > 0) {
         // Count loaded images
         const loadedImages = this.alternativeImages.filter(img => img.loadedImage);
         const imageCount = loadedImages.length;
@@ -1157,7 +1157,7 @@ export class CanvasRenderer<T> {
       // Draw main image (scaled same as alternative images if they exist)
       this.ctx.globalAlpha = opacity;
 
-      if (this.isHeroMode && isSelectedProduct && this.alternativeImages && this.alternativeImages.length > 0) {
+      if (isSelectedProduct && this.alternativeImages && this.alternativeImages.length > 0) {
         const loadedImages = this.alternativeImages.filter(img => img.loadedImage);
         if (loadedImages.length > 0) {
           // Use animated scale value (already set above in alternative images section)
