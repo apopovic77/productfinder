@@ -53,6 +53,8 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
   const [fullProduct, setFullProduct] = useState<Product | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [isSiblingView, setIsSiblingView] = useState(false);
+  const [colorOptions, setColorOptions] = useState<Array<{ id: number; color_name: string; storage: any }>>([]);
+  const [activeColorId, setActiveColorId] = useState<number | null>(null);
 
   // Fetch full product details when modal opens (list API doesn't include variants)
   useEffect(() => {
@@ -73,8 +75,13 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
       try {
         const details = await fetchProductById(product.id);
         if (details) {
-          console.log('[V4 Modal] Got full product with variants:', (details as any).variants?.length);
           setFullProduct(details);
+          // Build fixed color options list (current + siblings) - never reorder
+          const raw = (details as any).raw || {};
+          const siblings = raw.siblings || [];
+          const current = { id: raw.id, color_name: raw.color_name, storage: raw.storage };
+          setColorOptions([current, ...siblings]);
+          setActiveColorId(raw.id);
         }
       } catch (error) {
         console.error('[V4 Modal] Failed to fetch product details:', error);
@@ -675,63 +682,63 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
           );
         })()}
 
-        {/* Color Siblings - switch between color variants of same design */}
+        {/* Color Siblings - fixed order, never re-sorts */}
         {(() => {
-          const activeRaw = (activeProduct as any)?.raw || {};
-          const siblings = activeRaw?.siblings || [];
-          const currentColor = activeRaw?.color_name;
-
-          if (siblings.length > 0) {
-            return (
-              <div>
-                <div style={{ fontSize: '12px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'rgba(0,0,0,0.5)', marginBottom: '8px' }}>
-                  Color: <span style={{ color: '#1a1a1a' }}>{currentColor || selectedColor}</span>
+          if (colorOptions.length <= 1) {
+            // No siblings - just show current color
+            if (selectedColor) {
+              return (
+                <div style={{ fontSize: '13px', color: 'rgba(0, 0, 0, 0.6)' }}>
+                  Color: <span style={{ fontWeight: '600', color: '#1a1a1a' }}>{selectedColor}</span>
                 </div>
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                  {currentColor && (
-                    <div style={{
-                      padding: '6px 14px', fontSize: '12px', borderRadius: '6px',
-                      border: '2px solid #1a1a1a', background: '#1a1a1a', color: 'white', fontWeight: '600'
-                    }}>
-                      {currentColor}
-                    </div>
-                  )}
-                  {siblings.map((sib: any) => (
+              );
+            }
+            return null;
+          }
+
+          const activeRaw = (activeProduct as any)?.raw || {};
+          const currentId = activeRaw?.id || activeColorId;
+
+          return (
+            <div>
+              <div style={{ fontSize: '12px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'rgba(0,0,0,0.5)', marginBottom: '8px' }}>
+                Color: <span style={{ color: '#1a1a1a' }}>{activeRaw?.color_name || selectedColor}</span>
+              </div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {colorOptions.map((opt) => {
+                  const isActive = opt.id === currentId;
+                  return (
                     <button
-                      key={sib.id}
+                      key={opt.id}
                       type="button"
                       onClick={async () => {
+                        if (isActive) return;
                         setIsSiblingView(true);
-                        const sibProduct = await fetchProductById(sib.id);
+                        setActiveColorId(opt.id);
+                        const sibProduct = await fetchProductById(opt.id);
                         if (sibProduct) {
                           setFullProduct(sibProduct);
                         }
                       }}
                       style={{
                         padding: '6px 14px', fontSize: '12px', borderRadius: '6px',
-                        border: '1px solid rgba(0,0,0,0.2)', background: 'rgba(0,0,0,0.03)',
-                        color: '#1a1a1a', cursor: 'pointer', transition: 'all 0.15s ease'
+                        border: isActive ? '2px solid #1a1a1a' : '1px solid rgba(0,0,0,0.2)',
+                        background: isActive ? '#1a1a1a' : 'rgba(0,0,0,0.03)',
+                        color: isActive ? 'white' : '#1a1a1a',
+                        fontWeight: isActive ? '600' : '400',
+                        cursor: isActive ? 'default' : 'pointer',
+                        transition: 'all 0.15s ease'
                       }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(0,0,0,0.08)'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(0,0,0,0.03)'; }}
+                      onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = 'rgba(0,0,0,0.08)'; }}
+                      onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = 'rgba(0,0,0,0.03)'; }}
                     >
-                      {sib.color_name}
+                      {opt.color_name}
                     </button>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
-            );
-          }
-
-          // Fallback: just show color from variant
-          if (selectedColor) {
-            return (
-              <div style={{ fontSize: '13px', color: 'rgba(0, 0, 0, 0.6)' }}>
-                Color: <span style={{ fontWeight: '600', color: '#1a1a1a' }}>{selectedColor}</span>
-              </div>
-            );
-          }
-          return null;
+            </div>
+          );
         })()}
 
         {/* Specifications Section */}
