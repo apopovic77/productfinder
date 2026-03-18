@@ -1068,33 +1068,27 @@ export class CanvasRenderer<T> {
           const axisSize = shouldSpreadVertically ? boundingHeight : boundingWidth;
           const baseOffset = shouldSpreadVertically ? axisSize * 0.15 : axisSize * (1 - overlapFactor);
 
-          // Initialize InterpolatedProperty for each image if needed
-          // Pivot Mode: Spread symmetrically (left, right, left, right...)
-          // Hero Mode: Spread all to the right (catalog style)
+          // Assign spread offsets to each image
+          // Pivot Mode: fan out symmetrically (left, right, further left, further right...)
+          // Hero Mode: spread all to the right (catalog style)
           for (let i = 0; i < imageCount; i++) {
             const altImg = loadedImages[i];
-            if (altImg && !altImg.spreadOffset) {
-              // Create InterpolatedProperty starting at 0, animating to target offset
-              altImg.spreadOffset = new InterpolatedProperty<number>(`spread-${i}`, 0, 0, 0.5);
+            if (!altImg) continue;
 
-              if (this.isHeroMode) {
-                // Hero Mode: All variants spread to the RIGHT (catalog style)
-                // i=0: +baseOffset (right)
-                // i=1: +2*baseOffset (further right)
-                // i=2: +3*baseOffset (even further right)
-                const distance = i + 1;
-                altImg.spreadOffset.targetValue = distance * baseOffset;
-              } else {
-                // Pivot Mode: Calculate symmetric offset:
-                // i=0: -baseOffset (left)
-                // i=1: +baseOffset (right)
-                // i=2: -2*baseOffset (further left)
-                // i=3: +2*baseOffset (further right)
-                const side = i % 2 === 0 ? -1 : 1; // Alternate left (-1) and right (+1)
-                const distance = Math.floor(i / 2) + 1; // Distance multiplier (1, 1, 2, 2, 3, 3, ...)
-                altImg.spreadOffset.targetValue = side * distance * baseOffset;
-              }
+            if (!altImg.spreadOffset) {
+              altImg.spreadOffset = new InterpolatedProperty<number>(`spread-${i}`, 0, 0, 0.5);
             }
+
+            let targetOffset: number;
+            if (this.isHeroMode) {
+              targetOffset = (i + 1) * baseOffset;
+            } else {
+              // i=0: left (-1), i=1: right (+1), i=2: further left (-2), i=3: further right (+2)
+              const side = i % 2 === 0 ? -1 : 1;
+              const distance = Math.floor(i / 2) + 1;
+              targetOffset = side * distance * baseOffset;
+            }
+            altImg.spreadOffset.targetValue = targetOffset;
           }
 
           // Calculate centering offset to keep images centered when scaled down
