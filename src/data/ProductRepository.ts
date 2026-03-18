@@ -395,6 +395,17 @@ function mapProduct(p: OnealProduct): Product | null {
       }
     : undefined);
 
+  // Model year (Jahrgang)
+  addAttribute(attributes, typeof apiAny.model_year === 'number' && apiAny.model_year > 0
+    ? {
+        key: 'model_year',
+        label: 'Jahrgang',
+        type: 'number',
+        value: apiAny.model_year,
+        sourcePath: 'model_year',
+      }
+    : undefined);
+
   // Is spare part
   addAttribute(attributes, {
     key: 'is_spare',

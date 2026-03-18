@@ -178,6 +178,11 @@ const ATTRIBUTE_HINTS: Record<string, AttributeHint> = {
     role: 'class',
     priorityBoost: 0.05,
   },
+  model_year: {
+    label: 'Jahrgang',
+    role: 'class',
+    priorityBoost: 0.08,
+  },
   variant_sizes: {
     label: 'Größen',
     role: 'metadata',
