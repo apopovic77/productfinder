@@ -133,9 +133,11 @@ export class PivotLayouter<T> {
       const numGroups = keys.length;
 
       if (orientation === 'rows') {
-        const totalGaps = this.config.frameGap * Math.max(0, numGroups - 1);
+        const MAX_VISIBLE_ROWS = 10;
+        const rowsForSizing = Math.min(numGroups, MAX_VISIBLE_ROWS);
+        const totalGaps = this.config.frameGap * Math.max(0, rowsForSizing - 1);
         const availableHeight = view.height - totalGaps - this.paddingTop - this.paddingBottom;
-        const frameHeight = availableHeight / Math.max(1, numGroups);
+        const frameHeight = availableHeight / Math.max(1, rowsForSizing);
         const matrixWidth = Math.max(1, view.width - this.paddingLeft - this.paddingRight);
         const matrixHeight = Math.max(1, frameHeight - headerHeight);
         const spacing = this.config.itemGap;
@@ -245,12 +247,14 @@ export class PivotLayouter<T> {
         return;
       }
 
-      // Use all groups - no artificial limit
-      const visibleGroups = numGroups;
-      const totalGaps = this.config.frameGap * Math.max(0, visibleGroups - 1);
+      // Calculate frame width: size columns as if max 10 are visible,
+      // but layout ALL groups (overflow scrolls off-screen to the right)
+      const MAX_VISIBLE = 10;
+      const columnsForSizing = Math.min(numGroups, MAX_VISIBLE);
+      const totalGaps = this.config.frameGap * Math.max(0, columnsForSizing - 1);
       const totalPadding = this.paddingLeft + this.paddingRight;
       const availableWidth = view.width - totalGaps - totalPadding;
-      const frameWidth = availableWidth / Math.max(1, visibleGroups);
+      const frameWidth = availableWidth / Math.max(1, columnsForSizing);
 
       // Calculate available height for products (minus header and padding)
       const availableHeight = view.height - this.paddingBottom - this.paddingTop - headerHeight;
