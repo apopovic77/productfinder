@@ -1208,14 +1208,16 @@ export class CanvasRenderer<T> {
         this.ctx.setLineDash([]);
       }
 
-      // Hero Mode: Render product name and variant color labels
-      this.renderHeroModeLabels(product, x, y, w, h);
-
       // NO TEXT RENDERING IN PIVOT MODE - Clean Microsoft Pivot style!
       // Text will be shown in tooltip on hover
-      
+
       // Restore item transform
       this.ctx.restore();
+
+      // Hero Mode: Render product name and variant color labels (OUTSIDE scale transform)
+      if (this.isHeroMode) {
+        this.renderHeroModeLabels(product, x, y, w, h);
+      }
     }
     
     // Draw group headers (after products, so they're on top) - matching .pf-pivot-chip style
