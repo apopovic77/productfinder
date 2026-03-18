@@ -1210,10 +1210,28 @@ export class CanvasRenderer<T> {
       // Restore item transform
       this.ctx.restore();
 
-      // Render product name and color labels in hero mode OR when zoomed in enough
-      const screenH = h * (this.viewport?.scale ?? 1);
-      if (this.isHeroMode || screenH > 200) {
-        this.renderHeroModeLabels(product, x, y, w, h);
+      // Render product name and color labels in hero mode only
+      if (this.isHeroMode) {
+        // Render directly here to ensure it works within viewport transform
+        const raw = (product as any).raw || {};
+        let labelName = product.name.toUpperCase().replace(/O'NEAL\s*/gi, '').trim();
+        const colorLabel = (raw.color_name || '').toUpperCase();
+        const labelFontSize = Math.max(10, Math.min(24, w * 0.05));
+
+        this.ctx.save();
+        this.ctx.font = `700 ${labelFontSize}px -apple-system, sans-serif`;
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'bottom';
+        this.ctx.fillText(labelName, x + w / 2, y - labelFontSize * 0.3, w);
+
+        if (colorLabel) {
+          this.ctx.font = `400 ${labelFontSize * 0.8}px -apple-system, sans-serif`;
+          this.ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+          this.ctx.textBaseline = 'top';
+          this.ctx.fillText(colorLabel, x + w / 2, y + h + labelFontSize * 0.3, w);
+        }
+        this.ctx.restore();
       }
     }
     
