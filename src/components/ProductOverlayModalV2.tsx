@@ -41,6 +41,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   // State for full product details (fetched from API with variants)
   const [fullProduct, setFullProduct] = useState<Product | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [isSiblingView, setIsSiblingView] = useState(false);
 
   // Always fetch full product details when modal opens
   // List API doesn't include variants with images array
@@ -48,6 +49,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     const loadFullDetails = async () => {
       setIsLoadingDetails(true);
       setFullProduct(null);
+      setIsSiblingView(false);
       try {
         const details = await fetchProductById(product.id);
         if (details) {
@@ -288,13 +290,13 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     }
   }, [activeVariant?.image_storage_id, allImages, selectedImageIndex]);
 
-  // Notify parent when variant changes
+  // Notify parent when variant changes (but NOT when viewing a sibling product)
   const activeVariantId = activeVariant?.sku || activeVariant?.name || '';
   useEffect(() => {
-    if (onVariantChange && activeVariant) {
+    if (onVariantChange && activeVariant && !isSiblingView) {
       onVariantChange(activeVariant);
     }
-  }, [activeVariantId, onVariantChange, activeVariant]);
+  }, [activeVariantId, onVariantChange, activeVariant, isSiblingView]);
 
   // Drag handlers
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -685,7 +687,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                   key={sib.id}
                   type="button"
                   onClick={async () => {
-                    // Load sibling product
+                    setIsSiblingView(true);
                     const sibProduct = await fetchProductById(sib.id);
                     if (sibProduct) {
                       setFullProduct(sibProduct);

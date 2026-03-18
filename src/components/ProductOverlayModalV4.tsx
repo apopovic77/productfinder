@@ -52,10 +52,12 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
   // State for full product details (fetched from API with variants)
   const [fullProduct, setFullProduct] = useState<Product | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [isSiblingView, setIsSiblingView] = useState(false);
 
   // Fetch full product details when modal opens (list API doesn't include variants)
   useEffect(() => {
     const loadFullDetails = async () => {
+      setIsSiblingView(false);
       // Check if we already have variants with images
       const existingVariants = (product as any).variants || [];
       const hasVariantsWithImages = existingVariants.some((v: any) => v.images?.length > 0);
@@ -312,13 +314,13 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
     priority: -20,
   });
 
-  // Notify parent when variant changes
+  // Notify parent when variant changes (but NOT when viewing a sibling product)
   const activeVariantId = activeVariant?.sku || activeVariant?.name || '';
   useEffect(() => {
-    if (onVariantChange && activeVariant) {
+    if (onVariantChange && activeVariant && !isSiblingView) {
       onVariantChange(activeVariant);
     }
-  }, [activeVariantId, onVariantChange, activeVariant]);
+  }, [activeVariantId, onVariantChange, activeVariant, isSiblingView]);
 
   // No drag handlers - dialog is fixed and expands on scroll
 
@@ -683,10 +685,10 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
                       key={sib.id}
                       type="button"
                       onClick={async () => {
+                        setIsSiblingView(true);
                         const sibProduct = await fetchProductById(sib.id);
                         if (sibProduct) {
                           setFullProduct(sibProduct);
-                          // Images will reload via useEffect
                         }
                       }}
                       style={{
