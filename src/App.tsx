@@ -722,12 +722,8 @@ export default class App extends React.Component<{}, State> {
 
     const img = new Image();
     img.onload = () => {
-      // Update the product's loaded image in the renderer
-      const product = this.state.selectedProduct;
-      if (product) {
-        (product as any)._image = img;
-        (product as any)._imageLoading = false;
-        (product as any)._imageError = false;
+      if (renderer) {
+        renderer.selectedVariantHeroImage = img;
       }
     };
     img.src = src;
