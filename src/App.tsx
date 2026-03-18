@@ -713,6 +713,26 @@ export default class App extends React.Component<{}, State> {
     }
   };
 
+  private handleDialogImageSelect = (storageId: number) => {
+    const renderer = this.controller.getRenderer();
+    if (!renderer) return;
+
+    const STORAGE_API_BASE = import.meta.env.VITE_STORAGE_API_URL || '/storage-api';
+    const src = `${STORAGE_API_BASE}/storage/media/${storageId}?width=1300&format=webp&quality=85`;
+
+    const img = new Image();
+    img.onload = () => {
+      // Update the product's loaded image in the renderer
+      const product = this.state.selectedProduct;
+      if (product) {
+        (product as any)._image = img;
+        (product as any)._imageLoading = false;
+        (product as any)._imageError = false;
+      }
+    };
+    img.src = src;
+  };
+
   private handleDialogVariantChange = (variant: any) => {
     // Only update if variant actually changed
     const currentVariant = this.state.selectedVariant;
@@ -2062,6 +2082,7 @@ export default class App extends React.Component<{}, State> {
                 onClose={() => this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false })}
                 onPositionChange={this.handleDialogPositionChange}
                 onVariantChange={this.handleDialogVariantChange}
+                onImageSelect={this.handleDialogImageSelect}
                 onBuy={this.handleProductBuy}
               />
             )

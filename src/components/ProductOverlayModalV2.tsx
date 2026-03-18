@@ -14,6 +14,7 @@ type Props = {
   position?: { x: number; y: number };
   onPositionChange?: (position: { x: number; y: number }) => void;
   onVariantChange?: (variant: any) => void;
+  onImageSelect?: (storageId: number) => void;
   onBuy?: (payload: {
     product: Product;
     variant?: any;
@@ -34,7 +35,7 @@ interface ParsedFeature {
  * Product Overlay Modal V2 - HALF WIDTH VERSION (240px)
  * Same design as V1, but with compact half-width layout
  */
-export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onBuy }) => {
+export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy }) => {
   const DIALOG_WIDTH = 240; // Half of original 480px
 
   // State for full product details (fetched from API with variants)
@@ -587,7 +588,12 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
             return (
               <button
                 key={idx}
-                onClick={() => setSelectedImageIndex(idx)}
+                onClick={() => {
+                  setSelectedImageIndex(idx);
+                  if (onImageSelect && allImages[idx]?.storageId) {
+                    onImageSelect(allImages[idx].storageId);
+                  }
+                }}
                 style={{
                   display: 'block',
                   width: '45px',
