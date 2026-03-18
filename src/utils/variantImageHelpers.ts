@@ -1,7 +1,8 @@
 import type { Product } from '../types/Product';
 
 /**
- * Get all images (hero + gallery) for a specific variant
+ * Get all images (hero + gallery) for a specific variant.
+ * Supports V2 API (variant.images[], variant.storage) and V1 (name-based matching).
  */
 export function getImagesForVariant(
   product: Product,
@@ -9,38 +10,55 @@ export function getImagesForVariant(
 ): Array<{ storageId: number; role: string; src: string }> {
   const images: Array<{ storageId: number; role: string; src: string }> = [];
 
-  if (!variant?.name) {
-    return images;
-  }
-
-  // Extract color from variant name (e.g., "Gray / 28" → "gray")
-  const variantColor = variant.name.split('/')[0]?.trim().toLowerCase();
-  if (!variantColor) {
-    return images;
-  }
-
-  const media = product.media || [];
-
-  // Match images by filename (src URL contains color)
-  for (const m of media) {
-    const storageId = (m as any).storage_id;
-    if (!storageId) continue;
-
-    const src = m.src || '';
-    const srcLower = src.toLowerCase();
-
-    // Check if filename contains the variant color
-    // e.g., "2022_ONeal_LEGACY_20V.22_gray_front.png" matches "gray"
-    if (srcLower.includes(`_${variantColor}_`) || srcLower.includes(`-${variantColor}-`)) {
-      images.push({
-        storageId,
-        role: m.role || 'gallery',
-        src: m.src || ''
-      });
+  // V2 API: variant has images[] array with storage objects
+  if (variant?.images && Array.isArray(variant.images)) {
+    for (const img of variant.images) {
+      const storageId = img.storage?.id;
+      if (storageId) {
+        images.push({
+          storageId,
+          role: img.role || 'gallery',
+          src: img.image_path || '',
+        });
+      }
     }
   }
 
-  // Sort by role (hero first, then gallery)
+  // V2 API: variant has direct storage (hero image)
+  if (images.length === 0 && variant?.storage?.id) {
+    images.push({
+      storageId: variant.storage.id,
+      role: 'hero',
+      src: variant.image_path || '',
+    });
+  }
+
+  // V2 API: variant has image_storage_id
+  if (images.length === 0 && variant?.image_storage_id) {
+    images.push({
+      storageId: variant.image_storage_id,
+      role: 'hero',
+      src: '',
+    });
+  }
+
+  // V1 fallback: match by variant name in product media
+  if (images.length === 0 && variant?.name) {
+    const variantColor = variant.name.split('/')[0]?.trim().toLowerCase();
+    if (variantColor) {
+      const media = product.media || [];
+      for (const m of media) {
+        const storageId = (m as any).storage_id;
+        if (!storageId) continue;
+        const srcLower = (m.src || '').toLowerCase();
+        if (srcLower.includes(`_${variantColor}_`) || srcLower.includes(`-${variantColor}-`)) {
+          images.push({ storageId, role: m.role || 'gallery', src: m.src || '' });
+        }
+      }
+    }
+  }
+
+  // Sort: hero first, then by storageId
   images.sort((a, b) => {
     if (a.role === 'hero') return -1;
     if (b.role === 'hero') return 1;
@@ -51,32 +69,33 @@ export function getImagesForVariant(
 }
 
 /**
- * Get the primary/hero variant for a product (first variant or first with image)
+ * Get the primary/hero variant for a product.
  */
 export function getPrimaryVariant(product: Product): any | null {
   const variants = (product as any).variants || [];
 
-  // Find first variant with image_storage_id
-  const withImage = variants.find((v: any) => v.image_storage_id);
-  if (withImage) return withImage;
+  // V2: find first variant with storage or image_storage_id
+  const withStorage = variants.find((v: any) => v.storage?.id || v.image_storage_id);
+  if (withStorage) return withStorage;
 
-  // Fallback to first variant
   return variants[0] || null;
 }
 
 /**
- * Group variants by color (first part of name, e.g., "Schwarz/Türkisblau / S" → "Schwarz/Türkisblau")
+ * Get variant color string.
+ * V2 API: uses variant.color or variant.description_short.
+ * V1: parses from variant.name.
  */
 export function getVariantColor(variant: any): string {
+  if (variant?.color) return String(variant.color);
+  if (variant?.description_short) return String(variant.description_short);
   if (!variant?.name) return '';
-
-  // Split by "/" and take first two parts (color combination)
   const parts = variant.name.split('/').map((s: string) => s.trim());
   return parts.slice(0, 2).join('/');
 }
 
 /**
- * Get unique color variants (one representative per color)
+ * Get unique color variants (one representative per color).
  */
 export function getUniqueColorVariants(product: Product): any[] {
   const variants = (product as any).variants || [];
