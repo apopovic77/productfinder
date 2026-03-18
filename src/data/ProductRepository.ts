@@ -443,13 +443,22 @@ function mapProduct(p: OnealProduct): Product | null {
   const colorTokens = new Set<string>();
   const sizeTokens = new Set<string>();
   for (const variant of variants) {
-    if (!variant?.name) continue;
-    const parts = String(variant.name)
-      .split('/')
-      .map((part: string) => part.trim())
-      .filter(Boolean);
-    if (parts.length >= 1) colorTokens.add(parts[0]);
-    if (parts.length >= 2) sizeTokens.add(parts[1]);
+    // V2 API: use direct color/size fields
+    if (variant.color) colorTokens.add(String(variant.color));
+    if (variant.size) sizeTokens.add(String(variant.size));
+    // V1 fallback: parse from name
+    if (!variant.color && variant.name) {
+      const parts = String(variant.name)
+        .split('/')
+        .map((part: string) => part.trim())
+        .filter(Boolean);
+      if (parts.length >= 1) colorTokens.add(parts[0]);
+      if (parts.length >= 2) sizeTokens.add(parts[1]);
+    }
+  }
+  // Also use product-level color_name
+  if (!colorTokens.size && apiAny.color_name) {
+    colorTokens.add(String(apiAny.color_name));
   }
 
   addAttribute(attributes, colorTokens.size
