@@ -1032,9 +1032,9 @@ export class CanvasRenderer<T> {
           // Total images to draw: main image + alternative images
           const totalImages = imageCount + 1;
 
-          // Overlap factor: how much images overlap (0.4 = 40% overlap, so 60% of next image visible)
+          // Overlap factor: how much images overlap (0.3 = 30% overlap, so 70% of next image visible)
           // Lower value = more spread, more space between images
-          const overlapFactor = 0.7;
+          const overlapFactor = 0.3;
 
           // Calculate scale factor so all images fit in the cell
           const spreadFactor = 1 + (totalImages - 1) * (1 - overlapFactor);
@@ -1067,7 +1067,7 @@ export class CanvasRenderer<T> {
           // Calculate offset between images based on spread direction
           // Vertical spreading uses smaller offset (0.35) to keep images very tight
           const axisSize = shouldSpreadVertically ? boundingHeight : boundingWidth;
-          const baseOffset = shouldSpreadVertically ? axisSize * 0.18 : axisSize * (1 - overlapFactor);
+          const baseOffset = shouldSpreadVertically ? axisSize * 0.35 : axisSize * (1 - overlapFactor);
 
           // Initialize InterpolatedProperty for each image if needed
           // Pivot Mode: Spread symmetrically (left, right, left, right...)
