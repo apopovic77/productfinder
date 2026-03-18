@@ -34,8 +34,8 @@ export type DrillDownState = {
   filters: DrillDownFilter[];
 };
 
-const UNKNOWN_LABEL = 'Unknown';
-const NONE_LABEL = 'None';
+const UNKNOWN_LABEL = 'N/A';
+const NONE_LABEL = 'N/A';
 
 const PIVOT_PROFILE = ACTIVE_PIVOT_PROFILE;
 const PRESENTATION_DIMENSION = 'category:presentation';
