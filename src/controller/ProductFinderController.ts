@@ -249,6 +249,9 @@ export class ProductFinderController {
   // Layout API
   setLayoutMode(mode: LayoutMode): void {
     this.layoutService.setMode(mode);
+    if (this.renderer) {
+      this.renderer.backgroundColor = mode === 'lanes' ? '#ffffff' : null;
+    }
     this.onDataChanged();
   }
 

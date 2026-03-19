@@ -1623,6 +1623,19 @@ export default class App extends React.Component<{}, State> {
             >
               {this.controller.isFamilyGrouped() ? 'Grouped' : 'All Colors'}
             </button>
+            <button
+              type="button"
+              className={`pf-header-btn ${this.controller.getLayoutMode() === 'lanes' ? 'active' : ''}`}
+              onClick={() => {
+                const current = this.controller.getLayoutMode();
+                this.controller.setLayoutMode(current === 'lanes' ? 'pivot' : 'lanes');
+                this.syncPivotUI();
+                setTimeout(() => this.controller.handleResize(), 50);
+              }}
+              title={this.controller.getLayoutMode() === 'lanes' ? 'Lane view (shop style)' : 'Pivot view'}
+            >
+              {this.controller.getLayoutMode() === 'lanes' ? 'Lanes' : 'Pivot'}
+            </button>
           </div>
           <div className="pf-header-title">Product Finder</div>
         </div>

@@ -504,10 +504,15 @@ export class CanvasRenderer<T> {
     // No-op: ImageLoadQueue handles all image loading now
   }
 
+  public backgroundColor: string | null = null;
+
   private clear() {
     const c = this.ctx.canvas;
-    this.ctx.clearRect(0,0,c.width,c.height);
-    // Canvas is transparent - body background shows through
+    this.ctx.clearRect(0, 0, c.width, c.height);
+    if (this.backgroundColor) {
+      this.ctx.fillStyle = this.backgroundColor;
+      this.ctx.fillRect(0, 0, c.width, c.height);
+    }
   }
 
   /**

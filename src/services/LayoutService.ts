@@ -13,9 +13,10 @@ import type { PivotAnalysisResult, PivotDimensionDefinition } from './PivotDimen
 import { ACTIVE_PIVOT_PROFILE } from '../config/pivot';
 import { PosterLayouter, type PosterRowDefinition } from '../layout/PosterLayouter';
 import type { PosterLayoutConfig } from '../layout/PosterLayouter';
+import { LaneLayouter } from '../layout/LaneLayouter';
 import { CANVAS_PADDING_CONFIG } from '../config/CanvasPaddingConfig';
 
-export type LayoutMode = 'grid' | 'masonry' | 'compact' | 'large' | 'pivot' | 'poster';
+export type LayoutMode = 'grid' | 'masonry' | 'compact' | 'large' | 'pivot' | 'poster' | 'lanes';
 
 const PIVOT_PROFILE = ACTIVE_PIVOT_PROFILE;
 
@@ -25,7 +26,7 @@ const createOrderMap = (items: readonly string[] = []): Map<string, number> =>
 export class LayoutService {
   private mode: LayoutMode = 'pivot'; // Start with pivot layout!
   private engine: LayoutEngine<Product>;
-  private layouter: SimpleLayouter<Product> | PivotLayouter<Product> | HeroLayouter<Product> | PosterLayouter<Product>;
+  private layouter: SimpleLayouter<Product> | PivotLayouter<Product> | HeroLayouter<Product> | PosterLayouter<Product> | LaneLayouter<Product>;
   private heroLayouter: HeroLayouter<Product> | null = null;
   private access = new ProductLayoutAccessors();
   private scalePolicy = new WeightScalePolicy();
@@ -333,6 +334,30 @@ export class LayoutService {
       }
       this.displayOrderIds = [];
       this.nodeToGroup.clear();
+    } else if (this.mode === 'lanes') {
+      const heroActive = this.drillDownService.isHeroModeActive();
+      if (heroActive) {
+        if (!(this.layouter instanceof HeroLayouter)) {
+          this.heroLayouter = this.createHeroLayouter();
+          this.layouter = this.heroLayouter;
+          this.engine.setLayouter(this.layouter);
+          this.applyAnimationDuration();
+        }
+      } else {
+        if (!(this.layouter instanceof LaneLayouter)) {
+          this.layouter = new LaneLayouter<Product>({
+            groupKey: (p: Product) => this.drillDownService.getGroupKey(p),
+            groupSort: (a: string, b: string) => {
+              const comparator = this.drillDownService.getGroupComparator();
+              return comparator(a, b);
+            },
+          });
+          this.engine.setLayouter(this.layouter);
+          this.applyAnimationDuration();
+        }
+      }
+      this.displayOrderIds = [];
+      this.nodeToGroup.clear();
     } else if (this.mode === 'poster') {
       this.displayOrderIds = [];
       this.nodeToGroup.clear();
@@ -365,11 +390,11 @@ export class LayoutService {
   setPriceBucketConfig(mode: PriceBucketMode, bucketCount: number): void {
     this.priceBucketConfig = { mode, bucketCount };
     this.drillDownService.setPriceBucketConfig(this.priceBucketConfig);
-    if (this.mode === 'pivot') {
+    if (this.mode === 'pivot' || this.mode === 'lanes') {
       this.updatePivotGroups();
     }
   }
-  
+
   getPriceBucketConfig(): PriceBucketConfig {
     return { ...this.priceBucketConfig };
   }
@@ -380,7 +405,7 @@ export class LayoutService {
    * Set pivot grouping dimension (changes columns)
    */
   setPivotDimension(dimension: GroupDimension): void {
-    if (this.mode !== 'pivot') return;
+    if (this.mode !== 'pivot' && this.mode !== 'lanes') return;
     const hasFilters = this.drillDownService.getFilters().length > 0;
     if (hasFilters) {
       this.drillDownService.setGroupingDimension(dimension);
@@ -438,7 +463,7 @@ export class LayoutService {
    * Drill down into a pivot group
    */
   drillDownPivot(value: string): void {
-    if (this.mode !== 'pivot') return;
+    if (this.mode !== 'pivot' && this.mode !== 'lanes') return;
     if (this.drillDownService.drillDown(value)) {
       this.updatePivotGroups();
     }
@@ -448,7 +473,7 @@ export class LayoutService {
    * Drill up (remove last filter)
    */
   drillUpPivot(): void {
-    if (this.mode !== 'pivot') return;
+    if (this.mode !== 'pivot' && this.mode !== 'lanes') return;
     if (this.drillDownService.drillUp()) {
       this.updatePivotGroups();
     }
@@ -458,7 +483,7 @@ export class LayoutService {
    * Reset pivot to top level
    */
   resetPivot(): void {
-    if (this.mode !== 'pivot') return;
+    if (this.mode !== 'pivot' && this.mode !== 'lanes') return;
     this.drillDownService.reset();
     this.updatePivotGroups();
   }
@@ -493,11 +518,21 @@ export class LayoutService {
    * Get group headers from pivot layouter (for rendering)
    */
   getGroupHeaders() {
-    if (this.mode === 'pivot' && this.layouter instanceof PivotLayouter) {
+    if (((this.mode === 'pivot' && this.layouter instanceof PivotLayouter) || (this.mode === 'lanes' && this.layouter instanceof LaneLayouter))) {
       const headers = this.layouter.getGroupHeaders();
       if (!this.pivotGroups.length) {
         return headers;
       }
+      const labelMap = new Map(this.pivotGroups.map(group => [group.key, group.label] as const));
+      return headers.map(header => (
+        labelMap.has(header.key)
+          ? { ...header, label: labelMap.get(header.key)! }
+          : header
+      ));
+    }
+    if (this.mode === 'lanes' && this.layouter instanceof LaneLayouter) {
+      const headers = this.layouter.getGroupHeaders();
+      if (!this.pivotGroups.length) return headers;
       const labelMap = new Map(this.pivotGroups.map(group => [group.key, group.label] as const));
       return headers.map(header => (
         labelMap.has(header.key)
@@ -613,17 +648,17 @@ export class LayoutService {
     }
     this.cacheCurrentNodePositions();
     // Apply drill-down filters
-    const filtered = this.mode === 'pivot' 
+    const usePivot = this.mode === 'pivot' || this.mode === 'lanes';
+    const filtered = usePivot
       ? this.drillDownService.filterProducts(products)
       : products;
-    
+
     this.engine.sync(filtered, p => p.id);
     this.primeNewNodesFromCache();
     this.applyAnimationDuration();
-    
-    if (this.mode === 'pivot') {
+
+    if (usePivot) {
       this.updatePivotGroups();
-      // ensure display order matches current groups immediately
       this.displayOrderIds = [];
       this.nodeToGroup.clear();
       for (const node of this.engine.all()) {
