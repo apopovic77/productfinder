@@ -360,13 +360,7 @@ export class LayoutService {
         }
       } else {
         if (!(this.layouter instanceof LaneLayouter)) {
-          this.layouter = new LaneLayouter<Product>({
-            groupKey: (p: Product) => this.drillDownService.getGroupKey(p),
-            groupSort: (a: string, b: string) => {
-              const comparator = this.drillDownService.getGroupComparator();
-              return comparator(a, b);
-            },
-          });
+          this.layouter = this.createLayouter('lanes') as LaneLayouter<Product>;
           this.engine.setLayouter(this.layouter);
           this.applyAnimationDuration();
         }
