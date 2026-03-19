@@ -1080,6 +1080,10 @@ export default class App extends React.Component<{}, State> {
     const canvas = this.canvasRef.current;
     if (!canvas) return;
 
+    // Suppress click after a drag/pan gesture
+    const vt = this.controller.getViewportTransform();
+    if (vt?.consumeDrag()) return;
+
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;

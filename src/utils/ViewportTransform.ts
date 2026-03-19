@@ -329,6 +329,7 @@ export class ViewportTransform {
   
   private isPotentialDrag = false; // mousedown happened, waiting for movement
   private dragThreshold = 4; // pixels before drag starts
+  private wasDragging = false; // true after a drag ended, consumed by next click
 
   private handleMouseDown = (e: MouseEvent) => {
     const canPan = e.button === 1 || e.button === 2 || e.ctrlKey || e.metaKey || (this.panWithLeftButton && e.button === 0);
@@ -366,10 +367,23 @@ export class ViewportTransform {
   private handleMouseUp = () => {
     this.isPotentialDrag = false;
     if (this.isDragging) {
+      this.wasDragging = true;
       this.isDragging = false;
       this.canvas.style.cursor = 'default';
     }
   };
+
+  /**
+   * Returns true if a drag just ended. Call this from click handlers
+   * to suppress click after pan. Resets the flag after reading.
+   */
+  public consumeDrag(): boolean {
+    if (this.wasDragging) {
+      this.wasDragging = false;
+      return true;
+    }
+    return false;
+  }
   
   // Touch support
   private touchStartDistance = 0;
