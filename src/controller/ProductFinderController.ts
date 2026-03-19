@@ -147,7 +147,20 @@ export class ProductFinderController {
 
       // Update renderer hero mode state
       if (this.renderer) {
-        this.renderer.isHeroMode = this.layoutService.isPivotHeroMode();
+        const isHero = this.layoutService.isPivotHeroMode();
+        this.renderer.isHeroMode = isHero;
+        // Enable labels in hero mode (name + color)
+        if (isHero && this.layoutService.getMode() !== 'lanes') {
+          this.renderer.productLabels.update({
+            enabled: true,
+            fields: ['name', 'color'],
+            position: 'below',
+            nameColor: 'rgba(0, 0, 0, 0.85)',
+            detailColor: 'rgba(0, 0, 0, 0.5)',
+          });
+        } else if (this.layoutService.getMode() !== 'lanes') {
+          this.renderer.productLabels.enabled = false;
+        }
       }
 
       // Calculate and set content bounds after layout
@@ -264,6 +277,18 @@ export class ProductFinderController {
     this.layoutService.setMode(mode);
     if (this.renderer) {
       this.renderer.backgroundColor = mode === 'lanes' ? '#ffffff' : null;
+      if (mode === 'lanes') {
+        this.renderer.productLabels.update({
+          enabled: true,
+          fields: ['category', 'name', 'price'],
+          position: 'below',
+          nameColor: 'rgba(0, 0, 0, 0.85)',
+          detailColor: 'rgba(0, 0, 0, 0.45)',
+          priceColor: '#ff6b00',
+        });
+      } else {
+        this.renderer.productLabels.enabled = false;
+      }
     }
     this.onDataChanged();
   }

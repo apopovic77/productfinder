@@ -8,6 +8,7 @@ import { ProductOverlayCanvasV2, MODERN_OVERLAY_STYLE } from './ProductOverlayCa
 import { globalImageQueue } from '../utils/GlobalImageQueue';
 import { buildMediaUrl } from '../utils/MediaUrlBuilder';
 import { InterpolatedProperty } from 'arkturian-typescript-utils';
+import { ProductLabelRenderer } from './ProductLabelRenderer';
 import { categoryMediaService } from '../services/CategoryMediaService';
 import { BUCKET_BUTTON_CONFIG } from '../config/BucketButtonConfig';
 
@@ -505,6 +506,7 @@ export class CanvasRenderer<T> {
   }
 
   public backgroundColor: string | null = null;
+  public productLabels = new ProductLabelRenderer({ enabled: false });
 
   private clear() {
     const c = this.ctx.canvas;
@@ -1207,28 +1209,10 @@ export class CanvasRenderer<T> {
       // Restore item transform
       this.ctx.restore();
 
-      // Render product name and color labels in hero mode only
-      if (this.isHeroMode) {
-        // Render directly here to ensure it works within viewport transform
-        const raw = (product as any).raw || {};
-        let labelName = product.name.toUpperCase().replace(/O'NEAL\s*/gi, '').trim();
-        const colorLabel = (raw.color_name || '').toUpperCase();
-        const labelFontSize = Math.max(10, Math.min(24, w * 0.05));
-
-        this.ctx.save();
-        this.ctx.font = `700 ${labelFontSize}px -apple-system, sans-serif`;
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-        this.ctx.textAlign = 'center';
-        this.ctx.textBaseline = 'bottom';
-        this.ctx.fillText(labelName, x + w / 2, y - labelFontSize * 0.3, w);
-
-        if (colorLabel) {
-          this.ctx.font = `400 ${labelFontSize * 0.8}px -apple-system, sans-serif`;
-          this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
-          this.ctx.textBaseline = 'top';
-          this.ctx.fillText(colorLabel, x + w / 2, y + h + labelFontSize * 0.3, w);
-        }
-        this.ctx.restore();
+      // Render product labels (hero mode, lanes mode, or custom config)
+      if (this.isHeroMode || this.productLabels.enabled) {
+        const vpScale = this.viewport?.scale ?? 1;
+        this.productLabels.render(this.ctx, product, x, y, w, h, vpScale);
       }
     }
     
