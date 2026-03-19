@@ -440,7 +440,7 @@ export class LayoutService {
   }
   
   getAvailablePivotDimensions(): GroupDimension[] {
-    if (this.mode !== 'pivot') return [];
+    if (this.mode !== 'pivot' && this.mode !== 'lanes') return [];
     const products = this.engine.all().map(n => n.data);
     return this.drillDownService.getAvailableDimensions(products);
   }
