@@ -63,16 +63,6 @@ export class LaneLayouter<T> implements ILayouter<T> {
       const list = groups.get(key)!;
       if (this.config.itemSort) list.sort((a, b) => this.config.itemSort!(a.data, b.data));
 
-      // Header
-      this.groupHeaders.push({
-        key,
-        label: key,
-        x: paddingX,
-        y: offsetY,
-        width: view.width - paddingX * 2,
-        height: headerHeight,
-      });
-
       const itemY = offsetY + headerHeight;
 
       // Position items horizontally
@@ -87,6 +77,17 @@ export class LaneLayouter<T> implements ILayouter<T> {
 
         offsetX += itemSize + itemGap;
       }
+
+      // Header width = content width (not full screen)
+      const contentWidth = Math.max(itemSize, offsetX - paddingX - itemGap);
+      this.groupHeaders.push({
+        key,
+        label: key,
+        x: paddingX,
+        y: offsetY,
+        width: Math.min(contentWidth, 300),
+        height: headerHeight,
+      });
 
       offsetY += laneHeight + laneGap;
     }
