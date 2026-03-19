@@ -659,7 +659,7 @@ export class ProductFinderController {
    * Handle click on canvas - check for group header clicks
    */
   handleGroupHeaderClick(canvasX: number, canvasY: number): boolean {
-    if (!this.canvas || this.layoutService.getMode() !== 'pivot') return false;
+    if (!this.canvas || (this.layoutService.getMode() !== 'pivot' && this.layoutService.getMode() !== 'lanes')) return false;
     
     // Transform canvas coordinates to world coordinates
     const viewport = this.viewportService.getTransform();
@@ -724,7 +724,7 @@ export class ProductFinderController {
    * Handle mouse move - check for group header hover
    */
   handleGroupHeaderHover(canvasX: number, canvasY: number): string | null {
-    if (!this.canvas || this.layoutService.getMode() !== 'pivot') return null;
+    if (!this.canvas || (this.layoutService.getMode() !== 'pivot' && this.layoutService.getMode() !== 'lanes')) return null;
     if (!this.layoutService.canDrillDownPivot()) return null;
     
     // Transform canvas coordinates to world coordinates

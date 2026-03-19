@@ -1783,7 +1783,7 @@ export default class App extends React.Component<{}, State> {
 
           {/* Desktop: DIMENSIONS section (always visible) */}
           <div className="pf-bottom-section pf-bottom-center pf-bottom-desktop-section">
-            {isPivotHeroMode && layoutMode === 'pivot' ? (
+            {isPivotHeroMode && (layoutMode === 'pivot' || layoutMode === 'lanes') ? (
               <>
                 <span className="pf-bottom-label">Sort</span>
                 <div className="pf-bottom-sort-hero">
@@ -1814,7 +1814,7 @@ export default class App extends React.Component<{}, State> {
               <>
                 <span className="pf-bottom-label">Dimensions</span>
                 <div className={`pf-bottom-dimensions ${isSidebarFooter ? 'pf-bottom-dimensions-horizontal' : ''}`}>
-                  {layoutMode === 'pivot' ? (
+                  {(layoutMode === 'pivot' || layoutMode === 'lanes') ? (
                     <div className={`pf-bottom-dimension-row ${isSidebarFooter ? 'pf-bottom-dimension-row-horizontal' : ''}`}>
                       {pivotDimensions
                         .filter(dim => availableDimsNow.includes(dim))
@@ -1840,7 +1840,7 @@ export default class App extends React.Component<{}, State> {
           </div>
 
           {/* Desktop: SORT section (hidden in Hero Mode) */}
-          {!(isPivotHeroMode && layoutMode === 'pivot') && (
+          {!(isPivotHeroMode && (layoutMode === 'pivot' || layoutMode === 'lanes')) && (
             <div className="pf-bottom-section pf-bottom-right pf-bottom-desktop-section">
               <label className="pf-bottom-label" htmlFor="pf-bottom-sort">Sort</label>
               <CustomSelect
@@ -2008,7 +2008,7 @@ export default class App extends React.Component<{}, State> {
 
               <div className="pf-bottom-section pf-bottom-center pf-bottom-mobile-section">
                 <div className="pf-bottom-dimensions">
-                  {layoutMode === 'pivot' ? (
+                  {(layoutMode === 'pivot' || layoutMode === 'lanes') ? (
                     <div className="pf-bottom-dimension-row">
                       {pivotDimensions
                         .filter(dim => availableDimsNow.includes(dim))
