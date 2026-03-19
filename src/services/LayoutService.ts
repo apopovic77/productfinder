@@ -117,6 +117,12 @@ export class LayoutService {
           const comparator = this.drillDownService.getGroupComparator();
           return comparator(a, b);
         },
+        subGroupKey: (p: Product) => (p.raw as any)?.design_group || p.name,
+        itemSort: (a: Product, b: Product) => {
+          const ga = (a.raw as any)?.design_group || a.name;
+          const gb = (b.raw as any)?.design_group || b.name;
+          return ga.localeCompare(gb);
+        },
       });
     }
     if (mode === 'poster') {

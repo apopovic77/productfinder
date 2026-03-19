@@ -6,9 +6,11 @@ export type LaneConfig<T> = {
   groupKey: (t: T) => string;
   groupSort?: (a: string, b: string) => number;
   itemSort?: (a: T, b: T) => number;
+  subGroupKey?: (t: T) => string; // clusters items within a lane
   laneHeight?: number;
   laneGap?: number;
   itemGap?: number;
+  subGroupGap?: number; // larger gap between sub-groups
   headerHeight?: number;
   paddingX?: number;
   paddingTop?: number;
@@ -64,10 +66,23 @@ export class LaneLayouter<T> implements ILayouter<T> {
       if (this.config.itemSort) list.sort((a, b) => this.config.itemSort!(a.data, b.data));
 
       const itemY = offsetY + headerHeight + 16; // margin between header and items
+      const subGroupGap = this.config.subGroupGap ?? itemGap * 2.5;
+      const subGroupKeyFn = this.config.subGroupKey;
 
-      // Position items horizontally
+      // Position items horizontally, with larger gaps between sub-groups
       let offsetX = paddingX;
+      let prevSubGroup: string | null = null;
+
       for (const node of list) {
+        // Add extra gap when sub-group changes
+        if (subGroupKeyFn) {
+          const subGroup = subGroupKeyFn(node.data);
+          if (prevSubGroup !== null && subGroup !== prevSubGroup) {
+            offsetX += subGroupGap - itemGap; // add difference
+          }
+          prevSubGroup = subGroup;
+        }
+
         node.posX.targetValue = offsetX;
         node.posY.targetValue = itemY;
         node.width.targetValue = itemSize;
