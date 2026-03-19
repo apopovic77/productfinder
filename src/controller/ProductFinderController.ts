@@ -206,7 +206,7 @@ export class ProductFinderController {
       const vt = this.viewportService.getTransform();
       if (vt) {
         vt.minScaleOverride = null;
-        vt.panWithLeftButton = false;
+        vt.panWithLeftButton = true;
       }
       this.viewportService.resetToFitContent();
     }

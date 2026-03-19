@@ -327,33 +327,44 @@ export class ViewportTransform {
     this.targetScale = newScale;
   };
   
+  private isPotentialDrag = false; // mousedown happened, waiting for movement
+  private dragThreshold = 4; // pixels before drag starts
+
   private handleMouseDown = (e: MouseEvent) => {
-    // Pan with middle/right button, Ctrl/Cmd key, or left button if enabled
-    if (e.button === 1 || e.button === 2 || e.ctrlKey || e.metaKey || (this.panWithLeftButton && e.button === 0)) {
-      e.preventDefault();
-      this.isDragging = true;
+    const canPan = e.button === 1 || e.button === 2 || e.ctrlKey || e.metaKey || (this.panWithLeftButton && e.button === 0);
+    if (canPan) {
+      // For middle/right button, start drag immediately
+      // For left button, wait for movement threshold
+      if (e.button !== 0) e.preventDefault();
+      this.isPotentialDrag = true;
+      this.isDragging = false;
       this.dragStart.x = e.clientX;
       this.dragStart.y = e.clientY;
       this.offsetStart.x = this.targetOffset.x;
       this.offsetStart.y = this.targetOffset.y;
-      this.canvas.style.cursor = 'grabbing';
     }
   };
 
   private handleMouseMove = (e: MouseEvent) => {
+    if (this.isPotentialDrag && !this.isDragging) {
+      const dx = Math.abs(e.clientX - this.dragStart.x);
+      const dy = Math.abs(e.clientY - this.dragStart.y);
+      if (dx > this.dragThreshold || dy > this.dragThreshold) {
+        this.isDragging = true;
+        this.canvas.style.cursor = 'grabbing';
+      }
+    }
     if (this.isDragging) {
       const dx = e.clientX - this.dragStart.x;
       const dy = e.clientY - this.dragStart.y;
-
-      // Apply rubber band resistance when dragging outside bounds
       const resisted = this.applyDragResistance(dx, dy);
-
       this.targetOffset.x = this.offsetStart.x + resisted.dx;
       this.targetOffset.y = this.offsetStart.y + resisted.dy;
     }
   };
-  
+
   private handleMouseUp = () => {
+    this.isPotentialDrag = false;
     if (this.isDragging) {
       this.isDragging = false;
       this.canvas.style.cursor = 'default';
