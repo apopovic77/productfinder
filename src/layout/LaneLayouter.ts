@@ -89,7 +89,7 @@ export class LaneLayouter<T> implements ILayouter<T> {
         height: headerHeight,
       });
 
-      offsetY += laneHeight + laneGap;
+      offsetY += laneHeight + laneGap + 16; // extra bottom margin
     }
   }
 }
