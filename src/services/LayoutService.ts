@@ -95,7 +95,7 @@ export class LayoutService {
     this.applyAnimationDuration();
   }
 
-  private createLayouter(mode: LayoutMode): SimpleLayouter<Product> | PivotLayouter<Product> | PosterLayouter<Product> {
+  private createLayouter(mode: LayoutMode): SimpleLayouter<Product> | PivotLayouter<Product> | PosterLayouter<Product> | LaneLayouter<Product> {
     if (mode === 'pivot') {
       // Ensure dynamic group key stays in sync with drill-down dimension
       this.pivotConfig = {
@@ -109,6 +109,15 @@ export class LayoutService {
         scale: this.scalePolicy
       };
       return new PivotLayouter<Product>(this.pivotConfig);
+    }
+    if (mode === 'lanes') {
+      return new LaneLayouter<Product>({
+        groupKey: (p: Product) => this.drillDownService.getGroupKey(p),
+        groupSort: (a: string, b: string) => {
+          const comparator = this.drillDownService.getGroupComparator();
+          return comparator(a, b);
+        },
+      });
     }
     if (mode === 'poster') {
       return this.createPosterLayouter();
@@ -280,7 +289,7 @@ export class LayoutService {
         this.drillDownService.setDimension(this.previousPivotDimension);
       }
     }
-    if (mode !== 'pivot') {
+    if (mode !== 'pivot' && mode !== 'lanes') {
       this.heroLayouter = null;
     }
     // Update layouter on existing engine to preserve nodes!
