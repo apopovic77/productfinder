@@ -183,18 +183,21 @@ export class ProductFinderController {
     // Different viewport behavior for hero mode (product presentation)
     const isHeroMode = this.layoutService.isPivotHeroMode();
 
+    const isLanesMode = this.layoutService.getMode() === 'lanes';
+
     if (isHeroMode) {
       // Hero mode: Horizontal-only scrolling, scale 1.0 (no zoom)
-      // HeroLayouter makes products large (80% viewport height), so no camera zoom needed
-      this.viewportService.setLockVerticalPan(true);  // Lock vertical panning
-      // Keep camera at scale 1.0 - don't call resetToFitContent()!
-      // Product sizes are handled by HeroLayouter, not by camera zoom
+      this.viewportService.setLockVerticalPan(true);
       const centerX = bounds.minX + bounds.width / 2;
       const centerY = bounds.minY + bounds.height / 2;
       this.viewportService.centerOn(centerX, centerY, 1);
+    } else if (isLanesMode) {
+      // Lanes mode: Fixed scale 1.0, free vertical scrolling, start at top
+      this.viewportService.setLockVerticalPan(false);
+      this.viewportService.centerOn(bounds.minX + (this.canvas?.width ?? 0) / 2, bounds.minY + (this.canvas?.height ?? 0) / 2, 1);
     } else {
-      // Normal mode: Enable vertical panning, fit all content
-      this.viewportService.setLockVerticalPan(false);  // Enable vertical panning
+      // Pivot mode: Fit all content, free panning
+      this.viewportService.setLockVerticalPan(false);
       this.viewportService.resetToFitContent();
     }
   }
