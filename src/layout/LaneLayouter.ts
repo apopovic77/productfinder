@@ -82,7 +82,7 @@ export class LaneLayouter<T> implements ILayouter<T> {
       const contentWidth = Math.max(itemSize, offsetX - paddingX - itemGap);
       this.groupHeaders.push({
         key,
-        label: key,
+        label: `${key} (${list.length})`,
         x: paddingX,
         y: offsetY,
         width: Math.min(contentWidth, 300),
