@@ -25,6 +25,7 @@ export class ViewportTransform {
   // Scale limits
   private fitToContentScale = 1; // Calculated from content bounds
   public maxScale = 2; // Dynamically calculated: fitToContentScale × 2
+  public minScaleOverride: number | null = null; // If set, overrides calculated minScale
 
   // Rubber banding config (iOS-style)
   private enableRubberBanding = true;
@@ -105,6 +106,7 @@ export class ViewportTransform {
    * Get minimum allowed scale (can't zoom out further than fit-to-content)
    */
   get minScale(): number {
+    if (this.minScaleOverride !== null) return this.minScaleOverride;
     // Allow zooming out to 90% of fit-to-content for some breathing room
     return this.fitToContentScale * 0.9;
   }

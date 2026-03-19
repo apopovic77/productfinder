@@ -192,12 +192,16 @@ export class ProductFinderController {
       const centerY = bounds.minY + bounds.height / 2;
       this.viewportService.centerOn(centerX, centerY, 1);
     } else if (isLanesMode) {
-      // Lanes mode: Fixed scale 1.0, free vertical scrolling, start at top
+      // Lanes mode: Fixed scale 1.0, free vertical scrolling, start at top, no zoom-out
       this.viewportService.setLockVerticalPan(false);
+      const vt = this.viewportService.getTransform();
+      if (vt) vt.minScaleOverride = 0.8; // Don't allow zooming out below 80%
       this.viewportService.centerOn(bounds.minX + (this.canvas?.width ?? 0) / 2, bounds.minY + (this.canvas?.height ?? 0) / 2, 1);
     } else {
-      // Pivot mode: Fit all content, free panning
+      // Pivot mode: Fit all content, free panning, no scale override
       this.viewportService.setLockVerticalPan(false);
+      const vt = this.viewportService.getTransform();
+      if (vt) vt.minScaleOverride = null;
       this.viewportService.resetToFitContent();
     }
   }
