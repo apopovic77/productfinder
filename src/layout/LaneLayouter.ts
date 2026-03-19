@@ -52,7 +52,7 @@ export class LaneLayouter<T> implements ILayouter<T> {
     const paddingX = this.config.paddingX ?? 32;
     const paddingTop = this.config.paddingTop ?? 24;
     const headerHeight = this.config.headerHeight ?? 48;
-    const laneGap = this.config.laneGap ?? 32;
+    const laneGap = this.config.laneGap ?? 80; // enough space for labels below products
     const itemGap = this.config.itemGap ?? 16;
 
     // Calculate item size: fit nicely in lane height
@@ -104,7 +104,7 @@ export class LaneLayouter<T> implements ILayouter<T> {
         height: headerHeight,
       });
 
-      offsetY += laneHeight + laneGap + 16; // extra bottom margin
+      offsetY += laneHeight + laneGap;
     }
   }
 }
