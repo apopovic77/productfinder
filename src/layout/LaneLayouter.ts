@@ -63,7 +63,7 @@ export class LaneLayouter<T> implements ILayouter<T> {
       const list = groups.get(key)!;
       if (this.config.itemSort) list.sort((a, b) => this.config.itemSort!(a.data, b.data));
 
-      const itemY = offsetY + headerHeight;
+      const itemY = offsetY + headerHeight + 16; // margin between header and items
 
       // Position items horizontally
       let offsetX = paddingX;
