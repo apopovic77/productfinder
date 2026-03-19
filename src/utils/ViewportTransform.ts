@@ -26,6 +26,7 @@ export class ViewportTransform {
   private fitToContentScale = 1; // Calculated from content bounds
   public maxScale = 2; // Dynamically calculated: fitToContentScale × 2
   public minScaleOverride: number | null = null; // If set, overrides calculated minScale
+  public panWithLeftButton = false; // If true, left mouse button also pans
 
   // Rubber banding config (iOS-style)
   private enableRubberBanding = true;
@@ -327,8 +328,8 @@ export class ViewportTransform {
   };
   
   private handleMouseDown = (e: MouseEvent) => {
-    // Only pan with middle or right button, or with Ctrl/Cmd key
-    if (e.button === 1 || e.button === 2 || e.ctrlKey || e.metaKey) {
+    // Pan with middle/right button, Ctrl/Cmd key, or left button if enabled
+    if (e.button === 1 || e.button === 2 || e.ctrlKey || e.metaKey || (this.panWithLeftButton && e.button === 0)) {
       e.preventDefault();
       this.isDragging = true;
       this.dragStart.x = e.clientX;
