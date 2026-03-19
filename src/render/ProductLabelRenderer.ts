@@ -56,26 +56,42 @@ export class ProductLabelRenderer {
   }
 
   /**
-   * Render labels for a product. Only call for visible products.
+   * Render labels for a product. Skips products that are off-screen or too small.
    * @param ctx Canvas context (already in world-space with viewport transform)
    * @param product The product data
-   * @param x Product x position
-   * @param y Product y position
-   * @param w Product width
-   * @param h Product height
-   * @param scale Current viewport scale (for visibility culling)
+   * @param x Product x position (world coords)
+   * @param y Product y position (world coords)
+   * @param w Product width (world coords)
+   * @param h Product height (world coords)
+   * @param scale Current viewport scale
+   * @param viewportOffset Optional viewport offset for culling {x, y}
+   * @param canvasSize Optional canvas size for culling {w, h}
    */
   render(
     ctx: CanvasRenderingContext2D,
     product: any,
     x: number, y: number, w: number, h: number,
-    scale: number
+    scale: number,
+    viewportOffset?: { x: number; y: number },
+    canvasSize?: { w: number; h: number }
   ): void {
     if (!this.config.enabled) return;
 
     // Skip if product is too small on screen
     const screenH = h * scale;
     if (screenH < 40) return;
+
+    // Viewport culling: skip products entirely off-screen
+    if (viewportOffset && canvasSize) {
+      const screenX = x * scale + viewportOffset.x;
+      const screenY = y * scale + viewportOffset.y;
+      const screenW = w * scale;
+      const margin = 50; // extra margin for labels below/above
+      if (screenX + screenW < -margin || screenX > canvasSize.w + margin ||
+          screenY + screenH < -margin * 2 || screenY > canvasSize.h + margin * 2) {
+        return;
+      }
+    }
 
     const raw = product.raw || {};
     const fields = this.config.fields;

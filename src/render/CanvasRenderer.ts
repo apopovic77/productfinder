@@ -1212,7 +1212,9 @@ export class CanvasRenderer<T> {
       // Render product labels (hero mode, lanes mode, or custom config)
       if (this.isHeroMode || this.productLabels.enabled) {
         const vpScale = this.viewport?.scale ?? 1;
-        this.productLabels.render(this.ctx, product, x, y, w, h, vpScale);
+        const vpOffset = this.viewport ? { x: this.viewport.offset.x, y: this.viewport.offset.y } : undefined;
+        const cvSize = { w: this.ctx.canvas.width, h: this.ctx.canvas.height };
+        this.productLabels.render(this.ctx, product, x, y, w, h, vpScale, vpOffset, cvSize);
       }
     }
     
