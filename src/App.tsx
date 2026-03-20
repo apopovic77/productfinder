@@ -1249,25 +1249,10 @@ export default class App extends React.Component<{}, State> {
     }
   };
 
-  private handleCanvasTouchMove = (e: TouchEvent) => {
-    // Don't prevent default here - allow scrolling when not over a product
-    const canvas = this.canvasRef.current;
-    if (!canvas) return;
-
-    const touch = e.touches[0];
-    if (!touch) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = touch.clientX - rect.left;
-    const y = touch.clientY - rect.top;
-
-    const product = this.controller.hitTest(x, y);
-
-    if (product !== this.state.hoveredProduct) {
-      this.setState({
-        hoveredProduct: product,
-        mousePos: product ? { x: touch.clientX, y: touch.clientY } : null
-      });
+  private handleCanvasTouchMove = (_e: TouchEvent) => {
+    // No hover/tooltip on touch - only tap to select
+    if (this.state.hoveredProduct) {
+      this.setState({ hoveredProduct: null, mousePos: null });
     }
   };
 
