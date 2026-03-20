@@ -76,10 +76,11 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   const taxonomySport = derivedTaxonomy?.sport;
   const taxonomyFamily = derivedTaxonomy?.product_family;
 
-  // Drag state - start positioned near center-right
+  // Drag state - desktop: center-right, mobile: bottom-center
+  const isMobileV2 = window.innerWidth <= 768;
   const [dragPosition, setDragPosition] = useState(() => ({
-    x: window.innerWidth * 0.65 - DIALOG_WIDTH / 2, // 65% from left, centered
-    y: window.innerHeight * 0.25 // 25% from top
+    x: isMobileV2 ? (window.innerWidth - DIALOG_WIDTH) / 2 : window.innerWidth * 0.65 - DIALOG_WIDTH / 2,
+    y: isMobileV2 ? window.innerHeight * 0.45 : window.innerHeight * 0.25 // mobile: lower half
   }));
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });

@@ -19,8 +19,8 @@ export class ViewportTransform {
   private targetScale = 1;
   private targetOffset = new Vector2(0, 0);
 
-  // Interpolation speed (0-1, higher = faster, e.g., 0.15 means 15% per frame)
-  public speedFactor = 0.15;
+  // Interpolation speed (0-1, higher = faster)
+  public speedFactor = 0.25;
 
   // Scale limits
   private fitToContentScale = 1; // Calculated from content bounds
@@ -33,6 +33,14 @@ export class ViewportTransform {
   private rubberBandResistance = 0.5; // 0-1, how much resistance (higher = more resistance)
   private rubberBandSpringBack = 0.08; // Speed of spring back (higher = faster)
   private lockVerticalPan = false; // If true, disable vertical panning and rubber banding
+
+  // Momentum / inertia
+  private velocityX = 0;
+  private velocityY = 0;
+  private lastDragX = 0;
+  private lastDragY = 0;
+  private lastDragTime = 0;
+  private momentumFriction = 0.95; // 0-1, higher = less friction, longer slide
 
   // Content bounds for bounds checking
   private contentBounds: ContentBounds | null = null;
@@ -356,6 +364,14 @@ export class ViewportTransform {
       }
     }
     if (this.isDragging) {
+      const now = performance.now();
+      const dt = Math.max(1, now - this.lastDragTime);
+      this.velocityX = (e.clientX - this.lastDragX) / dt * 16; // normalize to ~60fps
+      this.velocityY = (e.clientY - this.lastDragY) / dt * 16;
+      this.lastDragX = e.clientX;
+      this.lastDragY = e.clientY;
+      this.lastDragTime = now;
+
       const dx = e.clientX - this.dragStart.x;
       const dy = e.clientY - this.dragStart.y;
       const resisted = this.applyDragResistance(dx, dy);
@@ -370,8 +386,20 @@ export class ViewportTransform {
       this.wasDragging = true;
       this.isDragging = false;
       this.canvas.style.cursor = 'default';
+      // Apply momentum
+      this.applyMomentum();
     }
   };
+
+  private applyMomentum(): void {
+    const speed = Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
+    if (speed > 0.5) {
+      this.targetOffset.x += this.velocityX * 8;
+      this.targetOffset.y += this.velocityY * 8;
+    }
+    this.velocityX = 0;
+    this.velocityY = 0;
+  }
 
   /**
    * Returns true if a drag just ended. Call this from click handlers
@@ -448,6 +476,14 @@ export class ViewportTransform {
       }
 
       e.preventDefault();
+      const now = performance.now();
+      const dt = Math.max(1, now - this.lastDragTime);
+      this.velocityX = (touch.clientX - this.lastDragX) / dt * 16;
+      this.velocityY = (touch.clientY - this.lastDragY) / dt * 16;
+      this.lastDragX = touch.clientX;
+      this.lastDragY = touch.clientY;
+      this.lastDragTime = now;
+
       const resisted = this.applyDragResistance(dx, dy);
       this.targetOffset.x = this.offsetStart.x + resisted.dx;
       this.targetOffset.y = this.offsetStart.y + resisted.dy;
@@ -459,6 +495,7 @@ export class ViewportTransform {
     if (this.isDragging) {
       this.wasDragging = true;
       this.isDragging = false;
+      this.applyMomentum();
     }
     this.touchStartDistance = 0;
   };
