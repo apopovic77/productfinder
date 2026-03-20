@@ -351,7 +351,7 @@ export class ProductFinderController {
     const screenHeight = viewport.viewportHeight;
     const screenWidth = viewport.viewportWidth;
     const isMobile = screenWidth < 768;
-    const fillRatio = isMobile ? 0.5 : 0.9; // 50% on mobile, 90% on desktop
+    const fillRatio = isMobile ? 0.6 : 0.9; // 60% on mobile, 90% on desktop
     const targetScale = (screenHeight * fillRatio) / h;
 
     // Clamp scale to max allowed zoom (products max 2× their fit-to-content size)
