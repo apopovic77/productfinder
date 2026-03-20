@@ -298,27 +298,23 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     }
   }, [activeVariantId, onVariantChange, activeVariant, isSiblingView]);
 
-  // Drag handlers
-  const handleMouseDown = (e: React.MouseEvent) => {
-    const target = e.target as HTMLElement;
-
-    // Don't allow dragging from interactive elements
-    if (target.tagName === 'BUTTON' || target.tagName === 'SELECT' || target.tagName === 'A' || target.tagName === 'INPUT') {
-      return;
-    }
-
-    // Only allow dragging from the top 150px (header area)
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const relativeY = e.clientY - rect.top;
-    if (relativeY > 150) {
-      return;
-    }
-
+  // Drag handlers (mouse + touch)
+  const startDrag = (clientX: number, clientY: number, target: HTMLElement, currentTarget: HTMLElement) => {
+    if (target.tagName === 'BUTTON' || target.tagName === 'SELECT' || target.tagName === 'A' || target.tagName === 'INPUT') return;
+    const rect = currentTarget.getBoundingClientRect();
+    if (clientY - rect.top > 150) return;
     setIsDragging(true);
-    setDragOffset({
-      x: e.clientX - dragPosition.x,
-      y: e.clientY - dragPosition.y,
-    });
+    setDragOffset({ x: clientX - dragPosition.x, y: clientY - dragPosition.y });
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    startDrag(e.clientX, e.clientY, e.target as HTMLElement, e.currentTarget as HTMLElement);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    if (!touch) return;
+    startDrag(touch.clientX, touch.clientY, e.target as HTMLElement, e.currentTarget as HTMLElement);
   };
 
   const handleMouseMove = (e: MouseEvent) => {
@@ -341,14 +337,36 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     setIsDragging(false);
   };
 
-  // Setup drag listeners
+  const handleTouchMove = (e: TouchEvent) => {
+    if (!isDragging) return;
+    const touch = e.touches[0];
+    if (!touch) return;
+    const newX = touch.clientX - dragOffset.x;
+    const newY = touch.clientY - dragOffset.y;
+    const maxX = window.innerWidth - DIALOG_WIDTH;
+    const maxY = window.innerHeight - 100;
+    setDragPosition({
+      x: Math.max(0, Math.min(newX, maxX)),
+      y: Math.max(0, Math.min(newY, maxY)),
+    });
+  };
+
+  const handleTouchEnd = () => {
+    setIsDragging(false);
+  };
+
+  // Setup drag listeners (mouse + touch)
   useEffect(() => {
     if (isDragging) {
       window.addEventListener('mousemove', handleMouseMove);
       window.addEventListener('mouseup', handleMouseUp);
+      window.addEventListener('touchmove', handleTouchMove, { passive: false });
+      window.addEventListener('touchend', handleTouchEnd);
       return () => {
         window.removeEventListener('mousemove', handleMouseMove);
         window.removeEventListener('mouseup', handleMouseUp);
+        window.removeEventListener('touchmove', handleTouchMove);
+        window.removeEventListener('touchend', handleTouchEnd);
       };
     }
   }, [isDragging, dragOffset]);
@@ -548,6 +566,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       }}
       onClick={(e) => e.stopPropagation()}
       onMouseDown={handleMouseDown}
+      onTouchStart={handleTouchStart}
     >
       {/* Close button */}
       <button className="pom-close" onClick={onClose} aria-label="Close" style={{ position: 'absolute', top: '8px', right: '8px', fontSize: '20px' }}>
