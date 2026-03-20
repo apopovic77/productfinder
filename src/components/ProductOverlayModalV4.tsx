@@ -47,7 +47,8 @@ interface ParsedFeature {
  * Light glassmorphism theme with blur background
  */
 export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onBuy }) => {
-  const DIALOG_WIDTH = 1100; // Wider for horizontal layout
+  const isMobile = window.innerWidth <= 768;
+  const DIALOG_WIDTH = isMobile ? window.innerWidth : 1100;
 
   // State for full product details (fetched from API with variants)
   const [fullProduct, setFullProduct] = useState<Product | null>(null);
@@ -471,23 +472,22 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
         className="pom-info-panel pom-panel-standalone pom-v4-glassmorphism"
         style={{
           position: 'fixed',
-          left: `${(window.innerWidth - DIALOG_WIDTH) / 2}px`,
-          top: `${dialogTop}px`,
-          width: `${DIALOG_WIDTH}px`,
-          // Height is auto - grows with content (can be 5000px+)
-          overflow: 'hidden', // NO internal scrolling - entire dialog scrolls via translation
-          // GLASSMORPHISM EFFECT - Light theme with blur
-          background: 'rgba(255, 255, 255, 0.75)',
+          left: isMobile ? '0' : `${(window.innerWidth - DIALOG_WIDTH) / 2}px`,
+          top: isMobile ? '0' : `${dialogTop}px`,
+          width: isMobile ? '100%' : `${DIALOG_WIDTH}px`,
+          height: isMobile ? '100%' : 'auto',
+          overflow: isMobile ? 'auto' : 'hidden',
+          background: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(30px)',
-          WebkitBackdropFilter: 'blur(30px)', // Safari support
-          borderRadius: '24px 24px 0 0', // Only top corners rounded (content continues below)
+          WebkitBackdropFilter: 'blur(30px)',
+          borderRadius: isMobile ? '0' : '24px 24px 0 0',
           padding: '0',
-          border: '1px solid rgba(255, 255, 255, 0.8)',
-          borderBottom: 'none', // No bottom border (content continues)
-          boxShadow: '0 24px 64px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.5) inset',
+          border: isMobile ? 'none' : '1px solid rgba(255, 255, 255, 0.8)',
+          borderBottom: 'none',
+          boxShadow: isMobile ? 'none' : '0 24px 64px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.5) inset',
           display: 'flex',
-          flexDirection: 'row', // 2-column layout: Images left | Content right
-          transition: 'top 0.05s linear', // Very fast, smooth scrolling
+          flexDirection: isMobile ? 'column' : 'row',
+          transition: isMobile ? 'none' : 'top 0.05s linear',
           zIndex: 1000,
         }}
         initial={{ opacity: 0, scale: 0.95 }}
@@ -534,10 +534,10 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
         ×
       </button>
 
-      {/* LEFT SIDE - All Product Images (40%) */}
+      {/* LEFT/TOP SIDE - All Product Images */}
       <div style={{
-        width: '40%',
-        padding: '40px 30px',
+        width: isMobile ? '100%' : '40%',
+        padding: isMobile ? '16px 12px' : '40px 30px',
         display: 'flex',
         flexDirection: 'column',
         gap: '12px',
@@ -592,13 +592,13 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
         )}
       </div>
 
-      {/* RIGHT SIDE - Product Info (60%) */}
+      {/* RIGHT/BOTTOM SIDE - Product Info */}
       <div style={{
-        width: '60%',
-        padding: '40px 40px 40px 30px',
+        width: isMobile ? '100%' : '60%',
+        padding: isMobile ? '16px 16px 32px' : '40px 40px 40px 30px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '20px',
+        gap: isMobile ? '14px' : '20px',
         userSelect: 'text',
         cursor: 'auto',
       }}>
@@ -610,18 +610,18 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
           letterSpacing: '0.1em',
           color: 'rgba(0, 0, 0, 0.6)',
           marginBottom: '8px',
-          textAlign: 'center',
-          marginTop: '64px',
+          textAlign: isMobile ? 'left' : 'center',
+          marginTop: isMobile ? '0' : '64px',
         }}>
           {categoryText}
         </div>
 
         {/* Product Name - First word thin, rest bold */}
         <h2 style={{
-          fontSize: '48px',
+          fontSize: isMobile ? '28px' : '48px',
           lineHeight: '1.0',
           margin: 0,
-          marginBottom: '64px',
+          marginBottom: isMobile ? '16px' : '64px',
           color: '#000000',
           textTransform: 'uppercase',
           letterSpacing: '-0.02em',

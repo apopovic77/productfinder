@@ -1222,15 +1222,17 @@ export class CanvasRenderer<T> {
     const groupHeaders = this.getGroupHeaders();
     const currentDimension = this.getPivotDimension();
 
+    // Mobile scaling: reduce bucket button size on small screens
+    const canvasW = this.ctx.canvas.width;
+    const mobileScale = canvasW < 768 ? 0.5 : 1;
+
     for (const header of groupHeaders) {
       const isHovered = this.hoveredGroupKey === header.key;
 
-      // Rounded corners from config
       const radius = BUCKET_BUTTON_CONFIG.cornerRadius;
       const yOffset = isHovered ? BUCKET_BUTTON_CONFIG.hover.yOffset : 0;
 
-      // Apply width extension (negative margin effect)
-      const widthExt = BUCKET_BUTTON_CONFIG.widthExtension;
+      const widthExt = BUCKET_BUTTON_CONFIG.widthExtension * mobileScale;
       const buttonX = header.x - widthExt;
       const buttonWidth = header.width + (widthExt * 2);
 
@@ -1374,15 +1376,16 @@ export class CanvasRenderer<T> {
         this.ctx.fillStyle = BUCKET_BUTTON_CONFIG.font.color;
         const fontWeight = isHovered ? BUCKET_BUTTON_CONFIG.font.weightHover : BUCKET_BUTTON_CONFIG.font.weightNormal;
 
-        // Get individual padding values
-        const { paddingTop, paddingRight, paddingBottom, paddingLeft } = BUCKET_BUTTON_CONFIG.spacing;
+        // Get individual padding values (scaled for mobile)
+        const paddingTop = BUCKET_BUTTON_CONFIG.spacing.paddingTop * mobileScale;
+        const paddingRight = BUCKET_BUTTON_CONFIG.spacing.paddingRight * mobileScale;
+        const paddingBottom = BUCKET_BUTTON_CONFIG.spacing.paddingBottom * mobileScale;
+        const paddingLeft = BUCKET_BUTTON_CONFIG.spacing.paddingLeft * mobileScale;
 
-        // Calculate available width and height for text
         const maxTextWidth = header.width - paddingLeft - paddingRight;
-        const maxTextHeight = BUCKET_BUTTON_CONFIG.height - paddingTop - paddingBottom;
+        const maxTextHeight = header.height - paddingTop - paddingBottom;
 
-        // Calculate optimal text layout (with intelligent line breaking)
-        const maxFontSize = isHovered ? BUCKET_BUTTON_CONFIG.font.sizeHover : BUCKET_BUTTON_CONFIG.font.sizeNormal;
+        const maxFontSize = (isHovered ? BUCKET_BUTTON_CONFIG.font.sizeHover : BUCKET_BUTTON_CONFIG.font.sizeNormal) * mobileScale;
         const minFontSize = 4; // Minimum readable size
         const { fontSize, lines } = this.calculateOptimalTextLayout(
           header.label,
