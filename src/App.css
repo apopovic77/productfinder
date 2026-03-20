@@ -365,6 +365,110 @@ body {
   .pf-nav-arrow {
     display: none;
   }
+
+  /* === MOBILE HEADER === */
+  .pf-header {
+    padding: 0 12px;
+    min-height: 44px;
+    gap: 8px;
+  }
+
+  .pf-header-logo img {
+    height: 18px;
+  }
+
+  .pf-header-search {
+    display: none;
+  }
+
+  .pf-header-title {
+    font-size: 12px;
+  }
+
+  .pf-header-actions {
+    margin-right: 0;
+    gap: 4px;
+  }
+
+  .pf-header-btn {
+    padding: 4px 8px;
+    font-size: 10px;
+  }
+
+  .pf-header-breadcrumbs {
+    margin-left: 8px;
+    gap: 4px;
+    overflow-x: auto;
+    max-width: 40vw;
+    scrollbar-width: none;
+  }
+
+  .pf-header-breadcrumbs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .pf-header-breadcrumb {
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  /* === MOBILE SIDEBAR → force bottom on mobile === */
+  .pf-footer-left,
+  .pf-footer-right {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: 100% !important;
+    max-height: none !important;
+    height: auto !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-top: 1px solid rgba(255, 255, 255, 0.8);
+    border-radius: 0;
+    flex-direction: row !important;
+    flex-wrap: wrap;
+    padding: 12px !important;
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.1);
+  }
+
+  .pf-footer-left .pf-bottom-section,
+  .pf-footer-right .pf-bottom-section {
+    margin-bottom: 8px;
+  }
+
+  .pf-footer-floating {
+    left: 8px !important;
+    right: 8px;
+    width: auto !important;
+    max-width: calc(100vw - 16px);
+    max-height: 60vh !important;
+    border-radius: 12px;
+  }
+
+  /* Stage: no sidebar offset on mobile */
+  .pf-stage-left,
+  .pf-stage-right {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  /* AI search button compact */
+  .pf-ai-search-btn {
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+
+  .pf-ai-history {
+    max-width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+
+  .pf-ai-history-item {
+    max-width: 120px;
+  }
 }
 
 .pf-canvas {
