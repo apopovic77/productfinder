@@ -20,7 +20,7 @@ export class ViewportTransform {
   private targetOffset = new Vector2(0, 0);
 
   // Interpolation speed (0-1, higher = faster)
-  public speedFactor = 0.25;
+  public speedFactor = 0.15;
 
   // Scale limits
   private fitToContentScale = 1; // Calculated from content bounds
@@ -392,13 +392,7 @@ export class ViewportTransform {
   };
 
   private applyMomentum(): void {
-    const speed = Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
-    if (speed > 0.3) {
-      // Stronger momentum — flick gesture feels natural
-      const factor = 12;
-      this.targetOffset.x += this.velocityX * factor;
-      this.targetOffset.y += this.velocityY * factor;
-    }
+    // No artificial momentum — let the interpolation handle deceleration naturally
     this.velocityX = 0;
     this.velocityY = 0;
   }
