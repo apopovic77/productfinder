@@ -1023,8 +1023,9 @@ export class CanvasRenderer<T> {
       this.ctx.scale(scale, scale);
       this.ctx.translate(-centerX, -centerY);
 
-      // Draw alternative images stacked behind (for selected product in any mode)
-      if (isSelectedProduct && this.alternativeImages && this.alternativeImages.length > 0) {
+      // Draw alternative images stacked behind (desktop only - skip on mobile)
+      const isMobileSpread = this.ctx.canvas.width < 768;
+      if (!isMobileSpread && isSelectedProduct && this.alternativeImages && this.alternativeImages.length > 0) {
         // Count loaded images
         const loadedImages = this.alternativeImages.filter(img => img.loadedImage);
         const imageCount = loadedImages.length;
