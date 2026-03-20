@@ -1224,7 +1224,7 @@ export class CanvasRenderer<T> {
 
     // Mobile scaling: reduce bucket button size on small screens
     const canvasW = this.ctx.canvas.width;
-    const mobileScale = canvasW < 768 ? 0.5 : 1;
+    const mobileScale = canvasW < 768 ? 0.3 : 1;
 
     for (const header of groupHeaders) {
       const isHovered = this.hoveredGroupKey === header.key;

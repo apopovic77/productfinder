@@ -382,7 +382,7 @@ body {
   }
 
   .pf-header-title {
-    font-size: 12px;
+    display: none;
   }
 
   .pf-header-actions {

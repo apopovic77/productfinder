@@ -534,13 +534,16 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
         ×
       </button>
 
-      {/* LEFT/TOP SIDE - All Product Images */}
+      {/* LEFT/TOP SIDE - Product Images */}
       <div style={{
         width: isMobile ? '100%' : '40%',
-        padding: isMobile ? '16px 12px' : '40px 30px',
+        padding: isMobile ? '0' : '40px 30px',
         display: 'flex',
-        flexDirection: 'column',
-        gap: '12px',
+        flexDirection: isMobile ? 'row' : 'column',
+        gap: isMobile ? '0' : '12px',
+        overflowX: isMobile ? 'auto' : 'visible',
+        scrollSnapType: isMobile ? 'x mandatory' : 'none',
+        flexShrink: 0,
       }}>
         {allImages.length > 0 ? (
           allImages.map((img, idx) => {
@@ -553,10 +556,13 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
               <div
                 key={idx}
                 style={{
-                  width: '100%',
+                  width: isMobile ? '100%' : '100%',
+                  minWidth: isMobile ? '100%' : 'auto',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  scrollSnapAlign: isMobile ? 'start' : 'none',
+                  padding: isMobile ? '12px' : '0',
                 }}
               >
                 {loadedImage ? (
@@ -565,6 +571,7 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
                     alt={`${product.name} - ${img.label || `Image ${idx + 1}`}`}
                     style={{
                       width: '100%',
+                      maxHeight: isMobile ? '50vh' : 'none',
                       height: 'auto',
                       objectFit: 'contain',
                     }}
