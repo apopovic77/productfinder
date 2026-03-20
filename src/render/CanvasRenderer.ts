@@ -1224,7 +1224,9 @@ export class CanvasRenderer<T> {
 
     // Mobile scaling: reduce bucket button size on small screens
     const canvasW = this.ctx.canvas.width;
-    const mobileScale = canvasW < 768 ? 0.3 : 1;
+    const isMobileCanvas = canvasW < 768;
+    const mobileScale = isMobileCanvas ? 0.3 : 1;
+    const mobileFontScale = isMobileCanvas ? 0.7 : 1; // font stays bigger than button
 
     for (const header of groupHeaders) {
       const isHovered = this.hoveredGroupKey === header.key;
@@ -1385,7 +1387,7 @@ export class CanvasRenderer<T> {
         const maxTextWidth = header.width - paddingLeft - paddingRight;
         const maxTextHeight = header.height - paddingTop - paddingBottom;
 
-        const maxFontSize = (isHovered ? BUCKET_BUTTON_CONFIG.font.sizeHover : BUCKET_BUTTON_CONFIG.font.sizeNormal) * mobileScale;
+        const maxFontSize = (isHovered ? BUCKET_BUTTON_CONFIG.font.sizeHover : BUCKET_BUTTON_CONFIG.font.sizeNormal) * mobileFontScale;
         const minFontSize = 4; // Minimum readable size
         const { fontSize, lines } = this.calculateOptimalTextLayout(
           header.label,
