@@ -406,10 +406,10 @@ export class ViewportTransform {
       this.touchStartCenter.x = ((touch1.clientX + touch2.clientX) / 2) - rect.left;
       this.touchStartCenter.y = ((touch1.clientY + touch2.clientY) / 2) - rect.top;
     } else if (e.touches.length === 1) {
-      // Prevent default to avoid iOS Safari scroll/bounce behavior
       e.preventDefault();
       const touch = e.touches[0];
-      this.isDragging = true;
+      this.isPotentialDrag = true;
+      this.isDragging = false;
       this.dragStart.x = touch.clientX;
       this.dragStart.y = touch.clientY;
       this.offsetStart.x = this.targetOffset.x;
@@ -429,28 +429,37 @@ export class ViewportTransform {
       const scaleFactor = distance / this.touchStartDistance;
       const newScale = Math.max(this.minScale, Math.min(this.maxScale, this.touchStartScale * scaleFactor));
 
-      // Zoom towards the midpoint between fingers (iOS-style pinch-to-zoom)
       const scaleRatio = newScale / this.targetScale;
       this.targetOffset.x = this.touchStartCenter.x - (this.touchStartCenter.x - this.targetOffset.x) * scaleRatio;
       this.targetOffset.y = this.touchStartCenter.y - (this.touchStartCenter.y - this.targetOffset.y) * scaleRatio;
 
       this.targetScale = newScale;
-    } else if (e.touches.length === 1 && this.isDragging) {
-      e.preventDefault();
+    } else if (e.touches.length === 1 && this.isPotentialDrag) {
       const touch = e.touches[0];
       const dx = touch.clientX - this.dragStart.x;
       const dy = touch.clientY - this.dragStart.y;
 
-      // Apply rubber band resistance when dragging outside bounds
-      const resisted = this.applyDragResistance(dx, dy);
+      if (!this.isDragging) {
+        if (Math.abs(dx) > this.dragThreshold || Math.abs(dy) > this.dragThreshold) {
+          this.isDragging = true;
+        } else {
+          return;
+        }
+      }
 
+      e.preventDefault();
+      const resisted = this.applyDragResistance(dx, dy);
       this.targetOffset.x = this.offsetStart.x + resisted.dx;
       this.targetOffset.y = this.offsetStart.y + resisted.dy;
     }
   };
-  
+
   private handleTouchEnd = () => {
-    this.isDragging = false;
+    this.isPotentialDrag = false;
+    if (this.isDragging) {
+      this.wasDragging = true;
+      this.isDragging = false;
+    }
     this.touchStartDistance = 0;
   };
   

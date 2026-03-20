@@ -1176,12 +1176,15 @@ export default class App extends React.Component<{}, State> {
   };
 
   private handleCanvasTouchEnd = (e: TouchEvent) => {
-    e.preventDefault(); // Prevent default touch behavior (scroll, zoom, etc.)
+    e.preventDefault();
 
     const canvas = this.canvasRef.current;
     if (!canvas) return;
 
-    // Use the first touch point
+    // Suppress tap after a touch pan/drag gesture
+    const vt = this.controller.getViewportTransform();
+    if (vt?.consumeDrag()) return;
+
     const touch = e.changedTouches[0];
     if (!touch) return;
 
