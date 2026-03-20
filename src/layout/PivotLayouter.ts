@@ -129,7 +129,8 @@ export class PivotLayouter<T> {
       // === INTELLIGENT CELL MATRIX PIVOT LAYOUT ===
       // Global optimization: Find cell size that fits the LARGEST group, use for all groups
       
-      const headerHeight = BUCKET_BUTTON_CONFIG.height;
+      const isMobile = view.width < 768;
+      const headerHeight = isMobile ? Math.round(BUCKET_BUTTON_CONFIG.height * 0.5) : BUCKET_BUTTON_CONFIG.height;
       const numGroups = keys.length;
 
       if (orientation === 'rows') {

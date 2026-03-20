@@ -49,9 +49,10 @@ export class LaneLayouter<T> implements ILayouter<T> {
     const keys = Array.from(groups.keys());
     if (this.config.groupSort) keys.sort(this.config.groupSort);
 
-    const paddingX = this.config.paddingX ?? 32;
-    const paddingTop = this.config.paddingTop ?? 24;
-    const headerHeight = this.config.headerHeight ?? 48;
+    const isMobile = view.width < 768;
+    const paddingX = this.config.paddingX ?? (isMobile ? 12 : 32);
+    const paddingTop = this.config.paddingTop ?? (isMobile ? 12 : 24);
+    const headerHeight = this.config.headerHeight ?? (isMobile ? 32 : 48);
     const laneGap = this.config.laneGap ?? 80; // enough space for labels below products
     const itemGap = this.config.itemGap ?? 16;
 
