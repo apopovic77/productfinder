@@ -347,9 +347,12 @@ export class ProductFinderController {
     const centerX = x + w / 2;
     const centerY = y + h / 2;
 
-    // Calculate hero zoom: product should take 90% of screen height
+    // Calculate hero zoom: product should take a portion of screen height
     const screenHeight = viewport.viewportHeight;
-    const targetScale = (screenHeight * 0.9) / h;
+    const screenWidth = viewport.viewportWidth;
+    const isMobile = screenWidth < 768;
+    const fillRatio = isMobile ? 0.5 : 0.9; // 50% on mobile, 90% on desktop
+    const targetScale = (screenHeight * fillRatio) / h;
 
     // Clamp scale to max allowed zoom (products max 2× their fit-to-content size)
     const clampedScale = Math.min(targetScale, viewport.maxScale);
