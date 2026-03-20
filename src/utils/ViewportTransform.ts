@@ -393,9 +393,11 @@ export class ViewportTransform {
 
   private applyMomentum(): void {
     const speed = Math.sqrt(this.velocityX * this.velocityX + this.velocityY * this.velocityY);
-    if (speed > 0.5) {
-      this.targetOffset.x += this.velocityX * 8;
-      this.targetOffset.y += this.velocityY * 8;
+    if (speed > 0.3) {
+      // Stronger momentum — flick gesture feels natural
+      const factor = 12;
+      this.targetOffset.x += this.velocityX * factor;
+      this.targetOffset.y += this.velocityY * factor;
     }
     this.velocityX = 0;
     this.velocityY = 0;
@@ -496,6 +498,10 @@ export class ViewportTransform {
       this.wasDragging = true;
       this.isDragging = false;
       this.applyMomentum();
+    }
+    // Also suppress click after pinch-zoom
+    if (this.touchStartDistance > 0) {
+      this.wasDragging = true;
     }
     this.touchStartDistance = 0;
   };

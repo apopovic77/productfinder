@@ -36,7 +36,8 @@ interface ParsedFeature {
  * Same design as V1, but with compact half-width layout
  */
 export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy }) => {
-  const DIALOG_WIDTH = 240; // Half of original 480px
+  const isMobilePortrait = window.innerWidth <= 768 && window.innerHeight > window.innerWidth;
+  const DIALOG_WIDTH = isMobilePortrait ? Math.min(window.innerWidth - 16, 380) : 240;
 
   // State for full product details (fetched from API with variants)
   const [fullProduct, setFullProduct] = useState<Product | null>(null);
@@ -550,13 +551,15 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       className="pom-info-panel pom-panel-standalone"
       style={{
         position: 'fixed',
-        left: `${dragPosition.x}px`,
-        top: `${dragPosition.y}px`,
+        left: isMobilePortrait ? `${(window.innerWidth - DIALOG_WIDTH) / 2}px` : `${dragPosition.x}px`,
+        top: isMobilePortrait ? 'auto' : `${dragPosition.y}px`,
+        bottom: isMobilePortrait ? '8px' : 'auto',
         width: `${DIALOG_WIDTH}px`,
-        maxHeight: '80vh',
+        maxHeight: isMobilePortrait ? '48vh' : '80vh',
         cursor: isDragging ? 'grabbing' : 'grab',
         userSelect: isDragging ? 'none' : 'auto',
-        fontSize: '11px', // Smaller font for compact layout
+        fontSize: isMobilePortrait ? '12px' : '11px',
+        overflowY: isMobilePortrait ? 'auto' : 'visible',
       }}
       initial={{ opacity: 0, x: 50 }}
       animate={{ opacity: 1, x: 0 }}
@@ -569,10 +572,24 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       onMouseDown={handleMouseDown}
       onTouchStart={handleTouchStart}
     >
-      {/* Close button */}
-      <button className="pom-close" onClick={onClose} aria-label="Close" style={{ position: 'absolute', top: '8px', right: '8px', fontSize: '20px' }}>
-        ×
-      </button>
+      {/* Action buttons - top right on mobile, close only on desktop */}
+      <div style={{
+        position: 'absolute',
+        top: '6px',
+        right: '6px',
+        display: 'flex',
+        gap: '4px',
+        zIndex: 10,
+      }}>
+        {isMobilePortrait && (
+          <button className="pom-button pom-button-primary" onClick={handleAddToCart} style={{ fontSize: '10px', padding: '4px 10px', borderRadius: '6px' }}>
+            Cart
+          </button>
+        )}
+        <button className="pom-close" onClick={onClose} aria-label="Close" style={{ fontSize: '18px', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          ×
+        </button>
+      </div>
 
       {/* Title - V4 Style: First word thin, rest bold */}
       <h2 className="pom-title" style={{ fontSize: '14px', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '-0.01em', lineHeight: '1.1' }}>
@@ -827,20 +844,22 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         )}
       </div>
 
-      {/* Buttons - Compact */}
-      <div className="pom-actions" style={{ gap: '6px' }}>
-        <button className="pom-button pom-button-primary" onClick={handleAddToCart} style={{ fontSize: '11px', padding: '8px 12px' }}>
-          Add to Cart
-        </button>
-        {productUrl && (
-          <button className="pom-button pom-button-secondary" onClick={handleShowInHP} style={{ fontSize: '11px', padding: '8px 12px' }}>
-            Show in HP
+      {/* Buttons - hidden on mobile portrait (moved to top right) */}
+      {!isMobilePortrait && (
+        <div className="pom-actions" style={{ gap: '6px' }}>
+          <button className="pom-button pom-button-primary" onClick={handleAddToCart} style={{ fontSize: '11px', padding: '8px 12px' }}>
+            Add to Cart
           </button>
-        )}
-        <button className="pom-button pom-button-secondary" onClick={onClose} style={{ fontSize: '11px', padding: '8px 12px' }}>
-          Close
-        </button>
-      </div>
+          {productUrl && (
+            <button className="pom-button pom-button-secondary" onClick={handleShowInHP} style={{ fontSize: '11px', padding: '8px 12px' }}>
+              Show in HP
+            </button>
+          )}
+          <button className="pom-button pom-button-secondary" onClick={onClose} style={{ fontSize: '11px', padding: '8px 12px' }}>
+            Close
+          </button>
+        </div>
+      )}
     </motion.div>
   );
 };
