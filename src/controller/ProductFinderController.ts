@@ -351,14 +351,14 @@ export class ProductFinderController {
     const screenHeight = viewport.viewportHeight;
     const screenWidth = viewport.viewportWidth;
     const isMobile = screenWidth < 768;
-    const fillRatio = isMobile ? 0.6 : 0.9; // 60% on mobile, 90% on desktop
+    const fillRatio = isMobile ? 0.6 : 0.9;
     const targetScale = (screenHeight * fillRatio) / h;
 
-    // Clamp scale to max allowed zoom (products max 2× their fit-to-content size)
     const clampedScale = Math.min(targetScale, viewport.maxScale);
 
-    // Center and zoom to product in hero mode
-    this.viewportService.centerOn(centerX, centerY, clampedScale);
+    // On mobile: position product in upper third (leave space for V2 dialog below)
+    const focusY = isMobile ? centerY + h * 0.4 : centerY;
+    this.viewportService.centerOn(centerX, focusY, clampedScale);
     // Hero zoom applied
   }
 
