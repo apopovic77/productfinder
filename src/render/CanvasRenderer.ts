@@ -1226,7 +1226,7 @@ export class CanvasRenderer<T> {
     const canvasW = this.ctx.canvas.width;
     const isMobileCanvas = canvasW < 768;
     const mobileScale = isMobileCanvas ? 0.3 : 1;
-    const mobileFontScale = isMobileCanvas ? 0.7 : 1; // font stays bigger than button
+    const mobileFontScale = isMobileCanvas ? 1.0 : 1; // full size font even on mobile
 
     for (const header of groupHeaders) {
       const isHovered = this.hoveredGroupKey === header.key;
