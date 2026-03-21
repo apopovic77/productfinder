@@ -173,9 +173,16 @@ const ATTRIBUTE_HINTS: Record<string, AttributeHint> = {
     priorityBoost: -1.0,
     delimiter: '|',
   },
+  design_group: {
+    label: 'Design',
+    role: 'class',
+    parentKey: 'attribute:product_family',
+    priorityBoost: 0.09,
+  },
   color_name: {
     label: 'Farbe',
     role: 'class',
+    parentKey: 'attribute:design_group',
     priorityBoost: 0.05,
   },
   model_year: {
