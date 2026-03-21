@@ -282,13 +282,14 @@ function mapProduct(p: OnealProduct): Product | null {
       }
     : undefined);
 
-  // Category from API (for backwards compatibility)
-  addAttribute(attributes, apiAny.category
+  // Category from API (ERP category - skip Z-categories like spare parts/merchandise)
+  const categoryValue = apiAny.category as string | undefined;
+  addAttribute(attributes, categoryValue && !categoryValue.startsWith('Z-')
     ? {
         key: 'category_primary',
         label: 'Category',
         type: 'enum',
-        value: apiAny.category,
+        value: categoryValue,
         sourcePath: 'category',
       }
     : undefined);
