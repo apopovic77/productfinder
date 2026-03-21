@@ -121,7 +121,6 @@ const ATTRIBUTE_HINTS: Record<string, AttributeHint> = {
     candidateKey: 'attribute:product_family',
     label: 'Produktlinie',
     role: 'class',
-    parentKey: 'category:presentation',
     priorityBoost: 0.12,
   },
   // === Internal/Display Attributes ===
@@ -183,13 +182,11 @@ const ATTRIBUTE_HINTS: Record<string, AttributeHint> = {
   design_group: {
     label: 'Design',
     role: 'class',
-    parentKey: 'attribute:product_family',
     priorityBoost: 0.09,
   },
   color_name: {
     label: 'Farbe',
     role: 'class',
-    parentKey: 'attribute:design_group',
     priorityBoost: 0.05,
   },
   model_year: {
