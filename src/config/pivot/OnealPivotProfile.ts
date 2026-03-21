@@ -444,8 +444,8 @@ export const ONEAL_PIVOT_PROFILE: PivotProfile = {
   isClothingContext,
   isProtectorContext,
   getPreferredChildDimension(parentDimension, _parentValue) {
-    // After any category drill-down → show product lines (3SRS, ELEMENT, BACKFLIP...)
-    if (parentDimension === 'category:presentation' || parentDimension === 'attribute:sport' || parentDimension === 'category:erp') {
+    // After category → show product lines (3SRS, ELEMENT, BACKFLIP...)
+    if (parentDimension === 'category:erp' || parentDimension === 'category:presentation' || parentDimension === 'attribute:sport') {
       return 'attribute:product_family';
     }
     // After product line → show designs (3SRS Helmet RIFF, 3SRS Helmet VISION...)
