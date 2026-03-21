@@ -443,19 +443,8 @@ export const ONEAL_PIVOT_PROFILE: PivotProfile = {
   formatTokenPath,
   isClothingContext,
   isProtectorContext,
-  getPreferredChildDimension(parentDimension, _parentValue) {
-    // After category → show product lines (3SRS, ELEMENT, BACKFLIP...)
-    if (parentDimension === 'category:erp' || parentDimension === 'category:presentation' || parentDimension === 'attribute:sport') {
-      return 'attribute:product_family';
-    }
-    // After product line → show designs (3SRS Helmet RIFF, 3SRS Helmet VISION...)
-    if (parentDimension === 'attribute:product_family') {
-      return 'attribute:design_group';
-    }
-    // After design → show colors
-    if (parentDimension === 'attribute:design_group') {
-      return 'attribute:color_name';
-    }
+  getPreferredChildDimension(_parentDimension, _parentValue) {
+    // Smart mode: let the system decide based on coverage/entropy
     return undefined;
   },
   getPreferredGrandchildDimension(parentDimension, parentValue, childDimension, childValue) {

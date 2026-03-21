@@ -74,25 +74,37 @@ type AttributeHint = {
 };
 
 const ATTRIBUTE_HINTS: Record<string, AttributeHint> = {
-  // === V2 API Properties ===
+  // === Category Dimensions (initial grouping) ===
   presentation_category: {
     candidateKey: 'category:presentation',
     label: 'Produkttyp',
     role: 'category',
-    priorityBoost: 0.15,
+    priorityBoost: 0.2,
     source: { type: 'attribute', key: 'presentation_category' },
   },
   category_primary: {
     candidateKey: 'category:erp',
     label: 'Kategorie',
     role: 'category',
-    priorityBoost: 0.25,
+    priorityBoost: 0.15,
     source: { type: 'attribute', key: 'category_primary' },
   },
   sport: {
     label: 'Sport',
     role: 'category',
-    priorityBoost: 0.15,
+    priorityBoost: 0.1,
+  },
+  // === Class Dimensions (drill-down grouping) ===
+  product_line: {
+    candidateKey: 'attribute:product_family',
+    label: 'Produktlinie',
+    role: 'class',
+    priorityBoost: 0.12,
+  },
+  design_group: {
+    label: 'Design',
+    role: 'class',
+    priorityBoost: 0.09,
   },
   target_group: {
     label: 'Zielgruppe',
@@ -102,59 +114,24 @@ const ATTRIBUTE_HINTS: Record<string, AttributeHint> = {
   body_part: {
     label: 'Körperteil',
     role: 'class',
-    parentKey: 'category:presentation',
-    priorityBoost: 0.08,
+    priorityBoost: 0.04,
   },
   product_function: {
     label: 'Funktion',
     role: 'class',
-    priorityBoost: 0.06,
+    priorityBoost: 0.03,
   },
-  product_type: {
-    candidateKey: 'attribute:product_type',
-    label: 'Produkttyp',
+  color_name: {
+    label: 'Farbe',
     role: 'class',
-    parentKey: 'category:presentation',
-    priorityBoost: 0.1,
+    priorityBoost: 0.05,
   },
-  product_line: {
-    candidateKey: 'attribute:product_family',
-    label: 'Produktlinie',
+  model_year: {
+    label: 'Jahrgang',
     role: 'class',
-    priorityBoost: 0.12,
+    priorityBoost: 0.08,
   },
-  // === Internal/Display Attributes ===
-  poster_group: {
-    label: 'Poster Gruppe',
-    role: 'metadata',  // Demote from category - only used for poster layout
-    priorityBoost: -0.5,
-  },
-  // === Legacy/Compatibility ===
-  category_secondary: {
-    candidateKey: 'category:secondary',
-    label: 'Unterkategorie',
-    role: 'class',
-    parentKey: 'category:presentation',
-    source: { type: 'category', level: 1 },
-  },
-  product_family: {
-    label: 'Produktfamilie',
-    role: 'class',
-    parentKey: 'category:presentation',
-  },
-  taxonomy_path: {
-    label: 'Taxonomie',
-    role: 'class',
-    source: { type: 'attribute', key: 'taxonomy_path', level: 999 }, // level 999 = use last part
-  },
-  brand: {
-    label: 'Brand',
-    role: 'class',
-  },
-  season: {
-    label: 'Season',
-    role: 'class',
-  },
+  // === Variation Dimensions (numeric) ===
   price: {
     label: 'Preis',
     role: 'variation',
@@ -169,6 +146,7 @@ const ATTRIBUTE_HINTS: Record<string, AttributeHint> = {
     role: 'variation',
     priorityBoost: 0.05,
   },
+  // === Metadata (low priority / hidden) ===
   has_image: {
     label: 'Hat Bild',
     role: 'metadata',
@@ -179,20 +157,50 @@ const ATTRIBUTE_HINTS: Record<string, AttributeHint> = {
     priorityBoost: -1.0,
     delimiter: '|',
   },
-  design_group: {
-    label: 'Design',
-    role: 'class',
-    priorityBoost: 0.09,
+  poster_group: {
+    label: 'Poster Gruppe',
+    role: 'metadata',
+    priorityBoost: -0.5,
   },
-  color_name: {
-    label: 'Farbe',
-    role: 'class',
-    priorityBoost: 0.05,
+  brand: {
+    label: 'Brand',
+    role: 'metadata',
   },
-  model_year: {
-    label: 'Jahrgang',
+  season: {
+    label: 'Season',
     role: 'class',
-    priorityBoost: 0.08,
+  },
+  product_type: {
+    candidateKey: 'attribute:product_type',
+    label: 'Typ',
+    role: 'metadata',
+  },
+  product_family: {
+    label: 'Produktfamilie',
+    role: 'metadata',
+  },
+  taxonomy_path: {
+    label: 'Taxonomie',
+    role: 'metadata',
+    source: { type: 'attribute', key: 'taxonomy_path', level: 999 },
+  },
+  category_secondary: {
+    candidateKey: 'category:secondary',
+    label: 'Unterkategorie',
+    role: 'metadata',
+    source: { type: 'category', level: 1 },
+  },
+  is_spare: {
+    label: 'Ersatzteil',
+    role: 'metadata',
+  },
+  family_size: {
+    label: 'Farbvarianten',
+    role: 'metadata',
+  },
+  product_code: {
+    label: 'Produktcode',
+    role: 'metadata',
   },
   variant_sizes: {
     label: 'Größen',

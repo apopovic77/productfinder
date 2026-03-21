@@ -38,7 +38,7 @@ const UNKNOWN_LABEL = 'N/A';
 const NONE_LABEL = 'N/A';
 
 const PIVOT_PROFILE = ACTIVE_PIVOT_PROFILE;
-const PRESENTATION_DIMENSION = 'category:erp';
+const PRESENTATION_DIMENSION = 'category:presentation';
 
 
 
