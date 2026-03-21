@@ -77,10 +77,17 @@ const ATTRIBUTE_HINTS: Record<string, AttributeHint> = {
   // === V2 API Properties ===
   presentation_category: {
     candidateKey: 'category:presentation',
-    label: 'Produktkategorie',
+    label: 'Produkttyp',
     role: 'category',
-    priorityBoost: 0.2,
+    priorityBoost: 0.15,
     source: { type: 'attribute', key: 'presentation_category' },
+  },
+  category_primary: {
+    candidateKey: 'category:erp',
+    label: 'Kategorie',
+    role: 'category',
+    priorityBoost: 0.25,
+    source: { type: 'attribute', key: 'category_primary' },
   },
   sport: {
     label: 'Sport',
@@ -397,8 +404,7 @@ export class PivotDimensionAnalyzer {
       }
 
       for (const [attrKey, attr] of attributeEntries) {
-        // Skip category_primary as it's redundant with presentation_category
-        if (attrKey === 'category_primary') continue;
+        // category_primary is now its own dimension (ERP category like "Helmets MX")
 
         if (!attr) continue;
         const rawValue = attr.value ?? attr.normalizedValue;
