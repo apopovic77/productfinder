@@ -7,7 +7,10 @@ import { PivotGroup } from '../layout/PivotGroup';
 import { ShelfLayoutStrategy } from '../layout/ShelfLayoutStrategy';
 import { LayoutEngine } from '../layout/LayoutEngine';
 import { Vector2 } from 'arkturian-typescript-utils';
-import { PivotDrillDownService, type GroupDimension, type PriceBucketConfig, type PriceBucketMode } from './PivotDrillDownService';
+import { GpanePivotService, type GroupDimension, type PriceBucketConfig } from '../gpane/GpanePivotService';
+import { ONEAL_TAXONOMY } from '../gpane';
+// Legacy import kept for type compatibility
+import type { PriceBucketMode } from './PivotDrillDownService';
 import { HeroLayouter } from '../layout/HeroLayouter';
 import type { PivotAnalysisResult, PivotDimensionDefinition } from './PivotDimensionAnalyzer';
 import { ACTIVE_PIVOT_PROFILE } from '../config/pivot';
@@ -31,8 +34,8 @@ export class LayoutService {
   private access = new ProductLayoutAccessors();
   private scalePolicy = new WeightScalePolicy();
   
-  // Pivot drill-down service
-  private drillDownService = new PivotDrillDownService();
+  // GPANE pivot service (replaces PivotDrillDownService)
+  private drillDownService: GpanePivotService;
   private pivotGroups: PivotGroup[] = [];
   private pivotConfig: PivotConfig<Product>;
   private animationDuration = 0.4;
@@ -79,6 +82,30 @@ export class LayoutService {
   private static readonly PRESENTATION_ORDER = createOrderMap(PIVOT_PROFILE.presentationCategoryOrder);
 
   constructor() {
+    // Initialize GPANE-backed pivot service with O'Neal taxonomy
+    this.drillDownService = new GpanePivotService({
+      maxBuckets: 12,
+      minCoverage: 0.5,
+      scoring: { coverage: 0.25, diversity: 0.25, informationGain: 0.20, usability: 0.15, redundancy: 0.10, history: 0.05, fragmentation: 0.05 },
+      overrides: {
+        variant_colors: { hidden: true },
+        variant_sizes: { hidden: true },
+        has_image: { hidden: true },
+        product_code: { hidden: true },
+        family_name: { hidden: true },
+        is_spare: { label: 'Ersatzteil' },
+        model_year: { label: 'Jahrgang', dataType: 'numeric_discrete' },
+      },
+      hierarchies: [{
+        name: 'Product Hierarchy',
+        levels: ['presentation_category', 'product_line', 'design_group'],
+        bonusPerLevel: 0.3,
+        strictOrder: false,
+      }],
+      domain: 'oneal',
+      taxonomy: ONEAL_TAXONOMY,
+    });
+
     this.pivotConfig = this.createDefaultPivotConfig();
     this.layouter = this.createLayouter(this.mode);
     this.engine = new LayoutEngine<Product>(this.layouter);
@@ -313,6 +340,31 @@ export class LayoutService {
     this.pivotGroups = [];
   }
 
+  setCellSizeOverride(size: number): void {
+    this.pivotConfig = { ...this.pivotConfig, cellSizeOverride: size || undefined };
+    if (this.layouter instanceof PivotLayouter) {
+      (this.layouter as any).config = this.pivotConfig;
+    }
+    this._cellSizeOverrideActive = size > 0;
+  }
+
+  private _cellSizeOverrideActive = false;
+
+  get hasCellSizeOverride(): boolean {
+    return this._cellSizeOverrideActive;
+  }
+
+  setMinCellSize(size: number): void {
+    this.pivotConfig = { ...this.pivotConfig, minCellSize: size || undefined };
+    if (this.layouter instanceof PivotLayouter) {
+      (this.layouter as any).config = this.pivotConfig;
+    }
+  }
+
+  forceReloadPivot(products: Product[]): void {
+    this.drillDownService.forceReload(products);
+  }
+
   getMode(): LayoutMode {
     return this.mode;
   }
@@ -436,7 +488,8 @@ export class LayoutService {
   }
 
   getPivotDimensionDefinitions(): PivotDimensionDefinition[] {
-    return this.pivotModel?.dimensions ?? [];
+    // Use GPANE's scored dimensions converted to PivotDimensionDefinition format
+    return this.drillDownService.getDimensionDefinitions();
   }
   
   getAvailablePivotDimensions(): GroupDimension[] {
@@ -652,6 +705,9 @@ export class LayoutService {
    * Override sync to update pivot groups
    */
   sync(products: Product[], canonicalSource?: Product[]): void {
+    // Load products into GPANE engine (uses canonical source if available, else all products)
+    this.drillDownService.loadProducts(canonicalSource || products);
+
     if (canonicalSource) {
       this.updateCanonicalOrders(canonicalSource);
     }
@@ -827,47 +883,47 @@ export class LayoutService {
    * system from centering content vertically (since content < viewport = centering)
    */
   private calculateFixedBounds(nodes: any[], viewportWidth: number, viewportHeight: number): { width: number; height: number; minX: number; minY: number; maxX: number; maxY: number; maxItemHeight: number } {
-    // First, get actual content bounds to determine horizontal extent
-    let minX = Infinity;
-    let maxX = -Infinity;
+    let contentMinX = Infinity;
+    let contentMaxX = -Infinity;
+    let contentMinY = Infinity;
+    let contentMaxY = -Infinity;
     let maxItemHeight = 0;
 
     for (const node of nodes) {
       const x = node.posX.targetValue ?? node.posX.value ?? 0;
+      const y = node.posY.targetValue ?? node.posY.value ?? 0;
       const w = node.width.targetValue ?? node.width.value ?? 0;
       const h = node.height.targetValue ?? node.height.value ?? 0;
 
-      minX = Math.min(minX, x);
-      maxX = Math.max(maxX, x + w);
-
-      // Track maximum item height for zoom limit calculation
+      contentMinX = Math.min(contentMinX, x);
+      contentMaxX = Math.max(contentMaxX, x + w);
+      contentMinY = Math.min(contentMinY, y);
+      contentMaxY = Math.max(contentMaxY, y + h);
       maxItemHeight = Math.max(maxItemHeight, h);
     }
 
-    // Include group headers in horizontal bounds
+    // Include group headers in bounds
     const headers = this.getGroupHeaders();
     for (const header of headers) {
-      minX = Math.min(minX, header.x);
-      maxX = Math.max(maxX, header.x + header.width);
+      contentMinX = Math.min(contentMinX, header.x);
+      contentMaxX = Math.max(contentMaxX, header.x + header.width);
+      contentMinY = Math.min(contentMinY, header.y);
+      contentMaxY = Math.max(contentMaxY, header.y + header.height);
     }
 
-    const actualWidth = maxX - minX;
+    // Use actual content extent, expanded to at least viewport size
+    const finalMinX = Math.min(0, contentMinX);
+    const finalMinY = Math.min(0, contentMinY);
+    const finalMaxX = Math.max(contentMaxX, viewportWidth);
+    const finalMaxY = Math.max(contentMaxY, viewportHeight);
 
-    // Force bounds to be at least viewport size
-    // This prevents vertical centering in pivot mode
-    const width = Math.max(actualWidth, viewportWidth);
-
-    // IMPORTANT: Fixed bounds must start at 0 to ensure symmetric centering
-    // If we preserve the actual minX (e.g., framePadding=20), the rubberband
-    // would center based on asymmetric bounds (20 to 1940 instead of 0 to 1920)
-    // causing the layout to appear offset
     return {
-      minX: 0,  // Always start at left edge for symmetric centering
-      minY: 0,  // Always start at top
-      maxX: viewportWidth,  // Always end at viewport width
-      maxY: viewportHeight,  // Always end at viewport height
-      width: viewportWidth,
-      height: viewportHeight,
+      minX: finalMinX,
+      minY: finalMinY,
+      maxX: finalMaxX,
+      maxY: finalMaxY,
+      width: finalMaxX - finalMinX,
+      height: finalMaxY - finalMinY,
       maxItemHeight
     };
   }

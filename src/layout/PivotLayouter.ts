@@ -28,6 +28,7 @@ export type PivotConfig<T> = {
   colBaseWidth?: number;
   minCellSize?: number;
   maxCellSize?: number;
+  cellSizeOverride?: number;  // Force cell size (skip auto-calculation)
   smallGroupThreshold?: number;
   access: { weight(item: T): number | undefined };
   scale: WeightScalePolicy;
@@ -166,7 +167,9 @@ export class PivotLayouter<T> {
         let globalCols = 1;
         let globalRows = maxProductsInAnyGroup;
 
-        if (fitsAllProducts(searchMin)) {
+        if (this.config.cellSizeOverride && this.config.cellSizeOverride > 0) {
+          globalCellSize = this.config.cellSizeOverride;
+        } else if (fitsAllProducts(searchMin)) {
           let low = searchMin;
           let high = searchMax;
           while (fitsAllProducts(high) && high < searchMax * 4) {
@@ -192,8 +195,17 @@ export class PivotLayouter<T> {
         globalCols = Math.max(1, Math.floor((matrixWidth + spacing) / (globalCellSize + spacing)));
         globalRows = Math.max(1, Math.floor((matrixHeight + spacing) / (globalCellSize + spacing)));
 
-        while (globalCols * globalRows < maxProductsInAnyGroup && globalCellSize > searchMin) {
-          globalCellSize = Math.max(searchMin, globalCellSize - 0.5);
+        if (!this.config.cellSizeOverride) {
+          while (globalCols * globalRows < maxProductsInAnyGroup && globalCellSize > searchMin) {
+            globalCellSize = Math.max(searchMin, globalCellSize - 0.5);
+            globalCols = Math.max(1, Math.floor((matrixWidth + spacing) / (globalCellSize + spacing)));
+            globalRows = Math.max(1, Math.floor((matrixHeight + spacing) / (globalCellSize + spacing)));
+          }
+        }
+
+        // Enforce hard minimum cell size (content may overflow)
+        if (this.config.minCellSize && globalCellSize < this.config.minCellSize) {
+          globalCellSize = this.config.minCellSize;
           globalCols = Math.max(1, Math.floor((matrixWidth + spacing) / (globalCellSize + spacing)));
           globalRows = Math.max(1, Math.floor((matrixHeight + spacing) / (globalCellSize + spacing)));
         }
@@ -248,10 +260,8 @@ export class PivotLayouter<T> {
         return;
       }
 
-      // Calculate frame width: size columns as if max 10 are visible,
-      // but layout ALL groups (overflow scrolls off-screen to the right)
-      const MAX_VISIBLE = 10;
-      const columnsForSizing = Math.min(numGroups, MAX_VISIBLE);
+      // Calculate frame width: divide viewport among ALL groups
+      const columnsForSizing = numGroups;
       const totalGaps = this.config.frameGap * Math.max(0, columnsForSizing - 1);
       const totalPadding = this.paddingLeft + this.paddingRight;
       const availableWidth = view.width - totalGaps - totalPadding;
@@ -292,8 +302,10 @@ export class PivotLayouter<T> {
       let globalCellSize = searchMin;
       let globalCols = 1;
       let globalRows = maxProductsInAnyGroup;
-      
-      if (fitsAllProducts(searchMin)) {
+
+      if (this.config.cellSizeOverride && this.config.cellSizeOverride > 0) {
+        globalCellSize = this.config.cellSizeOverride;
+      } else if (fitsAllProducts(searchMin)) {
         let low = searchMin;
         let high = searchMax;
         
@@ -326,12 +338,22 @@ export class PivotLayouter<T> {
       globalRows = Math.max(1, Math.floor((matrixHeight + spacing) / (globalCellSize + spacing)));
       
       // Final safety check – if rounding dropped capacity, reduce size slightly
-      while (globalCols * globalRows < maxProductsInAnyGroup && globalCellSize > searchMin) {
-        globalCellSize = Math.max(searchMin, globalCellSize - 0.5);
+      // Skip if cell size is overridden — user wants that size even if it overflows
+      if (!this.config.cellSizeOverride) {
+        while (globalCols * globalRows < maxProductsInAnyGroup && globalCellSize > searchMin) {
+          globalCellSize = Math.max(searchMin, globalCellSize - 0.5);
+          globalCols = Math.max(1, Math.floor((matrixWidth + spacing) / (globalCellSize + spacing)));
+          globalRows = Math.max(1, Math.floor((matrixHeight + spacing) / (globalCellSize + spacing)));
+        }
+      }
+      
+      // Enforce hard minimum cell size (content may overflow)
+      if (this.config.minCellSize && globalCellSize < this.config.minCellSize) {
+        globalCellSize = this.config.minCellSize;
         globalCols = Math.max(1, Math.floor((matrixWidth + spacing) / (globalCellSize + spacing)));
         globalRows = Math.max(1, Math.floor((matrixHeight + spacing) / (globalCellSize + spacing)));
       }
-      
+
       // STEP 3: Layout ALL groups using the SAME cell size
       let offsetX = this.paddingLeft;
       for (const k of keys) {

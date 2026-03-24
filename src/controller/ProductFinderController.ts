@@ -32,6 +32,7 @@ export class ProductFinderController {
 
   // Renderers
   private renderer: CanvasRenderer<Product> | null = null;
+  private _productLimit = 5000;
   private skeletonRenderer: SkeletonRenderer | null = null;
   private skeletonRafId: number | null = null;
   private renderAccess = new ProductRenderAccessors();
@@ -134,16 +135,19 @@ export class ProductFinderController {
       filtered = this.collapseByFamily(filtered);
     }
 
+    // Apply dev product limit
+    if (filtered.length > this._productLimit) {
+      filtered = filtered.slice(0, this._productLimit);
+    }
     const analyzerSource = filtered.length > 0 ? filtered : this.products;
     this.pivotModel = this.pivotAnalyzer.analyze(analyzerSource);
     this.layoutService.setPivotModel(this.pivotModel);
 
     this.layoutService.sync(filtered, analyzerSource);
 
-    // Only re-layout, don't resize canvas
-    // Canvas size should only change on actual window resize
+    // Re-layout: recalculate canvas dimensions (respects insets from settings panel)
     if (this.canvas) {
-      this.layoutService.layout(this.canvas.width, this.canvas.height);
+      this.handleResize();
 
       // Update renderer hero mode state
       if (this.renderer) {
@@ -188,10 +192,23 @@ export class ProductFinderController {
       return;
     }
 
-    // Content bounds set
-
     // Set content bounds on viewport
     this.viewportService.setContentBounds(bounds);
+
+    // Debug: pass bounds to renderer for visualization
+    if (this.renderer) {
+      this.renderer.debugBoundsContent = {
+        x: bounds.minX, y: bounds.minY,
+        w: bounds.maxX - bounds.minX, h: bounds.maxY - bounds.minY,
+      };
+      // Auto bounds = viewport size (what auto cell size would produce)
+      if (this.canvas) {
+        this.renderer.debugBoundsAuto = {
+          x: 0, y: 0,
+          w: this.canvas.width, h: this.canvas.height,
+        };
+      }
+    }
 
     // Different viewport behavior for hero mode (product presentation)
     const isHeroMode = this.layoutService.isPivotHeroMode();
@@ -214,14 +231,35 @@ export class ProductFinderController {
       }
       this.viewportService.centerOn(bounds.minX + (this.canvas?.width ?? 0) / 2, bounds.minY + (this.canvas?.height ?? 0) / 2, 1);
     } else {
-      // Pivot mode: Fit all content, free panning, no scale override
+      // Pivot mode: free panning
       this.viewportService.setLockVerticalPan(false);
       const vt = this.viewportService.getTransform();
       if (vt) {
-        vt.minScaleOverride = null;
         vt.panWithLeftButton = true;
+        if (this.layoutService.hasCellSizeOverride) {
+          // Cell size override: allow panning to overflow content,
+          // but zoom-out limit = fit viewport (not the larger content)
+          const minScale = Math.min(
+            (this.canvas?.width ?? 800) / (bounds.maxX || 1),
+            (this.canvas?.height ?? 600) / (bounds.maxY || 1)
+          );
+          vt.minScaleOverride = Math.max(0.1, minScale);
+        } else {
+          vt.minScaleOverride = null;
+        }
       }
-      this.viewportService.resetToFitContent();
+      // Position camera: bottom-aligned (buckets are at the bottom)
+      // Scale = fit viewport (auto bounds), Y = show bottom of content
+      const vw = this.canvas?.width ?? 800;
+      const vh = this.canvas?.height ?? 600;
+      const fitScale = Math.min(vw / (bounds.width || 1), vh / vh);
+      const scale = vt?.minScaleOverride ?? fitScale;
+
+      // Bottom-align: offset so that maxY maps to viewport bottom
+      const offsetY = vh - bounds.maxY * scale;
+      const offsetX = -bounds.minX * scale;
+
+      this.viewportService.getTransform()?.setPosition(offsetX, offsetY, scale);
     }
   }
 
@@ -433,6 +471,8 @@ export class ProductFinderController {
            this.canvas.width = viewportWidth;
            this.canvas.height = viewportHeight;
 
+           console.log(`[Resize] parent=${parentWidth}x${parentHeight} insets L=${left} R=${right} → canvas=${viewportWidth}x${viewportHeight}`);
+
            // Layout uses viewport size
            this.layoutService.layout(viewportWidth, viewportHeight);
            this.updateContentBounds();
@@ -499,6 +539,38 @@ export class ProductFinderController {
   
   setPriceBucketConfig(mode: PriceBucketMode, bucketCount: number): void {
     this.layoutService.setPriceBucketConfig(mode, bucketCount);
+    this.onDataChanged();
+  }
+
+  setIgnoreBounds(ignore: boolean): void {
+    const vt = this.viewportService.getTransform();
+    if (vt) {
+      vt.ignoreBounds = ignore;
+    }
+  }
+
+  setCellSizeOverride(size: number): void {
+    this.layoutService.setCellSizeOverride(size);
+    this.handleResize();
+  }
+
+  setMinCellSize(size: number): void {
+    this.layoutService.setMinCellSize(size);
+    this.handleResize();
+  }
+
+  setProductLimit(limit: number): void {
+    this._productLimit = limit;
+    // Force reload GPANE engine with limited products
+    let filtered = this.filterService.filterAndSort(this.products);
+    filtered = this.favoritesService.filter(filtered);
+    if (this._familyGrouped) {
+      filtered = this.collapseByFamily(filtered);
+    }
+    if (filtered.length > limit) {
+      filtered = filtered.slice(0, limit);
+    }
+    this.layoutService.forceReloadPivot(filtered);
     this.onDataChanged();
   }
 

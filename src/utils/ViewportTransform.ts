@@ -25,8 +25,9 @@ export class ViewportTransform {
   // Scale limits
   private fitToContentScale = 1; // Calculated from content bounds
   public maxScale = 2; // Dynamically calculated: fitToContentScale × 2
-  public minScaleOverride: number | null = null; // If set, overrides calculated minScale
-  public panWithLeftButton = false; // If true, left mouse button also pans
+  public minScaleOverride: number | null = null;
+  public panWithLeftButton = false;
+  public ignoreBounds = false;  // Debug: disable all bounds clamping
 
   // Rubber banding config (iOS-style)
   private enableRubberBanding = true;
@@ -167,6 +168,7 @@ export class ViewportTransform {
     shouldCenterY: boolean;
   } | null {
     if (!this.contentBounds) return null;
+    if (this.ignoreBounds) return null;  // Free pan mode
 
     const scaledWidth = this.contentBounds.width * this.targetScale;
     const scaledHeight = this.contentBounds.height * this.targetScale;
@@ -561,6 +563,15 @@ export class ViewportTransform {
     const offsetY = this.viewportHeight / 2 - worldY * scale;
 
     // Set targets (smooth interpolation will handle the animation)
+    this.targetScale = scale;
+    this.targetOffset.x = offsetX;
+    this.targetOffset.y = offsetY;
+  }
+
+  /**
+   * Set target position (smooth interpolation)
+   */
+  setPosition(offsetX: number, offsetY: number, scale: number): void {
     this.targetScale = scale;
     this.targetOffset.x = offsetX;
     this.targetOffset.y = offsetY;

@@ -92,6 +92,7 @@ type State = {
   // Developer Settings
   devSettings: DeveloperSettings;
   fps: number;
+  productLimit: number;
   zoom: number;
 
   // Dialog position for connection line
@@ -173,6 +174,7 @@ const createInitialState = (): State => {
 
     devSettings: createDefaultDeveloperSettings(),
     fps: 60,
+    productLimit: 5000,
     zoom: 1,
     mobileFooterExpanded: false,
     dialogPosition: null,
@@ -406,6 +408,7 @@ export default class App extends React.Component<{}, State> {
         renderer.heroDisplayMode = this.state.devSettings.heroDisplayMode;
         renderer.overlayScaleMode = this.state.devSettings.overlayScaleMode;
         renderer.imageSpreadDirection = this.state.devSettings.imageSpreadDirection;
+        renderer.rectMode = this.state.devSettings.rectMode;
 
         // Load variant images for stacked display (React mode)
         if (this.state.overlayMode === 'react' && this.state.selectedProduct) {
@@ -861,6 +864,14 @@ export default class App extends React.Component<{}, State> {
     this.controller.updateGridConfig(newSettings.gridConfig);
     this.controller.setAnimationDuration(newSettings.animationDuration);
     this.controller.setPriceBucketConfig(newSettings.priceBucketMode, newSettings.priceBucketCount);
+    this.controller.setCellSizeOverride(newSettings.cellSizeOverride);
+    this.controller.setMinCellSize(newSettings.minCellSize);
+    const renderer = this.controller.getRenderer();
+    if (renderer) {
+      renderer.rectMode = newSettings.rectMode;
+      renderer.showBoundsDebug = newSettings.showBoundsDebug;
+    }
+    this.controller.setIgnoreBounds(newSettings.ignoreBounds);
     const orientation = this.computePivotOrientation();
     this.controller.setPivotOrientation(orientation);
   };
@@ -875,10 +886,7 @@ export default class App extends React.Component<{}, State> {
 
     if (index === 0) {
       this.controller.resetPivot();
-      const defaultDim = this.controller.getPivotDimensionDefinitions()[0]?.key;
-      if (defaultDim) {
-        this.controller.setPivotDimension(defaultDim);
-      }
+      // No need to set dimension — reset returns to taxonomy root
     } else {
       const levelsToRemove = pivotBreadcrumbs.length - 1 - index;
       for (let i = 0; i < levelsToRemove; i++) {
@@ -2127,34 +2135,7 @@ export default class App extends React.Component<{}, State> {
           })()}
         </AnimatePresence>
         
-        {hoveredProduct && mousePos && (() => {
-          const hoverDiscipline = this.getSportBadge(hoveredProduct);
-
-          return (
-            <div 
-              className="pf-tooltip"
-              style={{
-                position: 'fixed',
-                left: mousePos.x + 15,
-                top: mousePos.y + 15,
-              }}
-            >
-              <div className="pf-tooltip-content">
-                <div className="pf-tooltip-name">{hoveredProduct.name}</div>
-                {hoverDiscipline && hoverDiscipline !== 'UNKNOWN' && (
-                  <div className="pf-tooltip-discipline">{hoverDiscipline}</div>
-                )}
-                {hoveredProduct.price && (
-                  <div className="pf-tooltip-price">{hoveredProduct.price.formatted}</div>
-                )}
-                {hoveredProduct.brand && (
-                  <div className="pf-tooltip-brand">{hoveredProduct.brand}</div>
-                )}
-                <div className="pf-tooltip-hint">Click for details</div>
-              </div>
-            </div>
-          );
-        })()}
+        {/* Product hover tooltip removed */}
 
         <DeveloperOverlay
           settings={this.state.devSettings}
@@ -2162,6 +2143,14 @@ export default class App extends React.Component<{}, State> {
           productCount={this.state.filteredProducts.length}
           fps={this.state.fps}
           zoom={this.state.zoom}
+          drawTimeMs={this.controller.getRenderer()?.drawTimeMs ?? 0}
+          visibleCount={this.controller.getRenderer()?.visibleCount ?? 0}
+          culledCount={this.controller.getRenderer()?.culledCount ?? 0}
+          productLimit={this.state.productLimit ?? 5000}
+          onProductLimitChange={(limit) => {
+            this.setState({ productLimit: limit });
+            this.controller.setProductLimit(limit);
+          }}
         />
       </div>
     );

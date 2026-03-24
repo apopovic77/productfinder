@@ -25,7 +25,16 @@ export class CanvasRenderer<T> {
   public hoveredItem: T | null = null;
   public focusedItem: T | null = null;
   public hoveredGroupKey: string | null = null;
-  public hoveredGroupLabel: string | null = null; // Full label for tooltip
+  public hoveredGroupLabel: string | null = null;
+
+  // Performance stats
+  public drawTimeMs = 0;
+  public visibleCount = 0;
+  public culledCount = 0;
+  public rectMode = false;
+  public showBoundsDebug = false;
+  public debugBoundsAuto: { x: number; y: number; w: number; h: number } | null = null;
+  public debugBoundsContent: { x: number; y: number; w: number; h: number } | null = null;
 
   // Selected product for overlay rendering
   public selectedProduct: Product | null = null;
@@ -941,6 +950,8 @@ export class CanvasRenderer<T> {
   }
 
   private async draw() {
+    const drawStart = performance.now();
+
     const c = this.ctx.canvas;
     if (c.width !== c.clientWidth || c.height !== c.clientHeight) {
       c.width = c.clientWidth;
@@ -949,18 +960,49 @@ export class CanvasRenderer<T> {
 
     this.clear();
 
-    // Update viewport interpolation (smooth camera)
     if (this.viewport) {
       this.viewport.update();
     }
 
-    // Apply viewport transform
     this.ctx.save();
     if (this.viewport) {
       this.viewport.applyTransform(this.ctx);
     }
-    
+
     const nodes = this.getNodes();
+    let visible = 0;
+    let culled = 0;
+
+    // Debug: draw bounds rectangles
+    if (this.showBoundsDebug) {
+      if (this.debugBoundsAuto) {
+        const b = this.debugBoundsAuto;
+        this.ctx.strokeStyle = 'rgba(59, 130, 246, 0.5)';
+        this.ctx.lineWidth = 2;
+        this.ctx.setLineDash([8, 4]);
+        this.ctx.strokeRect(b.x, b.y, b.w, b.h);
+        this.ctx.fillStyle = 'rgba(59, 130, 246, 0.05)';
+        this.ctx.fillRect(b.x, b.y, b.w, b.h);
+        this.ctx.setLineDash([]);
+        // Label
+        this.ctx.fillStyle = 'rgba(59, 130, 246, 0.8)';
+        this.ctx.font = '12px monospace';
+        this.ctx.fillText(`AUTO ${b.w.toFixed(0)}×${b.h.toFixed(0)}`, b.x + 4, b.y + 14);
+      }
+      if (this.debugBoundsContent) {
+        const b = this.debugBoundsContent;
+        this.ctx.strokeStyle = 'rgba(239, 68, 68, 0.5)';
+        this.ctx.lineWidth = 2;
+        this.ctx.setLineDash([4, 4]);
+        this.ctx.strokeRect(b.x, b.y, b.w, b.h);
+        this.ctx.fillStyle = 'rgba(239, 68, 68, 0.03)';
+        this.ctx.fillRect(b.x, b.y, b.w, b.h);
+        this.ctx.setLineDash([]);
+        this.ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
+        this.ctx.font = '12px monospace';
+        this.ctx.fillText(`CONTENT ${b.w.toFixed(0)}×${b.h.toFixed(0)}`, b.x + 4, b.y + 30);
+      }
+    }
 
     // Update hero mode offsets if needed (products moving aside for spread animation)
     this.updateHeroModeOffsets();
@@ -968,15 +1010,23 @@ export class CanvasRenderer<T> {
     for (const n of nodes) {
       const baseX = n.posX.value ?? 0;
       const heroOffset = n.heroOffsetX.value ?? 0;
-      const x = baseX + heroOffset; // Apply hero mode offset
+      const x = baseX + heroOffset;
       const y = n.posY.value ?? 0;
       const w = n.width.value ?? 0, h = n.height.value ?? 0;
       const scale = n.scale.value ?? 1;
       const opacity = n.opacity.value ?? 1;
-      
-      // Skip if fully transparent
-      if (opacity <= 0.01) continue;
-      
+
+      if (opacity <= 0.01) { culled++; continue; }
+      visible++;
+
+      // Rect mode: draw colored rects instead of images (performance test)
+      if (this.rectMode) {
+        const hue = (parseInt(n.id, 36) * 137) % 360;
+        this.ctx.fillStyle = `hsla(${hue}, 60%, 50%, ${opacity})`;
+        this.ctx.fillRect(x, y, w, h);
+        continue;
+      }
+
       // Get product and ensure image is loaded (OOP self-managed)
       const product = n.data as any as Product;
       if (!product.isImageReady) {
@@ -1479,53 +1529,7 @@ export class CanvasRenderer<T> {
         this.ctx.restore();
       }
 
-      // Draw click hint or full text tooltip on hover
-      if (isHovered) {
-        // For color dimensions, always show the color name as tooltip
-        // For other dimensions, show tooltip only if text is on multiple lines
-        const isMultiLine = transformedLines && transformedLines.length > 1;
-        if (isColorDimension || isMultiLine) {
-          // Show full text as tooltip above the button
-          const tooltipPadding = 12;
-          const tooltipFont = '14px system-ui';
-          this.ctx.font = tooltipFont;
-          const tooltipMetrics = this.ctx.measureText(header.label);
-          const tooltipWidth = tooltipMetrics.width + tooltipPadding * 2;
-          const tooltipHeight = 32;
-          const tooltipX = header.x + header.width / 2 - tooltipWidth / 2;
-          const tooltipY = header.y + yOffset - tooltipHeight - 8;
-
-          // Draw tooltip background
-          this.drawRoundedRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight, 8);
-          this.ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
-          this.ctx.fill();
-          this.ctx.lineWidth = 1;
-          this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-          this.ctx.stroke();
-
-          // Draw full text in tooltip (white on dark background)
-          this.ctx.fillStyle = '#ffffff';
-          this.ctx.font = tooltipFont;
-          this.ctx.textAlign = 'center';
-          this.ctx.textBaseline = 'middle';
-          this.ctx.fillText(
-            header.label,
-            tooltipX + tooltipWidth / 2,
-            tooltipY + tooltipHeight / 2
-          );
-        } else {
-          // Show click hint if not truncated - white text with slight transparency
-          this.ctx.font = '11px system-ui';
-          this.ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
-          this.ctx.textAlign = 'center';
-          this.ctx.textBaseline = 'middle';
-          this.ctx.fillText(
-            'Click to drill down',
-            header.x + header.width / 2,
-            header.y + yOffset + header.height / 2 + 12
-          );
-        }
-      }
+      // Tooltip/hover hints removed — not needed with GPANE taxonomy navigation
     }
 
     // Draw dialog connection line (React overlay mode) - IN CANVAS SPACE
@@ -1583,7 +1587,10 @@ export class CanvasRenderer<T> {
     // Restore viewport transform
     this.ctx.restore();
 
-    // DEBUG content-bounds visualization intentionally removed for TypeScript strict mode.
+    // Performance stats
+    this.drawTimeMs = performance.now() - drawStart;
+    this.visibleCount = visible;
+    this.culledCount = culled;
   }
 
   /**
