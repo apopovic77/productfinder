@@ -350,20 +350,34 @@ export class CanvasRenderer<T> {
       const screenHeight = h * scale;
       const screenSize = Math.max(screenWidth, screenHeight);
 
-      // Determine required image size with HYSTERESIS to prevent flickering
+      // Determine required LOD tier with HYSTERESIS to prevent flickering
+      // 3 tiers: micro (35px) → low (130px) → high (1300px)
       const currentSize = this.loadedImageSizes.get(node.id);
       let requiredSize: number;
 
       if (currentSize === LOD_CONFIG.highResolution) {
-        // Currently high-res: only switch down if below lower threshold
-        requiredSize = screenSize < LOD_CONFIG.transitionThresholdDown
-          ? LOD_CONFIG.lowResolution
+        // Currently high: drop to low if below low→high threshold
+        requiredSize = screenSize < LOD_CONFIG.lowToHighDown
+          ? (screenSize < LOD_CONFIG.microToLowDown ? LOD_CONFIG.microResolution : LOD_CONFIG.lowResolution)
           : LOD_CONFIG.highResolution;
+      } else if (currentSize === LOD_CONFIG.lowResolution) {
+        // Currently low: up to high or down to micro
+        if (screenSize > LOD_CONFIG.lowToHighUp) {
+          requiredSize = LOD_CONFIG.highResolution;
+        } else if (screenSize < LOD_CONFIG.microToLowDown) {
+          requiredSize = LOD_CONFIG.microResolution;
+        } else {
+          requiredSize = LOD_CONFIG.lowResolution;
+        }
       } else {
-        // Currently low-res (or no image): only switch up if above upper threshold
-        requiredSize = screenSize > LOD_CONFIG.transitionThresholdUp
-          ? LOD_CONFIG.highResolution
-          : LOD_CONFIG.lowResolution;
+        // Currently micro (or no image): up to low or high
+        if (screenSize > LOD_CONFIG.lowToHighUp) {
+          requiredSize = LOD_CONFIG.highResolution;
+        } else if (screenSize > LOD_CONFIG.microToLowUp) {
+          requiredSize = LOD_CONFIG.lowResolution;
+        } else {
+          requiredSize = LOD_CONFIG.microResolution;
+        }
       }
 
       // Check if we need to load a different size
@@ -386,7 +400,9 @@ export class CanvasRenderer<T> {
           const taskId = `lod-${node.id}`; // Simplified ID (no size) to enable cancellation
           this.imageLoadQueue.cancel(taskId);
 
-          const quality = requiredSize === LOD_CONFIG.highResolution ? LOD_CONFIG.highQuality : LOD_CONFIG.lowQuality;
+          const quality = requiredSize === LOD_CONFIG.highResolution ? LOD_CONFIG.highQuality
+            : requiredSize === LOD_CONFIG.lowResolution ? LOD_CONFIG.lowQuality
+            : LOD_CONFIG.microQuality;
           const imageUrl = buildMediaUrl({
             storageId,
             width: requiredSize,
@@ -462,7 +478,9 @@ export class CanvasRenderer<T> {
             const taskId = `pivot-hero-${storageId}`; // Simplified ID (no size)
             this.imageLoadQueue.cancel(taskId);
 
-            const quality = requiredSize === LOD_CONFIG.highResolution ? LOD_CONFIG.highQuality : LOD_CONFIG.lowQuality;
+            const quality = requiredSize === LOD_CONFIG.highResolution ? LOD_CONFIG.highQuality
+            : requiredSize === LOD_CONFIG.lowResolution ? LOD_CONFIG.lowQuality
+            : LOD_CONFIG.microQuality;
             const imageUrl = buildMediaUrl({
               storageId,
               width: requiredSize,

@@ -177,8 +177,9 @@ export class Product {
     // Prefer Storage API for optimized images
     if (media.storage_id) {
       const STORAGE_API_BASE = (import.meta as any).env?.VITE_STORAGE_API_URL || 'https://gsgbot.arkturian.com/storage-api';
-      const size = 130;
-      const quality = 75;
+      // Initial load = micro thumbnail (35px) for fast overview
+      const size = 35;
+      const quality = 60;
       return `${STORAGE_API_BASE}/storage/media/${media.storage_id}?width=${size}&format=webp&quality=${quality}`;
     }
 
