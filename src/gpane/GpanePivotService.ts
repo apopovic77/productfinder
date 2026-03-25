@@ -155,9 +155,8 @@ export class GpanePivotService {
   }
 
   getAvailableDimensions(products: Product[]): GroupDimension[] {
-    return this.engine.scoredDimensions
-      .filter(d => d.isPivotCandidate && d.cardinality > 1)
-      .map(d => d.key);
+    // Show ALL scored dimensions — user can manually choose any
+    return this.engine.scoredDimensions.map(d => d.key);
   }
 
   canUseDimension(dimension: GroupDimension): boolean {

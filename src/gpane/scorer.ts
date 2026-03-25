@@ -27,7 +27,8 @@ export function scoreDimensions(
   history: string[],
   config: GPANEConfig
 ): ScoredDimension[] {
-  const candidates = dimensions.filter(d => d.isPivotCandidate);
+  // Score ALL dimensions — even non-candidates get a score so users can manually select them
+  const candidates = dimensions.filter(d => d.cardinality > 0);
   if (candidates.length === 0) return [];
 
   const contextDimensions = products.length < dimensions[0]?.totalCount
