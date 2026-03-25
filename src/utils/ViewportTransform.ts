@@ -488,7 +488,7 @@ export class ViewportTransform {
     }
   };
 
-  private handleTouchEnd = () => {
+  private handleTouchEnd = (e: TouchEvent) => {
     this.isPotentialDrag = false;
     if (this.isDragging) {
       this.wasDragging = true;
@@ -499,7 +499,10 @@ export class ViewportTransform {
     if (this.touchStartDistance > 0) {
       this.wasDragging = true;
     }
-    this.touchStartDistance = 0;
+    // Only reset pinch distance when all fingers are up
+    if (e.touches.length === 0) {
+      this.touchStartDistance = 0;
+    }
   };
   
   /**
