@@ -219,6 +219,7 @@ export class PivotLayouter<T> {
           const baseY = offsetY + mobileHeaderHeight;
 
           // Column-major fill: top-to-bottom first, then right
+          // Stagger animation: random delay 0-300ms per product
           for (let col = 0; col < colsInFrame; col++) {
             for (let row = 0; row < rowsInFrame; row++) {
               const productIndex = col * rowsInFrame + row;
@@ -228,12 +229,15 @@ export class PivotLayouter<T> {
               const finalSize = globalCellSize * scale;
               const x = this.paddingLeft + col * (globalCellSize + spacing);
               const y = baseY + row * (globalCellSize + spacing);
-              node.posX.targetValue = x;
-              node.posY.targetValue = y;
-              node.width.targetValue = finalSize;
-              node.height.targetValue = finalSize;
-              node.scale.targetValue = 1;
-              node.opacity.targetValue = 1;
+              const delay = Math.random() * 300;
+              setTimeout(() => {
+                node.posX.targetValue = x;
+                node.posY.targetValue = y;
+                node.width.targetValue = finalSize;
+                node.height.targetValue = finalSize;
+                node.scale.targetValue = 1;
+                node.opacity.targetValue = 1;
+              }, delay);
             }
           }
 
@@ -372,6 +376,7 @@ export class PivotLayouter<T> {
         const baseY = headerY - cellSize;
 
         // Layout products in a grid within this column (BOTTOM TO TOP, LEFT TO RIGHT)
+        // Stagger animation: random delay 0-300ms per product for organic feel
         for (let row = 0; row < rowsInFrame; row++) {
           for (let col = 0; col < colsInFrame; col++) {
             const productIndex = row * colsInFrame + col;
@@ -383,13 +388,16 @@ export class PivotLayouter<T> {
 
             const x = offsetX + col * (cellSize + spacing);
             const y = baseY - row * (cellSize + spacing);
-             
-            node.posX.targetValue = x;
-            node.posY.targetValue = y;
-            node.width.targetValue = finalSize;
-            node.height.targetValue = finalSize;
-            node.scale.targetValue = 1;
-            node.opacity.targetValue = 1;
+
+            const delay = Math.random() * 300;
+            setTimeout(() => {
+              node.posX.targetValue = x;
+              node.posY.targetValue = y;
+              node.width.targetValue = finalSize;
+              node.height.targetValue = finalSize;
+              node.scale.targetValue = 1;
+              node.opacity.targetValue = 1;
+            }, delay);
           }
         }
         
