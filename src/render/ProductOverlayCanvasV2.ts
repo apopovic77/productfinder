@@ -117,7 +117,7 @@ export class ProductOverlayCanvasV2 {
     let imageUrl = heroMedia.src;
 
     if (storageId) {
-      imageUrl = `${STORAGE_API_URL}/storage/media/${storageId}?width=800&height=800&format=webp&quality=85`;
+      imageUrl = `${STORAGE_API_URL}/storage/media/${storageId}?width=1300&format=webp&quality=85&trim=true`;
     }
 
     if (this.imageCache.has(imageUrl)) {

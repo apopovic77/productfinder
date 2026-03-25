@@ -310,7 +310,7 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
   const imageUrls = useMemo(() => {
     return allImages.map(img => {
       if (img.storageId) {
-        return getStorageMediaUrl(img.storageId, { width: 800, format: 'webp', quality: 85 });
+        return getStorageMediaUrl(img.storageId, { width: 1300, format: 'webp', quality: 85 });
       }
       return img.src;
     });
@@ -548,7 +548,7 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
         {allImages.length > 0 ? (
           allImages.map((img, idx) => {
             const imageUrl = img.storageId
-              ? getStorageMediaUrl(img.storageId, { width: 800, format: 'webp', quality: 85 })
+              ? getStorageMediaUrl(img.storageId, { width: 1300, format: 'webp', quality: 85 })
               : img.src;
             const loadedImage = loadedImages.get(imageUrl);
 

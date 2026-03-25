@@ -203,7 +203,7 @@ export class Product {
     // Prefer Storage API for optimized images (800px max dimension WebP)
     if (media.storage_id) {
       const STORAGE_API_BASE = (import.meta as any).env?.VITE_STORAGE_API_URL || 'https://gsgbot.arkturian.com/storage-api';
-      return `${STORAGE_API_BASE}/storage/media/${media.storage_id}?width=800&format=webp&quality=85&trim=true`;
+      return `${STORAGE_API_BASE}/storage/media/${media.storage_id}?width=1300&format=webp&quality=85&trim=true`;
     }
 
     // Fallback to Shopify CDN
