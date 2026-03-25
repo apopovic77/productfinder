@@ -515,10 +515,11 @@ body {
 
 /* Bottom mode (default) - V4 Glassmorphism Style */
 .pf-footer-bottom {
-  position: relative;
+  position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
+  z-index: 10;
   background: rgba(230, 230, 230, 0.85);
   backdrop-filter: blur(30px);
   -webkit-backdrop-filter: blur(30px);
