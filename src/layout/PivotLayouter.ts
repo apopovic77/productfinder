@@ -157,12 +157,12 @@ export class PivotLayouter<T> {
           maxProductsInAnyGroup = Math.max(maxProductsInAnyGroup, groups.get(k)!.length);
         }
 
-        // Binary search for optimal cell size
-        const fitsAllProducts = (cellSize: number): boolean => {
+        // For rows mode: width is unbounded (products scroll right).
+        // Cell size is determined only by how many rows fit in the frameHeight.
+        // No binary search needed — just divide frameHeight by desired row count.
+        const fitsInHeight = (cellSize: number): boolean => {
           if (cellSize <= 0) return false;
-          const rows = Math.max(1, Math.floor((matrixHeight + spacing) / (cellSize + spacing)));
-          const cols = Math.max(1, Math.floor((matrixWidth + spacing) / (cellSize + spacing)));
-          return rows * cols >= maxProductsInAnyGroup;
+          return Math.floor((matrixHeight + spacing) / (cellSize + spacing)) >= 1;
         };
 
         const preferredMin = this.config.minCellSize ?? 5;
@@ -171,41 +171,18 @@ export class PivotLayouter<T> {
         const searchMin = absoluteMin;
         const searchMax = Math.max(searchMin, Math.min(preferredMax, Math.min(matrixWidth, matrixHeight)));
 
-        let globalCellSize = searchMin;
+        // Cell size = max size that fits at least 1 row in frameHeight
+        // Width is unbounded — products scroll horizontally
+        let globalCellSize: number;
 
         if (this.config.cellSizeOverride && this.config.cellSizeOverride > 0) {
           globalCellSize = this.config.cellSizeOverride;
-        } else if (fitsAllProducts(searchMin)) {
-          let low = searchMin;
-          let high = searchMax;
-          while (fitsAllProducts(high) && high < searchMax * 4) {
-            high *= 1.5;
-          }
-          for (let i = 0; i < 30; i++) {
-            const mid = (low + high) / 2;
-            if (fitsAllProducts(mid)) {
-              low = mid;
-            } else {
-              high = mid;
-            }
-          }
-          globalCellSize = Math.max(searchMin, Math.min(searchMax, low));
-          if (globalCellSize < preferredMin && fitsAllProducts(preferredMin)) {
-            globalCellSize = Math.min(searchMax, preferredMin);
-          }
+        } else {
+          // Largest cell size that fits in matrixHeight
+          globalCellSize = Math.max(searchMin, Math.min(searchMax, matrixHeight));
         }
 
         let globalRows = Math.max(1, Math.floor((matrixHeight + spacing) / (globalCellSize + spacing)));
-
-        // Safety: shrink if needed
-        if (!this.config.cellSizeOverride) {
-          let globalCols = Math.max(1, Math.floor((matrixWidth + spacing) / (globalCellSize + spacing)));
-          while (globalRows * globalCols < maxProductsInAnyGroup && globalCellSize > searchMin) {
-            globalCellSize = Math.max(searchMin, globalCellSize - 0.5);
-            globalRows = Math.max(1, Math.floor((matrixHeight + spacing) / (globalCellSize + spacing)));
-            globalCols = Math.max(1, Math.floor((matrixWidth + spacing) / (globalCellSize + spacing)));
-          }
-        }
 
         // Enforce hard minimum
         if (this.config.minCellSize && globalCellSize < this.config.minCellSize) {
