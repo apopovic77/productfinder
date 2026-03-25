@@ -160,19 +160,37 @@ export class PivotLayouter<T> {
           maxProductsInAnyGroup = Math.max(maxProductsInAnyGroup, groups.get(k)!.length);
         }
 
-        // Rows mode: width is unbounded (products scroll right).
-        // Cell size = fill as many rows as possible in matrixHeight.
-        // Simply: how many rows fit at minCellSize? Use that many, then size cells to fill.
+        // Rows mode: try to fit all products in matrixWidth × matrixHeight first.
+        // If they fit → use larger cells. If not → use minCellSize, overflow horizontally.
         let globalCellSize: number;
 
         if (this.config.cellSizeOverride && this.config.cellSizeOverride > 0) {
           globalCellSize = this.config.cellSizeOverride;
         } else {
           const minCell = this.config.minCellSize ?? 5;
-          // How many rows fit at minimum cell size?
-          const maxPossibleRows = Math.max(1, Math.floor((matrixHeight + spacing) / (minCell + spacing)));
-          // Size cells to exactly fill the available height with that many rows
-          globalCellSize = Math.max(minCell, (matrixHeight + spacing) / maxPossibleRows - spacing);
+
+          // Binary search: largest cell size where all products fit in matrixWidth × matrixHeight
+          const fitsAll = (cs: number): boolean => {
+            const rows = Math.max(1, Math.floor((matrixHeight + spacing) / (cs + spacing)));
+            const cols = Math.max(1, Math.floor((matrixWidth + spacing) / (cs + spacing)));
+            return rows * cols >= maxProductsInAnyGroup;
+          };
+
+          if (fitsAll(minCell)) {
+            // Products fit on screen — find largest cell size
+            let low = minCell;
+            let high = Math.min(matrixWidth, matrixHeight);
+            for (let i = 0; i < 30; i++) {
+              const mid = (low + high) / 2;
+              if (fitsAll(mid)) low = mid;
+              else high = mid;
+            }
+            globalCellSize = Math.floor(low);
+          } else {
+            // Too many products — use minCellSize, overflow horizontally
+            const maxPossibleRows = Math.max(1, Math.floor((matrixHeight + spacing) / (minCell + spacing)));
+            globalCellSize = Math.max(minCell, (matrixHeight + spacing) / maxPossibleRows - spacing);
+          }
         }
 
         let globalRows = Math.max(1, Math.floor((matrixHeight + spacing) / (globalCellSize + spacing)));
