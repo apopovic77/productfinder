@@ -40,5 +40,5 @@ export const CANVAS_PADDING_CONFIG = {
    * Gap between individual items/products (in pixels)
    * Default: 12
    */
-  itemGap: 12,
+  itemGap: 4,
 };

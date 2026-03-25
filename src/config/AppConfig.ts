@@ -51,7 +51,7 @@ const PIVOT_DEFAULTS: PivotDefaults = {
 };
 
 const MEDIA_DEFAULTS: MediaDefaults = {
-  useTrimmedImages: false, // Set to true to use trim=true parameter for transparent backgrounds
+  useTrimmedImages: true, // Trim transparent borders from product images
 };
 
 const DEVELOPER_SETTINGS_DEFAULTS: DeveloperSettings = {

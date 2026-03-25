@@ -156,7 +156,7 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
 
       variantImageIds.forEach((storageId) => {
         // Build proxy URL for variant images (130px)
-        const imageUrl = `${STORAGE_API_URL}/storage/media/${storageId}?width=130&height=130&format=webp&quality=80`;
+        const imageUrl = `${STORAGE_API_URL}/storage/media/${storageId}?width=130&height=130&format=webp&quality=80&trim=true`;
         images.push({
           storageId,
           src: imageUrl,
@@ -178,7 +178,7 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
   const thumbnailUrls = useMemo(() => {
     return allImages.map(img => {
       if (img.storageId) {
-        return `${STORAGE_API_URL}/storage/media/${img.storageId}?width=130&height=130&format=webp&quality=80`;
+        return `${STORAGE_API_URL}/storage/media/${img.storageId}?width=130&height=130&format=webp&quality=80&trim=true`;
       }
       return img.src;
     });
@@ -286,7 +286,7 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
     const storageId = getCurrentStorageId();
 
     if (storageId) {
-      return `${STORAGE_API_URL}/storage/media/${storageId}?width=130&height=130&format=webp&quality=75`;
+      return `${STORAGE_API_URL}/storage/media/${storageId}?width=130&height=130&format=webp&quality=75&trim=true`;
     }
 
     // Fallback to src if no storage_id
@@ -300,7 +300,7 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
     const storageId = getCurrentStorageId();
 
     if (storageId) {
-      return `${STORAGE_API_URL}/storage/media/${storageId}?width=1300&height=1300&format=webp&quality=85`;
+      return `${STORAGE_API_URL}/storage/media/${storageId}?width=1300&height=1300&format=webp&quality=85&trim=true`;
     }
 
     // Fallback to src if no storage_id
@@ -473,7 +473,7 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
             }}>
               {allImages.map((img, idx) => {
                 const thumbnailUrl = img.storageId
-                  ? `${STORAGE_API_URL}/storage/media/${img.storageId}?width=130&height=130&format=webp&quality=80`
+                  ? `${STORAGE_API_URL}/storage/media/${img.storageId}?width=130&height=130&format=webp&quality=80&trim=true`
                   : img.src;
                 const loadedImage = loadedThumbnails.get(thumbnailUrl);
                 const isActive = idx === selectedImageIndex;
@@ -828,7 +828,7 @@ export const ProductOverlayModal: React.FC<Props> = ({ product, onClose, positio
               }}>
                 {allImages.map((img, idx) => {
                   const thumbnailUrl = img.storageId
-                    ? `${STORAGE_API_URL}/storage/media/${img.storageId}?width=130&height=130&format=webp&quality=80`
+                    ? `${STORAGE_API_URL}/storage/media/${img.storageId}?width=130&height=130&format=webp&quality=80&trim=true`
                     : img.src;
                   const loadedImage = loadedThumbnails.get(thumbnailUrl);
                   const isActive = idx === selectedImageIndex;

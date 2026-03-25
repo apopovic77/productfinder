@@ -195,7 +195,7 @@ export const ProductOverlayModalV3: React.FC<Props> = ({ product, onClose, posit
       });
 
       variantImageIds.forEach((storageId) => {
-        const imageUrl = `${STORAGE_API_URL}/storage/media/${storageId}?width=130&format=webp&quality=80&trim=false`;
+        const imageUrl = `${STORAGE_API_URL}/storage/media/${storageId}?width=130&format=webp&quality=80&trim=true`;
         images.push({
           storageId,
           src: imageUrl,
@@ -216,7 +216,7 @@ export const ProductOverlayModalV3: React.FC<Props> = ({ product, onClose, posit
   const thumbnailUrls = useMemo(() => {
     return allImages.map(img => {
       if (img.storageId) {
-        return `${STORAGE_API_URL}/storage/media/${img.storageId}?width=130&format=webp&quality=80&trim=false`;
+        return `${STORAGE_API_URL}/storage/media/${img.storageId}?width=130&format=webp&quality=80&trim=true`;
       }
       return img.src;
     });
@@ -321,7 +321,7 @@ export const ProductOverlayModalV3: React.FC<Props> = ({ product, onClose, posit
 
     if (storageId) {
       // Main dialog image: NO trim (consistent aspect ratio with thumbnail - prevents visual jump during LOD update)
-      return `${STORAGE_API_URL}/storage/media/${storageId}?width=1300&format=webp&quality=85&trim=false`;
+      return `${STORAGE_API_URL}/storage/media/${storageId}?width=1300&format=webp&quality=85&trim=true`;
     }
 
     const media = product.media || [];
@@ -528,7 +528,7 @@ export const ProductOverlayModalV3: React.FC<Props> = ({ product, onClose, posit
         }}>
           {allImages.map((img, idx) => {
             const thumbnailUrl = img.storageId
-              ? `${STORAGE_API_URL}/storage/media/${img.storageId}?width=130&format=webp&quality=80&trim=false`
+              ? `${STORAGE_API_URL}/storage/media/${img.storageId}?width=130&format=webp&quality=80&trim=true`
               : img.src;
             const loadedImage = loadedThumbnails.get(thumbnailUrl);
             const isActive = idx === selectedImageIndex;

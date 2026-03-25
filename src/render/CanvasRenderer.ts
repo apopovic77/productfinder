@@ -485,7 +485,7 @@ export class CanvasRenderer<T> {
               storageId,
               width: requiredSize,
               quality,
-              trim: false, // Always NO trim for consistent aspect ratio (no visual jump)
+              trim: true, // Trim transparent border
             });
 
             // Priority 0 = highest priority (pivot is most important)

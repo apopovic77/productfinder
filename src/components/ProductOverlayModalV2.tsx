@@ -203,7 +203,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
           const storageId = img.storage?.id || null;
           if (storageId && !seenStorageIds.has(storageId)) {
             seenStorageIds.add(storageId);
-            const imageUrl = `${STORAGE_API_URL}/storage/media/${storageId}?width=130&format=webp&quality=80`;
+            const imageUrl = `${STORAGE_API_URL}/storage/media/${storageId}?width=130&format=webp&quality=80&trim=true`;
             images.push({
               storageId,
               src: imageUrl,
@@ -218,7 +218,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         const storageId = activeColorVariant.storage.id;
         if (!seenStorageIds.has(storageId)) {
           seenStorageIds.add(storageId);
-          const imageUrl = `${STORAGE_API_URL}/storage/media/${storageId}?width=130&format=webp&quality=80`;
+          const imageUrl = `${STORAGE_API_URL}/storage/media/${storageId}?width=130&format=webp&quality=80&trim=true`;
           images.push({
             storageId,
             src: imageUrl,
@@ -232,7 +232,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         colorVariants.forEach((v: any) => {
           if (v.image_storage_id && !seenStorageIds.has(v.image_storage_id)) {
             seenStorageIds.add(v.image_storage_id);
-            const imageUrl = `${STORAGE_API_URL}/storage/media/${v.image_storage_id}?width=130&format=webp&quality=80`;
+            const imageUrl = `${STORAGE_API_URL}/storage/media/${v.image_storage_id}?width=130&format=webp&quality=80&trim=true`;
             images.push({
               storageId: v.image_storage_id,
               src: imageUrl,
@@ -270,7 +270,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   const thumbnailUrls = useMemo(() => {
     return allImages.map(img => {
       if (img.storageId) {
-        return `${STORAGE_API_URL}/storage/media/${img.storageId}?width=130&height=130&format=webp&quality=80`;
+        return `${STORAGE_API_URL}/storage/media/${img.storageId}?width=130&height=130&format=webp&quality=80&trim=true`;
       }
       return img.src;
     });
@@ -392,7 +392,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     const storageId = getCurrentStorageId();
 
     if (storageId) {
-      return `${STORAGE_API_URL}/storage/media/${storageId}?width=1300&height=1300&format=webp&quality=85`;
+      return `${STORAGE_API_URL}/storage/media/${storageId}?width=1300&height=1300&format=webp&quality=85&trim=true`;
     }
 
     const media = product.media || [];
@@ -458,7 +458,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   const getCartImageUrl = (): string | undefined => {
     const storageId = getCurrentStorageId();
     if (storageId) {
-      return `${STORAGE_API_URL}/storage/media/${storageId}?width=180&height=180&format=webp&quality=85`;
+      return `${STORAGE_API_URL}/storage/media/${storageId}?width=180&height=180&format=webp&quality=85&trim=true`;
     }
     if (allImages[selectedImageIndex]?.src) {
       return allImages[selectedImageIndex].src;
@@ -619,7 +619,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         }}>
           {allImages.map((img, idx) => {
             const thumbnailUrl = img.storageId
-              ? `${STORAGE_API_URL}/storage/media/${img.storageId}?width=130&height=130&format=webp&quality=80`
+              ? `${STORAGE_API_URL}/storage/media/${img.storageId}?width=130&height=130&format=webp&quality=80&trim=true`
               : img.src;
             const loadedImage = loadedThumbnails.get(thumbnailUrl);
             const isActive = idx === selectedImageIndex;
@@ -631,7 +631,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                   setSelectedImageIndex(idx);
                   if (onImageSelect && allImages[idx]?.storageId) {
                     const thumbnailUrl = allImages[idx].storageId
-                      ? `${STORAGE_API_URL}/storage/media/${allImages[idx].storageId}?width=130&height=130&format=webp&quality=80`
+                      ? `${STORAGE_API_URL}/storage/media/${allImages[idx].storageId}?width=130&height=130&format=webp&quality=80&trim=true`
                       : '';
                     const cachedThumb = loadedThumbnails.get(thumbnailUrl);
                     onImageSelect(allImages[idx].storageId, cachedThumb || undefined);
