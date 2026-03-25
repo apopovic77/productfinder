@@ -125,6 +125,22 @@ export class ProductFinderController {
     }
   }
 
+  /**
+   * Called after pivot drill/up/reset.
+   * The LayoutService already synced with correct filtered products.
+   * We only need to re-layout and notify listeners — NO re-sync.
+   */
+  private onPivotChanged(): void {
+    if (this.canvas) {
+      this.handleResize();
+      if (this.renderer) {
+        const isHero = this.layoutService.isPivotHeroMode();
+        this.renderer.isHeroMode = isHero;
+      }
+    }
+    this.notifyListeners();
+  }
+
   // Data Management
   private onDataChanged(): void {
     let filtered = this.filterService.filterAndSort(this.products);
@@ -640,7 +656,7 @@ export class ProductFinderController {
   
   drillDownPivot(value: string): void {
     this.layoutService.drillDownPivot(value);
-    this.onDataChanged();
+    this.onPivotChanged();
 
     // Push history state for browser back button
     if (!this.ignoreNextHistoryPush) {
@@ -652,7 +668,7 @@ export class ProductFinderController {
 
   drillUpPivot(): void {
     this.layoutService.drillUpPivot();
-    this.onDataChanged();
+    this.onPivotChanged();
 
     // Push history state for browser back button
     if (!this.ignoreNextHistoryPush) {
@@ -664,7 +680,7 @@ export class ProductFinderController {
 
   resetPivot(): void {
     this.layoutService.resetPivot();
-    this.onDataChanged();
+    this.onPivotChanged();
 
     // Replace history state (don't push)
     const state = this.layoutService.getPivotBreadcrumbs();
@@ -806,7 +822,7 @@ export class ProductFinderController {
           worldY >= header.y && worldY <= header.y + header.height) {
         // Click on group header - drill down!
         this.layoutService.drillDownPivot(header.key);
-        this.onDataChanged();
+        this.onPivotChanged();
         return true;
       }
     }

@@ -254,12 +254,13 @@ export class GpanePivotService {
   filterProducts(products: Product[]): Product[] {
     const focused = this.engine.focusedProducts;
 
-    // In taxonomy mode: only show products that match at least one current node
-    if (this.engine.mode === 'taxonomy' && this.engine.currentTaxonomyNodes.length > 0) {
+    // In taxonomy mode: only show products that match current taxonomy nodes
+    if (this.engine.mode === 'taxonomy' && this._currentBuckets.length > 0) {
       const matchedIds = new Set<string>();
       for (const bucket of this._currentBuckets) {
         for (const id of bucket.objectIds) matchedIds.add(id);
       }
+      // Use focused products (respects focus stack), filtered to current nodes
       return focused.filter(p => matchedIds.has(p.id));
     }
 

@@ -526,7 +526,21 @@ export class LayoutService {
    */
   drillDownPivot(value: string): void {
     if (this.mode !== 'pivot' && this.mode !== 'lanes') return;
+
+    // Cache positions BEFORE removing nodes — so they can return to same spot
+    this.cacheCurrentNodePositions();
+
+    // Get the products from the clicked bucket
+    const currentNodes = this.engine.all();
+    const groupProducts = currentNodes
+      .filter(n => this.drillDownService.getGroupKey(n.data) === value)
+      .map(n => n.data);
+
     if (this.drillDownService.drillDown(value)) {
+      if (groupProducts.length > 0) {
+        this.engine.sync(groupProducts, (p: Product) => p.id);
+      }
+      this.primeNewNodesFromCache();
       this.updatePivotGroups();
     }
   }
@@ -536,17 +550,25 @@ export class LayoutService {
    */
   drillUpPivot(): void {
     if (this.mode !== 'pivot' && this.mode !== 'lanes') return;
+    this.cacheCurrentNodePositions();
     if (this.drillDownService.drillUp()) {
+      const filtered = this.drillDownService.filterProducts([]);
+      this.engine.sync(filtered, (p: Product) => p.id);
+      this.primeNewNodesFromCache();
       this.updatePivotGroups();
     }
   }
-  
+
   /**
    * Reset pivot to top level
    */
   resetPivot(): void {
     if (this.mode !== 'pivot' && this.mode !== 'lanes') return;
+    this.cacheCurrentNodePositions();
     this.drillDownService.reset();
+    const filtered = this.drillDownService.filterProducts([]);
+    this.engine.sync(filtered, (p: Product) => p.id);
+    this.primeNewNodesFromCache();
     this.updatePivotGroups();
   }
   

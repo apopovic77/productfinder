@@ -50,6 +50,8 @@ export type GroupHeaderInfo = {
   height: number;
 };
 
+const STAGGER_MAX_MS = 300;
+
 export class PivotLayouter<T> {
   // Store group header positions for rendering and hit-testing
   private groupHeaders: GroupHeaderInfo[] = [];
@@ -219,7 +221,6 @@ export class PivotLayouter<T> {
           const baseY = offsetY + mobileHeaderHeight;
 
           // Column-major fill: top-to-bottom first, then right
-          // Stagger animation: random delay 0-300ms per product
           for (let col = 0; col < colsInFrame; col++) {
             for (let row = 0; row < rowsInFrame; row++) {
               const productIndex = col * rowsInFrame + row;
@@ -229,15 +230,13 @@ export class PivotLayouter<T> {
               const finalSize = globalCellSize * scale;
               const x = this.paddingLeft + col * (globalCellSize + spacing);
               const y = baseY + row * (globalCellSize + spacing);
-              const delay = Math.random() * 100;
-              setTimeout(() => {
-                node.posX.targetValue = x;
-                node.posY.targetValue = y;
-                node.width.targetValue = finalSize;
-                node.height.targetValue = finalSize;
-                node.scale.targetValue = 1;
-                node.opacity.targetValue = 1;
-              }, delay);
+
+              node.posX.targetValue = x;
+              node.posY.targetValue = y;
+              node.width.targetValue = finalSize;
+              node.height.targetValue = finalSize;
+              node.scale.targetValue = 1;
+              node.opacity.targetValue = 1;
             }
           }
 
@@ -376,7 +375,6 @@ export class PivotLayouter<T> {
         const baseY = headerY - cellSize;
 
         // Layout products in a grid within this column (BOTTOM TO TOP, LEFT TO RIGHT)
-        // Stagger animation: random delay 0-300ms per product for organic feel
         for (let row = 0; row < rowsInFrame; row++) {
           for (let col = 0; col < colsInFrame; col++) {
             const productIndex = row * colsInFrame + col;
@@ -385,22 +383,23 @@ export class PivotLayouter<T> {
             const node = list[productIndex];
             const scale = deriveScale(node);
             const finalSize = cellSize * scale;
-
             const x = offsetX + col * (cellSize + spacing);
             const y = baseY - row * (cellSize + spacing);
 
-            const delay = Math.random() * 100;
-            setTimeout(() => {
-              node.posX.targetValue = x;
-              node.posY.targetValue = y;
-              node.width.targetValue = finalSize;
-              node.height.targetValue = finalSize;
-              node.scale.targetValue = 1;
-              node.opacity.targetValue = 1;
-            }, delay);
+            // Per-product duration variance for organic animation
+            const durationVariance = Math.random() * STAGGER_MAX_MS / 1000;
+            node.posX.setDuration(node.posX.duration + durationVariance);
+            node.posY.setDuration(node.posY.duration + durationVariance);
+
+            node.posX.targetValue = x;
+            node.posY.targetValue = y;
+            node.width.targetValue = finalSize;
+            node.height.targetValue = finalSize;
+            node.scale.targetValue = 1;
+            node.opacity.targetValue = 1;
           }
         }
-        
+
         offsetX += frameWidth + this.config.frameGap;
       }
     } else {
