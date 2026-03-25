@@ -353,6 +353,17 @@ function mapProduct(p: OnealProduct): Product | null {
     sourcePath: 'variant_count',
   });
 
+  // Color count (unique colors, not SKUs)
+  addAttribute(attributes, typeof apiAny.color_count === 'number' && apiAny.color_count > 0
+    ? {
+        key: 'color_count',
+        label: 'Farbvarianten',
+        type: 'number',
+        value: apiAny.color_count,
+        sourcePath: 'color_count',
+      }
+    : undefined);
+
   // Image count (has image or not)
   const hasImage = apiAny.storage?.id ? 1 : 0;
   addAttribute(attributes, {
