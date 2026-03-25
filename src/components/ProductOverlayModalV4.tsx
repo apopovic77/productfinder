@@ -336,7 +336,7 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
   const getVariantPrice = (variant: any): string => {
     if (!variant?.price) return '';
     // V2 API: price is object { gross, net, currency }
-    if (typeof variant.price === 'object' && variant.price.gross !== undefined) {
+    if (typeof variant.price === 'object' && variant.price?.gross != null) {
       const currency = variant.price.currency === 'EUR' ? '€' : variant.price.currency || '€';
       return `${currency} ${variant.price.gross.toFixed(2)}`;
     }

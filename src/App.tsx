@@ -527,11 +527,7 @@ export default class App extends React.Component<{}, State> {
                   const STORAGE_API_KEY = import.meta.env.VITE_STORAGE_API_KEY || 'oneal_demo_token';
                   const trimBoundsUrl = `${STORAGE_API_BASE}/storage/media/${heroStorageId}/trim-bounds`;
                   console.log('[App] Fetching trim bounds for storage ID:', heroStorageId, 'URL:', trimBoundsUrl);
-                  fetch(trimBoundsUrl, {
-                    headers: {
-                      'X-API-Key': STORAGE_API_KEY
-                    }
-                  })
+                  fetch(trimBoundsUrl)
                     .then(async res => {
                       console.log('[App] Trim bounds response status:', res.status);
                       const data = await res.json();
@@ -542,9 +538,7 @@ export default class App extends React.Component<{}, State> {
                         // Trigger computation by calling with ?generate=true (default is already true, but being explicit)
                         const refreshUrl = `${trimBoundsUrl}?generate=true`;
                         console.log('[App] Fetching with generate=true:', refreshUrl);
-                        const refreshRes = await fetch(refreshUrl, {
-                          headers: { 'X-API-Key': 'oneal_demo_token' }
-                        });
+                        const refreshRes = await fetch(refreshUrl);
                         const refreshData = await refreshRes.json();
                         console.log('[App] Generate response:', JSON.stringify(refreshData, null, 2));
                         return refreshData;

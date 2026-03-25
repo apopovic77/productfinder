@@ -32,6 +32,7 @@ export class CanvasRenderer<T> {
   public visibleCount = 0;
   public culledCount = 0;
   public rectMode = false;
+  private failedStorageIds = new Set<number>();
   public showBoundsDebug = false;
   public debugBoundsAuto: { x: number; y: number; w: number; h: number } | null = null;
   public debugBoundsContent: { x: number; y: number; w: number; h: number } | null = null;
@@ -385,7 +386,7 @@ export class CanvasRenderer<T> {
         const product = node.data as any;
         const storageId = product.primaryImage?.storage_id;
 
-        if (storageId) {
+        if (storageId && !this.failedStorageIds.has(storageId)) {
           // Calculate priority (lower = higher priority)
           // LOD images have low priority (1000+) - hero and dialog images load first
           const centerX = (viewportLeft + viewportRight) / 2;
@@ -430,9 +431,11 @@ export class CanvasRenderer<T> {
               this.loadedImageSizes.set(node.id, requiredSize);
             }
           }).catch(error => {
-            // Only log real errors, not cancelled requests (expected behavior)
-            if (error.error?.message !== 'Request cancelled' && error.error?.message !== 'Request no longer relevant') {
-              console.warn('[LOD] Failed to load image:', error);
+            const msg = error?.error?.message || error?.message || String(error);
+            if (msg.includes('cancelled') || msg.includes('no longer relevant')) return;
+            // Only blacklist on 404 (image doesn't exist) — not on timeouts or temp errors
+            if (msg.includes('404') || msg.includes('Not Found')) {
+              this.failedStorageIds.add(storageId);
             }
           });
 
@@ -1069,9 +1072,9 @@ export class CanvasRenderer<T> {
 
       // Get product and ensure image is loaded (OOP self-managed)
       const product = n.data as any as Product;
-      if (!product.isImageReady) {
-        // Trigger async load (non-blocking)
-        product.loadImage();
+      if (!product.isImageReady && !product.hasImageError) {
+        // Trigger async load (non-blocking) — skip if already failed
+        if (!product.isImageLoading) product.loadImage();
 
         // Draw placeholder tile while image loads
         const radius = Math.min(18, Math.min(w, h) / 4);
