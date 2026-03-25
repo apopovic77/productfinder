@@ -229,7 +229,7 @@ export class PivotLayouter<T> {
               const finalSize = globalCellSize * scale;
               const x = this.paddingLeft + col * (globalCellSize + spacing);
               const y = baseY + row * (globalCellSize + spacing);
-              const delay = Math.random() * 300;
+              const delay = Math.random() * 100;
               setTimeout(() => {
                 node.posX.targetValue = x;
                 node.posY.targetValue = y;
@@ -389,7 +389,7 @@ export class PivotLayouter<T> {
             const x = offsetX + col * (cellSize + spacing);
             const y = baseY - row * (cellSize + spacing);
 
-            const delay = Math.random() * 300;
+            const delay = Math.random() * 100;
             setTimeout(() => {
               node.posX.targetValue = x;
               node.posY.targetValue = y;
