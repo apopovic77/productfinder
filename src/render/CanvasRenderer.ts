@@ -407,7 +407,7 @@ export class CanvasRenderer<T> {
             storageId,
             width: requiredSize,
             quality,
-            trim: false, // Always NO trim for consistent aspect ratio (no visual jump during LOD updates)
+            trim: true, // Trim transparent border for better visual quality
           });
 
           // Add to ImageLoadQueue (automatically handles duplicates and priority sorting)
@@ -1060,15 +1060,15 @@ export class CanvasRenderer<T> {
         continue;
       }
 
-      // Apply trim scale — products with more transparent border render smaller
-      const product = n.data as any as Product;
-      const trimScale = product.trimScale?.scale ?? 1;
-      const drawW = w * trimScale;
-      const drawH = h * trimScale;
-      const drawX = x + (w - drawW) / 2;  // center in cell
-      const drawY = y + (h - drawH) / 2;
+      // Images are loaded with ?trim=true — transparent border already removed.
+      // No client-side scale correction needed.
+      const drawW = w;
+      const drawH = h;
+      const drawX = x;
+      const drawY = y;
 
       // Get product and ensure image is loaded (OOP self-managed)
+      const product = n.data as any as Product;
       if (!product.isImageReady) {
         // Trigger async load (non-blocking)
         product.loadImage();

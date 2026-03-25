@@ -189,7 +189,7 @@ export class Product {
       // Initial load = micro thumbnail (35px) for fast overview
       const size = 35;
       const quality = 60;
-      return `${STORAGE_API_BASE}/storage/media/${media.storage_id}?width=${size}&format=webp&quality=${quality}`;
+      return `${STORAGE_API_BASE}/storage/media/${media.storage_id}?width=${size}&format=webp&quality=${quality}&trim=true`;
     }
 
     // Fallback to Shopify CDN
