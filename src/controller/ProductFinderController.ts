@@ -245,30 +245,37 @@ export class ProductFinderController {
       // Pivot mode: free panning
       this.viewportService.setLockVerticalPan(false);
       const vt = this.viewportService.getTransform();
+      const vw = this.canvas?.width ?? 800;
+      const vh = this.canvas?.height ?? 600;
+
       if (vt) {
         vt.panWithLeftButton = true;
-        if (this.layoutService.hasCellSizeOverride) {
-          // Cell size override: allow panning to overflow content,
-          // but zoom-out limit = fit viewport (not the larger content)
-          const minScale = Math.min(
-            (this.canvas?.width ?? 800) / (bounds.maxX || 1),
-            (this.canvas?.height ?? 600) / (bounds.maxY || 1)
-          );
-          vt.minScaleOverride = Math.max(0.1, minScale);
+        // If content overflows viewport (from cellSizeOverride OR minCellSize),
+        // zoom-out limit = fit viewport (blue bounds), not content (red bounds)
+        const contentOverflows = bounds.maxX > vw || bounds.maxY > vh || bounds.minY < 0 || bounds.minX < 0;
+        if (contentOverflows) {
+          vt.minScaleOverride = 1;
         } else {
           vt.minScaleOverride = null;
         }
       }
-      // Position camera: bottom-aligned (buckets are at the bottom)
-      // Scale = fit viewport (auto bounds), Y = show bottom of content
-      const vw = this.canvas?.width ?? 800;
-      const vh = this.canvas?.height ?? 600;
-      const fitScale = Math.min(vw / (bounds.width || 1), vh / vh);
-      const scale = vt?.minScaleOverride ?? fitScale;
 
-      // Bottom-align: offset so that maxY maps to viewport bottom
-      const offsetY = vh - bounds.maxY * scale;
-      const offsetX = -bounds.minX * scale;
+      // Position camera based on orientation:
+      // columns (desktop): bottom-aligned (buckets at bottom, content grows up)
+      // rows (mobile): left/top-aligned (buckets at left, content grows right)
+      const scale = vt?.minScaleOverride ?? 1;
+      const isRows = this.layoutService.getPivotOrientation() === 'rows';
+
+      let offsetX: number;
+      let offsetY: number;
+
+      if (isRows) {
+        offsetX = -bounds.minX * scale;
+        offsetY = -bounds.minY * scale;
+      } else {
+        offsetX = -bounds.minX * scale;
+        offsetY = vh - bounds.maxY * scale;
+      }
 
       this.viewportService.getTransform()?.setPosition(offsetX, offsetY, scale);
     }
