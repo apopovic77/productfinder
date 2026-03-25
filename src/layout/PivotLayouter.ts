@@ -141,14 +141,17 @@ export class PivotLayouter<T> {
         // Binary search cell size within screenWidth x (frameHeight - headerHeight)
         // Products fill top-to-bottom first, then add columns to the right (column-major)
         // Height bounded by frameHeight, width unbounded
+        // Mobile: compact gaps and header for more product rows
+        const mobileHeaderHeight = isMobile ? 20 : headerHeight;
+        const mobileFrameGap = isMobile ? 6 : this.config.frameGap;
+        const spacing = isMobile ? 3 : this.config.itemGap;
+
         const rowsForSizing = numGroups;
-        const totalGaps = this.config.frameGap * Math.max(0, rowsForSizing - 1);
+        const totalGaps = mobileFrameGap * Math.max(0, rowsForSizing - 1);
         const totalVertPadding = this.paddingTop + this.paddingBottom;
         const availableHeight = view.height - totalGaps - totalVertPadding;
         const frameHeight = availableHeight / Math.max(1, rowsForSizing);
-
-        const spacing = this.config.itemGap;
-        const matrixHeight = Math.max(1, frameHeight - headerHeight);
+        const matrixHeight = Math.max(1, frameHeight - mobileHeaderHeight);
         const matrixWidth = Math.max(1, view.width - this.paddingLeft - this.paddingRight);
 
         // Find the group with the MOST products
@@ -192,10 +195,10 @@ export class PivotLayouter<T> {
             x: this.paddingLeft,
             y: offsetY,
             width: view.width - this.paddingLeft - this.paddingRight,
-            height: headerHeight
+            height: mobileHeaderHeight
           });
 
-          const baseY = offsetY + headerHeight;
+          const baseY = offsetY + mobileHeaderHeight;
 
           // Column-major fill: top-to-bottom first, then right
           for (let col = 0; col < colsInFrame; col++) {
@@ -216,7 +219,7 @@ export class PivotLayouter<T> {
             }
           }
 
-          offsetY += frameHeight + this.config.frameGap;
+          offsetY += frameHeight + mobileFrameGap;
         }
 
         return;
