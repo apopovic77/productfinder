@@ -71,6 +71,8 @@ export function analyzeProperties(
     // Use ProductAttribute label if available, else format key
     const label = override?.label || getAttributeLabel(products, key) || formatLabel(key);
 
+    const unit = getAttributeUnit(products, key);
+
     results.push({
       key,
       label,
@@ -85,6 +87,7 @@ export function analyzeProperties(
       numericRange,
       isPivotCandidate,
       recommendedStrategy: strategy,
+      unit,
     });
   }
 
@@ -112,6 +115,17 @@ function getAttributeLabel(products: Product[], key: string): string | null {
   for (const product of products) {
     const attr = product.attributes[key];
     if (attr) return attr.label;
+  }
+  return null;
+}
+
+/**
+ * Get the unit from the first Product that has this attribute.
+ */
+function getAttributeUnit(products: Product[], key: string): string | null {
+  for (const product of products) {
+    const attr = product.attributes[key];
+    if (attr?.unit) return attr.unit;
   }
   return null;
 }

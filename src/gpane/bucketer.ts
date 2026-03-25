@@ -27,15 +27,17 @@ export function buildBuckets(
   const maxBuckets = override?.bucketCount || config.maxBuckets;
   const key = dimension.key;
 
+  const unit = dimension.unit || null;
+
   switch (strategy) {
     case 'identity':
       return identityBuckets(products, key, maxBuckets, override?.normalization);
     case 'range_equal_width':
-      return rangeBuckets(products, key, maxBuckets, 'equal_width');
+      return rangeBuckets(products, key, maxBuckets, 'equal_width', unit);
     case 'range_quantile':
-      return rangeBuckets(products, key, maxBuckets, 'quantile');
+      return rangeBuckets(products, key, maxBuckets, 'quantile', unit);
     case 'range_logarithmic':
-      return rangeBuckets(products, key, maxBuckets, 'logarithmic');
+      return rangeBuckets(products, key, maxBuckets, 'logarithmic', unit);
     case 'discrete':
       return discreteBuckets(products, key, maxBuckets);
     case 'boolean_split':
@@ -113,7 +115,8 @@ function rangeBuckets(
   products: Product[],
   key: string,
   bucketCount: number,
-  mode: 'equal_width' | 'quantile' | 'logarithmic'
+  mode: 'equal_width' | 'quantile' | 'logarithmic',
+  unit: string | null = null
 ): Bucket[] {
   const values: Array<{ id: string; num: number }> = [];
   const unknown: string[] = [];
@@ -196,10 +199,11 @@ function rangeBuckets(
 
     if (ids.length === 0) continue;
 
+    const u = unit ? `${unit} ` : '';
     let label: string;
-    if (isFirst && !isLast) label = `< ${formatNumber(hi)}`;
-    else if (isLast) label = `≥ ${formatNumber(lo)}`;
-    else label = `${formatNumber(lo)} – ${formatNumber(hi)}`;
+    if (isFirst && !isLast) label = `< ${u}${formatNumber(hi)}`;
+    else if (isLast) label = `≥ ${u}${formatNumber(lo)}`;
+    else label = `${u}${formatNumber(lo)} – ${u}${formatNumber(hi)}`;
 
     buckets.push(makeBucket(label, ids, false, false, {
       min: lo,

@@ -63,6 +63,7 @@ export interface PropertyAnalysis {
   numericRange: NumericRange | null;
   isPivotCandidate: boolean;
   recommendedStrategy: BucketStrategy;
+  unit: string | null;
 }
 
 export interface TopValue {
