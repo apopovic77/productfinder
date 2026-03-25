@@ -1060,8 +1060,15 @@ export class CanvasRenderer<T> {
         continue;
       }
 
-      // Get product and ensure image is loaded (OOP self-managed)
+      // Apply trim scale — products with more transparent border render smaller
       const product = n.data as any as Product;
+      const trimScale = product.trimScale?.scale ?? 1;
+      const drawW = w * trimScale;
+      const drawH = h * trimScale;
+      const drawX = x + (w - drawW) / 2;  // center in cell
+      const drawY = y + (h - drawH) / 2;
+
+      // Get product and ensure image is loaded (OOP self-managed)
       if (!product.isImageReady) {
         // Trigger async load (non-blocking)
         product.loadImage();
@@ -1262,12 +1269,12 @@ export class CanvasRenderer<T> {
         } else {
           // No loaded images yet - reset scale to 1.0
           this.imageScaleFactor.targetValue = 1.0;
-          this.drawImageFit(img, x, y, w, h);
+          this.drawImageFit(img, drawX, drawY, drawW, drawH);
         }
       } else {
         // No alternative images - reset scale to 1.0 smoothly
         this.imageScaleFactor.targetValue = 1.0;
-        this.drawImageFit(img, x, y, w, h);
+        this.drawImageFit(img, drawX, drawY, drawW, drawH);
       }
 
       this.ctx.globalAlpha = 1;

@@ -611,7 +611,12 @@ function mapProduct(p: OnealProduct): Product | null {
         is_nos: v.is_nos,
       };
     }),
-    raw: p as any
+    raw: p as any,
+    trimScale: anyP.storage?.trim?.scale != null ? {
+      scale: anyP.storage.trim.scale,
+      scale_x: anyP.storage.trim.scale_x,
+      scale_y: anyP.storage.trim.scale_y,
+    } : undefined,
   };
 
   return new Product(data);

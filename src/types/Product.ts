@@ -69,6 +69,12 @@ export type ProductVariant = {
   option2?: string;
 };
 
+export type TrimScale = {
+  scale: number;       // max(scale_x, scale_y) — for uniform scaling
+  scale_x: number;
+  scale_y: number;
+};
+
 export type ProductData = {
   id: string;
   sku?: string;
@@ -87,6 +93,7 @@ export type ProductData = {
   aiAnalysis?: ProductAIAnalysis;
   variants?: ProductVariant[];
   raw?: Record<string, unknown>;
+  trimScale?: TrimScale;
 };
 
 /**
@@ -112,6 +119,7 @@ export class Product {
   public readonly description?: string;
   public readonly displayName: string;
   public readonly attributes: Record<string, ProductAttribute>;
+  public readonly trimScale?: TrimScale;
   public readonly aiTags: string[];
   public readonly aiAnalysis?: ProductAIAnalysis;
   public readonly variants?: ProductVariant[];
@@ -162,6 +170,7 @@ export class Product {
     this.aiAnalysis = data.aiAnalysis;
     this.variants = data.variants ?? [];
     this.raw = data.raw ?? {};
+    this.trimScale = data.trimScale;
   }
 
   get primaryImage(): MediaItem | undefined {
