@@ -343,24 +343,27 @@ function mapProduct(p: OnealProduct): Product | null {
       }
     : undefined);
 
-  // Variant count from API (total SKUs including sizes)
-  const apiVariantCount = apiAny.variant_count ?? variants.length;
-  addAttribute(attributes, {
-    key: 'variant_count',
-    label: 'Varianten',
-    type: 'number',
-    value: apiVariantCount,
-    sourcePath: 'variant_count',
-  });
-
-  // Color count (unique colors, not SKUs)
-  addAttribute(attributes, typeof apiAny.color_count === 'number' && apiAny.color_count > 0
+  // Varianten = Farben (color_count from API)
+  const colorCount = apiAny.color_count ?? 0;
+  addAttribute(attributes, colorCount > 0
     ? {
-        key: 'color_count',
-        label: 'Farbvarianten',
+        key: 'variant_count',
+        label: 'Varianten',
         type: 'number',
-        value: apiAny.color_count,
+        value: colorCount,
         sourcePath: 'color_count',
+      }
+    : undefined);
+
+  // Größen = unique sizes (size_count from API)
+  const sizeCount = apiAny.size_count ?? 0;
+  addAttribute(attributes, sizeCount > 0
+    ? {
+        key: 'size_count',
+        label: 'Größen',
+        type: 'number',
+        value: sizeCount,
+        sourcePath: 'size_count',
       }
     : undefined);
 
