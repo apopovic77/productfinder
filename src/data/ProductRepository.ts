@@ -343,15 +343,8 @@ function mapProduct(p: OnealProduct): Product | null {
       }
     : undefined);
 
-  // Variant count
-  const variantCount = apiAny.variant_count ?? variants.length;
-  addAttribute(attributes, {
-    key: 'variant_count',
-    label: 'Varianten',
-    type: 'number',
-    value: variantCount,
-    sourcePath: 'variant_count',
-  });
+  // Variant count — will be overwritten below with unique color count
+  // (kept as placeholder, actual value set after colorTokens are computed)
 
   // Image count (has image or not)
   const hasImage = apiAny.storage?.id ? 1 : 0;
@@ -472,6 +465,15 @@ function mapProduct(p: OnealProduct): Product | null {
   if (!colorTokens.size && apiAny.color_name) {
     colorTokens.add(String(apiAny.color_name));
   }
+
+  // Variant count = unique colors (not total SKUs including sizes)
+  addAttribute(attributes, {
+    key: 'variant_count',
+    label: 'Farbvarianten',
+    type: 'number',
+    value: colorTokens.size || 1,
+    sourcePath: 'variants[].color',
+  });
 
   addAttribute(attributes, colorTokens.size
     ? {
