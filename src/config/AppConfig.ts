@@ -81,7 +81,7 @@ const DEVELOPER_SETTINGS_DEFAULTS: DeveloperSettings = {
   rectMode: false,
   showBoundsDebug: false,
   ignoreBounds: false,
-  minCellSize: 20,
+  minCellSize: 25,
 };
 
 export const APP_CONFIG = {
