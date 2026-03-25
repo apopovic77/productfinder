@@ -1304,58 +1304,62 @@ export class CanvasRenderer<T> {
       const buttonX = header.x - widthExt;
       const buttonWidth = header.width + (widthExt * 2);
 
-      // Try to load hero image for this header
-      const imageKey = `${currentDimension}:${header.label}`;
-      this.loadGroupHeaderImage(currentDimension, header.label);
-      const heroImage = this.groupHeaderImages.get(imageKey);
+      if (!isMobileCanvas) {
+        // Desktop: full-width gradient/image background
+        // Try to load hero image for this header
+        const imageKey = `${currentDimension}:${header.label}`;
+        this.loadGroupHeaderImage(currentDimension, header.label);
+        const heroImage = this.groupHeaderImages.get(imageKey);
 
-      // Draw background (image or gradient)
-      this.ctx.save();
-      this.drawRoundedRect(buttonX, header.y + yOffset, buttonWidth, header.height, radius);
-      this.ctx.clip(); // Clip to rounded rect
-
-      if (heroImage && heroImage.complete && heroImage.naturalWidth > 0) {
-        // Draw hero image as background (cover mode)
-        this.drawImageCover(
-          heroImage,
-          buttonX,
-          header.y + yOffset,
-          buttonWidth,
-          header.height
-        );
-
-        // Dark overlay for text readability
-        const opacity = isHovered ? BUCKET_BUTTON_CONFIG.imageOverlay.opacityHover : BUCKET_BUTTON_CONFIG.imageOverlay.opacityNormal;
-        this.ctx.fillStyle = `rgba(0, 0, 0, ${opacity})`;
-        this.ctx.fillRect(buttonX, header.y + yOffset, buttonWidth, header.height);
-      } else {
-        // Fallback gradient
-        const gradient = this.ctx.createLinearGradient(
-          buttonX,
-          header.y,
-          buttonX + buttonWidth,
-          header.y + header.height
-        );
-        const colors = isHovered ? BUCKET_BUTTON_CONFIG.gradient.hover : BUCKET_BUTTON_CONFIG.gradient.normal;
-        gradient.addColorStop(0, colors.start);
-        gradient.addColorStop(1, colors.end);
-        this.ctx.fillStyle = gradient;
-        this.ctx.fillRect(buttonX, header.y + yOffset, buttonWidth, header.height);
-      }
-
-      this.ctx.restore();
-
-      // Add subtle shadow for hover
-      if (isHovered) {
+        // Draw background (image or gradient)
         this.ctx.save();
-        this.ctx.shadowColor = BUCKET_BUTTON_CONFIG.hover.shadow.color;
-        this.ctx.shadowBlur = BUCKET_BUTTON_CONFIG.hover.shadow.blur;
-        this.ctx.shadowOffsetY = BUCKET_BUTTON_CONFIG.hover.shadow.offsetY;
         this.drawRoundedRect(buttonX, header.y + yOffset, buttonWidth, header.height, radius);
-        this.ctx.fillStyle = 'transparent';
-        this.ctx.fill();
+        this.ctx.clip(); // Clip to rounded rect
+
+        if (heroImage && heroImage.complete && heroImage.naturalWidth > 0) {
+          // Draw hero image as background (cover mode)
+          this.drawImageCover(
+            heroImage,
+            buttonX,
+            header.y + yOffset,
+            buttonWidth,
+            header.height
+          );
+
+          // Dark overlay for text readability
+          const opacity = isHovered ? BUCKET_BUTTON_CONFIG.imageOverlay.opacityHover : BUCKET_BUTTON_CONFIG.imageOverlay.opacityNormal;
+          this.ctx.fillStyle = `rgba(0, 0, 0, ${opacity})`;
+          this.ctx.fillRect(buttonX, header.y + yOffset, buttonWidth, header.height);
+        } else {
+          // Fallback gradient
+          const gradient = this.ctx.createLinearGradient(
+            buttonX,
+            header.y,
+            buttonX + buttonWidth,
+            header.y + header.height
+          );
+          const colors = isHovered ? BUCKET_BUTTON_CONFIG.gradient.hover : BUCKET_BUTTON_CONFIG.gradient.normal;
+          gradient.addColorStop(0, colors.start);
+          gradient.addColorStop(1, colors.end);
+          this.ctx.fillStyle = gradient;
+          this.ctx.fillRect(buttonX, header.y + yOffset, buttonWidth, header.height);
+        }
+
         this.ctx.restore();
+
+        // Add subtle shadow for hover
+        if (isHovered) {
+          this.ctx.save();
+          this.ctx.shadowColor = BUCKET_BUTTON_CONFIG.hover.shadow.color;
+          this.ctx.shadowBlur = BUCKET_BUTTON_CONFIG.hover.shadow.blur;
+          this.ctx.shadowOffsetY = BUCKET_BUTTON_CONFIG.hover.shadow.offsetY;
+          this.drawRoundedRect(buttonX, header.y + yOffset, buttonWidth, header.height, radius);
+          this.ctx.fillStyle = 'transparent';
+          this.ctx.fill();
+          this.ctx.restore();
+        }
       }
+      // Mobile: compact label drawn after text measurement (below)
 
       // Check if we're in color pivot mode
       const isColorDimension = currentDimension === 'attribute:variant_colors';
@@ -1466,13 +1470,18 @@ export class CanvasRenderer<T> {
 
         this.ctx.font = `${fontWeight} ${fontSize}px ${BUCKET_BUTTON_CONFIG.font.family}`;
 
-        // Dynamic alignment: if only 2 columns, make second column left-aligned
-        const allHeaders = this.getGroupHeaders();
-        const totalColumns = allHeaders.length;
-        const columnIndex = allHeaders.indexOf(header);
-        const textAlign = (totalColumns === 2 && columnIndex === 1)
-          ? 'left'
-          : BUCKET_BUTTON_CONFIG.font.alignHorizontal;
+        // Mobile: always left-aligned; Desktop: dynamic alignment
+        let textAlign: CanvasTextAlign;
+        if (isMobileCanvas) {
+          textAlign = 'left';
+        } else {
+          const allHeaders = this.getGroupHeaders();
+          const totalColumns = allHeaders.length;
+          const columnIndex = allHeaders.indexOf(header);
+          textAlign = (totalColumns === 2 && columnIndex === 1)
+            ? 'left'
+            : BUCKET_BUTTON_CONFIG.font.alignHorizontal;
+        }
 
         this.ctx.textAlign = textAlign;
         const verticalAlign = BUCKET_BUTTON_CONFIG.font.alignVertical;
@@ -1533,6 +1542,25 @@ export class CanvasRenderer<T> {
         this.ctx.beginPath();
         this.ctx.rect(header.x, header.y + yOffset, header.width, header.height);
         this.ctx.clip();
+
+        // Mobile: draw compact black bg behind text only
+        if (isMobileCanvas && transformedLines.length > 0) {
+          const bgPad = 4;
+          // Measure max text width
+          let maxLineWidth = 0;
+          for (const line of transformedLines) {
+            const w = this.ctx.measureText(line).width;
+            if (w > maxLineWidth) maxLineWidth = w;
+          }
+          const bgX = textX - bgPad;
+          const bgY = startY - bgPad;
+          const bgW = maxLineWidth + bgPad * 2;
+          const bgH = totalTextHeight + bgPad * 2;
+          this.ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+          this.drawRoundedRect(bgX, bgY, bgW, bgH, 4);
+          this.ctx.fill();
+          this.ctx.fillStyle = BUCKET_BUTTON_CONFIG.font.color;
+        }
 
         // Draw each line
         transformedLines.forEach((line, index) => {
