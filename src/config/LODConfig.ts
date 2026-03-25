@@ -9,15 +9,15 @@ export const LOD_CONFIG = {
   scanInterval: 500,
   processInterval: 100,
 
-  // Image resolutions (3 tiers)
-  microResolution: 35,       // Micro thumbnail — initial load, overview
-  lowResolution: 130,        // Normal thumbnail — zoomed in
+  // Image resolutions (3 tiers — micro currently disabled)
+  microResolution: 35,       // Micro thumbnail — DISABLED (initial loads at lowResolution)
+  lowResolution: 130,        // Normal thumbnail — initial load + overview
   highResolution: 1300,      // Full detail — hero/close-up
 
   // Transition thresholds (screen space size in pixels) with hysteresis
-  // micro → low
-  microToLowUp: 80,          // Switch to low when screen size > 80px
-  microToLowDown: 60,        // Switch back to micro when < 60px
+  // micro → low (disabled: micro never used when initial load is 130px)
+  microToLowUp: 0,           // Effectively disabled — always at least low
+  microToLowDown: 0,
   // low → high
   lowToHighUp: 420,          // Switch to high when screen size > 420px
   lowToHighDown: 380,        // Switch back to low when < 380px
