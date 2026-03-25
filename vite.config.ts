@@ -7,6 +7,9 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     base: env.VITE_BASE_PATH || '/',
+    server: {
+      allowedHosts: ['productfinder-dev.oneal.arkturian.com'],
+    },
     build: {
       chunkSizeWarningLimit: 1000,
       rollupOptions: {
