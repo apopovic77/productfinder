@@ -157,45 +157,22 @@ export class PivotLayouter<T> {
           maxProductsInAnyGroup = Math.max(maxProductsInAnyGroup, groups.get(k)!.length);
         }
 
-        // For rows mode: width is unbounded (products scroll right).
-        // Cell size is determined only by how many rows fit in the frameHeight.
-        // No binary search needed — just divide frameHeight by desired row count.
-        const fitsInHeight = (cellSize: number): boolean => {
-          if (cellSize <= 0) return false;
-          return Math.floor((matrixHeight + spacing) / (cellSize + spacing)) >= 1;
-        };
-
-        const preferredMin = this.config.minCellSize ?? 5;
-        const preferredMax = this.config.maxCellSize ?? Math.min(matrixWidth, matrixHeight);
-        const absoluteMin = 5;
-        const searchMin = absoluteMin;
-        const searchMax = Math.max(searchMin, Math.min(preferredMax, Math.min(matrixWidth, matrixHeight)));
-
-        // Binary search: find largest cell size where the largest group
-        // fits within the frameHeight. Width is unbounded (scrolls right).
-        // We want multiple rows to fill the height — more rows = smaller cells = more visible.
-        let globalCellSize = searchMin;
+        // Rows mode: width is unbounded (products scroll right).
+        // Cell size = fill as many rows as possible in matrixHeight.
+        // Simply: how many rows fit at minCellSize? Use that many, then size cells to fill.
+        let globalCellSize: number;
 
         if (this.config.cellSizeOverride && this.config.cellSizeOverride > 0) {
           globalCellSize = this.config.cellSizeOverride;
-        } else if (fitsInHeight(searchMin)) {
-          // Target: enough rows so that cols needed stays reasonable
-          // rows = matrixHeight / cellSize, cols = maxProducts / rows
-          // We want cols to be roughly screenWidth / cellSize (fill the screen)
-          const targetCols = Math.max(1, Math.floor((matrixWidth + spacing) / (searchMin + spacing)));
-          const targetRows = Math.max(1, Math.ceil(maxProductsInAnyGroup / targetCols));
-          // Cell size from target rows
-          const fromTargetRows = Math.max(searchMin, (matrixHeight + spacing) / targetRows - spacing);
-          globalCellSize = Math.max(searchMin, Math.min(searchMax, fromTargetRows));
+        } else {
+          const minCell = this.config.minCellSize ?? 5;
+          // How many rows fit at minimum cell size?
+          const maxPossibleRows = Math.max(1, Math.floor((matrixHeight + spacing) / (minCell + spacing)));
+          // Size cells to exactly fill the available height with that many rows
+          globalCellSize = Math.max(minCell, (matrixHeight + spacing) / maxPossibleRows - spacing);
         }
 
         let globalRows = Math.max(1, Math.floor((matrixHeight + spacing) / (globalCellSize + spacing)));
-
-        // Enforce hard minimum
-        if (this.config.minCellSize && globalCellSize < this.config.minCellSize) {
-          globalCellSize = this.config.minCellSize;
-          globalRows = Math.max(1, Math.floor((matrixHeight + spacing) / (globalCellSize + spacing)));
-        }
 
         // Layout each group using same cell size
         let offsetY = this.paddingTop;
