@@ -135,57 +135,111 @@ export class PivotLayouter<T> {
       const numGroups = keys.length;
 
       if (orientation === 'rows') {
-        // === SCROLLABLE ROWS LAYOUT (mobile/portrait) ===
-        // Content scrolls vertically — do NOT constrain to viewport height.
-        // Cell size is determined by WIDTH only; each group grows as tall as needed.
-        const matrixWidth = Math.max(1, view.width - this.paddingLeft - this.paddingRight);
-        const spacing = this.config.itemGap;
+        // === ROWS LAYOUT (mobile/portrait) ===
+        // Same algorithm as columns, just rotated:
+        // screenHeight / numBuckets = frameHeight
+        // Binary search cell size within screenWidth x (frameHeight - headerHeight)
+        // Products fill top-to-bottom first, then add columns to the right (column-major)
+        // Height bounded by frameHeight, width unbounded
+        const rowsForSizing = numGroups;
+        const totalGaps = this.config.frameGap * Math.max(0, rowsForSizing - 1);
+        const totalVertPadding = this.paddingTop + this.paddingBottom;
+        const availableHeight = view.height - totalGaps - totalVertPadding;
+        const frameHeight = availableHeight / Math.max(1, rowsForSizing);
 
-        // Determine cell size from width constraints only
-        let globalCellSize: number;
+        const spacing = this.config.itemGap;
+        const matrixHeight = Math.max(1, frameHeight - headerHeight);
+        const matrixWidth = Math.max(1, view.width - this.paddingLeft - this.paddingRight);
+
+        // Find the group with the MOST products
+        let maxProductsInAnyGroup = 0;
+        for (const k of keys) {
+          maxProductsInAnyGroup = Math.max(maxProductsInAnyGroup, groups.get(k)!.length);
+        }
+
+        // Binary search for optimal cell size
+        const fitsAllProducts = (cellSize: number): boolean => {
+          if (cellSize <= 0) return false;
+          const rows = Math.max(1, Math.floor((matrixHeight + spacing) / (cellSize + spacing)));
+          const cols = Math.max(1, Math.floor((matrixWidth + spacing) / (cellSize + spacing)));
+          return rows * cols >= maxProductsInAnyGroup;
+        };
+
+        const preferredMin = this.config.minCellSize ?? 5;
+        const preferredMax = this.config.maxCellSize ?? Math.min(matrixWidth, matrixHeight);
+        const absoluteMin = 5;
+        const searchMin = absoluteMin;
+        const searchMax = Math.max(searchMin, Math.min(preferredMax, Math.min(matrixWidth, matrixHeight)));
+
+        let globalCellSize = searchMin;
+
         if (this.config.cellSizeOverride && this.config.cellSizeOverride > 0) {
           globalCellSize = this.config.cellSizeOverride;
-        } else {
-          // Use maxCellSize as target, clamped to what fits at least 2 columns
-          const preferredMax = this.config.maxCellSize ?? matrixWidth;
-          const preferredMin = this.config.minCellSize ?? 30;
-          // Aim for cells that fill the width nicely
-          const minCols = 2;
-          const maxCellForMinCols = (matrixWidth - spacing * (minCols - 1)) / minCols;
-          globalCellSize = Math.max(preferredMin, Math.min(preferredMax, maxCellForMinCols));
+        } else if (fitsAllProducts(searchMin)) {
+          let low = searchMin;
+          let high = searchMax;
+          while (fitsAllProducts(high) && high < searchMax * 4) {
+            high *= 1.5;
+          }
+          for (let i = 0; i < 30; i++) {
+            const mid = (low + high) / 2;
+            if (fitsAllProducts(mid)) {
+              low = mid;
+            } else {
+              high = mid;
+            }
+          }
+          globalCellSize = Math.max(searchMin, Math.min(searchMax, low));
+          if (globalCellSize < preferredMin && fitsAllProducts(preferredMin)) {
+            globalCellSize = Math.min(searchMax, preferredMin);
+          }
+        }
+
+        let globalRows = Math.max(1, Math.floor((matrixHeight + spacing) / (globalCellSize + spacing)));
+
+        // Safety: shrink if needed
+        if (!this.config.cellSizeOverride) {
+          let globalCols = Math.max(1, Math.floor((matrixWidth + spacing) / (globalCellSize + spacing)));
+          while (globalRows * globalCols < maxProductsInAnyGroup && globalCellSize > searchMin) {
+            globalCellSize = Math.max(searchMin, globalCellSize - 0.5);
+            globalRows = Math.max(1, Math.floor((matrixHeight + spacing) / (globalCellSize + spacing)));
+            globalCols = Math.max(1, Math.floor((matrixWidth + spacing) / (globalCellSize + spacing)));
+          }
         }
 
         // Enforce hard minimum
         if (this.config.minCellSize && globalCellSize < this.config.minCellSize) {
           globalCellSize = this.config.minCellSize;
+          globalRows = Math.max(1, Math.floor((matrixHeight + spacing) / (globalCellSize + spacing)));
         }
 
-        const globalCols = Math.max(1, Math.floor((matrixWidth + spacing) / (globalCellSize + spacing)));
-
-        // Layout each group: header + grid rows, advance offsetY by actual content height
+        // Layout each group using same cell size
         let offsetY = this.paddingTop;
         for (const k of keys) {
           const list = groups.get(k)!;
           if (this.config.itemSort) list.sort((a, b) => this.config.itemSort!(a.data, b.data));
+          this.config.onGroupLayout?.(k, list);
 
           const productsInThisGroup = list.length;
-          const colsInFrame = Math.max(1, Math.min(globalCols, productsInThisGroup));
-          const rowsInFrame = Math.max(1, Math.ceil(productsInThisGroup / colsInFrame));
+          const rowsInFrame = Math.max(1, Math.min(globalRows, productsInThisGroup));
+          const colsInFrame = Math.max(1, Math.ceil(productsInThisGroup / rowsInFrame));
 
+          // Header at left edge
           this.groupHeaders.push({
             key: k,
             label: k,
             x: this.paddingLeft,
             y: offsetY,
-            width: matrixWidth,
+            width: view.width - this.paddingLeft - this.paddingRight,
             height: headerHeight
           });
 
           const baseY = offsetY + headerHeight;
 
-          for (let row = 0; row < rowsInFrame; row++) {
-            for (let col = 0; col < colsInFrame; col++) {
-              const productIndex = row * colsInFrame + col;
+          // Column-major fill: top-to-bottom first, then right
+          for (let col = 0; col < colsInFrame; col++) {
+            for (let row = 0; row < rowsInFrame; row++) {
+              const productIndex = col * rowsInFrame + row;
               if (productIndex >= list.length) break;
               const node = list[productIndex];
               const scale = deriveScale(node);
@@ -201,9 +255,7 @@ export class PivotLayouter<T> {
             }
           }
 
-          // Advance by actual content height (not fixed frameHeight)
-          const contentHeight = headerHeight + rowsInFrame * (globalCellSize + spacing) - spacing;
-          offsetY += contentHeight + this.config.frameGap;
+          offsetY += frameHeight + this.config.frameGap;
         }
 
         return;
