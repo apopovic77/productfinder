@@ -104,6 +104,7 @@ export class LayoutService {
       }],
       domain: 'oneal',
       taxonomy: ONEAL_TAXONOMY,
+      heroThreshold: 15,
     });
 
     this.pivotConfig = this.createDefaultPivotConfig();
