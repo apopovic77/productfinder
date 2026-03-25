@@ -135,41 +135,94 @@ export class PivotLayouter<T> {
       const numGroups = keys.length;
 
       if (orientation === 'rows') {
-        // === SCROLLABLE ROWS LAYOUT (mobile/portrait) ===
-        // Content scrolls vertically — do NOT constrain to viewport height.
-        // Cell size is determined by WIDTH only; each group grows as tall as needed.
+        const MAX_VISIBLE_ROWS = 10;
+        const rowsForSizing = Math.min(numGroups, MAX_VISIBLE_ROWS);
+        const totalGaps = this.config.frameGap * Math.max(0, rowsForSizing - 1);
+        const availableHeight = view.height - totalGaps - this.paddingTop - this.paddingBottom;
+        const frameHeight = availableHeight / Math.max(1, rowsForSizing);
         const matrixWidth = Math.max(1, view.width - this.paddingLeft - this.paddingRight);
+        const matrixHeight = Math.max(1, frameHeight - headerHeight);
         const spacing = this.config.itemGap;
 
-        // Determine cell size from width constraints only
-        let globalCellSize: number;
+        let maxProductsInAnyGroup = 0;
+        for (const k of keys) {
+          const list = groups.get(k)!;
+          maxProductsInAnyGroup = Math.max(maxProductsInAnyGroup, list.length);
+        }
+
+        const fitsAllProducts = (cellSize: number): boolean => {
+          if (cellSize <= 0) return false;
+          const cols = Math.max(1, Math.floor((matrixWidth + spacing) / (cellSize + spacing)));
+          const rows = Math.max(1, Math.floor((matrixHeight + spacing) / (cellSize + spacing)));
+          return cols * rows >= maxProductsInAnyGroup;
+        };
+
+        const preferredMin = this.config.minCellSize ?? 5;
+        const preferredMax = this.config.maxCellSize ?? Math.min(matrixWidth, matrixHeight);
+        const absoluteMin = 5;
+        const searchMin = absoluteMin;
+        const searchMax = Math.max(searchMin, Math.min(preferredMax, Math.min(matrixWidth, matrixHeight)));
+
+        let globalCellSize = searchMin;
+        let globalCols = 1;
+        let globalRows = maxProductsInAnyGroup;
+
         if (this.config.cellSizeOverride && this.config.cellSizeOverride > 0) {
           globalCellSize = this.config.cellSizeOverride;
+        } else if (fitsAllProducts(searchMin)) {
+          let low = searchMin;
+          let high = searchMax;
+          while (fitsAllProducts(high) && high < searchMax * 4) {
+            high *= 1.5;
+          }
+          for (let i = 0; i < 30; i++) {
+            const mid = (low + high) / 2;
+            if (fitsAllProducts(mid)) {
+              low = mid;
+            } else {
+              high = mid;
+            }
+          }
+          globalCellSize = Math.max(searchMin, Math.min(searchMax, low));
+          if (globalCellSize < preferredMin && fitsAllProducts(preferredMin)) {
+            globalCellSize = Math.min(searchMax, preferredMin);
+          }
         } else {
-          // Use maxCellSize as target, clamped to what fits at least 2 columns
-          const preferredMax = this.config.maxCellSize ?? matrixWidth;
-          const preferredMin = this.config.minCellSize ?? 30;
-          // Aim for cells that fill the width nicely
-          const minCols = 2;
-          const maxCellForMinCols = (matrixWidth - spacing * (minCols - 1)) / minCols;
-          globalCellSize = Math.max(preferredMin, Math.min(preferredMax, maxCellForMinCols));
+          console.warn(`PivotLayouter: Even the minimum cell size ${searchMin}px cannot fit ${maxProductsInAnyGroup} products within the available matrix ${matrixWidth}x${matrixHeight}.`);
+          globalCellSize = searchMin;
         }
 
-        // Enforce hard minimum
+        globalCols = Math.max(1, Math.floor((matrixWidth + spacing) / (globalCellSize + spacing)));
+        globalRows = Math.max(1, Math.floor((matrixHeight + spacing) / (globalCellSize + spacing)));
+
+        if (!this.config.cellSizeOverride) {
+          while (globalCols * globalRows < maxProductsInAnyGroup && globalCellSize > searchMin) {
+            globalCellSize = Math.max(searchMin, globalCellSize - 0.5);
+            globalCols = Math.max(1, Math.floor((matrixWidth + spacing) / (globalCellSize + spacing)));
+            globalRows = Math.max(1, Math.floor((matrixHeight + spacing) / (globalCellSize + spacing)));
+          }
+        }
+
+        // Enforce hard minimum cell size (content may overflow)
         if (this.config.minCellSize && globalCellSize < this.config.minCellSize) {
           globalCellSize = this.config.minCellSize;
+          globalCols = Math.max(1, Math.floor((matrixWidth + spacing) / (globalCellSize + spacing)));
+          globalRows = Math.max(1, Math.floor((matrixHeight + spacing) / (globalCellSize + spacing)));
         }
 
-        const globalCols = Math.max(1, Math.floor((matrixWidth + spacing) / (globalCellSize + spacing)));
-
-        // Layout each group: header + grid rows, advance offsetY by actual content height
+        // Limit to MAX_COLUMNS rows (same as columns orientation)
         let offsetY = this.paddingTop;
         for (const k of keys) {
           const list = groups.get(k)!;
           if (this.config.itemSort) list.sort((a, b) => this.config.itemSort!(a.data, b.data));
 
           const productsInThisGroup = list.length;
-          const colsInFrame = Math.max(1, Math.min(globalCols, productsInThisGroup));
+          const cellSize = globalCellSize;
+          const maxColsForFrame = Math.max(1, Math.floor((matrixWidth + spacing) / (cellSize + spacing)));
+          const colsInFrame = Math.max(
+            1,
+            Math.min(globalCols, maxColsForFrame, productsInThisGroup)
+          );
           const rowsInFrame = Math.max(1, Math.ceil(productsInThisGroup / colsInFrame));
 
           this.groupHeaders.push({
@@ -177,7 +230,7 @@ export class PivotLayouter<T> {
             label: k,
             x: this.paddingLeft,
             y: offsetY,
-            width: matrixWidth,
+            width: view.width - this.paddingLeft - this.paddingRight,
             height: headerHeight
           });
 
@@ -189,9 +242,9 @@ export class PivotLayouter<T> {
               if (productIndex >= list.length) break;
               const node = list[productIndex];
               const scale = deriveScale(node);
-              const finalSize = globalCellSize * scale;
-              const x = this.paddingLeft + col * (globalCellSize + spacing);
-              const y = baseY + row * (globalCellSize + spacing);
+              const finalSize = cellSize * scale;
+              const x = this.paddingLeft + col * (cellSize + spacing);
+              const y = baseY + row * (cellSize + spacing);
               node.posX.targetValue = x;
               node.posY.targetValue = y;
               node.width.targetValue = finalSize;
@@ -201,9 +254,7 @@ export class PivotLayouter<T> {
             }
           }
 
-          // Advance by actual content height (not fixed frameHeight)
-          const contentHeight = headerHeight + rowsInFrame * (globalCellSize + spacing) - spacing;
-          offsetY += contentHeight + this.config.frameGap;
+          offsetY += frameHeight + this.config.frameGap;
         }
 
         return;
