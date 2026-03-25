@@ -238,6 +238,8 @@ export default class App extends React.Component<{}, State> {
       this.state.devSettings.priceBucketMode,
       this.state.devSettings.priceBucketCount
     );
+    this.controller.setMinCellSize(this.state.devSettings.minCellSize);
+    this.controller.setCellSizeOverride(this.state.devSettings.cellSizeOverride);
     const orientation = this.computePivotOrientation();
     this.controller.setPivotOrientation(orientation);
     this.setState({ pivotOrientation: orientation }, () => this.syncPivotUI());

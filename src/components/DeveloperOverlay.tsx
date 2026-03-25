@@ -167,7 +167,7 @@ export const DeveloperOverlay: React.FC<DeveloperOverlayProps> = ({
       rectMode: false,
       showBoundsDebug: false,
       ignoreBounds: false,
-      minCellSize: 35,
+      minCellSize: 20,
     });
   };
 

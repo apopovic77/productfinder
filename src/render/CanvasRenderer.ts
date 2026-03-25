@@ -35,6 +35,7 @@ export class CanvasRenderer<T> {
   public showBoundsDebug = false;
   public debugBoundsAuto: { x: number; y: number; w: number; h: number } | null = null;
   public debugBoundsContent: { x: number; y: number; w: number; h: number } | null = null;
+  public debugBucketBounds: Array<{ key: string; x: number; y: number; w: number; h: number; productCount: number; cellSize: number }> = [];
 
   // Selected product for overlay rendering
   public selectedProduct: Product | null = null;
@@ -1001,6 +1002,20 @@ export class CanvasRenderer<T> {
         this.ctx.fillStyle = 'rgba(239, 68, 68, 0.8)';
         this.ctx.font = '12px monospace';
         this.ctx.fillText(`CONTENT ${b.w.toFixed(0)}×${b.h.toFixed(0)}`, b.x + 4, b.y + 30);
+      }
+      // Draw bucket bounds
+      for (const bucket of this.debugBucketBounds) {
+        const hue = (parseInt(bucket.key, 36) * 137) % 360;
+        this.ctx.strokeStyle = `hsla(${hue}, 70%, 50%, 0.6)`;
+        this.ctx.lineWidth = 1;
+        this.ctx.setLineDash([4, 2]);
+        this.ctx.strokeRect(bucket.x, bucket.y, bucket.w, bucket.h);
+        this.ctx.setLineDash([]);
+        this.ctx.fillStyle = `hsla(${hue}, 70%, 50%, 0.03)`;
+        this.ctx.fillRect(bucket.x, bucket.y, bucket.w, bucket.h);
+        this.ctx.fillStyle = `hsla(${hue}, 70%, 50%, 0.8)`;
+        this.ctx.font = '10px monospace';
+        this.ctx.fillText(`${bucket.key} (${bucket.productCount}) cs=${bucket.cellSize.toFixed(0)}`, bucket.x + 4, bucket.y + 12);
       }
     }
 

@@ -208,6 +208,17 @@ export class ProductFinderController {
           w: this.canvas.width, h: this.canvas.height,
         };
       }
+      // Pass bucket bounds from group headers
+      const headers = this.layoutService.getGroupHeaders();
+      this.renderer.debugBucketBounds = headers.map(h => ({
+        key: h.key,
+        x: h.x,
+        y: h.y,
+        w: h.width,
+        h: h.height,
+        productCount: 0,
+        cellSize: 0,
+      }));
     }
 
     // Different viewport behavior for hero mode (product presentation)
