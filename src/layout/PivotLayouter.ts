@@ -171,15 +171,22 @@ export class PivotLayouter<T> {
         const searchMin = absoluteMin;
         const searchMax = Math.max(searchMin, Math.min(preferredMax, Math.min(matrixWidth, matrixHeight)));
 
-        // Cell size = max size that fits at least 1 row in frameHeight
-        // Width is unbounded — products scroll horizontally
-        let globalCellSize: number;
+        // Binary search: find largest cell size where the largest group
+        // fits within the frameHeight. Width is unbounded (scrolls right).
+        // We want multiple rows to fill the height — more rows = smaller cells = more visible.
+        let globalCellSize = searchMin;
 
         if (this.config.cellSizeOverride && this.config.cellSizeOverride > 0) {
           globalCellSize = this.config.cellSizeOverride;
-        } else {
-          // Largest cell size that fits in matrixHeight
-          globalCellSize = Math.max(searchMin, Math.min(searchMax, matrixHeight));
+        } else if (fitsInHeight(searchMin)) {
+          // Target: enough rows so that cols needed stays reasonable
+          // rows = matrixHeight / cellSize, cols = maxProducts / rows
+          // We want cols to be roughly screenWidth / cellSize (fill the screen)
+          const targetCols = Math.max(1, Math.floor((matrixWidth + spacing) / (searchMin + spacing)));
+          const targetRows = Math.max(1, Math.ceil(maxProductsInAnyGroup / targetCols));
+          // Cell size from target rows
+          const fromTargetRows = Math.max(searchMin, (matrixHeight + spacing) / targetRows - spacing);
+          globalCellSize = Math.max(searchMin, Math.min(searchMax, fromTargetRows));
         }
 
         let globalRows = Math.max(1, Math.floor((matrixHeight + spacing) / (globalCellSize + spacing)));
