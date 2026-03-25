@@ -378,7 +378,12 @@ body {
   }
 
   .pf-header-search {
-    display: none;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .pf-header-search-input {
+    font-size: 16px !important;
   }
 
   .pf-header-title {
@@ -386,8 +391,15 @@ body {
   }
 
   .pf-header-actions {
-    margin-right: 0;
-    gap: 4px;
+    display: none;
+  }
+
+  .pf-bottom-bar {
+    display: none !important;
+  }
+
+  .pf-mobile-icons {
+    display: flex !important;
   }
 
   .pf-header-btn {
@@ -1788,4 +1800,126 @@ body {
 .quicksearch-indicator button:hover {
   background: rgba(126, 146, 255, 0.4);
   transform: translateY(-1px);
+}
+
+/* Mobile Header Icons */
+.pf-mobile-icons {
+  display: none;
+  gap: 8px;
+  align-items: center;
+}
+
+.pf-mobile-icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pf-mobile-icon-btn:active {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Mobile Pivot Overlay */
+.pf-mobile-pivot-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.92);
+  backdrop-filter: blur(20px);
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.pf-mobile-pivot-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.pf-mobile-pivot-breadcrumbs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.pf-mobile-pivot-crumb {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.pf-mobile-pivot-crumb.active {
+  background: rgba(99, 102, 241, 0.3);
+  border-color: rgba(99, 102, 241, 0.5);
+  color: white;
+  font-weight: 600;
+}
+
+.pf-mobile-pivot-label {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 10px;
+}
+
+.pf-mobile-pivot-dims {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pf-mobile-pivot-dim {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.pf-mobile-pivot-dim.active {
+  background: rgba(99, 102, 241, 0.25);
+  border-color: rgba(99, 102, 241, 0.5);
+  color: white;
+  font-weight: 600;
+}
+
+.pf-mobile-pivot-dim:active {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.pf-mobile-search-close {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }

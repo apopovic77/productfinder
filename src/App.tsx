@@ -85,6 +85,7 @@ type State = {
   mousePos: { x: number; y: number } | null;
   focusedIndex: number;
   mobileFooterExpanded: boolean;
+  mobilePivotOpen: boolean;
 
   // Overlay Mode
   overlayMode: 'canvas' | 'react'; // Toggle between canvas and React overlay
@@ -169,6 +170,7 @@ const createInitialState = (): State => {
     hoveredProduct: null,
     mousePos: null,
     focusedIndex: -1,
+    mobilePivotOpen: false,
 
     overlayMode: 'react', // Default to React overlay
 
@@ -1638,7 +1640,75 @@ export default class App extends React.Component<{}, State> {
             </button>
           </div>
           <div className="pf-header-title">Product Finder</div>
+          {/* Mobile: hamburger menu + gear */}
+          <div className="pf-mobile-icons">
+            <button type="button" className="pf-mobile-icon-btn" onClick={() => this.setState({ mobilePivotOpen: !this.state.mobilePivotOpen })}>
+              <i className="fa-solid fa-bars"></i>
+            </button>
+            <button type="button" className="pf-mobile-icon-btn" onClick={() => window.dispatchEvent(new Event('pf-toggle-dev-overlay'))}>
+              <i className="fa-solid fa-gear"></i>
+            </button>
+          </div>
         </div>
+
+        {/* Mobile Pivot Overlay */}
+        {this.state.mobilePivotOpen && (
+          <div className="pf-mobile-pivot-overlay">
+            <div className="pf-mobile-pivot-header">
+              <span>Menu</span>
+              <button type="button" className="pf-mobile-search-close" onClick={() => this.setState({ mobilePivotOpen: false })}>
+                <i className="fa-solid fa-xmark"></i>
+              </button>
+            </div>
+
+            {/* View Mode */}
+            <div className="pf-mobile-pivot-label">Ansicht</div>
+            <div className="pf-mobile-pivot-dims" style={{ marginBottom: 20 }}>
+              <button type="button" className={`pf-mobile-pivot-dim ${!this.controller.isFamilyGrouped() ? 'active' : ''}`}
+                onClick={() => { this.controller.setFamilyGrouped(false); this.syncPivotUI(); }}>
+                <i className="fa-solid fa-palette" style={{ marginRight: 6 }}></i>All Colors
+              </button>
+              <button type="button" className={`pf-mobile-pivot-dim ${this.controller.isFamilyGrouped() ? 'active' : ''}`}
+                onClick={() => { this.controller.setFamilyGrouped(true); this.syncPivotUI(); }}>
+                <i className="fa-solid fa-object-group" style={{ marginRight: 6 }}></i>Grouped
+              </button>
+              <button type="button" className={`pf-mobile-pivot-dim ${this.controller.getLayoutMode() === 'pivot' ? 'active' : ''}`}
+                onClick={() => { this.controller.setLayoutMode('pivot'); this.syncPivotUI(); setTimeout(() => this.controller.handleResize(), 50); }}>
+                <i className="fa-solid fa-grip" style={{ marginRight: 6 }}></i>Pivot
+              </button>
+              <button type="button" className={`pf-mobile-pivot-dim ${this.controller.getLayoutMode() === 'lanes' ? 'active' : ''}`}
+                onClick={() => { this.controller.setLayoutMode('lanes'); this.syncPivotUI(); setTimeout(() => this.controller.handleResize(), 50); }}>
+                <i className="fa-solid fa-bars-staggered" style={{ marginRight: 6 }}></i>Lanes
+              </button>
+            </div>
+
+            {/* Breadcrumbs */}
+            <div className="pf-mobile-pivot-label">Navigation</div>
+            <div className="pf-mobile-pivot-breadcrumbs">
+              {pivotBreadcrumbs.map((crumb, i) => (
+                <button type="button" key={`mobile-crumb-${crumb}-${i}`}
+                  className={`pf-mobile-pivot-crumb ${i === pivotBreadcrumbs.length - 1 ? 'active' : ''}`}
+                  onClick={() => { this.handleBreadcrumbClick(i); this.setState({ mobilePivotOpen: false }); }}>
+                  {crumb}
+                </button>
+              ))}
+            </div>
+
+            {/* Dimension Picker */}
+            <div className="pf-mobile-pivot-label">Dimension</div>
+            <div className="pf-mobile-pivot-dims">
+              {pivotDimensions
+                .filter(dim => availableDimsNow.includes(dim))
+                .map(dim => (
+                  <button type="button" key={`mobile-dim-${dim}`}
+                    className={`pf-mobile-pivot-dim ${dim === pivotDimension ? 'active' : ''}`}
+                    onClick={() => { this.handleDimensionClick(dim); this.setState({ mobilePivotOpen: false }); }}>
+                    {getDimensionLabel(dim)}
+                  </button>
+                ))}
+            </div>
+          </div>
+        )}
 
         <div className={`pf-stage pf-stage-${this.state.footerPosition}`}>
           <canvas ref={this.canvasRef} className="pf-canvas" />
