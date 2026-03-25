@@ -673,16 +673,19 @@ export default class App extends React.Component<{}, State> {
 
     if (canvas && footer) {
       const footerPosition = this.state.footerPosition;
+      const isMobile = window.innerWidth < 768;
+      const effectivePosition = isMobile && (footerPosition === 'left' || footerPosition === 'right')
+        ? 'bottom' : footerPosition;
 
       // Set canvas insets ONLY for footer sidebar modes (not for padding config)
       // This prevents products from going under the footer panel
-      if (footerPosition === 'left' || footerPosition === 'right') {
+      if (effectivePosition === 'left' || effectivePosition === 'right') {
         const footerWidth = footer.offsetWidth;
 
-        if (footerPosition === 'left') {
+        if (effectivePosition === 'left') {
           canvas.style.left = `${footerWidth}px`;
           canvas.style.right = '0px';
-        } else if (footerPosition === 'right') {
+        } else if (effectivePosition === 'right') {
           canvas.style.left = '0px';
           canvas.style.right = `${footerWidth}px`;
         }
