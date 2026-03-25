@@ -232,11 +232,15 @@ export interface GPANEConfig {
 
   /** Predefined navigation tree. When set, engine starts in taxonomy mode. */
   taxonomy?: TaxonomyNode[];
+
+  /** Max products for hero mode to be considered (default: 15) */
+  heroThreshold: number;
 }
 
 export const DEFAULT_CONFIG: GPANEConfig = {
   maxBuckets: 12,
   minCoverage: 0.5,
+  heroThreshold: 15,
   scoring: {
     coverage: 0.25,
     diversity: 0.25,

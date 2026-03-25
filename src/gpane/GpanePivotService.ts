@@ -296,6 +296,9 @@ export class GpanePivotService {
   }
 
   isHeroModeActive(): boolean {
+    // GPANE engine decides hero mode via scoring (competes with pivot dimensions)
+    if (this.engine.isHeroMode) return true;
+    // Fallback: old threshold-based check
     return this._heroModeActive;
   }
 

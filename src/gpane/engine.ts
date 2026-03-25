@@ -49,6 +49,7 @@ export class GPANEEngine {
 
   // Taxonomy state
   private _mode: EngineMode = 'gpane';
+  private _heroMode = false;
   private _taxonomyPath: TaxonomyNode[] = [];
   private _navigationStack: NavigationEntry[] = [];  // single source of truth for breadcrumbs
   private _currentTaxonomyNodes: TaxonomyNode[] = [];  // nodes shown as buckets
@@ -360,7 +361,44 @@ export class GPANEEngine {
   get canUnfocus(): boolean { return this._focusStack.length > 0 || this._taxonomyPath.length > 0; }
 
   get isTaxonomy(): boolean { return this._mode === 'taxonomy'; }
+  get isHeroMode(): boolean { return this._heroMode; }
   get navigationStack(): NavigationEntry[] { return this._navigationStack; }
+
+  /**
+   * Determine if hero mode should take over instead of further pivoting.
+   * Hero competes with pivot dimensions via scoring:
+   * - Few products → high hero score
+   * - Low quality pivot dimensions → hero wins
+   * - Deep drill level → hero more relevant
+   */
+  private _shouldUseHeroMode(products: Product[]): boolean {
+    const count = products.length;
+    const threshold = this._config.heroThreshold;
+
+    // Too many products for hero
+    if (count > threshold) return false;
+    // No products
+    if (count === 0) return false;
+
+    // Hero score: inversely proportional to product count
+    // At 1 product → 1.0, at threshold → 0.0
+    const countScore = 1 - (count / threshold);
+
+    // Drill depth bonus: deeper = more likely hero
+    const depth = this._focusStack.length;
+    const depthBonus = Math.min(0.3, depth * 0.1);
+
+    // Dimension quality: how good is the best available pivot?
+    const bestDimScore = this._scoredDimensions.length > 0
+      ? this._scoredDimensions[0].score.total
+      : 0;
+
+    // Hero total score
+    const heroScore = countScore + depthBonus;
+
+    // Hero wins if it scores higher than the best dimension
+    return heroScore > bestDimScore;
+  }
 
   canSubsplit(dimensionKey: string, bucketObjectIds: string[]): boolean {
     return canSubsplit(bucketObjectIds, this._allProducts, dimensionKey);
@@ -427,6 +465,15 @@ export class GPANEEngine {
       this._config
     );
 
+    // Check if hero mode should win over pivoting
+    if (this._shouldUseHeroMode(products)) {
+      this._activeDimension = null;
+      this._buckets = [];
+      this._heroMode = true;
+      return;
+    }
+    this._heroMode = false;
+
     // Try to restore the requested dimension
     const restored = dimensionKey
       ? this._scoredDimensions.find(d => d.key === dimensionKey)
@@ -484,6 +531,15 @@ export class GPANEEngine {
       this._dimensionHistory,
       this._config
     );
+
+    // Check hero mode
+    if (this._shouldUseHeroMode(products)) {
+      this._activeDimension = null;
+      this._buckets = [];
+      this._heroMode = true;
+      return;
+    }
+    this._heroMode = false;
 
     if (this._scoredDimensions.length > 0) {
       const viable = this._scoredDimensions.filter(d => d.entropy > 0 && d.cardinality > 1);
