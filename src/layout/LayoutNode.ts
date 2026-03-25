@@ -1,4 +1,4 @@
-import { InterpolatedProperty, Easing } from 'arkturian-typescript-utils';
+import { InterpolatedProperty, Easing, Vector2 } from 'arkturian-typescript-utils';
 
 /**
  * LayoutNode represents a persistent visual element in the layout.
