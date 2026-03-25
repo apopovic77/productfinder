@@ -178,7 +178,7 @@ export class LayoutService {
       framePaddingLeft: CANVAS_PADDING_CONFIG.paddingLeft,
       itemGap: CANVAS_PADDING_CONFIG.itemGap,
       rowBaseHeight: 150,
-      minCellSize: 80,
+      minCellSize: 20,
       maxCellSize: 220,
       smallGroupThreshold: 8,
       innerLayoutType: 'shelf',
