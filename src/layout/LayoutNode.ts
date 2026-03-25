@@ -1,5 +1,4 @@
-import { InterpolatedProperty } from 'arkturian-typescript-utils';
-import { Vector2 } from 'arkturian-typescript-utils';
+import { InterpolatedProperty, Easing } from 'arkturian-typescript-utils';
 
 /**
  * LayoutNode represents a persistent visual element in the layout.
@@ -34,12 +33,12 @@ export class LayoutNode<T> {
 
     // Initialize interpolated properties ONCE
     // These will persist and smoothly interpolate when targets change
-    this.posX = new InterpolatedProperty<number>('posX', 0, 0, 0.4);
-    this.posY = new InterpolatedProperty<number>('posY', 0, 0, 0.4);
-    this.width = new InterpolatedProperty<number>('width', 0, 0, 0.3);
-    this.height = new InterpolatedProperty<number>('height', 0, 0, 0.3);
+    this.posX = new InterpolatedProperty<number>('posX', 0, 0, 0.5).withEasing(Easing.easeOutCubic);
+    this.posY = new InterpolatedProperty<number>('posY', 0, 0, 0.5).withEasing(Easing.easeOutCubic);
+    this.width = new InterpolatedProperty<number>('width', 0, 0, 0.4).withEasing(Easing.easeOutCubic);
+    this.height = new InterpolatedProperty<number>('height', 0, 0, 0.4).withEasing(Easing.easeOutCubic);
     this.opacity = new InterpolatedProperty<number>('opacity', 0, 0, 0.3);
-    this.scale = new InterpolatedProperty<number>('scale', 0.8, 0.8, 0.35);
+    this.scale = new InterpolatedProperty<number>('scale', 0.8, 0.8, 0.4).withEasing(Easing.easeOutCubic);
     this.heroOffsetX = new InterpolatedProperty<number>('heroOffsetX', 0, 0, 0.5); // Hero-mode spread offset
   }
   
