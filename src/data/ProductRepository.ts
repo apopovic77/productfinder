@@ -367,6 +367,27 @@ function mapProduct(p: OnealProduct): Product | null {
       }
     : undefined);
 
+  // Größen-Typ (shoe, boot, helmet, pants, clothing, sock)
+  const sizeType = apiAny.size_type;
+  const sizeTypeLabels: Record<string, string> = {
+    shoe: 'Schuhgrößen',
+    boot: 'Stiefelgrößen',
+    helmet: 'Helmgrößen',
+    pants: 'Hosengrößen',
+    clothing: 'Konfektionsgrößen',
+    sock: 'Sockengrößen',
+    other: 'Sonstige',
+  };
+  addAttribute(attributes, sizeType && sizeType !== 'other'
+    ? {
+        key: 'size_type',
+        label: 'Größentyp',
+        type: 'enum',
+        value: sizeTypeLabels[sizeType] || sizeType,
+        sourcePath: 'size_type',
+      }
+    : undefined);
+
   // Image count (has image or not)
   const hasImage = apiAny.storage?.id ? 1 : 0;
   addAttribute(attributes, {
