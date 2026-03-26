@@ -1,20 +1,17 @@
 /**
  * ProductFinder v2 — GPU Instanced Scene (Arcturian Engine)
  *
- * Uses Arcturian's MorphShader + InstancedMesh for rendering.
- * Products are flat quads (depth=0.01) with atlas textures.
+ * Uses Arcturian's MorphShader via onBeforeCompile.
+ * Products are flat quads with atlas textures from MultiTierAtlas.
  */
 import { useRef, useEffect, useMemo, useCallback } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { createUniforms, applyShaderToMaterial, MAX_PARTICLES } from '@arcturian';
 import type { MorphShaderUniforms } from '@arcturian/core/MorphShader';
-import { DynamicAtlas } from './render/DynamicAtlas';
+import { MultiTierAtlas } from './render/MultiTierAtlas';
+import { ImageLoadPipeline } from './render/ImageLoadPipeline';
 import type { LayoutItem } from './render/PivotLayoutAdapter';
-
-const ATLAS_COLS = 36;
-const ATLAS_ROWS = 36;
-const ATLAS_CELL_SIZE = 128;
 
 interface ProductFinderSceneProps {
   layoutItems: LayoutItem[];
@@ -33,26 +30,28 @@ export function ProductFinderScene({
   const { camera, gl } = useThree();
   const countRef = useRef(0);
 
-  // Atlas
-  const atlas = useMemo(() => new DynamicAtlas(ATLAS_COLS, ATLAS_ROWS, ATLAS_CELL_SIZE), []);
+  // Multi-tier atlas + image pipeline
+  const atlas = useMemo(() => new MultiTierAtlas(), []);
+  const pipeline = useMemo(() => {
+    const p = new ImageLoadPipeline(atlas);
+    p.start();
+    return p;
+  }, [atlas]);
 
   // Arcturian uniforms
   const uniforms = useMemo<MorphShaderUniforms>(() => {
     const u = createUniforms();
     u.uUseAtlas.value = 1.0;
-    u.uAtlasFaceMode.value = 2.0; // front face only (flat quads)
-    u.uAtlasTexture.value = atlas.texture;
+    u.uAtlasFaceMode.value = 2.0; // front face only
     u.uColor1.value.set('#1a1a2e');
     u.uLayoutMix.value = 1.0;
     return u;
-  }, [atlas]);
+  }, []);
 
-  // Geometry: BoxGeometry 1×1×1 (Arcturian MorphShader expects a box)
+  // Geometry: BoxGeometry with Arcturian's 8 instanced attributes
   const geometry = useMemo(() => {
     const geo = new THREE.BoxGeometry(1, 1, 1);
     const max = MAX_PARTICLES;
-
-    // 8 instanced attributes (Arcturian standard)
     geo.setAttribute('aLayout', new THREE.InstancedBufferAttribute(new Float32Array(max * 4), 4));
     geo.setAttribute('aOldLayout', new THREE.InstancedBufferAttribute(new Float32Array(max * 4), 4));
     geo.setAttribute('aQuaternion', new THREE.InstancedBufferAttribute(new Float32Array(max * 4), 4));
@@ -61,17 +60,15 @@ export function ProductFinderScene({
     geo.setAttribute('aOldTarget', new THREE.InstancedBufferAttribute(new Float32Array(max * 4), 4));
     geo.setAttribute('aTarget2', new THREE.InstancedBufferAttribute(new Float32Array(max * 4), 4));
     geo.setAttribute('aUVOffset', new THREE.InstancedBufferAttribute(new Float32Array(max * 4), 4));
-
     return geo;
   }, []);
 
-  // Material: meshStandardMaterial + Arcturian shader injection
-  const materialRef = useRef<THREE.MeshStandardMaterial>(null);
+  // Material with Arcturian shader injection
   const onBeforeCompile = useCallback((shader: THREE.WebGLProgramParametersWithUniforms) => {
     applyShaderToMaterial(shader, uniforms);
   }, [uniforms]);
 
-  // CPU-side data for hit testing
+  // CPU data for hit testing
   const cpuData = useRef<{ ids: string[]; positions: Float32Array; sizes: Float32Array }>({
     ids: [], positions: new Float32Array(0), sizes: new Float32Array(0),
   });
@@ -90,12 +87,11 @@ export function ProductFinderScene({
     const aTarget2 = geometry.getAttribute('aTarget2') as THREE.InstancedBufferAttribute;
     const aUVOffset = geometry.getAttribute('aUVOffset') as THREE.InstancedBufferAttribute;
 
-    // Snapshot current → old for transition
+    // Snapshot current → old
     (aOldLayout.array as Float32Array).set(aLayout.array as Float32Array);
     (aOldQuaternion.array as Float32Array).set(aQuaternion.array as Float32Array);
     (aOldTarget.array as Float32Array).set(aTarget.array as Float32Array);
 
-    // CPU hit test cache
     const ids: string[] = [];
     const positions = new Float32Array(count * 2);
     const sizes = new Float32Array(count * 2);
@@ -103,24 +99,27 @@ export function ProductFinderScene({
     for (let i = 0; i < count; i++) {
       const item = items[i];
 
-      // Position (flat 2D)
+      // Position
       aLayout.setXYZW(i, item.posX, item.posY, 0, item.opacity > 0 ? 1.0 : 0.0);
 
-      // No rotation (identity quaternion)
+      // Identity quaternion
       aQuaternion.setXYZW(i, 0, 0, 0, 1);
 
-      // Size: sizeX, depth (minimal for flat), trapezoidX, trapezoidY
+      // Size: sizeX=width, depth=0.01, no trapezoid
       aTarget.setXYZW(i, item.width, 0.01, 0, 0);
 
-      // sizeY in aTarget2.y (current), aTarget2.w (old)
+      // sizeY in aTarget2.y
       const oldSizeY = (aTarget2.array as Float32Array)[i * 4 + 1] || item.height;
       aTarget2.setXYZW(i, 0, item.height, 0, oldSizeY);
 
-      // Atlas UV
-      const [u, v, su, sv] = atlas.getUV(item.atlasIndex);
-      aUVOffset.setXYZW(i, u, v, su, sv);
+      // Atlas UV — allocate T0 slot and load
+      if (item.storageId) {
+        const slot = atlas.allocateSlot(item.id, 0);
+        if (slot) {
+          aUVOffset.setXYZW(i, slot.u, slot.v, slot.su, slot.sv);
+        }
+      }
 
-      // CPU cache
       ids.push(item.id);
       positions[i * 2] = item.posX;
       positions[i * 2 + 1] = item.posY;
@@ -133,6 +132,9 @@ export function ProductFinderScene({
       aLayout.setXYZW(i, 0, 0, 0, 0);
     }
 
+    // Update atlas texture uniform
+    uniforms.uAtlasTexture.value = atlas.getTexture(0);
+
     aLayout.needsUpdate = true;
     aOldLayout.needsUpdate = true;
     aQuaternion.needsUpdate = true;
@@ -144,35 +146,38 @@ export function ProductFinderScene({
 
     countRef.current = count;
     cpuData.current = { ids, positions, sizes };
-  }, [geometry, atlas]);
 
-  // Apply layout + load images when items change
+    // Feed visibility to image pipeline
+    pipeline.updateVisibility(items.map(item => ({
+      id: item.id,
+      storageId: item.storageId || 0,
+      screenSize: 64, // Will be updated per frame
+    })));
+  }, [geometry, atlas, uniforms, pipeline]);
+
+  // Apply layout when items change
   useEffect(() => {
     if (layoutItems.length === 0) return;
-
     applyLayout(layoutItems);
-    uniforms.uLayoutMix.value = 0; // trigger transition
+    uniforms.uLayoutMix.value = 0;
+  }, [layoutItems, applyLayout, uniforms]);
 
-    // Load images
-    const STORAGE_API = (import.meta as any).env?.VITE_STORAGE_API_URL || 'https://gsgbot.arkturian.com/storage-api';
-    for (const item of layoutItems) {
-      if (item.storageId && !atlas.isTileLoaded(item.atlasIndex) && !atlas.isTileLoading(item.atlasIndex)) {
-        atlas.setTile(item.atlasIndex, `${STORAGE_API}/storage/media/${item.storageId}?width=${ATLAS_CELL_SIZE}&format=webp&quality=80&trim=true`);
-      }
-    }
-  }, [layoutItems, applyLayout, atlas, uniforms]);
-
-  // Animation loop
+  // Animation + LOD scan
   useFrame((_, delta) => {
+    // Transition animation
     if (uniforms.uLayoutMix.value < 1.0) {
       uniforms.uLayoutMix.value = Math.min(1.0, uniforms.uLayoutMix.value + delta / transitionDuration);
     }
+
     if (meshRef.current) {
       meshRef.current.count = countRef.current;
     }
+
+    // Update atlas texture (may have new tiles painted)
+    uniforms.uAtlasTexture.value = atlas.getTexture(0);
   });
 
-  // Hit test helper
+  // Hit test
   const hitTest = useCallback((clientX: number, clientY: number): string | null => {
     if (!(camera instanceof THREE.OrthographicCamera)) return null;
     const rect = gl.domElement.getBoundingClientRect();
@@ -194,7 +199,7 @@ export function ProductFinderScene({
     return null;
   }, [camera, gl]);
 
-  // Canvas interaction events
+  // Canvas interaction
   useEffect(() => {
     const canvas = gl.domElement;
     const handleMove = (e: PointerEvent) => {
@@ -214,10 +219,17 @@ export function ProductFinderScene({
     };
   }, [gl, hitTest, onProductClick, onProductHover]);
 
+  // Cleanup
+  useEffect(() => {
+    return () => {
+      pipeline.stop();
+      atlas.dispose();
+    };
+  }, [pipeline, atlas]);
+
   return (
     <instancedMesh ref={meshRef} args={[geometry, undefined!, MAX_PARTICLES]} frustumCulled={false}>
       <meshStandardMaterial
-        ref={materialRef}
         onBeforeCompile={onBeforeCompile}
         roughness={0.8}
         metalness={0.0}
