@@ -997,6 +997,16 @@ export class CanvasRenderer<T> {
     let visible = 0;
     let culled = 0;
 
+    // Update viewport bounds for culling (per-frame, not just LOD scan)
+    if (this.viewport) {
+      const scale = this.viewport.scale;
+      this.viewportLeft = -this.viewport.offset.x / scale;
+      this.viewportTop = -this.viewport.offset.y / scale;
+      this.viewportRight = this.viewportLeft + (c.width / scale);
+      this.viewportBottom = this.viewportTop + (c.height / scale);
+      this.zoomFactor = scale;
+    }
+
     // Debug: draw bounds rectangles
     if (this.showBoundsDebug) {
       if (this.debugBoundsAuto) {
@@ -1055,6 +1065,15 @@ export class CanvasRenderer<T> {
       const opacity = n.opacity.value ?? 1;
 
       if (opacity <= 0.01) { culled++; continue; }
+
+      // Viewport culling: skip nodes completely outside the visible area
+      if (this.viewport && (
+        x + w < this.viewportLeft ||
+        x > this.viewportRight ||
+        y + h < this.viewportTop ||
+        y > this.viewportBottom
+      )) { culled++; continue; }
+
       visible++;
 
       // Rect mode: draw colored rects instead of images (performance test)
