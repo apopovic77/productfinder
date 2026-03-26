@@ -33,6 +33,7 @@ export class CanvasRenderer<T> {
   public culledCount = 0;
   public rectMode = false;
   private failedStorageIds = new Set<number>();
+  private pendingStorageIds = new Set<number>();  // prevent re-queuing while loading
   public showBoundsDebug = false;
   public debugBoundsAuto: { x: number; y: number; w: number; h: number } | null = null;
   public debugBoundsContent: { x: number; y: number; w: number; h: number } | null = null;
@@ -385,8 +386,12 @@ export class CanvasRenderer<T> {
       if (currentSize !== requiredSize) {
         const product = node.data as any;
         const storageId = product.primaryImage?.storage_id;
+        if (requiredSize === LOD_CONFIG.highResolution && storageId) {
+          console.log(`[LOD] Upgrading ${node.id} to ${requiredSize}px (screenSize=${screenSize.toFixed(0)}, current=${currentSize})`);
+        }
 
-        if (storageId && !this.failedStorageIds.has(storageId)) {
+        if (storageId && !this.failedStorageIds.has(storageId) && !this.pendingStorageIds.has(storageId)) {
+          this.pendingStorageIds.add(storageId);
           // Calculate priority (lower = higher priority)
           // LOD images have low priority (1000+) - hero and dialog images load first
           const centerX = (viewportLeft + viewportRight) / 2;
@@ -429,14 +434,11 @@ export class CanvasRenderer<T> {
             if (product && typeof product.loadImageFromUrl === 'function') {
               product._image = result.image;
               this.loadedImageSizes.set(node.id, requiredSize);
+              this.pendingStorageIds.delete(storageId);
             }
-          }).catch(error => {
-            const msg = error?.error?.message || error?.message || String(error);
-            if (msg.includes('cancelled') || msg.includes('no longer relevant')) return;
-            // Only blacklist on 404 (image doesn't exist) — not on timeouts or temp errors
-            if (msg.includes('404') || msg.includes('Not Found')) {
-              this.failedStorageIds.add(storageId);
-            }
+          }).catch(() => {
+            this.pendingStorageIds.delete(storageId);
+            this.failedStorageIds.add(storageId);
           });
 
           queuedCount++;
@@ -1072,6 +1074,14 @@ export class CanvasRenderer<T> {
 
       // Get product and ensure image is loaded (OOP self-managed)
       const product = n.data as any as Product;
+
+      // Seed LOD tracking for products loaded via draw loop (not via LOD scanner)
+      // Without this, the LOD scanner sees currentSize=undefined and wastes queue
+      // capacity re-loading 130px images that already exist
+      if (product.isImageReady && !this.loadedImageSizes.has(n.id)) {
+        this.loadedImageSizes.set(n.id, LOD_CONFIG.lowResolution);
+      }
+
       if (!product.isImageReady && !product.hasImageError) {
         // Trigger async load (non-blocking) — skip if already failed
         if (!product.isImageLoading) product.loadImage();
