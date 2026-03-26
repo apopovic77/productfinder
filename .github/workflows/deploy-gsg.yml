@@ -62,8 +62,13 @@ jobs:
               VITE_BASE_PATH=/productfinder/ npm run build
               mkdir -p /var/www/productfinder/site
               rsync -av --delete dist/ /var/www/productfinder/site/
-              echo "Deployment completed!"
+              echo "Deployment to aiserver completed!"
             '
+
+            # Sync dist from aiserver to arkturian (nginx serves from /var/www/productfinder/dist/)
+            rsync -avz --delete -e "ssh -i /root/.ssh/oneal_aiserver -o StrictHostKeyChecking=no" \
+              gsgbot@aiserver.oneal.eu:/var/www/productfinder/site/ /var/www/productfinder/dist/
+            echo "Synced dist to arkturian nginx root"
 
       - name: Notify on success
         if: success()
