@@ -1,12 +1,13 @@
 /**
  * ProductFinder v2 — Main Component
  *
- * GPU-instanced product rendering powered by Arcturian engine concepts.
- * Drop-in replacement for the v1 Canvas renderer.
+ * GPU-instanced product rendering on the Arcturian 3D Engine.
+ * Route: /v2
  */
 import { useState, useEffect, useCallback } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { MapControls } from '@react-three/drei';
+import { CameraLight } from '@arcturian';
 import { ProductFinderScene } from './ProductFinderScene';
 import type { LayoutItem } from './render/PivotLayoutAdapter';
 
@@ -35,9 +36,9 @@ export function ProductFinderV2() {
       const items = data.results || [];
       setProductCount(items.length);
 
-      // Simple grid layout (PoC — will be replaced by PivotLayouter)
-      const cellSize = 70;
-      const gap = 4;
+      // Simple grid layout (Phase 1 PoC — will be replaced by PivotLayouter in Phase 3)
+      const cellSize = 1.0; // world units
+      const gap = 0.05;
       const cols = Math.ceil(Math.sqrt(items.length));
 
       const mapped: LayoutItem[] = items.map((p: any, i: number) => ({
@@ -67,15 +68,27 @@ export function ProductFinderV2() {
     setHoveredId(id);
   }, []);
 
+  // Camera position: center of grid
+  const cols = Math.ceil(Math.sqrt(productCount || 1));
+  const centerX = cols * 0.525;
+  const centerY = -(cols * 0.525);
+
   return (
     <div style={{ position: 'relative', width: '100%', height: '100vh', background: '#0a0a0a' }}>
       <Canvas
         orthographic
-        camera={{ zoom: 1, position: [0, 0, 100], near: 0.1, far: 200 }}
+        camera={{
+          zoom: 8,
+          position: [centerX, centerY, 100],
+          near: 0.1,
+          far: 200,
+        }}
         gl={{ antialias: true, alpha: false }}
         style={{ width: '100%', height: '100%' }}
       >
         <color attach="background" args={['#0a0a0a']} />
+        <ambientLight intensity={0.8} />
+        <CameraLight intensity={2.0} />
 
         <ProductFinderScene
           layoutItems={layoutItems}
@@ -88,12 +101,12 @@ export function ProductFinderV2() {
           enableDamping
           dampingFactor={0.1}
           zoomSpeed={0.5}
-          minZoom={0.1}
-          maxZoom={10}
+          minZoom={1}
+          maxZoom={80}
         />
       </Canvas>
 
-      {/* HUD Overlay */}
+      {/* HUD */}
       <div style={{
         position: 'absolute', top: 16, left: 16,
         color: '#fff', fontFamily: "'ITC Avant Garde Gothic', system-ui, sans-serif",
@@ -101,16 +114,13 @@ export function ProductFinderV2() {
       }}>
         <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 4 }}>
           ProductFinder <span style={{ color: '#58a6ff' }}>v2</span>
+          <span style={{ color: '#8b949e', fontSize: 11, marginLeft: 8 }}>Arcturian Engine</span>
         </div>
         <div style={{ opacity: 0.5 }}>
           {loading ? 'Loading...' : error ? `Error: ${error}` : `${productCount} products · GPU instanced`}
         </div>
-        {hoveredId && (
-          <div style={{ color: '#58a6ff', marginTop: 4 }}>Hover: {hoveredId}</div>
-        )}
-        {selectedId && (
-          <div style={{ color: '#3fb950', marginTop: 4 }}>Selected: {selectedId}</div>
-        )}
+        {hoveredId && <div style={{ color: '#58a6ff', marginTop: 4 }}>Hover: {hoveredId}</div>}
+        {selectedId && <div style={{ color: '#3fb950', marginTop: 4 }}>Selected: {selectedId}</div>}
       </div>
     </div>
   );

@@ -1,22 +1,20 @@
 /**
- * ProductFinder v2 — GPU Instanced Scene
+ * ProductFinder v2 — GPU Instanced Scene (Arcturian Engine)
  *
- * Renders products as GPU-instanced textured quads.
- * Positions from PivotLayouter, images from DynamicAtlas.
+ * Uses Arcturian's MorphShader + InstancedMesh for rendering.
+ * Products are flat quads (depth=0.01) with atlas textures.
  */
-import { useRef, useEffect, useMemo } from 'react';
+import { useRef, useEffect, useMemo, useCallback } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
+import { createUniforms, applyShaderToMaterial, MAX_PARTICLES } from '@arcturian';
+import type { MorphShaderUniforms } from '@arcturian/core/MorphShader';
 import { DynamicAtlas } from './render/DynamicAtlas';
-import { PivotLayoutAdapter, type LayoutItem } from './render/PivotLayoutAdapter';
+import type { LayoutItem } from './render/PivotLayoutAdapter';
 
-import vertexShader from './shaders/productfinder.vert?raw';
-import fragmentShader from './shaders/productfinder.frag?raw';
-
-const MAX_INSTANCES = 8192;
 const ATLAS_COLS = 36;
 const ATLAS_ROWS = 36;
-const ATLAS_CELL_SIZE = 128; // 128px tiles → 4608×4608 canvas (~80MB GPU)
+const ATLAS_CELL_SIZE = 128;
 
 interface ProductFinderSceneProps {
   layoutItems: LayoutItem[];
@@ -33,52 +31,136 @@ export function ProductFinderScene({
 }: ProductFinderSceneProps) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const { camera, gl } = useThree();
+  const countRef = useRef(0);
 
+  // Atlas
   const atlas = useMemo(() => new DynamicAtlas(ATLAS_COLS, ATLAS_ROWS, ATLAS_CELL_SIZE), []);
-  const adapter = useMemo(() => new PivotLayoutAdapter(MAX_INSTANCES), []);
 
-  const uniforms = useMemo(() => ({
-    uLayoutMix: { value: 1.0 },
-    uAtlasTexture: { value: atlas.texture },
-  }), [atlas]);
+  // Arcturian uniforms
+  const uniforms = useMemo<MorphShaderUniforms>(() => {
+    const u = createUniforms();
+    u.uUseAtlas.value = 1.0;
+    u.uAtlasFaceMode.value = 2.0; // front face only (flat quads)
+    u.uAtlasTexture.value = atlas.texture;
+    u.uColor1.value.set('#1a1a2e');
+    u.uLayoutMix.value = 1.0;
+    return u;
+  }, [atlas]);
 
-  const material = useMemo(() => new THREE.ShaderMaterial({
-    vertexShader,
-    fragmentShader,
-    uniforms,
-    transparent: true,
-    depthWrite: false,
-    side: THREE.DoubleSide,
-  }), [uniforms]);
-
+  // Geometry: BoxGeometry 1×1×1 (Arcturian MorphShader expects a box)
   const geometry = useMemo(() => {
-    const geo = new THREE.PlaneGeometry(1, 1);
-    geo.setAttribute('aLayout', adapter.layoutAttr);
-    geo.setAttribute('aOldLayout', adapter.oldLayoutAttr);
-    geo.setAttribute('aTarget', adapter.targetAttr);
-    geo.setAttribute('aOldTarget', adapter.oldTargetAttr);
-    geo.setAttribute('aUVOffset', adapter.uvOffsetAttr);
-    geo.setAttribute('aOpacity', adapter.opacityAttr);
-    geo.setAttribute('aAnimOffset', adapter.animOffsetAttr);
-    return geo;
-  }, [adapter]);
+    const geo = new THREE.BoxGeometry(1, 1, 1);
+    const max = MAX_PARTICLES;
 
-  // Apply layout when items change
+    // 8 instanced attributes (Arcturian standard)
+    geo.setAttribute('aLayout', new THREE.InstancedBufferAttribute(new Float32Array(max * 4), 4));
+    geo.setAttribute('aOldLayout', new THREE.InstancedBufferAttribute(new Float32Array(max * 4), 4));
+    geo.setAttribute('aQuaternion', new THREE.InstancedBufferAttribute(new Float32Array(max * 4), 4));
+    geo.setAttribute('aOldQuaternion', new THREE.InstancedBufferAttribute(new Float32Array(max * 4), 4));
+    geo.setAttribute('aTarget', new THREE.InstancedBufferAttribute(new Float32Array(max * 4), 4));
+    geo.setAttribute('aOldTarget', new THREE.InstancedBufferAttribute(new Float32Array(max * 4), 4));
+    geo.setAttribute('aTarget2', new THREE.InstancedBufferAttribute(new Float32Array(max * 4), 4));
+    geo.setAttribute('aUVOffset', new THREE.InstancedBufferAttribute(new Float32Array(max * 4), 4));
+
+    return geo;
+  }, []);
+
+  // Material: meshStandardMaterial + Arcturian shader injection
+  const materialRef = useRef<THREE.MeshStandardMaterial>(null);
+  const onBeforeCompile = useCallback((shader: THREE.WebGLProgramParametersWithUniforms) => {
+    applyShaderToMaterial(shader, uniforms);
+  }, [uniforms]);
+
+  // CPU-side data for hit testing
+  const cpuData = useRef<{ ids: string[]; positions: Float32Array; sizes: Float32Array }>({
+    ids: [], positions: new Float32Array(0), sizes: new Float32Array(0),
+  });
+
+  // Write layout items to GPU buffers
+  const applyLayout = useCallback((items: LayoutItem[]) => {
+    if (!geometry) return;
+    const count = Math.min(items.length, MAX_PARTICLES);
+
+    const aLayout = geometry.getAttribute('aLayout') as THREE.InstancedBufferAttribute;
+    const aOldLayout = geometry.getAttribute('aOldLayout') as THREE.InstancedBufferAttribute;
+    const aQuaternion = geometry.getAttribute('aQuaternion') as THREE.InstancedBufferAttribute;
+    const aOldQuaternion = geometry.getAttribute('aOldQuaternion') as THREE.InstancedBufferAttribute;
+    const aTarget = geometry.getAttribute('aTarget') as THREE.InstancedBufferAttribute;
+    const aOldTarget = geometry.getAttribute('aOldTarget') as THREE.InstancedBufferAttribute;
+    const aTarget2 = geometry.getAttribute('aTarget2') as THREE.InstancedBufferAttribute;
+    const aUVOffset = geometry.getAttribute('aUVOffset') as THREE.InstancedBufferAttribute;
+
+    // Snapshot current → old for transition
+    (aOldLayout.array as Float32Array).set(aLayout.array as Float32Array);
+    (aOldQuaternion.array as Float32Array).set(aQuaternion.array as Float32Array);
+    (aOldTarget.array as Float32Array).set(aTarget.array as Float32Array);
+
+    // CPU hit test cache
+    const ids: string[] = [];
+    const positions = new Float32Array(count * 2);
+    const sizes = new Float32Array(count * 2);
+
+    for (let i = 0; i < count; i++) {
+      const item = items[i];
+
+      // Position (flat 2D)
+      aLayout.setXYZW(i, item.posX, item.posY, 0, item.opacity > 0 ? 1.0 : 0.0);
+
+      // No rotation (identity quaternion)
+      aQuaternion.setXYZW(i, 0, 0, 0, 1);
+
+      // Size: sizeX, depth (minimal for flat), trapezoidX, trapezoidY
+      aTarget.setXYZW(i, item.width, 0.01, 0, 0);
+
+      // sizeY in aTarget2.y (current), aTarget2.w (old)
+      const oldSizeY = (aTarget2.array as Float32Array)[i * 4 + 1] || item.height;
+      aTarget2.setXYZW(i, 0, item.height, 0, oldSizeY);
+
+      // Atlas UV
+      const [u, v, su, sv] = atlas.getUV(item.atlasIndex);
+      aUVOffset.setXYZW(i, u, v, su, sv);
+
+      // CPU cache
+      ids.push(item.id);
+      positions[i * 2] = item.posX;
+      positions[i * 2 + 1] = item.posY;
+      sizes[i * 2] = item.width;
+      sizes[i * 2 + 1] = item.height;
+    }
+
+    // Hide remaining
+    for (let i = count; i < MAX_PARTICLES; i++) {
+      aLayout.setXYZW(i, 0, 0, 0, 0);
+    }
+
+    aLayout.needsUpdate = true;
+    aOldLayout.needsUpdate = true;
+    aQuaternion.needsUpdate = true;
+    aOldQuaternion.needsUpdate = true;
+    aTarget.needsUpdate = true;
+    aOldTarget.needsUpdate = true;
+    aTarget2.needsUpdate = true;
+    aUVOffset.needsUpdate = true;
+
+    countRef.current = count;
+    cpuData.current = { ids, positions, sizes };
+  }, [geometry, atlas]);
+
+  // Apply layout + load images when items change
   useEffect(() => {
     if (layoutItems.length === 0) return;
 
-    adapter.applyLayout(layoutItems, atlas);
-    uniforms.uLayoutMix.value = 0;
+    applyLayout(layoutItems);
+    uniforms.uLayoutMix.value = 0; // trigger transition
 
     // Load images
     const STORAGE_API = (import.meta as any).env?.VITE_STORAGE_API_URL || 'https://gsgbot.arkturian.com/storage-api';
     for (const item of layoutItems) {
       if (item.storageId && !atlas.isTileLoaded(item.atlasIndex) && !atlas.isTileLoading(item.atlasIndex)) {
-        const url = `${STORAGE_API}/storage/media/${item.storageId}?width=${ATLAS_CELL_SIZE}&format=webp&quality=80&trim=true`;
-        atlas.setTile(item.atlasIndex, url);
+        atlas.setTile(item.atlasIndex, `${STORAGE_API}/storage/media/${item.storageId}?width=${ATLAS_CELL_SIZE}&format=webp&quality=80&trim=true`);
       }
     }
-  }, [layoutItems, adapter, atlas, uniforms]);
+  }, [layoutItems, applyLayout, atlas, uniforms]);
 
   // Animation loop
   useFrame((_, delta) => {
@@ -86,42 +168,60 @@ export function ProductFinderScene({
       uniforms.uLayoutMix.value = Math.min(1.0, uniforms.uLayoutMix.value + delta / transitionDuration);
     }
     if (meshRef.current) {
-      meshRef.current.count = adapter.count;
+      meshRef.current.count = countRef.current;
     }
   });
 
-  // Interaction via canvas events (registered in parent)
+  // Hit test helper
+  const hitTest = useCallback((clientX: number, clientY: number): string | null => {
+    if (!(camera instanceof THREE.OrthographicCamera)) return null;
+    const rect = gl.domElement.getBoundingClientRect();
+    const mx = clientX - rect.left;
+    const my = clientY - rect.top;
+    const { ids, positions, sizes } = cpuData.current;
+    const projected = new THREE.Vector3();
+
+    for (let i = 0; i < ids.length; i++) {
+      const w = sizes[i * 2], h = sizes[i * 2 + 1];
+      projected.set(positions[i * 2] + w / 2, positions[i * 2 + 1] - h / 2, 0);
+      projected.project(camera);
+      const sx = (projected.x + 1) / 2 * rect.width;
+      const sy = (1 - projected.y) / 2 * rect.height;
+      if (Math.abs(mx - sx) < w * camera.zoom / 2 && Math.abs(my - sy) < h * camera.zoom / 2) {
+        return ids[i];
+      }
+    }
+    return null;
+  }, [camera, gl]);
+
+  // Canvas interaction events
   useEffect(() => {
     const canvas = gl.domElement;
-
     const handleMove = (e: PointerEvent) => {
-      if (!onProductHover || !(camera instanceof THREE.OrthographicCamera)) return;
-      const rect = canvas.getBoundingClientRect();
-      const hitId = adapter.hitTest(e.clientX - rect.left, e.clientY - rect.top, camera, rect.width, rect.height);
-      onProductHover(hitId);
-      canvas.style.cursor = hitId ? 'pointer' : 'default';
+      const id = hitTest(e.clientX, e.clientY);
+      onProductHover?.(id);
+      canvas.style.cursor = id ? 'pointer' : 'default';
     };
-
     const handleClick = (e: MouseEvent) => {
-      if (!onProductClick || !(camera instanceof THREE.OrthographicCamera)) return;
-      const rect = canvas.getBoundingClientRect();
-      const hitId = adapter.hitTest(e.clientX - rect.left, e.clientY - rect.top, camera, rect.width, rect.height);
-      if (hitId) onProductClick(hitId);
+      const id = hitTest(e.clientX, e.clientY);
+      if (id) onProductClick?.(id);
     };
-
     canvas.addEventListener('pointermove', handleMove);
     canvas.addEventListener('click', handleClick);
     return () => {
       canvas.removeEventListener('pointermove', handleMove);
       canvas.removeEventListener('click', handleClick);
     };
-  }, [gl, camera, adapter, onProductClick, onProductHover]);
+  }, [gl, hitTest, onProductClick, onProductHover]);
 
   return (
-    <instancedMesh
-      ref={meshRef}
-      args={[geometry, material, MAX_INSTANCES]}
-      frustumCulled={false}
-    />
+    <instancedMesh ref={meshRef} args={[geometry, undefined!, MAX_PARTICLES]} frustumCulled={false}>
+      <meshStandardMaterial
+        ref={materialRef}
+        onBeforeCompile={onBeforeCompile}
+        roughness={0.8}
+        metalness={0.0}
+      />
+    </instancedMesh>
   );
 }

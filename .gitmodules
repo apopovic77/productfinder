@@ -1,0 +1,3 @@
+[submodule "libs/arcturian"]
+	path = libs/arcturian
+	url = https://github.com/apopovic77/Arcturian.git

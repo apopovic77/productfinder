@@ -21,7 +21,11 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
-    "baseUrl": "."
+    "baseUrl": ".",
+    "paths": {
+      "@arcturian/*": ["./libs/arcturian/src/engine/*"],
+      "@arcturian": ["./libs/arcturian/src/engine/index.ts"]
+    }
   },
-  "include": ["src"]
+  "include": ["src", "libs/arcturian/src/engine"]
 }
