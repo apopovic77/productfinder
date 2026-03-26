@@ -1682,7 +1682,7 @@ export default class App extends React.Component<{}, State> {
             </div>
 
             {/* Breadcrumbs */}
-            <div className="pf-mobile-pivot-label">Navigation</div>
+            <div className="pf-mobile-pivot-label">Navigation · {getDimensionLabel(pivotDimension)}</div>
             <div className="pf-mobile-pivot-breadcrumbs">
               {pivotBreadcrumbs.map((crumb, i) => (
                 <button type="button" key={`mobile-crumb-${crumb}-${i}`}

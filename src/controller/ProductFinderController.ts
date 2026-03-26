@@ -816,10 +816,14 @@ export class ProductFinderController {
     const worldY = (canvasY - viewport.offset.y) / viewport.scale;
     
     // Check if click is on any group header
+    // On mobile, expand hit area by padding to make headers easier to tap
+    const isMobile = this.canvas!.width < 768;
+    const hitPadding = isMobile ? 10 : 0; // 10px extra tap area on mobile
+
     const headers = this.layoutService.getGroupHeaders();
     for (const header of headers) {
-      if (worldX >= header.x && worldX <= header.x + header.width &&
-          worldY >= header.y && worldY <= header.y + header.height) {
+      if (worldX >= header.x - hitPadding && worldX <= header.x + header.width + hitPadding &&
+          worldY >= header.y - hitPadding && worldY <= header.y + header.height + hitPadding) {
         // Click on group header - drill down!
         this.layoutService.drillDownPivot(header.key);
         this.onPivotChanged();
