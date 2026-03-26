@@ -8,8 +8,10 @@
  * - Hover Tooltip
  * - Product Detail Dialog (V4)
  */
+import { useState, useEffect } from 'react';
 import type { Product } from '../../types/Product';
 import type { PivotDimensionDefinition } from '../../services/PivotDimensionAnalyzer';
+import { setProjectionCallback, type ScreenBucketHeader } from '../hooks/useBucketProjection';
 
 interface OverlayLayerProps {
   loading: boolean;
@@ -26,14 +28,22 @@ interface OverlayLayerProps {
   onDimensionSelect: (key: string) => void;
   onDrillUp: () => void;
   onProductClose: () => void;
+  onBucketClick: (label: string) => void;
 }
 
 export function OverlayLayer({
   loading, error, productCount, breadcrumbs,
   activeDimension, availableDimensions, heroMode,
   hoveredProductId, selectedProduct, mode,
-  onBreadcrumbClick, onDimensionSelect, onDrillUp, onProductClose,
+  onBreadcrumbClick, onDimensionSelect, onDrillUp, onProductClose, onBucketClick,
 }: OverlayLayerProps) {
+  const [bucketHeaders, setBucketHeaders] = useState<ScreenBucketHeader[]>([]);
+
+  useEffect(() => {
+    setProjectionCallback(setBucketHeaders);
+    return () => setProjectionCallback(() => {});
+  }, []);
+
   return (
     <div style={{
       position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
@@ -148,6 +158,38 @@ export function OverlayLayer({
           Hero Mode
         </div>
       )}
+
+      {/* Bucket Headers (projected from 3D) */}
+      {bucketHeaders.filter(h => h.visible).map(header => (
+        <button
+          key={`bucket-${header.key}`}
+          onClick={() => onBucketClick(header.label)}
+          style={{
+            position: 'absolute',
+            left: header.screenX,
+            top: header.screenY,
+            transform: 'translate(-50%, -50%)',
+            background: 'rgba(0,0,0,0.75)',
+            backdropFilter: 'blur(4px)',
+            color: '#fff',
+            padding: '6px 14px',
+            borderRadius: 4,
+            fontSize: 12,
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            cursor: 'pointer',
+            pointerEvents: 'auto',
+            whiteSpace: 'nowrap',
+            border: '1px solid rgba(255,255,255,0.08)',
+            fontFamily: "'ITC Avant Garde Gothic', system-ui, sans-serif",
+          }}
+          onMouseEnter={(e) => { (e.target as HTMLElement).style.background = 'rgba(88,166,255,0.3)'; }}
+          onMouseLeave={(e) => { (e.target as HTMLElement).style.background = 'rgba(0,0,0,0.75)'; }}
+        >
+          {header.label}
+        </button>
+      ))}
 
       {/* Mode Badge */}
       <div style={{

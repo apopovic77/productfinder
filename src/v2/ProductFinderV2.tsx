@@ -12,6 +12,7 @@ import { CameraLight } from '@arcturian';
 import { ProductFinderScene } from './ProductFinderScene';
 import { useProductFinderStore } from './store/useProductFinderStore';
 import { OverlayLayer } from './overlays/OverlayLayer';
+import { BucketProjector } from './hooks/useBucketProjection';
 
 function ResizeHandler() {
   const { size } = useThree();
@@ -88,6 +89,8 @@ export function ProductFinderV2() {
           transitionDuration={0.8}
         />
 
+        <BucketProjector />
+
         <MapControls
           enableRotate={false}
           enableDamping
@@ -114,6 +117,7 @@ export function ProductFinderV2() {
         onDimensionSelect={selectDimension}
         onDrillUp={drillUp}
         onProductClose={() => selectProduct(null)}
+        onBucketClick={handleBucketClick}
       />
     </div>
   );
