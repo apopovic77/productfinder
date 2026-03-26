@@ -22,6 +22,7 @@ interface OverlayLayerProps {
   availableDimensions: PivotDimensionDefinition[];
   heroMode: boolean;
   hoveredProductId: string | null;
+  hoveredProduct: Product | null;
   selectedProduct: Product | null;
   mode: 'taxonomy' | 'gpane';
   onBreadcrumbClick: (index: number) => void;
@@ -35,7 +36,7 @@ export function OverlayLayer({
   loading, error, productCount, breadcrumbs,
   activeDimension, availableDimensions, heroMode,
   hoveredProductId, selectedProduct, mode,
-  onBreadcrumbClick, onDimensionSelect, onDrillUp, onProductClose, onBucketClick,
+  onBreadcrumbClick, onDimensionSelect, onDrillUp, onProductClose, onBucketClick, hoveredProduct,
 }: OverlayLayerProps) {
   const [bucketHeaders, setBucketHeaders] = useState<ScreenBucketHeader[]>([]);
 
@@ -135,15 +136,25 @@ export function OverlayLayer({
         </div>
       )}
 
-      {/* Hover Info (bottom right) */}
-      {hoveredProductId && (
+      {/* Hover Tooltip (bottom right) */}
+      {hoveredProduct && (
         <div style={{
           position: 'absolute', bottom: 16, right: 16,
-          background: 'rgba(0,0,0,0.8)', padding: '8px 12px',
-          borderRadius: 6, color: '#fff', fontSize: 12,
-          backdropFilter: 'blur(8px)',
+          background: 'rgba(0,0,0,0.85)', padding: '10px 14px',
+          borderRadius: 8, color: '#fff', fontSize: 12,
+          backdropFilter: 'blur(12px)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          maxWidth: 280,
         }}>
-          ID: {hoveredProductId}
+          <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 2 }}>
+            {hoveredProduct.name}
+          </div>
+          {hoveredProduct.priceText && (
+            <div style={{ color: '#58a6ff' }}>{hoveredProduct.priceText}</div>
+          )}
+          {hoveredProduct.brand && (
+            <div style={{ color: '#8b949e', fontSize: 11, marginTop: 2 }}>{hoveredProduct.brand}</div>
+          )}
         </div>
       )}
 

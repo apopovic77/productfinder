@@ -46,6 +46,10 @@ export function ProductFinderV2() {
     setHovered(id);
   }, [setHovered]);
 
+  const hoveredProduct = hoveredProductId
+    ? useProductFinderStore.getState()._service.getProductById(hoveredProductId) || null
+    : null;
+
   const handleBucketClick = useCallback((bucketLabel: string) => {
     drillDown(bucketLabel);
   }, [drillDown]);
@@ -116,6 +120,7 @@ export function ProductFinderV2() {
         onBreadcrumbClick={handleBreadcrumbClick}
         onDimensionSelect={selectDimension}
         onDrillUp={drillUp}
+        hoveredProduct={hoveredProduct}
         onProductClose={() => selectProduct(null)}
         onBucketClick={handleBucketClick}
       />
