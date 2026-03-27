@@ -98,11 +98,12 @@ class StaticAtlas {
 // Scene — Arcturian InstancedMesh + MorphShader
 // ============================================================
 function ArcturianScene({
-  products, shape, shapeSize, gapFactor, tileAspect, atlasFormat, tileColor,
+  products, shape, shapeSize, depth, gapFactor, tileAspect, atlasFormat, tileColor,
 }: {
   products: ProductInfo[];
   shape: LayoutShape;
   shapeSize: number;
+  depth: number;
   gapFactor: number;
   tileAspect: number;
   atlasFormat: 'png' | 'jpg';
@@ -111,12 +112,13 @@ function ArcturianScene({
   const meshRef = useRef<THREE.InstancedMesh>(null!);
   const flyTargetRef = useRef<FlyTarget>({ active: false, position: new THREE.Vector3(), lookAt: new THREE.Vector3() });
 
-  // Static Atlas (128px tier, 3 pages for 2603 products)
-  const atlas = useMemo(() => new StaticAtlas(128, 3, 32, 32, products.length), [products.length]);
+  // Static Atlas (128px tier, 3 pages for 2603 products) — recreate on format change
+  const atlas = useMemo(() => new StaticAtlas(128, 3, 32, 32, products.length), [products.length, atlasFormat]);
 
   // Load atlas files
   const [atlasReady, setAtlasReady] = useState(false);
   useEffect(function loadAtlasFiles() {
+    setAtlasReady(false);
     const basePath = atlasFormat === 'jpg' ? '/atlas/jpg' : '/atlas/png';
     atlas.load(basePath, atlasFormat).then(() => setAtlasReady(true));
   }, [atlas, atlasFormat]);
@@ -249,15 +251,22 @@ function ArcturianScene({
       shape,
       mode: 'fixedShapeSize',
       targetRadius: shapeSize,
+      targetDepth: depth,
       baseParticleSize: new THREE.Vector2(0.1, 0.1),
       gapFactor,
       tileAspect,
       galleryRedux: 0.3,
     });
 
+    // Override tile depth per morph config
+    for (const r of results) {
+      if (r.target.morph) r.target.morph.depth = depth;
+      if (r.current.morph) r.current.morph.depth = depth;
+    }
+
     applyLayout(results, !isFirstRender.current);
     isFirstRender.current = false;
-  }, [products.length, shape, shapeSize, gapFactor, tileAspect, applyLayout]);
+  }, [products.length, shape, shapeSize, depth, gapFactor, tileAspect, applyLayout]);
 
   // Animate transition
   useFrame((_, delta) => {
@@ -273,8 +282,7 @@ function ArcturianScene({
           onBeforeCompile={onBeforeCompile}
           roughness={0.6}
           metalness={0.1}
-          transparent
-          depthWrite={false}
+          alphaTest={0.5}
         />
       </instancedMesh>
 
@@ -299,6 +307,7 @@ export function ProductFinderV3() {
   const [tileAspect, setTileAspect] = useState(1.0);
   const [atlasFormat, setAtlasFormat] = useState<'png' | 'jpg'>('png');
   const [tileColor, setTileColor] = useState('#ffffff');
+  const [depth, setDepth] = useState(0);
 
   useEffect(function fetchProducts() {
     (async function fetchProductsAsync() {
@@ -336,6 +345,7 @@ export function ProductFinderV3() {
             shapeSize={shapeSize}
             gapFactor={gapFactor}
             tileAspect={tileAspect}
+            depth={depth}
             atlasFormat={atlasFormat}
             tileColor={tileColor}
           />
@@ -370,6 +380,26 @@ export function ProductFinderV3() {
           ))}
         </div>
 
+        {/* Style Presets */}
+        <div style={{ display: 'flex', gap: 4, marginTop: 12 }}>
+          {[
+            { label: 'Flat', depth: 0 },
+            { label: 'Cards', depth: 0.05 },
+            { label: 'Tiles', depth: 0.3 },
+            { label: 'Blocks', depth: 1.0 },
+          ].map(p => (
+            <button key={p.label} onClick={() => setDepth(p.depth)} style={{
+              background: Math.abs(depth - p.depth) < 0.01 ? 'rgba(255,200,50,0.3)' : 'rgba(255,255,255,0.06)',
+              border: Math.abs(depth - p.depth) < 0.01 ? '1px solid rgba(255,200,50,0.5)' : '1px solid rgba(255,255,255,0.1)',
+              color: Math.abs(depth - p.depth) < 0.01 ? '#ffc832' : '#888',
+              padding: '5px 10px', borderRadius: 4, fontSize: 11,
+              cursor: 'pointer', fontFamily: 'inherit',
+            }}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+
         {/* Atlas Format Toggle */}
         <div style={{ display: 'flex', gap: 4, marginTop: 12 }}>
           {(['png', 'jpg'] as const).map(f => (
@@ -391,6 +421,12 @@ export function ProductFinderV3() {
             Size: {shapeSize.toFixed(1)}
             <input type="range" min="1" max="20" step="0.5" value={shapeSize}
               onChange={e => setShapeSize(Number(e.target.value))}
+              style={{ width: 160, display: 'block' }} />
+          </label>
+          <label style={{ fontSize: 11, color: '#666' }}>
+            Depth: {depth.toFixed(3)}
+            <input type="range" min="0.001" max="2" step="0.01" value={depth}
+              onChange={e => setDepth(Number(e.target.value))}
               style={{ width: 160, display: 'block' }} />
           </label>
           <label style={{ fontSize: 11, color: '#666' }}>
