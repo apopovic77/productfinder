@@ -28,52 +28,69 @@ interface ProductInfo {
 }
 
 // ============================================================
-// Atlas Loader — builds canvas texture from product images
+// Static Atlas — loads pre-generated atlas PNG/JPG files
 // ============================================================
-class SimpleAtlas {
-  canvas: HTMLCanvasElement;
-  ctx: CanvasRenderingContext2D;
-  texture: THREE.CanvasTexture;
+class StaticAtlas {
+  textures: THREE.Texture[] = [];
   cols: number;
   rows: number;
-  cellSize: number;
+  tilesPerPage: number;
+  totalTiles: number;
+  ready = false;
 
-  constructor(cols: number, rows: number, cellSize: number) {
-    this.cols = cols; this.rows = rows; this.cellSize = cellSize;
-    this.canvas = document.createElement('canvas');
-    this.canvas.width = cols * cellSize;
-    this.canvas.height = rows * cellSize;
-    this.ctx = this.canvas.getContext('2d')!;
-    this.ctx.fillStyle = '#e0e0e0';
-    this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-    this.texture = new THREE.CanvasTexture(this.canvas);
-    this.texture.minFilter = THREE.LinearFilter;
-    this.texture.magFilter = THREE.LinearFilter;
-    this.texture.colorSpace = THREE.SRGBColorSpace;
+  constructor(public tier: number, public pageCount: number, cols: number, rows: number, totalTiles: number) {
+    this.cols = cols;
+    this.rows = rows;
+    this.tilesPerPage = cols * rows;
+    this.totalTiles = totalTiles;
   }
 
-  async loadTile(index: number, storageId: number) {
-    const col = index % this.cols;
-    const row = Math.floor(index / this.cols);
-    try {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.src = `${STORAGE_API}/storage/media/${storageId}?width=${this.cellSize}&format=webp&quality=80&trim=true`;
-      await img.decode();
-      this.ctx.drawImage(img, col * this.cellSize, row * this.cellSize, this.cellSize, this.cellSize);
-      this.texture.needsUpdate = true;
-      if (index < 3) console.log(`[Atlas] Tile ${index} loaded (storage ${storageId})`);
-    } catch (e) {
-      console.warn(`[Atlas] Tile ${index} failed (storage ${storageId}):`, e);
+  async load(basePath: string, format: 'png' | 'jpg' = 'png') {
+    const loader = new THREE.TextureLoader();
+    const loadTex = (url: string): Promise<THREE.Texture> => new Promise((resolve, reject) => {
+      loader.load(url, (tex) => {
+        tex.minFilter = THREE.LinearFilter;
+        tex.magFilter = THREE.LinearFilter;
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.generateMipmaps = false;
+        resolve(tex);
+      }, undefined, reject);
+    });
+
+    console.log(`[StaticAtlas] Loading ${this.pageCount} pages (${this.tier}px ${format})...`);
+    for (let i = 0; i < this.pageCount; i++) {
+      const url = `${basePath}/${this.tier}/atlas_${i}.${format}`;
+      try {
+        const tex = await loadTex(url);
+        this.textures.push(tex);
+        console.log(`[StaticAtlas] Page ${i} loaded`);
+      } catch (e) {
+        console.warn(`[StaticAtlas] Page ${i} failed:`, e);
+        this.textures.push(new THREE.Texture());
+      }
     }
+    this.ready = true;
+    console.log(`[StaticAtlas] All ${this.textures.length} pages loaded`);
   }
 
-  getUV(index: number): [number, number, number, number] {
-    const col = index % this.cols;
-    const row = Math.floor(index / this.cols);
+  getUV(globalIndex: number): { pageIndex: number; u: number; v: number; su: number; sv: number } {
+    const pageIndex = Math.floor(globalIndex / this.tilesPerPage);
+    const localIndex = globalIndex % this.tilesPerPage;
+    const col = localIndex % this.cols;
+    const row = Math.floor(localIndex / this.cols);
     const su = 1 / this.cols;
     const sv = 1 / this.rows;
-    return [col / this.cols, 1 - (row + 1) / this.rows, su, sv];
+    return {
+      pageIndex,
+      u: col / this.cols,
+      v: 1 - (row + 1) / this.rows,
+      su,
+      sv,
+    };
+  }
+
+  dispose() {
+    for (const t of this.textures) t.dispose();
   }
 }
 
@@ -81,43 +98,40 @@ class SimpleAtlas {
 // Scene — Arcturian InstancedMesh + MorphShader
 // ============================================================
 function ArcturianScene({
-  products, shape, shapeSize, gapFactor, tileAspect,
+  products, shape, shapeSize, gapFactor, tileAspect, atlasFormat, tileColor,
 }: {
   products: ProductInfo[];
   shape: LayoutShape;
   shapeSize: number;
   gapFactor: number;
   tileAspect: number;
+  atlasFormat: 'png' | 'jpg';
+  tileColor: string;
 }) {
   const meshRef = useRef<THREE.InstancedMesh>(null!);
   const flyTargetRef = useRef<FlyTarget>({ active: false, position: new THREE.Vector3(), lookAt: new THREE.Vector3() });
 
-  // Atlas
-  const atlas = useMemo(() => {
-    const cols = Math.ceil(Math.sqrt(products.length));
-    return new SimpleAtlas(cols, cols, 128);
-  }, [products.length]);
+  // Static Atlas (128px tier, 3 pages for 2603 products)
+  const atlas = useMemo(() => new StaticAtlas(128, 3, 32, 32, products.length), [products.length]);
 
-  // Load images
-  useEffect(function loadProductImages() {
-    for (let i = 0; i < products.length; i++) {
-      const p = products[i];
-      if (p.storageId) atlas.loadTile(i, p.storageId);
-    }
-  }, [products, atlas]);
+  // Load atlas files
+  const [atlasReady, setAtlasReady] = useState(false);
+  useEffect(function loadAtlasFiles() {
+    const basePath = atlasFormat === 'jpg' ? '/atlas/jpg' : '/atlas/png';
+    atlas.load(basePath, atlasFormat).then(() => setAtlasReady(true));
+  }, [atlas, atlasFormat]);
 
-  // Uniforms
-  const uniforms = useMemo<MorphShaderUniforms>(() => {
-    const u = createUniforms();
-    u.uUseAtlas.value = 1.0;
-    u.uAtlasFaceMode.value = 1.0; // front + back
-    u.uAtlasTexture.value = atlas.texture;
-    u.uColor1.value.set('#cccccc');
-    u.uColor2.value.set('#999999');
-    u.uColorMix.value = 0.0;
-    u.uLayoutMix.value = 1.0;
-    return u;
-  }, [atlas]);
+  // Uniforms — create ONCE, never recreate (material captures reference on first compile)
+  const uniforms = useRef<MorphShaderUniforms>(null!);
+  if (!uniforms.current) {
+    uniforms.current = createUniforms();
+    uniforms.current.uUseAtlas.value = 1.0;
+    uniforms.current.uAtlasFaceMode.value = 1.0;
+    uniforms.current.uColor1.value.set(tileColor);
+    uniforms.current.uColor2.value.set(tileColor);
+    uniforms.current.uColorMix.value = 0.0;
+    uniforms.current.uLayoutMix.value = 1.0;
+  }
 
   // Geometry with Arcturian attributes
   const geometry = useMemo(() => {
@@ -135,8 +149,8 @@ function ArcturianScene({
 
   // Shader injection
   const onBeforeCompile = useCallback((shader: THREE.WebGLProgramParametersWithUniforms) => {
-    applyShaderToMaterial(shader, uniforms);
-  }, [uniforms]);
+    applyShaderToMaterial(shader, uniforms.current);
+  }, []);
 
   // Copy attribute helper
   const copyAttr = (from: string, to: string) => {
@@ -178,9 +192,9 @@ function ArcturianScene({
         aTarget2.setXYZW(i, morph.trapezoidZ, morph.sizeY, oldTrapZ, oldSizeY);
       }
 
-      // Atlas UV
-      const [u, v, su, sv] = atlas.getUV(i);
-      aUVOffset.setXYZW(i, u, v, su, sv);
+      // Atlas UV (from static atlas)
+      const uv = atlas.getUV(i);
+      aUVOffset.setXYZW(i, uv.u, uv.v, uv.su, uv.sv);
 
       if (!animate) {
         // Init old = current (no transition on first load)
@@ -208,8 +222,21 @@ function ArcturianScene({
     geometry.getAttribute('aOldTarget').needsUpdate = true;
 
     if (meshRef.current) meshRef.current.count = count;
-    if (animate) uniforms.uLayoutMix.value = 0;
-  }, [geometry, atlas, uniforms]);
+    if (animate) uniforms.current.uLayoutMix.value = 0;
+  }, [geometry, atlas]);
+
+  // Update tile color
+  useEffect(function updateTileColor() {
+    uniforms.current.uColor1.value.set(tileColor);
+    uniforms.current.uColor2.value.set(tileColor);
+  }, [tileColor]);
+
+  // Set atlas texture when loaded
+  useEffect(function setAtlasTexture() {
+    if (!atlasReady || atlas.textures.length === 0) return;
+    uniforms.current.uAtlasTexture.value = atlas.textures[0];
+    console.log(`[Atlas] Texture set (page 0, ${atlas.tier}px)`);
+  }, [atlasReady, atlas]);
 
   // Generate + apply layout when shape/params change
   const isFirstRender = useRef(true);
@@ -233,8 +260,8 @@ function ArcturianScene({
 
   // Animate transition
   useFrame((_, delta) => {
-    if (uniforms.uLayoutMix.value < 1.0) {
-      uniforms.uLayoutMix.value = Math.min(1.0, uniforms.uLayoutMix.value + delta / 1.2);
+    if (uniforms.current.uLayoutMix.value < 1.0) {
+      uniforms.current.uLayoutMix.value = Math.min(1.0, uniforms.current.uLayoutMix.value + delta / 1.2);
     }
   });
 
@@ -258,7 +285,7 @@ function ArcturianScene({
 // ============================================================
 // Page — loads products, provides shape controls
 // ============================================================
-const SHAPES: LayoutShape[] = ['gallery', 'sphere', 'ring', 'cube', 'box', 'cylinder', 'tube', 'torus', 'plane'];
+const SHAPES: LayoutShape[] = ['gallery', 'sphere', 'ring', 'cube', 'box', 'cylinder', 'tube', 'torus', 'plane', 'helix', 'dna', 'galaxy', 'hexgrid'];
 
 export function ProductFinderV3() {
   const [products, setProducts] = useState<ProductInfo[]>([]);
@@ -267,6 +294,8 @@ export function ProductFinderV3() {
   const [shapeSize, setShapeSize] = useState(5);
   const [gapFactor, setGapFactor] = useState(0.95);
   const [tileAspect, setTileAspect] = useState(1.0);
+  const [atlasFormat, setAtlasFormat] = useState<'png' | 'jpg'>('png');
+  const [tileColor, setTileColor] = useState('#ffffff');
 
   useEffect(function fetchProducts() {
     (async function fetchProductsAsync() {
@@ -304,6 +333,8 @@ export function ProductFinderV3() {
             shapeSize={shapeSize}
             gapFactor={gapFactor}
             tileAspect={tileAspect}
+            atlasFormat={atlasFormat}
+            tileColor={tileColor}
           />
         )}
       </Canvas>
@@ -336,6 +367,21 @@ export function ProductFinderV3() {
           ))}
         </div>
 
+        {/* Atlas Format Toggle */}
+        <div style={{ display: 'flex', gap: 4, marginTop: 12 }}>
+          {(['png', 'jpg'] as const).map(f => (
+            <button key={f} onClick={() => setAtlasFormat(f)} style={{
+              background: f === atlasFormat ? 'rgba(107,255,107,0.3)' : 'rgba(255,255,255,0.06)',
+              border: f === atlasFormat ? '1px solid rgba(107,255,107,0.5)' : '1px solid rgba(255,255,255,0.1)',
+              color: f === atlasFormat ? '#6bff6b' : '#888',
+              padding: '5px 10px', borderRadius: 4, fontSize: 11,
+              cursor: 'pointer', fontFamily: 'inherit', textTransform: 'uppercase',
+            }}>
+              {f === 'png' ? 'PNG (Alpha)' : 'JPG (White BG)'}
+            </button>
+          ))}
+        </div>
+
         {/* Sliders */}
         <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <label style={{ fontSize: 11, color: '#666' }}>
@@ -355,6 +401,13 @@ export function ProductFinderV3() {
             <input type="range" min="0.5" max="2" step="0.1" value={tileAspect}
               onChange={e => setTileAspect(Number(e.target.value))}
               style={{ width: 160, display: 'block' }} />
+          </label>
+          <label style={{ fontSize: 11, color: '#666', display: 'flex', alignItems: 'center', gap: 8 }}>
+            Tile Color:
+            <input type="color" value={tileColor}
+              onChange={e => setTileColor(e.target.value)}
+              style={{ width: 40, height: 24, border: 'none', cursor: 'pointer' }} />
+            <span style={{ fontFamily: 'monospace', fontSize: 10 }}>{tileColor}</span>
           </label>
         </div>
       </div>
