@@ -17,9 +17,9 @@ import type { MorphShaderUniforms } from '@arcturian/core/MorphShader';
 import type { LayoutShape, LayoutResult } from '@arcturian/tessellation/layouts';
 import type { FlyTarget } from '@arcturian/core/types';
 
-const STORAGE_API = (import.meta as any).env?.VITE_STORAGE_API_URL || 'https://gsgbot.arkturian.com/storage-api';
-const ONEAL_API = (import.meta as any).env?.VITE_ONEAL_API_BASE || 'https://gsgbot.arkturian.com/oneal-api/v1';
-const API_KEY = (import.meta as any).env?.VITE_ONEAL_API_KEY || 'oneal_demo_token';
+const STORAGE_API = '/storage-api';
+const ONEAL_API = '/oneal-api/v1';
+const API_KEY = 'oneal_demo_token';
 
 interface ProductInfo {
   id: number;
@@ -44,7 +44,7 @@ class SimpleAtlas {
     this.canvas.width = cols * cellSize;
     this.canvas.height = rows * cellSize;
     this.ctx = this.canvas.getContext('2d')!;
-    this.ctx.fillStyle = '#222';
+    this.ctx.fillStyle = '#e0e0e0';
     this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     this.texture = new THREE.CanvasTexture(this.canvas);
     this.texture.minFilter = THREE.LinearFilter;
@@ -62,7 +62,10 @@ class SimpleAtlas {
       await img.decode();
       this.ctx.drawImage(img, col * this.cellSize, row * this.cellSize, this.cellSize, this.cellSize);
       this.texture.needsUpdate = true;
-    } catch { /* skip failed */ }
+      if (index < 3) console.log(`[Atlas] Tile ${index} loaded (storage ${storageId})`);
+    } catch (e) {
+      console.warn(`[Atlas] Tile ${index} failed (storage ${storageId}):`, e);
+    }
   }
 
   getUV(index: number): [number, number, number, number] {
@@ -96,10 +99,11 @@ function ArcturianScene({
   }, [products.length]);
 
   // Load images
-  useEffect(() => {
-    products.forEach((p, i) => {
+  useEffect(function loadProductImages() {
+    for (let i = 0; i < products.length; i++) {
+      const p = products[i];
       if (p.storageId) atlas.loadTile(i, p.storageId);
-    });
+    }
   }, [products, atlas]);
 
   // Uniforms
@@ -108,8 +112,8 @@ function ArcturianScene({
     u.uUseAtlas.value = 1.0;
     u.uAtlasFaceMode.value = 1.0; // front + back
     u.uAtlasTexture.value = atlas.texture;
-    u.uColor1.value.set('#1a1a2e');
-    u.uColor2.value.set('#2a2a4e');
+    u.uColor1.value.set('#cccccc');
+    u.uColor2.value.set('#999999');
     u.uColorMix.value = 0.0;
     u.uLayoutMix.value = 1.0;
     return u;
@@ -209,7 +213,7 @@ function ArcturianScene({
 
   // Generate + apply layout when shape/params change
   const isFirstRender = useRef(true);
-  useEffect(() => {
+  useEffect(function applyShapeLayout() {
     if (products.length === 0) return;
 
     const results = generateLayout({
@@ -264,8 +268,8 @@ export function ProductFinderV3() {
   const [gapFactor, setGapFactor] = useState(0.95);
   const [tileAspect, setTileAspect] = useState(1.0);
 
-  useEffect(() => {
-    (async () => {
+  useEffect(function fetchProducts() {
+    (async function fetchProductsAsync() {
       try {
         const res = await fetch(`${ONEAL_API}/products?limit=2000`, {
           headers: { 'X-API-Key': API_KEY },
@@ -285,12 +289,12 @@ export function ProductFinderV3() {
   }, []);
 
   return (
-    <div style={{ width: '100vw', height: '100vh', background: '#000' }}>
+    <div style={{ width: '100vw', height: '100vh', background: '#fff' }}>
       <Canvas
         camera={{ position: [0, 0, 12], fov: 60 }}
         gl={{ antialias: true }}
       >
-        <color attach="background" args={['#050510']} />
+        <color attach="background" args={['#ffffff']} />
         <ambientLight intensity={0.3} />
 
         {products.length > 0 && (
