@@ -131,6 +131,7 @@ function ArcturianScene({
     uniforms.current.uColor2.value.set(tileColor);
     uniforms.current.uColorMix.value = 0.0;
     uniforms.current.uLayoutMix.value = 1.0;
+    (uniforms.current as any).uAlphaEnabled.value = 1.0;
   }
 
   // Geometry with Arcturian attributes
@@ -272,6 +273,8 @@ function ArcturianScene({
           onBeforeCompile={onBeforeCompile}
           roughness={0.6}
           metalness={0.1}
+          transparent
+          depthWrite={false}
         />
       </instancedMesh>
 
