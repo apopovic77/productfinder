@@ -71,7 +71,7 @@ const DEVELOPER_SETTINGS_DEFAULTS: DeveloperSettings = {
   },
   showDebugInfo: false,
   showBoundingBoxes: false,
-  animationDuration: 1.0,
+  animationDuration: 0.6,
   priceBucketMode: 'static',
   priceBucketCount: 5,
   heroDisplayMode: 'overlay',

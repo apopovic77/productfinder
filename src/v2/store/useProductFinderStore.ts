@@ -109,7 +109,7 @@ export const useProductFinderStore = create<ProductFinderState>((set, get) => {
       });
 
       // Clear transitioning after animation
-      setTimeout(() => set({ transitioning: false }), 900);
+      setTimeout(() => set({ transitioning: false }), 700);
     },
 
     drillUp: () => {
@@ -127,7 +127,7 @@ export const useProductFinderStore = create<ProductFinderState>((set, get) => {
         ...nav,
       });
 
-      setTimeout(() => set({ transitioning: false }), 900);
+      setTimeout(() => set({ transitioning: false }), 700);
     },
 
     reset: () => {

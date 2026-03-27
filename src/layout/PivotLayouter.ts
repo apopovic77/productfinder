@@ -50,7 +50,7 @@ export type GroupHeaderInfo = {
   height: number;
 };
 
-const STAGGER_MAX_MS = 300;
+const STAGGER_MAX_MS = 200;
 
 export class PivotLayouter<T> {
   // Store group header positions for rendering and hit-testing

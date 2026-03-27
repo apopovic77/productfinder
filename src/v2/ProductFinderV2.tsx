@@ -90,7 +90,7 @@ export function ProductFinderV2() {
           layoutItems={layoutItems}
           onProductClick={handleProductClick}
           onProductHover={handleProductHover}
-          transitionDuration={0.8}
+          transitionDuration={0.6}
         />
 
         <BucketProjector />

@@ -24,7 +24,7 @@ export function ProductFinderScene({
   layoutItems,
   onProductClick,
   onProductHover,
-  transitionDuration = 0.8,
+  transitionDuration = 0.6,
 }: ProductFinderSceneProps) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const { camera, gl } = useThree();
