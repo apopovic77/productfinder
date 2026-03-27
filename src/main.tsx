@@ -6,6 +6,7 @@ import App from './App.tsx'
 import AnnotationTester from './pages/AnnotationTester.tsx'
 import GpaneDoku from './pages/GpaneDoku.tsx'
 import { ProductFinderV2 } from './v2/ProductFinderV2.tsx'
+import { ProductFinderV3 } from './v3/ProductFinderV3.tsx'
 import { PreloaderProvider, PreloaderOverlay } from './libs/react-asset-preloader'
 import { AppPreloaderWrapper } from './components/AppPreloaderWrapper'
 
@@ -14,6 +15,7 @@ createRoot(document.getElementById('root')!).render(
     <BrowserRouter>
       <Routes>
         <Route path="/v2" element={<ProductFinderV2 />} />
+        <Route path="/v3" element={<ProductFinderV3 />} />
         <Route path="/doku" element={<GpaneDoku />} />
         <Route path="/annot" element={
           <PreloaderProvider
