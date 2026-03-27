@@ -747,6 +747,14 @@ export class ProductFinderController {
     return this.renderer;
   }
 
+  getLayoutEngine() {
+    return this.layoutService.getEngine();
+  }
+
+  getLayoutService() {
+    return this.layoutService;
+  }
+
   drillDownGroup(groupKey: string): void {
     this.layoutService.drillDownPivot(groupKey);
     this.onDataChanged();

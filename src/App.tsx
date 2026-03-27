@@ -1,5 +1,10 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import './App.css';
+
+// Lazy-load Arcturian renderer (only when ?renderer=arcturian)
+const ArcturianRendererComponent = lazy(() =>
+  import('./render/ArcturianRenderer').then(m => ({ default: m.ArcturianRendererComponent }))
+);
 import type { Product } from './types/Product';
 import { ProductFinderController } from './controller/ProductFinderController';
 import ProductModal from './components/ProductModal';
@@ -217,6 +222,16 @@ export default class App extends React.Component<{}, State> {
 
   // Use global shared image queue for truly sequential loading
   private imageLoadQueue = globalImageQueue;
+  private _productAtlasIndex = new Map<string, number>();
+
+  private useArcturianRenderer(): boolean {
+    if (typeof window === 'undefined') return false;
+    return new URLSearchParams(window.location.search).get('renderer') === 'arcturian';
+  }
+
+  private getProductAtlasIndex(): Map<string, number> {
+    return this._productAtlasIndex;
+  }
 
   state: State = createInitialState();
 
@@ -251,6 +266,12 @@ export default class App extends React.Component<{}, State> {
       const sequence = groupKey
         ? this.controller.getDisplayOrderForGroup(groupKey).map(p => p.id)
         : this.controller.getDisplayOrder().map(p => p.id);
+      // Update atlas index for Arcturian renderer
+      if (this.useArcturianRenderer()) {
+        this._productAtlasIndex.clear();
+        state.filteredProducts.forEach((p, i) => this._productAtlasIndex.set(p.id, i));
+      }
+
       this.setState({
         loading: state.loading,
         error: state.error,
@@ -1710,7 +1731,18 @@ export default class App extends React.Component<{}, State> {
         )}
 
         <div className={`pf-stage pf-stage-${this.state.footerPosition}`}>
-          <canvas ref={this.canvasRef} className="pf-canvas" />
+          {this.useArcturianRenderer() ? (
+            <Suspense fallback={<div className="pf-canvas" style={{ background: '#fff' }} />}>
+              <ArcturianRendererComponent
+                getNodes={() => this.controller.getLayoutEngine()?.all() ?? []}
+                getHeaders={() => this.controller.getLayoutService()?.getGroupHeaders() ?? []}
+                productToAtlasIndex={this.getProductAtlasIndex()}
+                width={this.canvasRef.current?.clientWidth ?? window.innerWidth}
+                height={this.canvasRef.current?.clientHeight ?? window.innerHeight}
+              />
+            </Suspense>
+          ) : null}
+          <canvas ref={this.canvasRef} className="pf-canvas" style={this.useArcturianRenderer() ? { display: 'none' } : undefined} />
 
           {/* Navigation arrows - visible when a product is selected */}
           {selectedProduct && this.state.modalSequence.length > 1 && (
