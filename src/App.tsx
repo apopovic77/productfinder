@@ -245,6 +245,7 @@ export default class App extends React.Component<{}, State> {
     });
 
     // Initialize controller
+    this.controller.skipCanvasRenderer = this.useArcturianRenderer();
     await this.controller.initialize(canvas);
     await mediaPromise;
     this.controller.updateGridConfig(this.state.devSettings.gridConfig);
@@ -253,7 +254,7 @@ export default class App extends React.Component<{}, State> {
       this.state.devSettings.priceBucketMode,
       this.state.devSettings.priceBucketCount
     );
-    this.controller.setMinCellSize(this.state.devSettings.minCellSize);
+    this.controller.setMinCellSize(this.useArcturianRenderer() ? 0 : this.state.devSettings.minCellSize);
     this.controller.setCellSizeOverride(this.state.devSettings.cellSizeOverride);
     const orientation = this.computePivotOrientation();
     this.controller.setPivotOrientation(orientation);
@@ -1737,12 +1738,16 @@ export default class App extends React.Component<{}, State> {
                 getNodes={() => this.controller.getLayoutEngine()?.all() ?? []}
                 getHeaders={() => this.controller.getLayoutService()?.getGroupHeaders() ?? []}
                 productToAtlasIndex={this.getProductAtlasIndex()}
-                width={this.canvasRef.current?.clientWidth ?? window.innerWidth}
-                height={this.canvasRef.current?.clientHeight ?? window.innerHeight}
+                onBucketClick={(label) => {
+                  this.controller.handleGroupHeaderClick_byLabel?.(label);
+                  this.syncPivotUI();
+                }}
+                width={window.innerWidth}
+                height={window.innerHeight}
               />
             </Suspense>
           ) : null}
-          <canvas ref={this.canvasRef} className="pf-canvas" style={this.useArcturianRenderer() ? { display: 'none' } : undefined} />
+          <canvas ref={this.canvasRef} className="pf-canvas" style={this.useArcturianRenderer() ? { position: 'absolute', opacity: 0, pointerEvents: 'none', zIndex: -1 } : undefined} />
 
           {/* Navigation arrows - visible when a product is selected */}
           {selectedProduct && this.state.modalSequence.length > 1 && (

@@ -12,6 +12,7 @@ import * as THREE from 'three';
 import {
   createUniforms, applyShaderToMaterial, generateLayout,
   MAX_PARTICLES, CameraLight, SmoothZoomControls, ClickPicker,
+  atlasRegistry, LodManager,
 } from '@arcturian';
 import type { MorphShaderUniforms } from '@arcturian/core/MorphShader';
 import type { LayoutShape, LayoutResult } from '@arcturian/tessellation/layouts';
@@ -112,18 +113,29 @@ function ArcturianScene({
   const meshRef = useRef<THREE.InstancedMesh>(null!);
   const flyTargetRef = useRef<FlyTarget>({ active: false, position: new THREE.Vector3(), lookAt: new THREE.Vector3() });
 
-  // Static Atlas (128px tier, 3 pages for 2603 products) — recreate on format change
-  const atlas = useMemo(() => new StaticAtlas(128, 3, 32, 32, products.length), [products.length, atlasFormat]);
+  // Register product atlas in Arcturian AtlasRegistry
+  const atlasId = `oneal_products_${atlasFormat}`;
+  useMemo(function registerAtlas() {
+    // jpg → /atlas/jpg, png → /atlas (main folder has PNGs)
+    const basePath = atlasFormat === 'jpg' ? '/atlas/jpg' : '/atlas';
+    const ext = atlasFormat === 'jpg' ? 'jpg' : 'png';
 
-  // Load atlas files
-  const [atlasReady, setAtlasReady] = useState(false);
-  useEffect(function loadAtlasFiles() {
-    setAtlasReady(false);
-    const basePath = atlasFormat === 'jpg' ? '/atlas/jpg' : '/atlas/png';
-    atlas.load(basePath, atlasFormat).then(() => setAtlasReady(true));
-  }, [atlas, atlasFormat]);
+    if (atlasRegistry.has(atlasId)) atlasRegistry.remove(atlasId);
+    atlasRegistry.register({
+      id: atlasId,
+      tileCount: products.length,
+      lods: [
+        // LOD 0: 64px — 1 atlas, 64×64 grid = 4096 tiles
+        { urls: [`${basePath}/64/atlas_0.${ext}`], rows: 64, cols: 64, tilesPerAtlas: 4096 },
+        // LOD 1: 128px — 3 atlases, 32×32 grid = 1024 tiles each
+        { urls: [0, 1, 2].map(i => `${basePath}/128/atlas_${i}.${ext}`), rows: 32, cols: 32, tilesPerAtlas: 1024 },
+        // LOD 2: 256px — 11 atlases, 16×16 grid = 256 tiles each
+        { urls: Array.from({ length: 11 }, (_, i) => `${basePath}/256/atlas_${i}.${ext}`), rows: 16, cols: 16, tilesPerAtlas: 256 },
+      ],
+    });
+  }, [atlasFormat, products.length, atlasId]);
 
-  // Uniforms — create ONCE, never recreate (material captures reference on first compile)
+  // Uniforms — create ONCE
   const uniforms = useRef<MorphShaderUniforms>(null!);
   if (!uniforms.current) {
     uniforms.current = createUniforms();
@@ -134,7 +146,52 @@ function ArcturianScene({
     uniforms.current.uColorMix.value = 0.0;
     uniforms.current.uLayoutMix.value = 1.0;
     (uniforms.current as any).uAlphaEnabled.value = 1.0;
+    uniforms.current.uLod2Enabled.value = 0.0; // LodManager handles LOD 2
+    uniforms.current.uLod2Threshold.value = 3.0;
+    uniforms.current.uLodThreshold.value = 8.0;
   }
+
+  // Load atlas textures (LOD 0 + LOD 1)
+  const [atlasReady, setAtlasReady] = useState(false);
+  useEffect(function loadAtlasTextures() {
+    setAtlasReady(false);
+    const entry = atlasRegistry.get(atlasId);
+    if (!entry) return;
+    const loader = new THREE.TextureLoader();
+    const loadTex = (url: string): Promise<THREE.Texture> => new Promise((resolve) => {
+      loader.load(url, (tex) => {
+        tex.minFilter = THREE.LinearFilter;
+        tex.magFilter = THREE.LinearFilter;
+        tex.colorSpace = THREE.SRGBColorSpace;
+        tex.generateMipmaps = false;
+        resolve(tex);
+      });
+    });
+
+    // LOD 0 (64px)
+    loadTex(entry.lods[0].urls[0]).then(tex => {
+      uniforms.current.uAtlasTexture.value = tex;
+      setAtlasReady(true);
+      console.log('[Atlas] LOD 0 loaded');
+    });
+
+    // LOD 1 (128px) — up to 4 pages
+    if (entry.lods[1]) {
+      const lod1 = entry.lods[1];
+      const targets = [uniforms.current.uAtlasLod1_0, uniforms.current.uAtlasLod1_1, uniforms.current.uAtlasLod1_2, uniforms.current.uAtlasLod1_3];
+      lod1.urls.forEach((url, i) => {
+        if (i < 4) {
+          loadTex(url).then(tex => {
+            targets[i].value = tex;
+            uniforms.current.uLodEnabled.value = 1.0;
+            uniforms.current.uLod1Cols.value = lod1.cols;
+            uniforms.current.uLod1TilesPerAtlas.value = lod1.tilesPerAtlas;
+            console.log(`[Atlas] LOD 1 page ${i} loaded`);
+          });
+        }
+      });
+    }
+  }, [atlasId, atlasFormat]);
 
   // Geometry with Arcturian attributes
   const geometry = useMemo(() => {
@@ -195,9 +252,13 @@ function ArcturianScene({
         aTarget2.setXYZW(i, morph.trapezoidZ, morph.sizeY, oldTrapZ, oldSizeY);
       }
 
-      // Atlas UV (from static atlas)
-      const uv = atlas.getUV(i);
-      aUVOffset.setXYZW(i, uv.u, uv.v, uv.su, uv.sv);
+      // Atlas UV — LOD 0 grid (64×64 = 4096 tiles, single atlas)
+      const lod0Cols = 64;
+      const col = i % lod0Cols;
+      const row = Math.floor(i / lod0Cols);
+      const su = 1 / lod0Cols;
+      const sv = 1 / lod0Cols;
+      aUVOffset.setXYZW(i, col * su, 1 - (row + 1) * sv, su, sv);
 
       if (!animate) {
         // Init old = current (no transition on first load)
@@ -226,20 +287,13 @@ function ArcturianScene({
 
     if (meshRef.current) meshRef.current.count = count;
     if (animate) uniforms.current.uLayoutMix.value = 0;
-  }, [geometry, atlas]);
+  }, [geometry]);
 
   // Update tile color
   useEffect(function updateTileColor() {
     uniforms.current.uColor1.value.set(tileColor);
     uniforms.current.uColor2.value.set(tileColor);
   }, [tileColor]);
-
-  // Set atlas texture when loaded
-  useEffect(function setAtlasTexture() {
-    if (!atlasReady || atlas.textures.length === 0) return;
-    uniforms.current.uAtlasTexture.value = atlas.textures[0];
-    console.log(`[Atlas] Texture set (page 0, ${atlas.tier}px)`);
-  }, [atlasReady, atlas]);
 
   // Generate + apply layout when shape/params change
   const isFirstRender = useRef(true);
@@ -282,13 +336,15 @@ function ArcturianScene({
           onBeforeCompile={onBeforeCompile}
           roughness={0.6}
           metalness={0.1}
-          alphaTest={0.5}
+          transparent
+          alphaTest={0.01}
         />
       </instancedMesh>
 
       <CameraLight intensity={2.5} />
       <SmoothZoomControls flyTargetRef={flyTargetRef} />
       <ClickPicker meshRef={meshRef} flyTargetRef={flyTargetRef} particleCount={products.length} />
+      <LodManager meshRef={meshRef} activeAtlasId={atlasId} particleCount={products.length} uniforms={uniforms.current} />
     </>
   );
 }

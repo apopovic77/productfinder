@@ -27,5 +27,6 @@
       "@arcturian": ["./libs/arcturian/src/engine/index.ts"]
     }
   },
-  "include": ["src", "libs/arcturian/src/engine"]
+  "include": ["src", "libs/arcturian/src/engine"],
+  "exclude": ["libs/arcturian/src/stores", "libs/arcturian/src/pages"]
 }

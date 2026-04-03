@@ -57,6 +57,8 @@ export class ProductFinderController {
   private historyPopStateHandler: ((e: PopStateEvent) => void) | null = null;
   private ignoreNextHistoryPush = false;
 
+  skipCanvasRenderer = false;
+
   async initialize(canvas: HTMLCanvasElement): Promise<void> {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
@@ -75,7 +77,10 @@ export class ProductFinderController {
     this.skeletonRenderer = new SkeletonRenderer(this.ctx);
     this.startSkeletonAnimation();
 
-    // Initialize main renderer
+    // Initialize main renderer (skip if using Arcturian)
+    if (this.skipCanvasRenderer) {
+      this.renderer = null;
+    } else {
     this.renderer = new CanvasRenderer<Product>(
       this.ctx,
       () => this.layoutService.getEngine().all(),
@@ -84,6 +89,7 @@ export class ProductFinderController {
       () => this.layoutService.getGroupHeaders(),
       () => this.layoutService.getPivotDimension()
     );
+    }
 
     // Setup favorites listener
     this.favoritesService.addListener(() => this.onDataChanged());
@@ -745,6 +751,11 @@ export class ProductFinderController {
    */
   getRenderer() {
     return this.renderer;
+  }
+
+  handleGroupHeaderClick_byLabel(label: string): void {
+    this.layoutService.drillDownPivot(label);
+    this.onPivotChanged();
   }
 
   getLayoutEngine() {
