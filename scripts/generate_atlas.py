@@ -67,8 +67,8 @@ def load_image(storage_id, size, quality):
     return None
 
 
-def generate_tier(products, tile_size, output_dir):
-    """Generate atlas pages for a specific tier."""
+def generate_tier(products, tile_size, output_dir, fmt='png'):
+    """Generate atlas pages for a specific tier. fmt: 'png' (alpha) or 'jpg' (white bg)."""
     tier_config = TIERS[tile_size]
     cols = tier_config['cols']
     rows = tier_config['rows']
@@ -92,7 +92,10 @@ def generate_tier(products, tile_size, output_dir):
         page_products = products[start:end]
 
         # Create atlas canvas
-        atlas = Image.new('RGBA', (cols * tile_size, rows * tile_size), (26, 26, 46, 255))
+        if fmt == 'jpg':
+            atlas = Image.new('RGB', (cols * tile_size, rows * tile_size), (255, 255, 255))
+        else:
+            atlas = Image.new('RGBA', (cols * tile_size, rows * tile_size), (0, 0, 0, 0))
 
         loaded_count = 0
         for i, product in enumerate(page_products):
@@ -103,9 +106,24 @@ def generate_tier(products, tile_size, output_dir):
 
             img = load_image(product['storage_id'], tile_size, quality)
             if img:
-                # Resize to exact tile size (cover mode)
-                img = img.resize((tile_size, tile_size), Image.LANCZOS)
-                atlas.paste(img, (x, y), img)  # Use alpha mask
+                # Contain mode: maintain aspect ratio, center in tile
+                src_w, src_h = img.size
+                scale = min(tile_size / src_w, tile_size / src_h)
+                new_w = int(src_w * scale)
+                new_h = int(src_h * scale)
+                img = img.resize((new_w, new_h), Image.LANCZOS)
+                offset_x = (tile_size - new_w) // 2
+                offset_y = (tile_size - new_h) // 2
+                if fmt == 'jpg':
+                    # Composite onto white background (no alpha in JPG)
+                    if img.mode == 'RGBA':
+                        white_tile = Image.new('RGB', (new_w, new_h), (255, 255, 255))
+                        white_tile.paste(img, mask=img.split()[3])
+                        atlas.paste(white_tile, (x + offset_x, y + offset_y))
+                    else:
+                        atlas.paste(img.convert('RGB'), (x + offset_x, y + offset_y))
+                else:
+                    atlas.paste(img, (x + offset_x, y + offset_y), img)
                 loaded_count += 1
 
             # Manifest entry
@@ -126,9 +144,13 @@ def generate_tier(products, tile_size, output_dir):
             if (i + 1) % 100 == 0:
                 print(f"  Page {page_idx}: {i+1}/{len(page_products)} tiles ({loaded_count} loaded)")
 
-        # Save atlas page as PNG
-        atlas_path = tier_dir / f"atlas_{page_idx}.png"
-        atlas.save(str(atlas_path), 'PNG', optimize=True)
+        # Save atlas page
+        if fmt == 'jpg':
+            atlas_path = tier_dir / f"atlas_{page_idx}.jpg"
+            atlas.save(str(atlas_path), 'JPEG', quality=90, optimize=True)
+        else:
+            atlas_path = tier_dir / f"atlas_{page_idx}.png"
+            atlas.save(str(atlas_path), 'PNG', optimize=True)
         file_size = atlas_path.stat().st_size / (1024 * 1024)
         total_loaded += loaded_count
 
@@ -143,6 +165,7 @@ def main():
     parser.add_argument('--tier', type=int, choices=[64, 128, 256], help='Generate only one tier')
     parser.add_argument('--output', type=str, default='atlas/', help='Output directory')
     parser.add_argument('--limit', type=int, default=0, help='Limit number of products (0=all)')
+    parser.add_argument('--format', type=str, choices=['png', 'jpg'], default='png', help='Output format (png=alpha, jpg=white bg)')
     args = parser.parse_args()
 
     output_dir = Path(args.output)
@@ -159,7 +182,7 @@ def main():
     all_manifest = {}
 
     for tier in tiers_to_generate:
-        entries = generate_tier(products, tier, output_dir)
+        entries = generate_tier(products, tier, output_dir, fmt=args.format)
         # Merge into manifest
         for pid, data in entries.items():
             if pid not in all_manifest:
