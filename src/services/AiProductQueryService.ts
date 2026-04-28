@@ -1,35 +1,36 @@
-const ONEAL_API_BASE = import.meta.env.VITE_ONEAL_API_BASE || '/oneal-api/v1';
-const ONEAL_API_KEY = import.meta.env.VITE_ONEAL_API_KEY || 'oneal_demo_token';
+import { AgentDispatchService } from './AgentDispatchService';
+
+const PRODUCT_SEARCH_AGENT =
+  import.meta.env.VITE_PRODUCT_SEARCH_AGENT || 'OnealProductSearch';
 
 export type AiQueryResult = {
   productIds: string[];
   rawText: string;
 };
 
+type AgentResponse = {
+  ids: number[];
+  explanation?: string;
+};
+
 export class AiProductQueryService {
   static async queryProducts(userPrompt: string): Promise<AiQueryResult> {
-    const response = await fetch(`${ONEAL_API_BASE}/products/ai/search`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-Key': ONEAL_API_KEY,
-      },
-      body: JSON.stringify({ query: userPrompt }),
-    });
+    const data = await AgentDispatchService.query<AgentResponse>(
+      PRODUCT_SEARCH_AGENT,
+      userPrompt,
+    );
 
-    if (!response.ok) {
-      const detail = await response.text().catch(() => '');
-      throw new Error(`AI-Suche fehlgeschlagen (${response.status}): ${detail || response.statusText}`);
+    if (!Array.isArray(data.ids)) {
+      throw new Error(data.explanation || 'AI-Suche lieferte ein ungültiges Ergebnis.');
     }
 
-    const data = await response.json();
-    const productIds = (data.product_ids || []).map((id: number) => String(id));
-    const explanation = data.explanation || '';
-
-    if (!productIds.length) {
-      throw new Error(explanation || 'Keine passenden Produkte gefunden. Bitte Suche präzisieren.');
+    if (!data.ids.length) {
+      throw new Error(data.explanation || 'Keine passenden Produkte gefunden.');
     }
 
-    return { productIds, rawText: explanation };
+    return {
+      productIds: data.ids.map((id) => String(id)),
+      rawText: data.explanation || '',
+    };
   }
 }
