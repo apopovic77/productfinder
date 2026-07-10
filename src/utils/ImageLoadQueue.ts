@@ -30,6 +30,17 @@ import { imageCache } from './IndexedDBImageCache';
  * ```
  */
 
+/**
+ * Error for HTTP statuses that will never succeed on retry (404/410).
+ * Carries the status so queue logic can skip fallback + retries.
+ */
+export class PermanentImageError extends Error {
+  constructor(url: string, public readonly status: number) {
+    super(`Image permanently unavailable (HTTP ${status}): ${url}`);
+    this.name = 'PermanentImageError';
+  }
+}
+
 export type LoadMode = 'parallel' | 'sequential';
 
 export interface ImageLoadRequest<T = any> {
@@ -78,6 +89,7 @@ export class ImageLoadQueue<T = any> {
   private config: Required<Omit<ImageLoadQueueConfig, 'shouldLoad'>> & { shouldLoad?: <T>(request: ImageLoadRequest<T>) => boolean };
   private queue: QueuedRequest<T>[] = [];
   private activeRequests = new Map<string, QueuedRequest<T>>();
+  private deadUrls = new Set<string>();
   private paused = false;
 
   // Event callbacks
@@ -373,8 +385,9 @@ export class ImageLoadQueue<T = any> {
       this.processQueue();
 
     } catch (error) {
-      // Retry logic
-      if (queued.retries < this.config.retryCount) {
+      // Retry logic — pointless for permanent (404/410) failures
+      const isPermanent = error instanceof PermanentImageError;
+      if (!isPermanent && queued.retries < this.config.retryCount) {
         queued.retries++;
         this.activeRequests.delete(request.id);
 
@@ -420,6 +433,11 @@ export class ImageLoadQueue<T = any> {
    * CORS is now enabled on share.arkturian.com/proxy.php
    */
   private async loadImage(url: string, timeout: number): Promise<HTMLImageElement> {
+    // Known-dead URL (404/410 seen this session) — reject without network
+    if (this.deadUrls.has(url)) {
+      throw new PermanentImageError(url, 404);
+    }
+
     // Step 1: Try IndexedDB cache first
     try {
       const cachedBlob = await imageCache.get(url);
@@ -437,6 +455,12 @@ export class ImageLoadQueue<T = any> {
     try {
       return await this.loadImageWithFetch(url, timeout);
     } catch (error) {
+      if (error instanceof PermanentImageError) {
+        // 404/410: the resource does not exist — an <img> fallback or retry
+        // would just repeat the same request (issue #262)
+        this.deadUrls.add(url);
+        throw error;
+      }
       // Fetch failed (CORS or network error) - fall back to <img> tag
       console.warn('[ImageLoadQueue] Fetch failed, using <img> fallback:', error);
       return this.loadImageWithImgTag(url, timeout);
@@ -465,6 +489,9 @@ export class ImageLoadQueue<T = any> {
       fetch(url, { mode: 'cors' })
         .then(response => {
           if (!response.ok) {
+            if (response.status === 404 || response.status === 410) {
+              throw new PermanentImageError(url, response.status);
+            }
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
           return response.blob();
@@ -489,8 +516,11 @@ export class ImageLoadQueue<T = any> {
         .catch(error => {
           if (fetchAborted) return;
           cleanup();
-          // Mark CORS errors specially
-          if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+          // Permanent errors pass through untouched so callers can detect them
+          if (error instanceof PermanentImageError) {
+            reject(error);
+          } else if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+            // Mark CORS errors specially
             reject(new Error(`CORS error: ${url}`));
           } else {
             reject(new Error(`Failed to load image: ${url} - ${error.message}`));
