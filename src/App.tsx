@@ -868,13 +868,16 @@ export default class App extends React.Component<{}, State> {
       this.fpsFrameCount += 1;
       if (now - this.fpsLastSample >= 500) {
         const elapsed = now - this.fpsLastSample;
-        const fps = (this.fpsFrameCount * 1000) / elapsed;
+        const fps = Math.round((this.fpsFrameCount * 1000) / elapsed);
         const zoom = this.controller.getZoom();
 
-        // Only update zoom if it changed significantly (avoid dialog flicker from floating point changes)
-        if (Math.abs(zoom - this.state.zoom) > 0.01) {
+        // Only setState when something actually changed — the unconditional
+        // 500ms setState re-rendered the whole app shell forever (issue #256).
+        const zoomChanged = Math.abs(zoom - this.state.zoom) > 0.01;
+        const fpsChanged = fps !== this.state.fps;
+        if (zoomChanged) {
           this.setState({ fps, zoom });
-        } else {
+        } else if (fpsChanged) {
           this.setState({ fps });
         }
 
