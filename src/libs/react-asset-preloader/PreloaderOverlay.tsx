@@ -2,9 +2,10 @@ import type { CSSProperties, ReactNode, FC } from 'react';
 import { useRef, useEffect } from 'react';
 import { usePreloader } from './PreloaderContext';
 import type { PreloaderConfig } from './types';
+import { STORAGE_API_BASE } from '../../config/apiConfig';
 
 // Storage API URL from environment
-const STORAGE_API_URL = import.meta.env.VITE_STORAGE_API_URL || 'https://gsgbot.arkturian.com/storage-api';
+const STORAGE_API_URL = STORAGE_API_BASE;
 
 interface PreloaderOverlayProps {
   config?: PreloaderConfig;

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { STORAGE_API_BASE as CENTRAL_STORAGE_BASE } from '../config/apiConfig';
+import { STORAGE_API_BASE as CENTRAL_STORAGE_BASE, STORAGE_API_KEY } from '../config/apiConfig';
 
 type Annotation = {
   label: string;
@@ -20,7 +20,7 @@ type AnnotationsResponse = {
 
 const STORAGE_API_BASE = CENTRAL_STORAGE_BASE;
 // Fallback to well-known demo key if env not provided
-const DEFAULT_API_KEY = import.meta.env.VITE_STORAGE_API_KEY || 'oneal_demo_token';
+const DEFAULT_API_KEY = STORAGE_API_KEY;
 
 export default function AnnotationTester(): React.JSX.Element {
   const [objectId, setObjectId] = useState<string>('');
