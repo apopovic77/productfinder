@@ -1,4 +1,4 @@
-import type { Product } from '../types/Product';
+import type { Product, ProductVariant } from '../types/Product';
 
 /**
  * Get all images (hero + gallery) for a specific variant.
@@ -109,4 +109,49 @@ export function getUniqueColorVariants(product: Product): any[] {
   }
 
   return Array.from(colorMap.values());
+}
+
+
+/**
+ * Base color of a variant — the plain color value ("black", "red/blue").
+ * Semantics of the standard (V2) overlay dialog.
+ * Order: v2 `color` field → legacy Shopify option2/option1 → name parse.
+ */
+export function getVariantBaseColor(variant: ProductVariant | any): string {
+  if (variant.color) return String(variant.color);
+  if (variant.option2) return String(variant.option2);
+  if (variant.option1) return String(variant.option1);
+  const parts = (variant.name || variant.description_short || '').split(' / ').map((s: string) => s.trim());
+  return parts[0] || variant.sku || 'Default';
+}
+
+/**
+ * Design/graphic name of a variant ("PRODIGY black", "RACE Carbon").
+ * Semantics of the hero (V4) dialog — deliberately different from
+ * getVariantBaseColor: description_short distinguishes design variants
+ * that share the same base color.
+ */
+export function getVariantDesignName(variant: ProductVariant | any): string {
+  if (variant.description_short) return String(variant.description_short);
+  if (variant.color) return String(variant.color);
+  if (variant.option2) return String(variant.option2);
+  if (variant.option1) return String(variant.option1);
+  const parts = (variant.name || '').split(' / ').map((s: string) => s.trim());
+  return parts[0] || variant.sku || 'Default';
+}
+
+/**
+ * Size of a variant. Shared by V2 and V4 dialogs.
+ * Order: v2 `size` field → legacy option heuristics → name parse.
+ */
+export function getVariantSize(variant: ProductVariant | any): string {
+  if (variant.size) return String(variant.size);
+  if (variant.option1 && !variant.option2) return String(variant.option1);
+  if (variant.option1 && variant.option2) {
+    const opt1 = String(variant.option1);
+    if (/^\d+$/.test(opt1) || opt1.length <= 3) return opt1;
+    return '';
+  }
+  const parts = (variant.name || '').split(' / ').map((s: string) => s.trim());
+  return parts[1] || '';
 }

@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Product } from '../types/Product';
 import { useImageQueue } from '../hooks/useImageQueue';
 import { fetchProductById } from '../data/ProductRepository';
 import './ProductOverlayModal.css';
 import { STORAGE_API_BASE } from '../config/apiConfig';
+import { getVariantDesignName, getVariantSize } from '../utils/variantImageHelpers';
 
 // Storage API base URL from environment
 const STORAGE_API_URL = STORAGE_API_BASE;
@@ -101,7 +102,7 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
   // Extract variants from the active product
   const variants = (activeProduct as any).variants || [];
   const rawProduct = (activeProduct as any).raw || {};
-  const derivedTaxonomy = (product as any).derived_taxonomy || rawProduct?.derived_taxonomy;
+  const derivedTaxonomy = product.derived_taxonomy || (rawProduct as any)?.derived_taxonomy;
   const metaInfo = (product.meta && Object.keys(product.meta).length ? product.meta : rawProduct?.meta) || {};
   const taxonomyPath = Array.isArray(derivedTaxonomy?.path) ? derivedTaxonomy.path : [];
   const taxonomySport = derivedTaxonomy?.sport;
@@ -146,35 +147,10 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
 
   // Helper functions to parse variant attributes
   // V2 API has direct color/size fields, fallback to option1/option2 for legacy
-  const getColor = useCallback((variant: any): string => {
-    // V2 API: description_short contains the actual color/graphic variant name
-    // e.g., "PRODIGY black", "RACE Carbon" - this distinguishes variants
-    if (variant.description_short) return String(variant.description_short);
-    // V2 API: direct color field (fallback, often just base color like "black")
-    if (variant.color) return String(variant.color);
-    // Legacy Shopify-style
-    if (variant.option2) return String(variant.option2);
-    if (variant.option1) return String(variant.option1);
-    const parts = (variant.name || '').split(' / ').map((s: string) => s.trim());
-    return parts[0] || variant.sku || 'Default';
-  }, []);
+  // Design-name semantics (description_short first) — centralized helper
+  const getColor = getVariantDesignName;
 
-  const getSize = useCallback((variant: any): string => {
-    // V2 API: direct size field
-    if (variant.size) return String(variant.size);
-    // Legacy Shopify-style
-    if (variant.option1 && !variant.option2) return String(variant.option1);
-    if (variant.option1 && variant.option2) {
-      const opt1 = String(variant.option1);
-      const opt2 = String(variant.option2);
-      if (/^\d+$/.test(opt1) || opt1.length <= 3) {
-        return opt1;
-      }
-      return '';
-    }
-    const parts = (variant.name || '').split(' / ').map((s: string) => s.trim());
-    return parts[1] || '';
-  }, []);
+  const getSize = getVariantSize;
 
   // Extract unique colors from all variants
   const allColors = useMemo(() =>
@@ -218,7 +194,7 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
   ) || variants[0];
 
   // Extract data
-  const keyFeatures = (product as any).key_features || [];
+  const keyFeatures = product.key_features || [];
   const specs = product.specifications || {};
   const material = specs.shell_material || specs.materials || '100% Polyester';
 

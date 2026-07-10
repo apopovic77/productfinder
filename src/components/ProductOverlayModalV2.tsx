@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Product } from '../types/Product';
 import { useImageQueue } from '../hooks/useImageQueue';
 import { fetchProductById } from '../data/ProductRepository';
 import './ProductOverlayModal.css';
 import { STORAGE_API_BASE } from '../config/apiConfig';
+import { getVariantBaseColor, getVariantSize } from '../utils/variantImageHelpers';
 
 // Storage API URL from environment
 const STORAGE_API_URL = STORAGE_API_BASE;
@@ -72,7 +73,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   // Extract variants from active product
   const variants = (activeProduct as any).variants || [];
   const rawProduct = (product as any).raw || {};
-  const derivedTaxonomy = (product as any).derived_taxonomy || rawProduct?.derived_taxonomy;
+  const derivedTaxonomy = product.derived_taxonomy || (rawProduct as any)?.derived_taxonomy;
   const metaInfo = (product.meta && Object.keys(product.meta).length ? product.meta : rawProduct?.meta) || {};
   const taxonomyPath = Array.isArray(derivedTaxonomy?.path) ? derivedTaxonomy.path : [];
   const taxonomySport = derivedTaxonomy?.sport;
@@ -95,32 +96,10 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     }
   }, [dragPosition.x, dragPosition.y, onPositionChange]);
 
-  // Helper functions to extract variant color/size - supports V2 API (color/size fields) and V1 (option1/option2)
-  const getColor = useCallback((variant: any): string => {
-    // V2 API: direct color field
-    if (variant.color) return String(variant.color);
-    // V1 API: option2 or option1
-    if (variant.option2) return String(variant.option2);
-    if (variant.option1) return String(variant.option1);
-    // Fallback to parsing name
-    const parts = (variant.name || variant.description_short || '').split(' / ').map((s: string) => s.trim());
-    return parts[0] || variant.sku || 'Default';
-  }, []);
-
-  const getSize = useCallback((variant: any): string => {
-    // V2 API: direct size field
-    if (variant.size) return String(variant.size);
-    // V1 API: option1/option2 logic
-    if (variant.option1 && !variant.option2) return String(variant.option1);
-    if (variant.option1 && variant.option2) {
-      const opt1 = String(variant.option1);
-      if (/^\d+$/.test(opt1) || opt1.length <= 3) return opt1;
-      return '';
-    }
-    // Fallback to parsing name
-    const parts = (variant.name || '').split(' / ').map((s: string) => s.trim());
-    return parts[1] || '';
-  }, []);
+  // Variant color/size extraction — centralized in variantImageHelpers
+  // (module functions are referentially stable, safe in dep arrays)
+  const getColor = getVariantBaseColor;
+  const getSize = getVariantSize;
 
   // Extract unique colors from all variants - memoized to prevent array recreation
   const allColors = useMemo(() =>
@@ -173,7 +152,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   ) || variants[0];
 
   // Extract data
-  const keyFeatures = (product as any).key_features || [];
+  const keyFeatures = product.key_features || [];
   const specs = product.specifications || {};
   // Material from variant data or specs
   const material = activeVariant?.material || specs.shell_material || specs.materials || null;

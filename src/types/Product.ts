@@ -58,17 +58,50 @@ export type ProductAIAnalysis = {
   collections?: string[];
 };
 
+/** Image entry on a v2 variant (subset of the API's product_images row). */
+export type VariantImage = {
+  id?: number;
+  image_path?: string;
+  role?: string;
+  sort_order?: number;
+  storage?: { id?: number; media_url?: string; thumbnail_url?: string | null } | null;
+  ai_alt_text?: string | null;
+};
+
 export type ProductVariant = {
+  /** v1 fields */
   name: string;
   sku?: string;
   gtin13?: string;
-  price?: number;
   currency?: string;
   availability?: string;
   url?: string;
   image_storage_id?: number;
   option1?: string;
   option2?: string;
+  /** price: number (v1) or {gross, net, currency} object (v2) */
+  price?: number | { gross?: number | null; net?: number | null; currency?: string; vat_rate?: number };
+  /** v2 API fields (oneal-api-v2 variant shape) */
+  color?: string;
+  size?: string;
+  description_short?: string;
+  storage?: { id?: number; media_url?: string; thumbnail_url?: string | null } | null;
+  images?: VariantImage[];
+  is_available?: boolean;
+  ean?: string;
+  weight_grams?: number | null;
+  material?: string | null;
+  customs_tariff?: string | null;
+  model_year?: number | null;
+  stock_available?: number | null;
+  is_nos?: boolean;
+};
+
+/** Taxonomy info derived by the pivot profile / API. */
+export type DerivedTaxonomy = {
+  sport?: string | null;
+  product_family?: string | null;
+  path?: string[];
 };
 
 export type TrimScale = {
@@ -95,6 +128,8 @@ export type ProductData = {
   aiAnalysis?: ProductAIAnalysis;
   variants?: ProductVariant[];
   raw?: Record<string, unknown>;
+  derived_taxonomy?: DerivedTaxonomy;
+  key_features?: string[];
   trimScale?: TrimScale;
 };
 
@@ -126,6 +161,8 @@ export class Product {
   public readonly aiAnalysis?: ProductAIAnalysis;
   public readonly variants?: ProductVariant[];
   public readonly raw: Record<string, unknown>;
+  public readonly derived_taxonomy?: DerivedTaxonomy;
+  public readonly key_features?: string[];
   private readonly attributeKeys: string[];
 
   private _image: HTMLImageElement | null = null;
@@ -172,6 +209,8 @@ export class Product {
     this.aiAnalysis = data.aiAnalysis;
     this.variants = data.variants ?? [];
     this.raw = data.raw ?? {};
+    this.derived_taxonomy = data.derived_taxonomy;
+    this.key_features = data.key_features;
     this.trimScale = data.trimScale;
   }
 
