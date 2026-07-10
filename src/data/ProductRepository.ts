@@ -181,7 +181,13 @@ function formatCategoryPath(categoryId: string): string {
   return categoryId.split('/').pop()?.replace(/^cat:/, '') || categoryId;
 }
 
-function mapProduct(p: OnealProduct): Product | null {
+// SDK 1.1.0's ProductDetail dropped legacy fields (media, sku, season,
+// specifications, meta, price object) that older API payloads may still
+// carry and that this mapper supports for both shapes. The intersection
+// keeps current fields typed while allowing legacy access.
+type ApiProduct = OnealProduct & Record<string, any>;
+
+function mapProduct(p: ApiProduct): Product | null {
   const attributes: Record<string, ProductAttribute> = {};
   const variants = Array.isArray((p as any)?.variants) ? (p as any).variants : [];
   const apiAny = p as any;
@@ -306,7 +312,7 @@ function mapProduct(p: OnealProduct): Product | null {
     : undefined);
 
   // Season - handle v2 API format
-  const seasonValue = apiAny.season ?? p.season ?? null;
+  const seasonValue = apiAny.season ?? (p as any).season ?? null;
   addAttribute(attributes, typeof seasonValue === 'number'
     ? {
         key: 'season',
@@ -318,7 +324,7 @@ function mapProduct(p: OnealProduct): Product | null {
     : undefined);
 
   // Price - handle v2 API format (price_from number)
-  const priceValue = apiAny.price_from ?? (p.price?.value) ?? null;
+  const priceValue = apiAny.price_from ?? ((p as any).price?.value) ?? null;
   addAttribute(attributes, typeof priceValue === 'number'
     ? {
         key: 'price',
@@ -332,14 +338,14 @@ function mapProduct(p: OnealProduct): Product | null {
     : undefined);
 
   // Weight from specifications
-  addAttribute(attributes, p.specifications?.weight !== undefined
+  addAttribute(attributes, (p as any).specifications?.weight !== undefined
     ? {
         key: 'weight',
         label: 'Gewicht',
         type: 'number',
-        value: p.specifications!.weight ?? null,
+        value: (p as any).specifications.weight ?? null,
         unit: 'g',
-        normalizedValue: p.specifications!.weight ?? undefined,
+        normalizedValue: (p as any).specifications.weight ?? undefined,
         sourcePath: 'specifications.weight',
       }
     : undefined);
@@ -481,8 +487,8 @@ function mapProduct(p: OnealProduct): Product | null {
   const posterGroup = derivePosterGroup({
     presentationCategory,
     productFamily: productLine ?? productType ?? undefined,
-    productName: p.name,
-    meta: p.meta as Record<string, unknown>,
+    productName: p.name ?? '',
+    meta: (p as any).meta as Record<string, unknown>,
     aiTags,
   });
 
@@ -583,9 +589,9 @@ function mapProduct(p: OnealProduct): Product | null {
   const filteredMedia = mediaArray.filter(isRealMedia);
 
   const data: ProductData = {
-    id: p.id,
+    id: String(p.id),
     sku: p.sku,
-    name: p.name,
+    name: p.name ?? '',
     brand: p.brand,
     category: categories,
     season: p.season,
@@ -601,7 +607,7 @@ function mapProduct(p: OnealProduct): Product | null {
       }
       return null;
     })(),
-    media: filteredMedia.map(item => {
+    media: filteredMedia.map((item: any) => {
       const anyItem = item as any;
       // Support both v1 format (storage_id) and v2 format (storage.id)
       const storageId = typeof anyItem?.storage_id === 'number'
@@ -617,10 +623,10 @@ function mapProduct(p: OnealProduct): Product | null {
         storage_id: storageId,
       };
     }),
-    specifications: p.specifications,
-    meta: p.meta as any,
-    description: (p.meta as any)?.description,
-    displayName: p.name,
+    specifications: (p as any).specifications,
+    meta: (p as any).meta,
+    description: (p as any).meta?.description,
+    displayName: p.name ?? undefined,
     attributes,
     aiTags,
     aiAnalysis,
