@@ -1,108 +1,105 @@
-import { useEffect, useRef } from 'react';
-import { usePreloader } from '../libs/react-asset-preloader';
+import { useEffect, useRef, useState } from 'react';
 import { fetchProducts } from '../data/ProductRepository';
 import { buildMediaUrl } from '../utils/MediaUrlBuilder';
-import { getImagesForVariant, getPrimaryVariant } from '../utils/variantImageHelpers';
+import { imageCache } from '../utils/IndexedDBImageCache';
 
 /**
- * Hook to preload all product images on app startup
+ * Preloads all product thumbnails directly into IndexedDB cache.
  *
- * Registers all product images with the preloader and starts loading
- * when the app mounts.
+ * When the CanvasRenderer later requests images via ImageLoadQueue,
+ * they're instant cache HITs — no network wait, no placeholders.
  */
 export function useProductPreloader() {
-  const { registerAssets, startLoading, state } = usePreloader();
   const hasStarted = useRef(false);
+  const [state, setState] = useState({
+    isLoading: true,
+    progress: 0,
+    loaded: 0,
+    total: 0,
+  });
 
   useEffect(() => {
     if (hasStarted.current) return;
     hasStarted.current = true;
 
-    const loadProductImages = async () => {
+    async function preloadToIndexedDB() {
       try {
-        console.log('[Preloader] 🚀 Starting product image preload...');
         const startTime = performance.now();
+        const products = await fetchProducts({ limit: 10000 }); // API max; catalog has 6310+ products (issue #250)
 
-        // Fetch all products
-        console.log('[Preloader] 📦 Fetching products from API...');
-        const products = await fetchProducts({ limit: 5000 });
-        const fetchTime = performance.now() - startTime;
-        console.log(`[Preloader] ✅ Fetched ${products.length} products in ${fetchTime.toFixed(0)}ms`);
-
-        // Build asset list
-        const assets = [];
-        let productsWithImages = 0;
-        let productsWithoutImages = 0;
-
-        console.log('[Preloader] 🔍 Analyzing product images...');
+        // Build URL list
+        const urls: string[] = [];
         for (const product of products) {
-          // Get primary variant for the product
-          const primaryVariant = getPrimaryVariant(product);
-          if (!primaryVariant) {
-            productsWithoutImages++;
-            continue;
-          }
-
-          // Get all images for the variant
-          const images = getImagesForVariant(product, primaryVariant);
-
-          if (images.length === 0) {
-            productsWithoutImages++;
-            continue;
-          }
-
-          productsWithImages++;
-
-          // ONLY load the FIRST/HERO image (not all gallery images)
-          const heroImage = images.find(img => img.role === 'hero') || images[0];
-
-          if (!heroImage || !heroImage.storageId) {
-            productsWithoutImages++;
-            continue;
-          }
-
-          // Build THUMBNAIL URL (130px @ 85% quality - fast loading!)
-          const url = buildMediaUrl({
-            storageId: heroImage.storageId,
-            width: 130,
-            quality: 85,
-            trim: true,
-          });
-
-          console.log(`[Preloader]   📸 ${product.name} (${product.id}): ${heroImage.role} image, storageId: ${heroImage.storageId}`);
-
-          assets.push({
-            id: `${product.id}-${heroImage.storageId}`,
-            type: 'image' as const,
-            src: url,
-            priority: 1,
-            metadata: {
-              productId: product.id,
-              storageId: heroImage.storageId,
-            },
-          });
+          const storageId = product.primaryImage?.storage_id;
+          if (!storageId) continue;
+          urls.push(buildMediaUrl({ storageId, width: 130, quality: 75, trim: true }));
         }
 
-        console.log(`[Preloader] 📊 Summary: ${productsWithImages} products with images, ${productsWithoutImages} without images`);
-        console.log(`[Preloader] 🎯 Registering ${assets.length} total images for preloading`);
+        const total = urls.length;
+        setState(s => ({ ...s, total }));
 
-        // Register all assets
-        registerAssets(assets);
+        // Check which are already cached — parallel in chunks so the UI counter
+        // updates while we work, instead of staying at 0/N until everything's done.
+        let alreadyCached = 0;
+        const toFetch: string[] = [];
+        const CHECK_CHUNK = 64;
 
-        console.log('[Preloader] ⏳ Starting image download...');
-        // Start preloading
-        await startLoading();
+        for (let i = 0; i < urls.length; i += CHECK_CHUNK) {
+          const chunk = urls.slice(i, i + CHECK_CHUNK);
+          const results = await Promise.all(chunk.map((url) => imageCache.get(url)));
+          for (let j = 0; j < chunk.length; j++) {
+            if (results[j]) alreadyCached++;
+            else toFetch.push(chunk[j]);
+          }
+          // progress reflects ready-images / total — same scale all the way
+          // through, so the bar grows monotonically across both phases.
+          setState({ isLoading: true, loaded: alreadyCached, total, progress: Math.round((alreadyCached / total) * 100) });
+        }
 
-        const totalTime = performance.now() - startTime;
-        console.log(`[Preloader] ✨ Complete! Total time: ${totalTime.toFixed(0)}ms (${(totalTime / 1000).toFixed(1)}s)`);
+        console.log(`[Preloader] ${alreadyCached}/${total} cached, ${toFetch.length} to fetch`);
+
+        if (toFetch.length === 0) {
+          setState({ isLoading: false, progress: 100, loaded: total, total });
+          return;
+        }
+
+        // Fetch in parallel batches
+        const BATCH_SIZE = 12;
+        let fetched = 0;
+
+        for (let i = 0; i < toFetch.length; i += BATCH_SIZE) {
+          const batch = toFetch.slice(i, i + BATCH_SIZE);
+
+          await Promise.allSettled(
+            batch.map(async (url) => {
+              try {
+                const res = await fetch(url, { mode: 'cors' });
+                if (!res.ok) return;
+                const blob = await res.blob();
+                if (blob.size > 0) {
+                  await imageCache.set(url, blob);
+                  fetched++;
+                }
+              } catch { /* skip */ }
+            })
+          );
+
+          const done = alreadyCached + fetched;
+          setState({ isLoading: true, loaded: done, total, progress: Math.round((done / total) * 100) });
+        }
+
+        const elapsed = performance.now() - startTime;
+        console.log(`[Preloader] Done: ${fetched} fetched, ${alreadyCached} cached, ${elapsed.toFixed(0)}ms`);
+        setState({ isLoading: false, progress: 100, loaded: total, total });
 
       } catch (error) {
-        console.error('[Preloader] ❌ Failed to load products:', error);
+        console.error('[Preloader] Failed:', error);
+        setState(s => ({ ...s, isLoading: false, progress: 100 }));
       }
-    };
+    }
 
-    loadProductImages();
-  }, [registerAssets, startLoading]);
+    preloadToIndexedDB();
+  }, []);
 
   return state;
 }

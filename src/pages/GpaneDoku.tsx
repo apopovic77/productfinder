@@ -45,7 +45,7 @@ export default function GpaneDoku() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchProducts({ limit: 5000 })
+    fetchProducts({ limit: 10000 })
       .then(p => { setProducts(p); setLoading(false); })
       .catch(err => { setError(String(err)); setLoading(false); });
   }, []);

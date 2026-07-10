@@ -368,7 +368,7 @@ export function ProductFinderV3() {
   useEffect(function fetchProducts() {
     (async function fetchProductsAsync() {
       try {
-        const res = await fetch(`${ONEAL_API}/products?limit=2000`, {
+        const res = await fetch(`${ONEAL_API}/products?limit=10000`, {
           headers: { 'X-API-Key': API_KEY },
         });
         const data = await res.json();

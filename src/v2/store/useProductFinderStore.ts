@@ -75,7 +75,7 @@ export const useProductFinderStore = create<ProductFinderState>((set, get) => {
       set({ loading: true, error: null });
       try {
         const { fetchProducts } = await import('../../data/ProductRepository');
-        const products = await fetchProducts({ limit: 2000 });
+        const products = await fetchProducts({ limit: 10000 }); // API max; catalog has 6310+ products (issue #250)
 
         service.init(products);
         const { viewWidth, viewHeight } = get();

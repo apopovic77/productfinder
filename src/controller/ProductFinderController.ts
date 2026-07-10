@@ -58,6 +58,15 @@ export class ProductFinderController {
   private ignoreNextHistoryPush = false;
 
   skipCanvasRenderer = false;
+  preConfig: {
+    gridConfig?: { spacing: number; margin: number; minCellSize: number; maxCellSize: number };
+    animationDuration?: number;
+    priceBucketMode?: string;
+    priceBucketCount?: number;
+    minCellSize?: number;
+    cellSizeOverride?: number;
+    orientation?: Orientation;
+  } = {};
 
   async initialize(canvas: HTMLCanvasElement): Promise<void> {
     this.canvas = canvas;
@@ -73,9 +82,7 @@ export class ProductFinderController {
     // Setup browser history integration for pivot drill-down
     this.setupHistoryIntegration();
 
-    // Initialize skeleton renderer
-    this.skeletonRenderer = new SkeletonRenderer(this.ctx);
-    this.startSkeletonAnimation();
+    // Skip skeleton — preloader already cached all images before App renders
 
     // Initialize main renderer (skip if using Arcturian)
     if (this.skipCanvasRenderer) {
@@ -98,19 +105,38 @@ export class ProductFinderController {
     // Use setTimeout to ensure DOM is fully rendered
     setTimeout(() => this.handleResize(), 0);
 
+    // Apply pre-config (without triggering layout)
+    if (this.preConfig.gridConfig) {
+      this.layoutService.updateGridConfig(this.preConfig.gridConfig);
+    }
+    if (this.preConfig.animationDuration !== undefined) {
+      this.layoutService.setAnimationDuration(this.preConfig.animationDuration);
+    }
+    if (this.preConfig.priceBucketMode) {
+      this.layoutService.setPriceBucketConfig(this.preConfig.priceBucketMode as any, this.preConfig.priceBucketCount ?? 5);
+    }
+    if (this.preConfig.minCellSize !== undefined) {
+      this.layoutService.setMinCellSize(this.preConfig.minCellSize || undefined);
+    }
+    if (this.preConfig.cellSizeOverride !== undefined) {
+      this.layoutService.setCellSizeOverride(this.preConfig.cellSizeOverride || undefined);
+    }
+    if (this.preConfig.orientation) {
+      this.layoutService.setPivotOrientation(this.preConfig.orientation);
+    }
+
     // Load products
     try {
-      const results = await fetchProducts({ limit: 5000 });
+      const results = await fetchProducts({ limit: 10000 }); // API max; catalog has 6310+ products (issue #250)
       this.products = results || [];
       this.pivotModel = this.pivotAnalyzer.analyze(this.products);
       this.layoutService.setPivotModel(this.pivotModel);
       this.loading = false;
       this.stopSkeletonAnimation();
       if (this.renderer) this.renderer.start();
+
       this.onDataChanged();
-      
-      // Resize again after data is loaded to ensure correct layout
-      setTimeout(() => this.handleResize(), 100);
+      this.handleResize();
     } catch (e: any) {
       this.error = e.message || 'Load error';
       this.loading = false;
@@ -311,7 +337,7 @@ export class ProductFinderController {
   // Filter API
   setFilterCriteria(criteria: Partial<FilterCriteria>): void {
     this.filterService.setCriteria(criteria);
-    this.onDataChanged();
+    this.reloadPivotWithCurrentFilter();
   }
 
   getFilterCriteria(): FilterCriteria {
@@ -320,11 +346,30 @@ export class ProductFinderController {
 
   setAiFilterProductIds(ids: string[]): void {
     this.filterService.setIncludeIds(ids);
-    this.onDataChanged();
+    this.reloadPivotWithCurrentFilter();
   }
 
   clearAiFilterProductIds(): void {
     this.filterService.clearIncludeIds();
+    this.reloadPivotWithCurrentFilter();
+  }
+
+  /**
+   * Recompute filtered set and force-reload the GPANE engine with it.
+   * The engine's internal product list is otherwise loaded only once
+   * (loadProducts has an early-return guard to preserve nav state on clicks).
+   * Whenever the underlying filter changes we must explicitly forceReload.
+   */
+  private reloadPivotWithCurrentFilter(): void {
+    let filtered = this.filterService.filterAndSort(this.products);
+    filtered = this.favoritesService.filter(filtered);
+    if (this._familyGrouped) {
+      filtered = this.collapseByFamily(filtered);
+    }
+    if (filtered.length > this._productLimit) {
+      filtered = filtered.slice(0, this._productLimit);
+    }
+    this.layoutService.forceReloadPivot(filtered);
     this.onDataChanged();
   }
 
@@ -559,6 +604,10 @@ export class ProductFinderController {
   }
 
   // Utility
+  getAllProducts(): Product[] {
+    return this.products;
+  }
+
   getUniqueCategories(): string[] {
     return this.filterService.getUniqueCategories(this.products);
   }
