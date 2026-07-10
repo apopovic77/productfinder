@@ -49,10 +49,11 @@ export function buildMediaUrl(options: MediaUrlOptions): string {
  * Build a thumbnail URL (low resolution)
  */
 export function buildThumbnailUrl(storageId: number, size: number = 130): string {
+  // Width only — width+height with trim=true distorts non-square trimmed
+  // images into the forced box (issue #249). Square fitting belongs in CSS.
   return buildMediaUrl({
     storageId,
     width: size,
-    height: size,
     quality: 75,
   });
 }

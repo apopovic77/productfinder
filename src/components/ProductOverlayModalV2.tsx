@@ -259,6 +259,16 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
 
       setThumbnailImages(images);
       setThumbnailsLoading(false);
+
+      // Sync with canvas: the canvas shows the product-level storage image
+      // (which can be a different perspective, e.g. back view). Start the
+      // gallery on that image when it exists in this variant's set so the
+      // active thumb matches what the user already sees. Fallback: index 0.
+      const productStorageId = (product as any).storage?.id ?? null;
+      const initialIdx = productStorageId != null
+        ? images.findIndex(i => i.storageId === productStorageId)
+        : -1;
+      setSelectedImageIndex(initialIdx >= 0 ? initialIdx : 0);
     }, 10);
 
     return () => clearTimeout(timer);
@@ -266,11 +276,17 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
 
   const allImages = thumbnailsLoading ? [] : thumbnailImages;
 
+  // Thumbnail URL builder — width only, NO height: with trim=true the server
+  // crops to (non-square) trim bounds first; forcing width+height would
+  // distort the image into a square (issue #249). Aspect fit happens in CSS.
+  const buildThumbUrl = (storageId: number) =>
+    `${STORAGE_API_URL}/storage/media/${storageId}?width=130&format=webp&quality=80&trim=true`;
+
   // Extract thumbnail URLs for ImageLoadQueue
   const thumbnailUrls = useMemo(() => {
     return allImages.map(img => {
       if (img.storageId) {
-        return `${STORAGE_API_URL}/storage/media/${img.storageId}?width=130&height=130&format=webp&quality=80&trim=true`;
+        return buildThumbUrl(img.storageId);
       }
       return img.src;
     });
@@ -282,7 +298,9 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     priority: 200, // Low priority: Load AFTER canvas images (hero=0, LOD=1000+)
   });
 
-  // Update selected image when variant changes
+  // Update selected image when variant changes (V1 API only — V2 variants
+  // carry storage.id instead, but auto-jumping on V2 would fight the
+  // canvas-synced initial index set in the thumbnail-load effect above).
   useEffect(() => {
     if (activeVariant?.image_storage_id) {
       const imgIndex = allImages.findIndex(img => img.storageId === activeVariant.image_storage_id);
@@ -392,7 +410,8 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     const storageId = getCurrentStorageId();
 
     if (storageId) {
-      return `${STORAGE_API_URL}/storage/media/${storageId}?width=1300&height=1300&format=webp&quality=85&trim=true`;
+      // width only — height would distort trimmed (non-square) images, see issue #249
+      return `${STORAGE_API_URL}/storage/media/${storageId}?width=1300&format=webp&quality=85&trim=true`;
     }
 
     const media = product.media || [];
@@ -458,7 +477,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   const getCartImageUrl = (): string | undefined => {
     const storageId = getCurrentStorageId();
     if (storageId) {
-      return `${STORAGE_API_URL}/storage/media/${storageId}?width=180&height=180&format=webp&quality=85&trim=true`;
+      return `${STORAGE_API_URL}/storage/media/${storageId}?width=180&format=webp&quality=85&trim=true`;
     }
     if (allImages[selectedImageIndex]?.src) {
       return allImages[selectedImageIndex].src;
@@ -619,7 +638,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         }}>
           {allImages.map((img, idx) => {
             const thumbnailUrl = img.storageId
-              ? `${STORAGE_API_URL}/storage/media/${img.storageId}?width=130&height=130&format=webp&quality=80&trim=true`
+              ? buildThumbUrl(img.storageId)
               : img.src;
             const loadedImage = loadedThumbnails.get(thumbnailUrl);
             const isActive = idx === selectedImageIndex;
@@ -630,10 +649,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                 onClick={() => {
                   setSelectedImageIndex(idx);
                   if (onImageSelect && allImages[idx]?.storageId) {
-                    const thumbnailUrl = allImages[idx].storageId
-                      ? `${STORAGE_API_URL}/storage/media/${allImages[idx].storageId}?width=130&height=130&format=webp&quality=80&trim=true`
-                      : '';
-                    const cachedThumb = loadedThumbnails.get(thumbnailUrl);
+                    const cachedThumb = loadedThumbnails.get(buildThumbUrl(allImages[idx].storageId!));
                     onImageSelect(allImages[idx].storageId, cachedThumb || undefined);
                   }
                 }}
@@ -664,7 +680,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                     style={{
                       width: '100%',
                       height: '100%',
-                      objectFit: 'cover'
+                      objectFit: 'contain'
                     }}
                   />
                 ) : (
@@ -695,116 +711,72 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         )}
       </div>
 
-      {/* Color Siblings - other colors of the same product */}
+      {/* Color — rectangles (selectable, switches to sibling product) */}
       {(() => {
         const activeRaw = (activeProduct as any)?.raw || {};
-        const siblings = activeRaw?.siblings || [];
-        const currentColor = activeRaw?.color_name;
-        if (siblings.length === 0) return null;
+        const siblings: any[] = activeRaw?.siblings || [];
+        const currentColor = activeRaw?.color_name || selectedColor;
+        const currentId = activeRaw?.id;
+
+        // Build a stable list: current color + siblings
+        const options: Array<{ id: number | string; color_name: string }> = [];
+        if (currentColor) options.push({ id: currentId ?? 'current', color_name: currentColor });
+        for (const sib of siblings) {
+          options.push({ id: sib.id, color_name: sib.color_name });
+        }
+        if (options.length === 0) return null;
 
         return (
-          <div style={{ marginBottom: '10px' }}>
-            <label style={{ display: 'block', fontSize: '9px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.8, marginBottom: '4px' }}>
-              Color: {currentColor || 'default'}
-            </label>
-            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-              {/* Current color (active) */}
-              {currentColor && (
-                <div style={{
-                  padding: '3px 8px', fontSize: '10px', borderRadius: '4px',
-                  border: '2px solid #ff6b00', background: 'rgba(255, 107, 0, 0.2)',
-                  color: 'white', fontWeight: '600'
-                }}>
-                  {currentColor}
-                </div>
-              )}
-              {/* Sibling colors */}
-              {siblings.map((sib: any) => (
-                <button
-                  key={sib.id}
-                  type="button"
-                  onClick={async () => {
-                    setIsSiblingView(true);
-                    const sibProduct = await fetchProductById(sib.id);
-                    if (sibProduct) {
-                      setFullProduct(sibProduct);
-                      setSelectedImageIndex(0);
-                    }
-                  }}
-                  style={{
-                    padding: '3px 8px', fontSize: '10px', borderRadius: '4px',
-                    border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.1)',
-                    color: 'rgba(255,255,255,0.8)', cursor: 'pointer',
-                    transition: 'all 0.15s ease'
-                  }}
-                  title={sib.color_name}
-                >
-                  {sib.color_name}
-                </button>
-              ))}
+          <div style={{ marginBottom: '12px' }}>
+            <div style={{ fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.8, marginBottom: '6px' }}>
+              Color: <span style={{ opacity: 1 }}>{currentColor}</span>
+            </div>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {options.map((opt) => {
+                const isActive = opt.id === currentId || (opt.id === 'current' && options.length === 1);
+                return (
+                  <button
+                    key={String(opt.id)}
+                    type="button"
+                    disabled={isActive}
+                    onClick={async () => {
+                      if (isActive || opt.id === 'current') return;
+                      setIsSiblingView(true);
+                      const sibProduct = await fetchProductById(opt.id as number);
+                      if (sibProduct) {
+                        setFullProduct(sibProduct);
+                        setSelectedImageIndex(0);
+                      }
+                    }}
+                    style={{
+                      padding: '6px 12px', fontSize: '11px', borderRadius: '6px',
+                      border: isActive ? '2px solid #ff6b00' : '1px solid rgba(255,255,255,0.25)',
+                      background: isActive ? 'rgba(255,107,0,0.18)' : 'rgba(255,255,255,0.08)',
+                      color: isActive ? '#fff' : 'rgba(255,255,255,0.85)',
+                      fontWeight: isActive ? 600 : 400,
+                      cursor: isActive ? 'default' : 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                    title={opt.color_name}
+                  >
+                    {opt.color_name}
+                  </button>
+                );
+              })}
             </div>
           </div>
         );
       })()}
 
-      {/* Dropdowns - Compact (2 per row) */}
-      {variants.length > 0 && (
-        <div className="pom-dropdowns" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px', marginBottom: '12px' }}>
-          {allColors.length > 0 && (
-            <div className="pom-dropdown-wrapper">
-              <label style={{
-                display: 'block',
-                fontSize: '9px',
-                fontWeight: '600',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                opacity: 0.8,
-                marginBottom: '4px'
-              }}>
-                Color
-              </label>
-              <select
-                className="pom-dropdown"
-                value={selectedColor}
-                onChange={(e) => setSelectedColor(e.target.value)}
-                style={{ fontSize: '11px', padding: '6px 8px' }}
-              >
-                {allColors.map((color, idx) => (
-                  <option key={idx} value={color}>
-                    {color}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {availableSizes.length > 0 && (
-            <div className="pom-dropdown-wrapper">
-              <label style={{
-                display: 'block',
-                fontSize: '9px',
-                fontWeight: '600',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                opacity: 0.8,
-                marginBottom: '4px'
-              }}>
-                Size
-              </label>
-              <select
-                className="pom-dropdown"
-                value={selectedSize}
-                onChange={(e) => setSelectedSize(e.target.value)}
-                style={{ fontSize: '11px', padding: '6px 8px' }}
-              >
-                {availableSizes.map((size, idx) => (
-                  <option key={idx} value={size}>
-                    {size}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+      {/* Sizes — info only (selection happens later in cart) */}
+      {availableSizes.length > 0 && (
+        <div style={{ marginBottom: '12px' }}>
+          <div style={{ fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.8, marginBottom: '6px' }}>
+            Available sizes
+          </div>
+          <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.85)' }}>
+            {availableSizes.join(' · ')}
+          </div>
         </div>
       )}
 
