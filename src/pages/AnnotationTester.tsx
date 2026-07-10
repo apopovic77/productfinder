@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { STORAGE_API_BASE as CENTRAL_STORAGE_BASE } from '../config/apiConfig';
 
 type Annotation = {
   label: string;
@@ -17,7 +18,7 @@ type AnnotationsResponse = {
   updated_at?: string | null;
 };
 
-const STORAGE_API_BASE = import.meta.env.VITE_STORAGE_API_URL || 'https://gsgbot.arkturian.com/storage-api';
+const STORAGE_API_BASE = CENTRAL_STORAGE_BASE;
 // Fallback to well-known demo key if env not provided
 const DEFAULT_API_KEY = import.meta.env.VITE_STORAGE_API_KEY || 'oneal_demo_token';
 

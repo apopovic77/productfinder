@@ -2,6 +2,7 @@
 import { ProductAttribute } from '../domain/ProductAttribute';
 import { globalImageQueue } from '../utils/GlobalImageQueue';
 import type { PrimitiveAttributeValue } from '../domain/ProductAttribute';
+import { STORAGE_API_BASE as CENTRAL_STORAGE_BASE } from '../config/apiConfig';
 export { ProductAttribute } from '../domain/ProductAttribute';
 export type { PrimitiveAttributeValue } from '../domain/ProductAttribute';
 export { ProductValue } from '../domain/ProductValue';
@@ -186,7 +187,7 @@ export class Product {
 
     // Prefer Storage API for optimized images
     if (media.storage_id) {
-      const STORAGE_API_BASE = (import.meta as any).env?.VITE_STORAGE_API_URL || 'https://gsgbot.arkturian.com/storage-api';
+      const STORAGE_API_BASE = CENTRAL_STORAGE_BASE;
       // Initial load = low resolution (micro 35px disabled for now)
       const size = 130;
       const quality = 75;
@@ -203,7 +204,7 @@ export class Product {
 
     // Prefer Storage API for optimized images (800px max dimension WebP)
     if (media.storage_id) {
-      const STORAGE_API_BASE = (import.meta as any).env?.VITE_STORAGE_API_URL || 'https://gsgbot.arkturian.com/storage-api';
+      const STORAGE_API_BASE = CENTRAL_STORAGE_BASE;
       return `${STORAGE_API_BASE}/storage/media/${media.storage_id}?width=1300&format=webp&quality=85&trim=true`;
     }
 

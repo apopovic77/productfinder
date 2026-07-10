@@ -1,7 +1,8 @@
 import type { Product } from '../types/Product';
+import { STORAGE_API_BASE } from '../config/apiConfig';
 
 // Storage API URL from environment
-const STORAGE_API_URL = import.meta.env.VITE_STORAGE_API_URL || 'https://gsgbot.arkturian.com/storage-api';
+const STORAGE_API_URL = STORAGE_API_BASE;
 
 /**
  * Modern Product Overlay Style (Blue gradient design)
