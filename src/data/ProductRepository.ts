@@ -1,4 +1,4 @@
-import { DefaultApi, Configuration, type Product as OnealProduct } from 'arkturian-oneal-sdk';
+import { ProductsApi, CategoriesFacetsApi, Configuration, type ProductDetail as OnealProduct } from 'arkturian-oneal-sdk';
 import { Product, type ProductData, ProductAttribute, type PrimitiveAttributeValue, type AttributeType } from '../types/Product';
 import { ACTIVE_PIVOT_PROFILE } from '../config/pivot';
 
@@ -10,7 +10,8 @@ const config = new Configuration({
   basePath: API_BASE,
   apiKey: API_KEY,
 });
-const api = new DefaultApi(config);
+const productsApi = new ProductsApi(config);
+const facetsApi = new CategoriesFacetsApi(config);
 
 const MEDIA_PLACEHOLDER_TOKENS = ['no-image', 'placeholder', 'shopifycloud/storefront/assets'];
 
@@ -669,22 +670,22 @@ function mapProduct(p: OnealProduct): Product | null {
 }
 
 export async function fetchProducts(query: Query = {}): Promise<Product[]> {
-  const response = await api.productsGet({
+  const response = await productsApi.listProductsV1ProductsGet({
     search: query.search,
     category: query.category,
-    season: query.season,
     priceMin: query.price_min,
     priceMax: query.price_max,
     sort: query.sort as any,
     order: query.order as any,
     limit: query.limit,
     offset: query.offset,
+    // Server-side filter (SDK 1.1.0 / issue #254) — replaces the old client
+    // filter, so count/paging from the API are accurate.
+    hasImage: true,
   });
-  
+
   const results = (response.data as any).results || [];
   const products = results
-    // Filter: Only include products that have storage (images)
-    .filter((p: any) => p.storage?.id || p.storage?.media_url)
     .map(mapProduct)
     .filter((product: Product | null): product is Product => Boolean(product));
 
@@ -695,7 +696,7 @@ export async function fetchProducts(query: Query = {}): Promise<Product[]> {
 }
 
 export async function fetchFacets(): Promise<any> {
-  const response = await api.facetsGet();
+  const response = await facetsApi.getFacetsV1FacetsGet();
   return response.data;
 }
 
