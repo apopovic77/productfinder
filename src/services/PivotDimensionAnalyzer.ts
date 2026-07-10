@@ -220,7 +220,39 @@ export class PivotDimensionAnalyzer {
     this.options = { ...DEFAULT_OPTIONS, ...options };
   }
 
+  // Memoization: repeated analyze() calls with the identical product set
+  // (e.g. every setFilterCriteria pass, hover-triggered relayouts) returned
+  // a freshly computed result each time — full maps/stats/bucket-sorts over
+  // up to ~6300 products (issue #259). Cache the last result keyed by an
+  // order-sensitive hash of the product ids; an O(n) hash is far cheaper
+  // than the O(n·attrs·log n) analysis.
+  private _memoKey: string | null = null;
+  private _memoResult: PivotAnalysisResult | null = null;
+
+  private static computeSetKey(products: Product[]): string {
+    let h = 5381;
+    for (let i = 0; i < products.length; i++) {
+      const id = products[i].id;
+      for (let j = 0; j < id.length; j++) {
+        h = ((h << 5) + h + id.charCodeAt(j)) | 0; // djb2
+      }
+      h = ((h << 5) + h + 44) | 0; // separator
+    }
+    return `${products.length}:${h}`;
+  }
+
   analyze(products: Product[]): PivotAnalysisResult {
+    const key = PivotDimensionAnalyzer.computeSetKey(products);
+    if (this._memoResult && this._memoKey === key) {
+      return this._memoResult;
+    }
+    const result = this.analyzeUncached(products);
+    this._memoKey = key;
+    this._memoResult = result;
+    return result;
+  }
+
+  private analyzeUncached(products: Product[]): PivotAnalysisResult {
     if (!products.length) {
       return {
         dimensions: [],
