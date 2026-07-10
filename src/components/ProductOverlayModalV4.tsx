@@ -398,6 +398,7 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
   };
 
   const handleAddToCartClick = () => {
+    if (quantity > 0) return; // Already in cart, do nothing (size/qty handled in cart view)
     emitCartChange(1);
     setQuantity(1);
   };
@@ -778,49 +779,34 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
           </div>
         )}
 
-        {/* CTA Buttons */}
+        {/* CTA Button — simple "In Warenkorb legen", no size/quantity selection here */}
         <div style={{ paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'flex-start', width: '100%' }}>
-          {quantity === 0 ? (
-            <button
-              onClick={handleAddToCartClick}
-              style={{
-                fontSize: '15px',
-                fontWeight: '700',
-                textTransform: 'uppercase',
-                letterSpacing: '0.05em',
-                padding: '16px 48px',
-                width: '100%',
-                maxWidth: '360px',
-                background: '#111827',
-                border: 'none',
-                borderRadius: '10px',
-                color: 'white',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#000000';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = '#111827';
-              }}
-            >
-              ADD TO CART
-            </button>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <span style={{ fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(17, 24, 39, 0.6)' }}>
-                Quantity
-              </span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div className="pf-cart-qty" style={{ padding: '6px 8px', background: 'rgba(248, 250, 252, 1)' }}>
-                  <button type="button" onClick={handleDecreaseQuantity} aria-label="Decrease quantity">−</button>
-                  <span>{quantity}</span>
-                  <button type="button" onClick={handleIncreaseQuantity} aria-label="Increase quantity">+</button>
-                </div>
-              </div>
-            </div>
-          )}
+          <button
+            onClick={handleAddToCartClick}
+            style={{
+              fontSize: '15px',
+              fontWeight: '700',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              padding: '16px 48px',
+              width: '100%',
+              maxWidth: '360px',
+              background: quantity > 0 ? '#3fb950' : '#111827',
+              border: 'none',
+              borderRadius: '10px',
+              color: 'white',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = quantity > 0 ? '#56d364' : '#000000';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = quantity > 0 ? '#3fb950' : '#111827';
+            }}
+          >
+            {quantity > 0 ? '✓ Im Warenkorb' : 'In Warenkorb legen'}
+          </button>
 
           {productUrl && (
             <button
@@ -900,41 +886,6 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
               </div>
             )}
 
-            {availableSizes.length > 1 && (
-              <div style={{ flex: 1 }}>
-                <label style={{
-                  display: 'block',
-                  fontSize: '11px',
-                  fontWeight: '600',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  color: 'rgba(0, 0, 0, 0.6)',
-                  marginBottom: '6px',
-                }}>
-                  Size
-                </label>
-                <select
-                  value={selectedSize}
-                  onChange={(e) => setSelectedSize(e.target.value)}
-                  style={{
-                    fontSize: '14px',
-                    padding: '10px 12px',
-                    background: 'rgba(255, 255, 255, 0.8)',
-                    border: '1px solid rgba(0, 0, 0, 0.15)',
-                    borderRadius: '8px',
-                    color: '#1a1a1a',
-                    width: '100%',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {availableSizes.map((size, idx) => (
-                    <option key={idx} value={size}>
-                      {size}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
           </div>
         )}
 

@@ -931,6 +931,80 @@ body {
   color: rgba(55, 65, 81, 0.7);
 }
 
+.pf-header-search-filter-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border: none;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(42, 168, 239, 0.12);
+  color: #0b6bbd;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.pf-header-search-filter-action:hover {
+  background: rgba(42, 168, 239, 0.22);
+}
+
+.pf-header-search-filter-hint {
+  font-size: 10px;
+  font-weight: 500;
+  opacity: 0.7;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.pf-search-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 10px;
+  padding: 3px 4px 3px 8px;
+  border-radius: 12px;
+  background: rgba(42, 168, 239, 0.22);
+  border: 1px solid rgba(42, 168, 239, 0.5);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.pf-search-filter-chip-icon {
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.pf-search-filter-chip-text {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pf-search-filter-chip-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.pf-search-filter-chip-close:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
 .pf-ai-result-count {
   font-size: 10px;
   padding: 2px 8px;

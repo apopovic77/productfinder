@@ -1,5 +1,9 @@
 import React, { lazy, Suspense } from 'react';
 import './App.css';
+import { CartView } from './components/cart/CartView';
+import { SlidePanel, SlidePanelBackdrop } from './components/cart/SlidePanel';
+import './components/cart/CartView.css';
+import type { CartItem as CartViewItem, ProductSearchResult } from './components/cart/types';
 
 // Lazy-load Arcturian renderer (only when ?renderer=arcturian)
 const ArcturianRendererComponent = lazy(() =>
@@ -51,6 +55,12 @@ type CartItem = {
   priceText?: string;
   imageUrl?: string;
   quantity: number;
+  // For new tabular cart view
+  articleNumber?: string;
+  color?: string;
+  availableColors?: string[];
+  availableSizes?: string[];
+  sizes?: Record<string, number>;
 };
 
 type State = {
@@ -134,7 +144,10 @@ type State = {
 
   // Footer helpers
   footerSearchTerm: string;
+  searchFilterTerm: string | null;
   cartItems: CartItem[];
+  cartPanelOpen: boolean;
+  cartFullOverlay: boolean;
 };
 
 const createInitialState = (): State => {
@@ -208,7 +221,10 @@ const createInitialState = (): State => {
     heroProductPolygon: null,
 
     footerSearchTerm: '',
+    searchFilterTerm: null,
     cartItems: [],
+    cartPanelOpen: false,
+    cartFullOverlay: false,
   };
 };
 
@@ -244,21 +260,20 @@ export default class App extends React.Component<{}, State> {
       console.warn('[App] Failed to load category media, continuing without hero images:', err);
     });
 
-    // Initialize controller
+    // Configure controller BEFORE initialize (avoids multiple layout re-triggers)
     this.controller.skipCanvasRenderer = this.useArcturianRenderer();
+    this.controller.preConfig = {
+      gridConfig: this.state.devSettings.gridConfig,
+      animationDuration: this.state.devSettings.animationDuration,
+      priceBucketMode: this.state.devSettings.priceBucketMode,
+      priceBucketCount: this.state.devSettings.priceBucketCount,
+      minCellSize: this.useArcturianRenderer() ? 0 : this.state.devSettings.minCellSize,
+      cellSizeOverride: this.state.devSettings.cellSizeOverride,
+      orientation: this.computePivotOrientation(),
+    };
     await this.controller.initialize(canvas);
     await mediaPromise;
-    this.controller.updateGridConfig(this.state.devSettings.gridConfig);
-    this.controller.setAnimationDuration(this.state.devSettings.animationDuration);
-    this.controller.setPriceBucketConfig(
-      this.state.devSettings.priceBucketMode,
-      this.state.devSettings.priceBucketCount
-    );
-    this.controller.setMinCellSize(this.useArcturianRenderer() ? 0 : this.state.devSettings.minCellSize);
-    this.controller.setCellSizeOverride(this.state.devSettings.cellSizeOverride);
-    const orientation = this.computePivotOrientation();
-    this.controller.setPivotOrientation(orientation);
-    this.setState({ pivotOrientation: orientation }, () => this.syncPivotUI());
+    this.setState({ pivotOrientation: this.controller.preConfig.orientation }, () => this.syncPivotUI());
 
     // Listen to controller state changes
     this.controller.addListener(state => {
@@ -940,17 +955,32 @@ export default class App extends React.Component<{}, State> {
     this.pushHistoryState({ type: 'drillDown', groupKey, breadcrumbs: this.state.pivotBreadcrumbs });
   };
 
-  private filterFooterSearchResults(term: string): Product[] {
-    const query = term.trim().toLowerCase();
-    if (!query) {
-      return [];
+  /**
+   * Global product search — independent of current pivot/filter state.
+   * Space-separated terms are OR-combined; a product matches if ANY term
+   * matches name / SKU / product_code.
+   * `limit = 0` returns all matches (used by the filter action).
+   */
+  private searchAllProducts(term: string, limit = 8): Product[] {
+    const tokens = term.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) return [];
+    const all = this.controller.getAllProducts();
+    const results: Product[] = [];
+    for (const product of all) {
+      const name = (product.name || '').toLowerCase();
+      const sku = (product.sku || '').toLowerCase();
+      const code = ((product.raw as any)?.product_code || '').toString().toLowerCase();
+      const matches = tokens.some(t => name.includes(t) || sku.includes(t) || code.includes(t));
+      if (matches) {
+        results.push(product);
+        if (limit > 0 && results.length >= limit) break;
+      }
     }
-    const results = this.state.filteredProducts.filter((product) => {
-      const nameMatch = product.name?.toLowerCase().includes(query);
-      const skuMatch = (product.sku || '').toLowerCase().includes(query);
-      return nameMatch || skuMatch;
-    });
-    return results.slice(0, 8);
+    return results;
+  }
+
+  private filterFooterSearchResults(term: string): Product[] {
+    return this.searchAllProducts(term, 8);
   }
 
   private handleFooterSearchChange = (value: string) => {
@@ -959,6 +989,12 @@ export default class App extends React.Component<{}, State> {
 
   private handleFooterSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
+      // Shift+Enter (or Ctrl/Cmd+Enter) → apply as filter chip
+      if (event.shiftKey || event.ctrlKey || event.metaKey) {
+        event.preventDefault();
+        this.applySearchFilter(this.state.footerSearchTerm);
+        return;
+      }
       const [firstMatch] = this.filterFooterSearchResults(this.state.footerSearchTerm);
       if (firstMatch) {
         this.handleFooterSearchSelect(firstMatch.id);
@@ -969,8 +1005,39 @@ export default class App extends React.Component<{}, State> {
     }
   };
 
+  private applySearchFilter = (term: string) => {
+    const trimmed = term.trim();
+    if (!trimmed) return;
+    const tokens = trimmed.toLowerCase().split(/\s+/).filter(Boolean);
+    if (tokens.some(t => t.length < 2)) {
+      console.warn('[searchFilter] ignored — token < 2 chars:', tokens);
+      return;
+    }
+    const matches = this.searchAllProducts(trimmed, 0);
+    const total = this.controller.getAllProducts().length;
+    console.log('[searchFilter] term=', trimmed, 'matches=', matches.length, '/', total);
+    if (matches.length === 0 || matches.length === total) {
+      console.warn('[searchFilter] no-op — matches everything or nothing');
+      return;
+    }
+    const ids = matches.map(p => p.id);
+    this.controller.setAiFilterProductIds(ids);
+    const after = this.controller.getFilteredProducts();
+    console.log('[searchFilter] controller filtered after=', after.length);
+    this.setState({
+      searchFilterTerm: trimmed,
+      footerSearchTerm: '',
+    }, () => this.syncPivotUI());
+  };
+
+  private clearSearchFilter = () => {
+    this.controller.clearAiFilterProductIds();
+    this.setState({ searchFilterTerm: null }, () => this.syncPivotUI());
+  };
+
   private handleFooterSearchSelect = (productId: string) => {
     const product =
+      this.controller.getAllProducts().find((p) => p.id === productId) ||
       this.state.filteredProducts.find((p) => p.id === productId) ||
       this.controller.getDisplayOrder().find((p) => p.id === productId);
     if (!product) {
@@ -1012,6 +1079,16 @@ export default class App extends React.Component<{}, State> {
           cartItems[existingIndex] = { ...existing, quantity: newQuantity };
         }
       } else if (delta > 0) {
+        // Extract available colors and sizes from product variants
+        const variants = payload.product.variants || [];
+        const colors = Array.from(new Set(variants.map((v: any) =>
+          v.color || v.option1 || v.name).filter(Boolean))) as string[];
+        const sizes = Array.from(new Set(variants.map((v: any) =>
+          v.size || v.option2).filter(Boolean))) as string[];
+
+        const currentColor = payload.variant?.color || payload.variant?.option1 ||
+          payload.variantLabel || payload.variant?.name || colors[0] || '';
+
         const newItem: CartItem = {
           id: itemId,
           productId: payload.product.id,
@@ -1021,12 +1098,90 @@ export default class App extends React.Component<{}, State> {
           priceText: payload.priceText,
           imageUrl: payload.imageUrl,
           quantity: delta,
+          articleNumber: payload.product.sku || (payload.product.raw as any)?.product_code || '',
+          color: currentColor,
+          availableColors: colors.length > 0 ? colors : [currentColor],
+          availableSizes: sizes.length > 0 ? sizes : ['One Size'],
+          sizes: {},
         };
-        cartItems = [newItem, ...cartItems].slice(0, 6);
+        cartItems = [newItem, ...cartItems];
       }
 
       return { cartItems };
     });
+  };
+
+  // === New tabular cart adapters ===
+  private handleCartSetQuantity = (itemId: string, size: string, qty: number) => {
+    this.setState(prev => {
+      const cartItems = prev.cartItems.map(item => {
+        if (item.id !== itemId) return item;
+        const sizes = { ...(item.sizes || {}) };
+        if (qty <= 0) delete sizes[size];
+        else sizes[size] = qty;
+        const totalQty = Object.values(sizes).reduce((s, q) => s + (q || 0), 0);
+        return { ...item, sizes, quantity: totalQty };
+      });
+      return { cartItems };
+    });
+  };
+
+  private handleCartChangeColor = (itemId: string, newColor: string) => {
+    this.setState(prev => ({
+      cartItems: prev.cartItems.map(item =>
+        item.id === itemId ? { ...item, color: newColor } : item
+      ),
+    }));
+  };
+
+  private handleCartRemoveItem = (itemId: string) => {
+    this.setState(prev => ({
+      cartItems: prev.cartItems.filter(item => item.id !== itemId),
+    }));
+  };
+
+  private handleCartSearchProducts = async (query: string): Promise<ProductSearchResult[]> => {
+    return this.searchAllProducts(query, 8).map(p => ({
+      productId: p.id,
+      name: p.name,
+      articleNumber: p.sku || (p.raw as any)?.product_code || '',
+      imageUrl: p.imageUrl,
+      color: (p.raw as any)?.color_name,
+    }));
+  };
+
+  private handleCartAddProduct = (result: ProductSearchResult) => {
+    const product = this.controller.getAllProducts().find(p => p.id === result.productId);
+    if (!product) return;
+    this.handleProductBuy({
+      product,
+      variant: getPrimaryVariant(product),
+      priceText: product.priceText,
+      imageUrl: product.imageUrl,
+      quantity: 1,
+    });
+  };
+
+  private handleCartUploadB2B = () => {
+    const total = this.state.cartItems.reduce(
+      (sum, item) => sum + Object.values(item.sizes || {}).reduce((s, q) => s + (q || 0), item.quantity || 0),
+      0
+    );
+    alert(`B2B Upload: ${this.state.cartItems.length} Positionen, ${total} Stk.`);
+  };
+
+  private toCartViewItems = (): CartViewItem[] => {
+    return this.state.cartItems.map(item => ({
+      id: item.id,
+      productId: item.productId,
+      productName: item.name,
+      productImageUrl: item.imageUrl,
+      articleNumber: item.articleNumber || '',
+      color: item.color || item.variantLabel || '',
+      availableColors: item.availableColors || [item.color || ''],
+      availableSizes: item.availableSizes || ['One Size'],
+      sizes: item.sizes || (item.quantity > 0 ? { [item.availableSizes?.[0] || 'One Size']: item.quantity } : {}),
+    }));
   };
 
   private handleCartItemQuantityChange = (itemId: string, delta: number) => {
@@ -1530,7 +1685,10 @@ export default class App extends React.Component<{}, State> {
       aiFilterProductIds,
       aiLastResultCount,
     footerSearchTerm,
+    searchFilterTerm,
     cartItems,
+    cartPanelOpen,
+    cartFullOverlay,
     } = this.state;
 
     // Compute availability live but keep chip order stable
@@ -1599,6 +1757,18 @@ export default class App extends React.Component<{}, State> {
                   </span>
                 </React.Fragment>
               ))}
+              {searchFilterTerm && (
+                <span className="pf-search-filter-chip" title="Click ✕ to remove search filter">
+                  <span className="pf-search-filter-chip-icon">🔍</span>
+                  <span className="pf-search-filter-chip-text">{searchFilterTerm}</span>
+                  <button
+                    type="button"
+                    className="pf-search-filter-chip-close"
+                    onClick={this.clearSearchFilter}
+                    aria-label="Remove search filter"
+                  >×</button>
+                </span>
+              )}
             </div>
           </div>
           <div className="pf-header-search">
@@ -1616,19 +1786,30 @@ export default class App extends React.Component<{}, State> {
                   {footerSearchResults.length === 0 ? (
                     <div className="pf-header-search-empty">No matches</div>
                   ) : (
-                    footerSearchResults.map((product) => (
+                    <>
+                      {footerSearchResults.map((product) => (
+                        <button
+                          type="button"
+                          key={`header-result-${product.id}`}
+                          className="pf-header-search-result"
+                          onClick={() => this.handleFooterSearchSelect(product.id)}
+                        >
+                          <span className="pf-header-search-name">{product.name}</span>
+                          {product.price?.formatted && (
+                            <span className="pf-header-search-price">{product.price.formatted}</span>
+                          )}
+                        </button>
+                      ))}
                       <button
                         type="button"
-                        key={`header-result-${product.id}`}
-                        className="pf-header-search-result"
-                        onClick={() => this.handleFooterSearchSelect(product.id)}
+                        className="pf-header-search-filter-action"
+                        onClick={() => this.applySearchFilter(footerSearchTerm)}
+                        title="Filter view to all matching products (Shift+Enter)"
                       >
-                        <span className="pf-header-search-name">{product.name}</span>
-                        {product.price?.formatted && (
-                          <span className="pf-header-search-price">{product.price.formatted}</span>
-                        )}
+                        <span>🔍 Als Filter anwenden</span>
+                        <span className="pf-header-search-filter-hint">Shift+Enter</span>
                       </button>
-                    ))
+                    </>
                   )}
                 </div>
               )}
@@ -1969,37 +2150,33 @@ export default class App extends React.Component<{}, State> {
 
           <div className="pf-bottom-section pf-bottom-right pf-bottom-desktop-section">
             <label className="pf-bottom-label">Cart</label>
-            {cartItems.length === 0 ? (
-              <div className="pf-cart-empty">Cart is empty</div>
-            ) : (
-              <div className="pf-cart-list">
-                {cartItems.map((item) => (
-                  <div key={item.id} className="pf-cart-item">
-                    {item.imageUrl ? (
-                      <img src={item.imageUrl} alt={item.name} className="pf-cart-thumb" />
-                    ) : (
-                      <div className="pf-cart-thumb pf-cart-thumb-placeholder">?</div>
-                    )}
-                    <div className="pf-cart-item-info">
-                      <div className="pf-cart-item-name">{item.name}</div>
-                      {item.variantLabel && <div className="pf-cart-item-variant">{item.variantLabel}</div>}
-                      <div className="pf-cart-item-bottom">
-                        {item.priceText && <div className="pf-cart-item-price">{item.priceText}</div>}
-                        <div className="pf-cart-qty">
-                          <button type="button" onClick={() => this.handleCartItemQuantityChange(item.id, -1)} aria-label="Decrease quantity">
-                            −
-                          </button>
-                          <span>{item.quantity}</span>
-                          <button type="button" onClick={() => this.handleCartItemQuantityChange(item.id, 1)} aria-label="Increase quantity">
-                            +
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <button
+              type="button"
+              onClick={() => this.setState({ cartPanelOpen: true })}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                background: cartItems.length > 0 ? 'rgba(63,185,80,0.15)' : 'rgba(255,255,255,0.05)',
+                border: cartItems.length > 0 ? '1px solid rgba(63,185,80,0.3)' : '1px solid rgba(255,255,255,0.1)',
+                color: '#fff', padding: '10px 16px', borderRadius: 8,
+                cursor: 'pointer', fontFamily: 'inherit', fontSize: 13,
+                width: '100%', justifyContent: 'space-between',
+              }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="9" cy="21" r="1"></circle>
+                  <circle cx="20" cy="21" r="1"></circle>
+                  <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                </svg>
+                {cartItems.length === 0 ? 'Warenkorb leer' : `${cartItems.length} ${cartItems.length === 1 ? 'Position' : 'Positionen'}`}
+              </span>
+              {totalCartQuantity > 0 && (
+                <span style={{
+                  background: '#3fb950', color: '#fff', borderRadius: 12,
+                  padding: '2px 8px', fontSize: 11, fontWeight: 700,
+                }}>{totalCartQuantity}</span>
+              )}
+            </button>
           </div>
 
           {/* Desktop: RESET button (always visible) */}
@@ -2258,6 +2435,48 @@ export default class App extends React.Component<{}, State> {
             this.controller.setProductLimit(limit);
           }}
         />
+
+        {/* Cart Panel — Slide-in from right, optional fullscreen overlay */}
+        {cartFullOverlay && cartPanelOpen && (
+          <SlidePanelBackdrop
+            open={cartPanelOpen}
+            onClick={() => this.setState({ cartPanelOpen: false, cartFullOverlay: false })}
+          />
+        )}
+        <SlidePanel
+          open={cartPanelOpen}
+          width={cartFullOverlay ? '90vw' : '60vw'}
+          side="right"
+        >
+          <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <div style={{
+              display: 'flex', justifyContent: 'flex-end', gap: 8,
+              padding: '8px 16px 0', background: '#0f0f12',
+            }}>
+              <button
+                onClick={() => this.setState({ cartFullOverlay: !cartFullOverlay })}
+                style={{
+                  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                  color: '#aaa', padding: '4px 10px', borderRadius: 4,
+                  fontSize: 11, cursor: 'pointer', fontFamily: 'inherit',
+                }}
+                title={cartFullOverlay ? 'Side Panel' : 'Vollbild'}
+              >{cartFullOverlay ? '◐ Side' : '◯ Full'}</button>
+            </div>
+            <div style={{ flex: 1, minHeight: 0 }}>
+              <CartView
+                items={this.toCartViewItems()}
+                onSetQuantity={this.handleCartSetQuantity}
+                onChangeColor={this.handleCartChangeColor}
+                onRemoveItem={this.handleCartRemoveItem}
+                onSearchProducts={this.handleCartSearchProducts}
+                onAddProduct={this.handleCartAddProduct}
+                onUploadB2B={this.handleCartUploadB2B}
+                onClose={() => this.setState({ cartPanelOpen: false, cartFullOverlay: false })}
+              />
+            </div>
+          </div>
+        </SlidePanel>
       </div>
     );
   }

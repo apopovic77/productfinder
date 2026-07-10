@@ -1105,24 +1105,12 @@ export class CanvasRenderer<T> {
         // Trigger async load (non-blocking) — skip if already failed
         if (!product.isImageLoading) product.loadImage();
 
-        // Draw placeholder tile while image loads
-        const radius = Math.min(18, Math.min(w, h) / 4);
-        this.drawRoundedRect(x, y, w, h, radius);
-        this.ctx.fillStyle = 'rgba(22, 32, 62, 0.85)';
+        // Draw placeholder: gray circle
+        const circleRadius = Math.min(w, h) / 2.5;
+        this.ctx.beginPath();
+        this.ctx.arc(x + w / 2, y + h / 2, circleRadius, 0, Math.PI * 2);
+        this.ctx.fillStyle = 'rgba(200, 200, 200, 0.4)';
         this.ctx.fill();
-
-        this.ctx.lineWidth = 1.5;
-        this.ctx.strokeStyle = 'rgba(102, 132, 255, 0.45)';
-        this.ctx.setLineDash([8, 6]);
-        this.ctx.stroke();
-        this.ctx.setLineDash([]);
-
-        this.ctx.fillStyle = 'rgba(180, 195, 255, 0.82)';
-        this.ctx.font = '600 12px "Inter", system-ui';
-        this.ctx.textAlign = 'center';
-        this.ctx.textBaseline = 'middle';
-        const label = this.renderAccessors.label(product as any);
-        this.ctx.fillText(label, x + w / 2, y + h / 2, Math.max(24, w - 16));
 
         continue;
       }

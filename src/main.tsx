@@ -7,6 +7,7 @@ import AnnotationTester from './pages/AnnotationTester.tsx'
 import GpaneDoku from './pages/GpaneDoku.tsx'
 import { ProductFinderV2 } from './v2/ProductFinderV2.tsx'
 import { ProductFinderV3 } from './v3/ProductFinderV3.tsx'
+import { CartDemo } from './pages/CartDemo.tsx'
 import { PreloaderProvider, PreloaderOverlay } from './libs/react-asset-preloader'
 import { AppPreloaderWrapper } from './components/AppPreloaderWrapper'
 
@@ -16,6 +17,7 @@ createRoot(document.getElementById('root')!).render(
       <Routes>
         <Route path="/v2" element={<ProductFinderV2 />} />
         <Route path="/v3" element={<ProductFinderV3 />} />
+        <Route path="/cart" element={<CartDemo />} />
         <Route path="/doku" element={<GpaneDoku />} />
         <Route path="/annot" element={
           <PreloaderProvider
@@ -34,27 +36,9 @@ createRoot(document.getElementById('root')!).render(
           </PreloaderProvider>
         } />
         <Route path="*" element={
-          <PreloaderProvider
-            config={{
-              minDisplayTime: 1000,
-              showProgress: true,
-              showCount: true,
-              backgroundColor: '#000000',
-              textColor: '#ffffff',
-              blurBackdrop: true,
-              onComplete: () => console.log('All assets loaded!'),
-            }}
-            autoStart={false}
-          >
-            <PreloaderOverlay
-              message="Loading Product Images..."
-              backgroundVideoStorageId={6617}
-              logoStorageId={6615}
-            />
-            <AppPreloaderWrapper>
-              <App />
-            </AppPreloaderWrapper>
-          </PreloaderProvider>
+          <AppPreloaderWrapper>
+            <App />
+          </AppPreloaderWrapper>
         } />
       </Routes>
     </BrowserRouter>
