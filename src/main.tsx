@@ -8,7 +8,7 @@ import GpaneDoku from './pages/GpaneDoku.tsx'
 import { ProductFinderV2 } from './v2/ProductFinderV2.tsx'
 import { ProductFinderV3 } from './v3/ProductFinderV3.tsx'
 import { CartDemo } from './pages/CartDemo.tsx'
-import { PreloaderProvider, PreloaderOverlay } from './libs/react-asset-preloader'
+import { PreloaderProvider } from './libs/react-asset-preloader'
 import { AppPreloaderWrapper } from './components/AppPreloaderWrapper'
 
 createRoot(document.getElementById('root')!).render(

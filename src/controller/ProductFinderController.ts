@@ -7,7 +7,7 @@ import { CanvasRenderer } from '../render/CanvasRenderer';
 import { SkeletonRenderer } from '../render/SkeletonRenderer';
 import { ProductRenderAccessors } from '../layout/Accessors';
 import { fetchProducts } from '../data/ProductRepository';
-import type { GroupDimension, PriceBucketMode } from '../services/PivotDrillDownService';
+import type { GroupDimension, PriceBucketMode } from '../types/pivot';
 import { PivotDimensionAnalyzer, type PivotAnalysisResult, type PivotDimensionDefinition } from '../services/PivotDimensionAnalyzer';
 import type { Orientation } from '../layout/PivotLayouter';
 import type { PivotGroup } from '../layout/PivotGroup';

@@ -11,10 +11,7 @@ const ArcturianRendererComponent = lazy(() =>
 );
 import type { Product } from './types/Product';
 import { ProductFinderController } from './controller/ProductFinderController';
-import ProductModal from './components/ProductModal';
 import { ProductAnnotations } from './components/ProductAnnotations';
-import { ProductImageAnnotations } from './components/ProductImageAnnotations';
-import { ProductOverlay } from './components/ProductOverlay';
 import { ProductOverlayModalV2 as ProductOverlayModal } from './components/ProductOverlayModalV2';
 import { ProductOverlayModalV4 } from './components/ProductOverlayModalV4';
 import { HeroVideoBackground } from './components/HeroVideoBackground';
@@ -24,7 +21,7 @@ import { DeveloperOverlay, type DeveloperSettings } from './components/Developer
 import { CustomSelect } from './components/CustomSelect';
 import type { SortMode } from './services/FilterService';
 import type { LayoutMode } from './services/LayoutService';
-import type { GroupDimension } from './services/PivotDrillDownService';
+import type { GroupDimension } from './types/pivot';
 import type { Orientation } from './layout/PivotLayouter';
 import type { PivotGroup } from './layout/PivotGroup';
 import type { PivotDimensionDefinition } from './services/PivotDimensionAnalyzer';

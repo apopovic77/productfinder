@@ -10,7 +10,7 @@ import { Vector2 } from 'arkturian-typescript-utils';
 import { GpanePivotService, type GroupDimension, type PriceBucketConfig } from '../gpane/GpanePivotService';
 import { ONEAL_TAXONOMY } from '../gpane';
 // Legacy import kept for type compatibility
-import type { PriceBucketMode } from './PivotDrillDownService';
+import type { PriceBucketMode } from '../types/pivot';
 import { HeroLayouter } from '../layout/HeroLayouter';
 import type { PivotAnalysisResult, PivotDimensionDefinition } from './PivotDimensionAnalyzer';
 import { ACTIVE_PIVOT_PROFILE } from '../config/pivot';

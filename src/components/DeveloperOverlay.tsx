@@ -1,6 +1,6 @@
 import React from 'react';
 import './DeveloperOverlay.css';
-import type { PriceBucketMode } from '../services/PivotDrillDownService';
+import type { PriceBucketMode } from '../types/pivot';
 
 export type GridConfig = {
   spacing: number;
