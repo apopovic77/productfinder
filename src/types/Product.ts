@@ -360,7 +360,7 @@ export class Product {
           id: `product-${this.id}-${url}`,
           url,
           group: 'product-grid',
-          priority: 100, // between hero (0) and LOD upgrades (1000+)
+          priority: 50, // after hero (0), BEFORE spread alternatives (100+) — issue #261
         });
         if (isValid(result.image)) {
           this._image = result.image;
@@ -378,7 +378,7 @@ export class Product {
             id: `product-${this.id}-refresh-${url}`,
             url: refreshUrl,
             group: 'product-grid',
-            priority: 100,
+            priority: 50,
           });
           if (isValid(retry.image)) {
             this._image = retry.image;

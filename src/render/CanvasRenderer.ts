@@ -1146,9 +1146,12 @@ export class CanvasRenderer<T> {
           const aspectRatio = w / h;
           const isClearlyLandscape = aspectRatio > 1.2; // Width at least 20% larger than height
 
-          // Calculate scaling and spacing to fit all images in cell
-          // Total images to draw: main image + alternative images
-          const totalImages = imageCount + 1;
+          // Calculate scaling and spacing to fit all images in cell.
+          // Use the TOTAL alternative count (not just loaded ones): basing the
+          // scale target on loadedImages.length made targetScale shrink with
+          // every image that finished loading — the visible size pulsed
+          // several times per click (issue #261).
+          const totalImages = this.alternativeImages.length + 1;
 
           // Overlap factor: card-fan effect (lower = more spread)
           const overlapFactor = 0.4;
@@ -1189,8 +1192,13 @@ export class CanvasRenderer<T> {
           // Assign spread offsets to each image
           // Pivot Mode: fan out symmetrically (left, right, further left, further right...)
           // Hero Mode: spread all to the right (catalog style)
-          for (let i = 0; i < imageCount; i++) {
-            const altImg = loadedImages[i];
+          // Slots are bound to the STABLE index in alternativeImages — indexing
+          // the filtered loaded list re-assigned sides/distances every time
+          // another image finished loading (left flipped to right etc.),
+          // causing the jumpy re-animation reported in issue #261.
+          const allAltImages = this.alternativeImages;
+          for (let i = 0; i < allAltImages.length; i++) {
+            const altImg = allAltImages[i];
             if (!altImg) continue;
 
             if (!altImg.spreadOffset) {
@@ -1213,9 +1221,10 @@ export class CanvasRenderer<T> {
           const centerOffsetX = (w - boundingWidth) / 2;
           const centerOffsetY = (h - boundingHeight) / 2;
 
-          // Draw from back to front (furthest images first)
-          for (let i = imageCount - 1; i >= 0; i--) {
-            const altImg = loadedImages[i];
+          // Draw from back to front (furthest images first); not-yet-loaded
+          // images keep their reserved slot and appear in place when ready
+          for (let i = allAltImages.length - 1; i >= 0; i--) {
+            const altImg = allAltImages[i];
             if (altImg && altImg.loadedImage && altImg.spreadOffset) {
               // Use animated offset from InterpolatedProperty
               const stackOffset = altImg.spreadOffset.value ?? 0;
