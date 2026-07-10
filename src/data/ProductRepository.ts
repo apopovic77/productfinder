@@ -6,9 +6,11 @@ import { ONEAL_API_BASE, ONEAL_API_KEY } from '../config/apiConfig';
 const API_BASE = ONEAL_API_BASE;
 const API_KEY = ONEAL_API_KEY;
 
-// Initialize SDK
+// Initialize SDK. The generated operation paths already include the /v1
+// prefix (e.g. `/v1/products`), while ONEAL_API_BASE ends in /v1 for the
+// plain-fetch call sites — strip it here or every SDK request hits /v1/v1.
 const config = new Configuration({
-  basePath: API_BASE,
+  basePath: API_BASE.replace(/\/v1\/?$/, ''),
   apiKey: API_KEY,
 });
 const productsApi = new ProductsApi(config);
