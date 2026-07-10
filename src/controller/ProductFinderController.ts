@@ -115,11 +115,14 @@ export class ProductFinderController {
     if (this.preConfig.priceBucketMode) {
       this.layoutService.setPriceBucketConfig(this.preConfig.priceBucketMode as any, this.preConfig.priceBucketCount ?? 5);
     }
-    if (this.preConfig.minCellSize !== undefined) {
-      this.layoutService.setMinCellSize(this.preConfig.minCellSize || undefined);
+    const minCellSize = this.preConfig.minCellSize;
+    if (minCellSize !== undefined) {
+      // LayoutService normalizes 0 -> undefined internally
+      this.layoutService.setMinCellSize(minCellSize);
     }
-    if (this.preConfig.cellSizeOverride !== undefined) {
-      this.layoutService.setCellSizeOverride(this.preConfig.cellSizeOverride || undefined);
+    const cellSizeOverride = this.preConfig.cellSizeOverride;
+    if (cellSizeOverride !== undefined) {
+      this.layoutService.setCellSizeOverride(cellSizeOverride);
     }
     if (this.preConfig.orientation) {
       this.layoutService.setPivotOrientation(this.preConfig.orientation);

@@ -273,7 +273,7 @@ export default class App extends React.Component<{}, State> {
     };
     await this.controller.initialize(canvas);
     await mediaPromise;
-    this.setState({ pivotOrientation: this.controller.preConfig.orientation }, () => this.syncPivotUI());
+    this.setState({ pivotOrientation: this.controller.preConfig.orientation ?? this.state.pivotOrientation }, () => this.syncPivotUI());
 
     // Listen to controller state changes
     this.controller.addListener(state => {
