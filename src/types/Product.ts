@@ -1,5 +1,6 @@
 
 import { ProductAttribute } from '../domain/ProductAttribute';
+import { globalImageQueue } from '../utils/GlobalImageQueue';
 import type { PrimitiveAttributeValue } from '../domain/ProductAttribute';
 export { ProductAttribute } from '../domain/ProductAttribute';
 export type { PrimitiveAttributeValue } from '../domain/ProductAttribute';
@@ -296,127 +297,73 @@ export class Product {
     this._imageLoading = true;
     this._imageError = false;
 
-    const loadPromise = new Promise<HTMLImageElement | null>((resolve) => {
-      const img = new Image();
-      // Don't set crossOrigin - not needed unless we're using Canvas
-      // img.crossOrigin = 'anonymous';
+    // All product image loading is routed through the shared globalImageQueue
+    // (maxConcurrent=6, priorities, IndexedDB cache). Previously this created
+    // raw `new Image()` per product — with 100+ visible grid products that
+    // fired 100+ concurrent requests in the first frame (issue #255).
+    const isValid = (img: HTMLImageElement) =>
+      img.complete && img.naturalWidth > 0 && img.naturalHeight > 0;
 
-      img.onload = () => {
-        // Validate that image actually loaded correctly
-        if (!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) {
-          console.warn(`Image loaded but appears corrupt: ${url} (naturalWidth: ${img.naturalWidth}, naturalHeight: ${img.naturalHeight})`);
+    const markFailure = () => {
+      const now = Date.now();
+      const info = Product.failedUrlAttempts.get(url);
+      if (info && now - info.lastFailed < Product.RETRY_COOLDOWN_MS) {
+        Product.failedUrlAttempts.set(url, { count: info.count + 1, lastFailed: now });
+      } else {
+        Product.failedUrlAttempts.set(url, { count: 1, lastFailed: now });
+      }
+    };
 
-          // Treat as error - keep existing image
+    const loadPromise = (async (): Promise<HTMLImageElement | null> => {
+      try {
+        const result = await globalImageQueue.add({
+          id: `product-${this.id}-${url}`,
+          url,
+          group: 'product-grid',
+          priority: 100, // between hero (0) and LOD upgrades (1000+)
+        });
+        if (isValid(result.image)) {
+          this._image = result.image;
           this._imageLoading = false;
-          // Only set error flag if we don't have an existing image to fall back to
-          if (!this._image) {
-            this._imageError = true;
-          }
+          Product.imageCache.set(url, result.image);
           Product.loadingPromises.delete(url);
-
-          const now = Date.now();
-          const info = Product.failedUrlAttempts.get(url);
-          if (info && now - info.lastFailed < Product.RETRY_COOLDOWN_MS) {
-            Product.failedUrlAttempts.set(url, { count: info.count + 1, lastFailed: now });
-          } else {
-            Product.failedUrlAttempts.set(url, { count: 1, lastFailed: now });
-          }
-
-          // Try retry with refresh=true if this was the first attempt
-          if (!url.includes('refresh=true') && (!info || info.count === 0)) {
-            console.log(`Retrying with refresh=true: ${url}`);
-            const refreshUrl = url + (url.includes('?') ? '&' : '?') + 'refresh=true';
-
-            // Retry once with refresh parameter
-            const retryImg = new Image();
-            retryImg.onload = () => {
-              if (retryImg.complete && retryImg.naturalWidth > 0 && retryImg.naturalHeight > 0) {
-                this._image = retryImg;
-                this._imageLoading = false;
-                this._imageError = false;
-                Product.imageCache.set(refreshUrl, retryImg);
-                Product.failedUrlAttempts.delete(url);
-                resolve(retryImg);
-              } else {
-                // Still corrupt - keep old image
-                resolve(this._image ?? null);
-              }
-            };
-            retryImg.onerror = () => {
-              // Retry failed - keep old image
-              resolve(this._image ?? null);
-            };
-            retryImg.src = refreshUrl;
-          } else {
-            // No retry - keep old image
-            resolve(this._image ?? null);
-          }
-          return;
+          Product.failedUrlAttempts.delete(url);
+          return result.image;
         }
-
-        // SUCCESS: Update to new image
-        this._image = img;
-        this._imageLoading = false;
-        Product.imageCache.set(url, img);
-        Product.loadingPromises.delete(url);
-        Product.failedUrlAttempts.delete(url);
-        resolve(img);
-      };
-
-      img.onerror = () => {
-        this._imageLoading = false;
-        // Only set error flag if we don't have an existing image to fall back to
-        if (!this._image) {
-          this._imageError = true;
-        }
-        Product.loadingPromises.delete(url);
-        console.warn(`Failed to load image for product ${this.id}: ${url} (keeping existing image)`);
-
-        const now = Date.now();
-        const info = Product.failedUrlAttempts.get(url);
-        if (info && now - info.lastFailed < Product.RETRY_COOLDOWN_MS) {
-          Product.failedUrlAttempts.set(url, { count: info.count + 1, lastFailed: now });
-        } else {
-          Product.failedUrlAttempts.set(url, { count: 1, lastFailed: now });
-        }
-
-        // Try retry with refresh=true if this was the first attempt
-        if (!url.includes('refresh=true') && (!info || info.count <= 1)) {
-          console.log(`🔄 Retrying with refresh=true: ${url}`);
+        // Corrupt payload — one retry with cache-busting refresh=true (also queued)
+        markFailure();
+        if (!url.includes('refresh=true')) {
           const refreshUrl = url + (url.includes('?') ? '&' : '?') + 'refresh=true';
-
-          // Retry once with refresh parameter
-          const retryImg = new Image();
-          retryImg.onload = () => {
-            if (retryImg.complete && retryImg.naturalWidth > 0 && retryImg.naturalHeight > 0) {
-              console.log(`✅ Retry successful with refresh=true for product ${this.id}`);
-              this._image = retryImg;
-              this._imageLoading = false;
-              this._imageError = false;
-              Product.imageCache.set(refreshUrl, retryImg);
-              Product.failedUrlAttempts.delete(url);
-              resolve(retryImg);
-            } else {
-              console.warn(`❌ Retry with refresh=true still corrupt for product ${this.id} - keeping existing image`);
-              // Still corrupt - keep old image
-              resolve(this._image ?? null);
-            }
-          };
-          retryImg.onerror = () => {
-            console.warn(`❌ Retry with refresh=true failed for product ${this.id} - keeping existing image`);
-            // Retry failed - keep old image
-            resolve(this._image ?? null);
-          };
-          retryImg.src = refreshUrl;
-        } else {
-          // No retry - keep old image
-          console.log(`⏭️ Skipping retry for ${url} (already tried or has refresh=true)`);
-          resolve(this._image ?? null);
+          const retry = await globalImageQueue.add({
+            id: `product-${this.id}-refresh-${url}`,
+            url: refreshUrl,
+            group: 'product-grid',
+            priority: 100,
+          });
+          if (isValid(retry.image)) {
+            this._image = retry.image;
+            this._imageLoading = false;
+            this._imageError = false;
+            Product.imageCache.set(refreshUrl, retry.image);
+            Product.failedUrlAttempts.delete(url);
+            Product.loadingPromises.delete(url);
+            return retry.image;
+          }
         }
-      };
-
-      img.src = url;
-    });
+        this._imageLoading = false;
+        if (!this._image) this._imageError = true;
+        Product.loadingPromises.delete(url);
+        return this._image ?? null;
+      } catch {
+        // Queue-level failure (network error after queue retries, timeout, cancel)
+        this._imageLoading = false;
+        if (!this._image) this._imageError = true;
+        Product.loadingPromises.delete(url);
+        markFailure();
+        console.warn(`Failed to load image for product ${this.id}: ${url} (keeping existing image)`);
+        return this._image ?? null;
+      }
+    })();
 
     Product.loadingPromises.set(url, loadPromise);
 
