@@ -1,9 +1,10 @@
 import type { CategoryMedia, CategoryMediaData, MediaLookupKey } from '../types/CategoryMedia';
+import { ONEAL_API_BASE, ONEAL_API_KEY, STORAGE_API_BASE } from '../config/apiConfig';
 
 // API Configuration
-const API_BASE = import.meta.env.VITE_ONEAL_API_BASE || 'https://gsgbot.arkturian.com/oneal-api/v1';
-const API_KEY = import.meta.env.VITE_ONEAL_API_KEY || 'oneal_demo_token';
-const STORAGE_API_URL = import.meta.env.VITE_STORAGE_API_URL || 'https://gsgbot.arkturian.com/storage-api';
+const API_BASE = ONEAL_API_BASE;
+const API_KEY = ONEAL_API_KEY;
+const STORAGE_API_URL = STORAGE_API_BASE;
 
 /**
  * Service for loading and managing category/group media assets

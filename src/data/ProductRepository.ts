@@ -1,9 +1,10 @@
 import { ProductsApi, CategoriesFacetsApi, Configuration, type ProductDetail as OnealProduct } from 'arkturian-oneal-sdk';
 import { Product, type ProductData, ProductAttribute, type PrimitiveAttributeValue, type AttributeType } from '../types/Product';
 import { ACTIVE_PIVOT_PROFILE } from '../config/pivot';
+import { ONEAL_API_BASE, ONEAL_API_KEY } from '../config/apiConfig';
 
-const API_BASE = import.meta.env.VITE_ONEAL_API_BASE || 'https://gsgbot.arkturian.com/oneal-api/v1';
-const API_KEY = import.meta.env.VITE_ONEAL_API_KEY || 'oneal_demo_token';
+const API_BASE = ONEAL_API_BASE;
+const API_KEY = ONEAL_API_KEY;
 
 // Initialize SDK
 const config = new Configuration({

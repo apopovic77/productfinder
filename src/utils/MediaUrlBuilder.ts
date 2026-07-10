@@ -4,9 +4,10 @@
  */
 
 import { APP_CONFIG } from '../config/AppConfig';
+import { STORAGE_API_BASE as CENTRAL_STORAGE_BASE } from '../config/apiConfig';
 
 // Get storage API URL from environment or use default
-const STORAGE_API_BASE = import.meta.env.VITE_STORAGE_API_URL || 'https://gsgbot.arkturian.com/storage-api';
+const STORAGE_API_BASE = CENTRAL_STORAGE_BASE;
 
 export interface MediaUrlOptions {
   storageId: number;

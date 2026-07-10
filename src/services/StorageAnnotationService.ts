@@ -1,12 +1,11 @@
+import { STORAGE_API_BASE as CENTRAL_STORAGE_BASE, STORAGE_API_KEY as CENTRAL_STORAGE_KEY } from '../config/apiConfig';
 /**
  * Storage Annotation Service
  * Fetches AI-generated annotations from Storage API
  */
 
-const STORAGE_API_BASE = import.meta.env.VITE_STORAGE_API_URL
-  ? `${import.meta.env.VITE_STORAGE_API_URL}/storage`
-  : 'https://gsgbot.arkturian.com/storage-api/storage';
-const STORAGE_API_KEY = import.meta.env.VITE_STORAGE_API_KEY || 'oneal_demo_token';
+const STORAGE_API_BASE = `${CENTRAL_STORAGE_BASE}/storage`;
+const STORAGE_API_KEY = CENTRAL_STORAGE_KEY;
 
 export interface AnnotationAnchor {
   x: number; // 0-1 normalized

@@ -17,10 +17,11 @@ import {
 import type { MorphShaderUniforms } from '@arcturian/core/MorphShader';
 import type { LayoutShape, LayoutResult } from '@arcturian/tessellation/layouts';
 import type { FlyTarget } from '@arcturian/core/types';
+import { ONEAL_API_KEY } from '../config/apiConfig';
 
 const STORAGE_API = '/storage-api';
 const ONEAL_API = '/oneal-api/v1';
-const API_KEY = 'oneal_demo_token';
+const API_KEY = ONEAL_API_KEY;
 
 interface ProductInfo {
   id: number;

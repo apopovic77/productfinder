@@ -38,6 +38,7 @@ import QuickSearchCommandPalette from './components/QuickSearchCommandPalette';
 import { AiProductQueryService } from './services/AiProductQueryService';
 import { categoryMediaService } from './services/CategoryMediaService';
 import { FOOTER_CONFIG, type FooterPosition } from './config/FooterConfig';
+import { STORAGE_API_BASE as CENTRAL_STORAGE_BASE, STORAGE_API_KEY as CENTRAL_STORAGE_KEY } from './config/apiConfig';
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -557,8 +558,8 @@ export default class App extends React.Component<{}, State> {
                   // No need to set it here, LOD will pick it up
 
                   // Fetch trim bounds for text positioning
-                  const STORAGE_API_BASE = import.meta.env.VITE_STORAGE_API_URL || 'https://gsgbot.arkturian.com/storage-api';
-                  const STORAGE_API_KEY = import.meta.env.VITE_STORAGE_API_KEY || 'oneal_demo_token';
+                  const STORAGE_API_BASE = CENTRAL_STORAGE_BASE;
+                  const STORAGE_API_KEY = CENTRAL_STORAGE_KEY;
                   const trimBoundsUrl = `${STORAGE_API_BASE}/storage/media/${heroStorageId}/trim-bounds`;
                   console.log('[App] Fetching trim bounds for storage ID:', heroStorageId, 'URL:', trimBoundsUrl);
                   fetch(trimBoundsUrl)
@@ -761,7 +762,7 @@ export default class App extends React.Component<{}, State> {
     }
 
     // Then load high-res version in background
-    const STORAGE_API_BASE = import.meta.env.VITE_STORAGE_API_URL || '/storage-api';
+    const STORAGE_API_BASE = CENTRAL_STORAGE_BASE;
     const src = `${STORAGE_API_BASE}/storage/media/${storageId}?width=1300&format=webp&quality=85`;
 
     const img = new Image();
@@ -1703,7 +1704,7 @@ export default class App extends React.Component<{}, State> {
     const footerSearchResults = this.filterFooterSearchResults(footerSearchTerm);
 
     // Storage URLs from environment
-    const STORAGE_API_BASE = import.meta.env.VITE_STORAGE_API_URL || 'https://gsgbot.arkturian.com/storage-api';
+    const STORAGE_API_BASE = CENTRAL_STORAGE_BASE;
     const logoUrl = `${STORAGE_API_BASE}/storage/media/6615?variant=thumbnail&height=25&trim=true`;
 
     if (error) return <div className="container"><div className="error">{error}</div></div>;

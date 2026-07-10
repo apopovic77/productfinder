@@ -1,3 +1,4 @@
+import { DISPATCH_BASE } from '../config/apiConfig';
 /**
  * Dispatch a request to a cloud-api Claude agent via the queue API.
  *
@@ -14,8 +15,7 @@
  * digit-merge regex), which could corrupt legitimate content (issue #252).
  */
 
-const DEFAULT_DISPATCH_BASE =
-  import.meta.env.VITE_DISPATCH_BASE || 'https://cloud-api.oneal.arkturian.com/api/queue';
+const DEFAULT_DISPATCH_BASE = DISPATCH_BASE;
 
 const DEFAULT_TIMEOUT_MS = 90_000;
 

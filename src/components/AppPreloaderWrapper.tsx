@@ -1,8 +1,9 @@
 import React, { useRef, useEffect } from 'react';
 import type { CSSProperties } from 'react';
 import { useProductPreloader } from '../hooks/useProductPreloader';
+import { STORAGE_API_BASE } from '../config/apiConfig';
 
-const STORAGE_API_URL = import.meta.env.VITE_STORAGE_API_URL || '/storage-api';
+const STORAGE_API_URL = STORAGE_API_BASE;
 const VIDEO_STORAGE_ID = 6617;
 const LOGO_STORAGE_ID = 6615;
 

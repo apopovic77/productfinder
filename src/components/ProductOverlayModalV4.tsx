@@ -4,9 +4,10 @@ import type { Product } from '../types/Product';
 import { useImageQueue } from '../hooks/useImageQueue';
 import { fetchProductById } from '../data/ProductRepository';
 import './ProductOverlayModal.css';
+import { STORAGE_API_BASE } from '../config/apiConfig';
 
 // Storage API base URL from environment
-const STORAGE_API_URL = import.meta.env.VITE_STORAGE_API_URL || 'https://gsgbot.arkturian.com/storage-api';
+const STORAGE_API_URL = STORAGE_API_BASE;
 
 // Helper to build storage media URL
 const getStorageMediaUrl = (storageId: number, params: Record<string, string | number> = {}) => {

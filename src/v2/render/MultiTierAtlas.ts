@@ -9,6 +9,7 @@
  * Images are loaded asynchronously and painted into tile slots.
  */
 import * as THREE from 'three';
+import { STORAGE_API_BASE } from '../../config/apiConfig';
 
 const MAX_CANVAS_SIZE = 4096;
 
@@ -212,8 +213,7 @@ export class MultiTierAtlas {
 
   constructor(storageApiUrl?: string) {
     this._storageApiUrl = storageApiUrl ||
-      (import.meta as any).env?.VITE_STORAGE_API_URL ||
-      'https://gsgbot.arkturian.com/storage-api';
+      STORAGE_API_BASE;
 
     this.tiers = [
       new AtlasTier(0, 64, 60),   // T0: micro
