@@ -227,9 +227,10 @@ export class Product {
     // Prefer Storage API for optimized images
     if (media.storage_id) {
       const STORAGE_API_BASE = CENTRAL_STORAGE_BASE;
-      // Initial load = low resolution (micro 35px disabled for now)
-      const size = 130;
-      const quality = 75;
+      // Initial load = low resolution (micro 35px disabled for now).
+      // 180px: 130px looked visibly poor in the start grid (2026-07-18)
+      const size = 180;
+      const quality = 80;
       return `${STORAGE_API_BASE}/storage/media/${media.storage_id}?width=${size}&format=webp&quality=${quality}&trim=true`;
     }
 

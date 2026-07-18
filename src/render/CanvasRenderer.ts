@@ -1106,7 +1106,7 @@ export class CanvasRenderer<T> {
 
       // Seed LOD tracking for products loaded via draw loop (not via LOD scanner)
       // Without this, the LOD scanner sees currentSize=undefined and wastes queue
-      // capacity re-loading 130px images that already exist
+      // capacity re-loading base-res thumb images that already exist
       if (product.isImageReady && !this.loadedImageSizes.has(n.id)) {
         this.loadedImageSizes.set(n.id, LOD_CONFIG.lowResolution);
       }
