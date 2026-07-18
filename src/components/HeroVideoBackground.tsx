@@ -1,12 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import './HeroVideoBackground.css';
 import { STORAGE_API_BASE } from '../config/apiConfig';
+import { searchLifestyleMedia, LIFESTYLE_MIN_SIMILARITY } from '../services/ProductMediaService';
 
 // Storage API URL from environment
 const STORAGE_API_URL = STORAGE_API_BASE;
 
 interface HeroVideoBackgroundProps {
+  /** Fallback video when no product-related backdrop image is found. */
   storageId: number;
+  /** Semantic query for a product-related backdrop (top lifestyle hit). */
+  imageQuery?: string;
   onClose: () => void;
   children?: React.ReactNode;
 }
@@ -18,6 +22,7 @@ interface HeroVideoBackgroundProps {
  */
 export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
   storageId,
+  imageQuery,
   onClose,
   children
 }) => {
@@ -30,6 +35,49 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
 
   // Build video URL from Storage API
   const videoUrl = `${STORAGE_API_URL}/storage/media/${storageId}?format=mp4`;
+
+  // Product-related backdrop: top semantic lifestyle hit. While the search
+  // is pending nothing renders (background stays dark); on a miss or error
+  // the sport video takes over as before.
+  const [bgImageUrl, setBgImageUrl] = useState<string | null>(null);
+  const [bgResolved, setBgResolved] = useState(!imageQuery);
+
+  useEffect(() => {
+    let cancelled = false;
+    setIsLoaded(false);
+    setBgImageUrl(null);
+    if (!imageQuery) {
+      setBgResolved(true);
+      return;
+    }
+    setBgResolved(false);
+    searchLifestyleMedia(imageQuery, 1)
+      .then((hits) => {
+        if (cancelled) return;
+        const hit = hits[0];
+        if (hit && hit.similarity >= LIFESTYLE_MIN_SIMILARITY) {
+          setBgImageUrl(`${STORAGE_API_URL}/storage/media/${hit.storage_id}?width=1920&format=webp&quality=82`);
+        }
+        setBgResolved(true);
+      })
+      .catch(() => {
+        if (!cancelled) setBgResolved(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [imageQuery]);
+
+  // Preload the backdrop image so the 1s fade-in starts fully decoded
+  useEffect(() => {
+    if (!bgImageUrl) return;
+    const img = new Image();
+    img.onload = () => setIsLoaded(true);
+    img.src = bgImageUrl;
+    return () => {
+      img.onload = null;
+    };
+  }, [bgImageUrl]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -56,7 +104,7 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
       video.removeEventListener('loadeddata', handleLoadedData);
       video.removeEventListener('error', handleError);
     };
-  }, [storageId]);
+  }, [storageId, bgResolved, bgImageUrl]);
 
   // Handle close with fade-out animation
   const handleClose = () => {
@@ -85,16 +133,23 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
 
   return (
     <div className="hero-video-background">
-      {/* Fullscreen Video */}
-      <video
-        ref={videoRef}
-        className={`hero-video ${isLoaded && !isClosing ? 'loaded' : ''}`}
-        src={videoUrl}
-        autoPlay
-        loop
-        muted
-        playsInline
-      />
+      {/* Product-related backdrop image (Ken-Burns), sport video as fallback */}
+      {bgImageUrl ? (
+        <div
+          className={`hero-bg-image ${isLoaded && !isClosing ? 'loaded' : ''}`}
+          style={{ backgroundImage: `url(${bgImageUrl})` }}
+        />
+      ) : bgResolved ? (
+        <video
+          ref={videoRef}
+          className={`hero-video ${isLoaded && !isClosing ? 'loaded' : ''}`}
+          src={videoUrl}
+          autoPlay
+          loop
+          muted
+          playsInline
+        />
+      ) : null}
 
       {/* Dark Overlay for better text readability */}
       <div

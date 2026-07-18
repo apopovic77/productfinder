@@ -118,3 +118,28 @@
 .hero-video-error button:hover {
   background: #f0f0f0;
 }
+
+/* Product-related backdrop image with slow Ken-Burns motion */
+.hero-bg-image {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  transition: opacity 1s ease-in-out;
+  animation: hero-kenburns 24s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+.hero-bg-image.loaded {
+  opacity: 1;
+}
+
+@keyframes hero-kenburns {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.12);
+  }
+}

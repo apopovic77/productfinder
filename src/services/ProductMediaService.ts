@@ -26,6 +26,10 @@ interface SemanticSearchResponse {
   results: LifestyleMediaHit[];
 }
 
+// Curation floor of the media-server catalog — below this the hits stop
+// being visually related to the product.
+export const LIFESTYLE_MIN_SIMILARITY = 45;
+
 // Per-session memo — the media inventory changes rarely, and the modal
 // re-mounts on every product click.
 const searchCache = new Map<string, LifestyleMediaHit[]>();

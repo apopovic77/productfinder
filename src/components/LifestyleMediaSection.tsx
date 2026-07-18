@@ -1,11 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { searchLifestyleMedia, type LifestyleMediaHit } from '../services/ProductMediaService';
+import { searchLifestyleMedia, LIFESTYLE_MIN_SIMILARITY, type LifestyleMediaHit } from '../services/ProductMediaService';
 import { STORAGE_API_BASE } from '../config/apiConfig';
 
-// Below this similarity the semantic hits stop being visually related to
-// the product — better to show nothing than an unrelated mood shot.
-// 45 matches the curation floor of the media-server catalog.
-const MIN_SIMILARITY = 45;
 const MAX_HITS = 6;
 
 type Props = {
@@ -30,7 +26,7 @@ export const LifestyleMediaSection: React.FC<Props> = ({ query }) => {
     searchLifestyleMedia(query, MAX_HITS)
       .then((results) => {
         if (cancelled) return;
-        setHits(results.filter((h) => h.similarity >= MIN_SIMILARITY));
+        setHits(results.filter((h) => h.similarity >= LIFESTYLE_MIN_SIMILARITY));
       })
       .catch(() => {
         // Search unavailable → section stays hidden, modal works without it.

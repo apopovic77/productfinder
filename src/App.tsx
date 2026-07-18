@@ -2389,11 +2389,19 @@ export default class App extends React.Component<{}, State> {
             // - Motocross (MX): 6629
             const videoStorageId = isMotocross ? 6629 : 6623;
 
+            // Product-related backdrop query (taxonomy terms match the German
+            // AI image descriptions); the sport video stays as fallback only
+            const heroFamily = (selectedProduct as any).derived_taxonomy?.product_family;
+            const heroImageQuery = [isMotocross ? 'MX' : 'MTB', heroFamily, 'Action Lifestyle']
+              .filter(Boolean)
+              .join(' ');
+
             return (
               // V4 Dialog (zoom-based): Shown when product occupies >65% of screen height
               this.state.shouldShowV4Dialog && !this.state.isPivotHeroMode ? (
                 <HeroVideoBackground
                   storageId={videoStorageId}
+                  imageQuery={heroImageQuery}
                   onClose={() => this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false })}
                 >
                   <ProductOverlayModalV4
