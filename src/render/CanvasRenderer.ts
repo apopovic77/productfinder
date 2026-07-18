@@ -1055,6 +1055,16 @@ export class CanvasRenderer<T> {
     // Update hero mode offsets if needed (products moving aside for spread animation)
     this.updateHeroModeOffsets();
 
+    // imageScaleFactor is shared renderer state: exactly ONE writer per frame.
+    // Without a selection it resets here; with a selection only the selected
+    // cell may write, otherwise every other cell restarts the interpolation
+    // curve each frame and the scale oscillates forever (issue #300).
+    // (Mobile skips the spread block entirely, so it resets here too.)
+    if (!this.selectedProduct || !this.alternativeImages || this.alternativeImages.length === 0
+        || this.ctx.canvas.width < 768) {
+      this.imageScaleFactor.targetValue = 1.0;
+    }
+
     for (const n of nodes) {
       const baseX = n.posX.value ?? 0;
       const heroOffset = n.heroOffsetX.value ?? 0;
@@ -1304,8 +1314,8 @@ export class CanvasRenderer<T> {
           this.drawImageFit(img, drawX, drawY, drawW, drawH);
         }
       } else {
-        // No alternative images - reset scale to 1.0 smoothly
-        this.imageScaleFactor.targetValue = 1.0;
+        // Non-selected cells must NOT touch the shared imageScaleFactor —
+        // the frame-level reset above owns the "no selection" case (issue #300).
         this.drawImageFit(img, drawX, drawY, drawW, drawH);
       }
 
