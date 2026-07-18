@@ -5,7 +5,9 @@ import { useImageQueue } from '../hooks/useImageQueue';
 import { fetchProductById } from '../data/ProductRepository';
 import './ProductOverlayModal.css';
 import { STORAGE_API_BASE } from '../config/apiConfig';
-import { getVariantDesignName, getVariantSize } from '../utils/variantImageHelpers';
+import { getVariantDesignName, getVariantSize, getVariantBaseColor } from '../utils/variantImageHelpers';
+import { LifestyleMediaSection } from './LifestyleMediaSection';
+import { ProductDocumentsSection } from './ProductDocumentsSection';
 
 // Storage API base URL from environment
 const STORAGE_API_URL = STORAGE_API_BASE;
@@ -353,13 +355,9 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
   };
 
   const [quantity, setQuantity] = useState(0);
-  const mxVideoUrl = getStorageMediaUrl(6629, { format: 'mp4' });
-  const mxVideoPoster = getStorageMediaUrl(6629, { width: 1200, format: 'webp', quality: 85 });
-  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
 
   useEffect(() => {
     setQuantity(0);
-    setIsVideoPlaying(false);
   }, [product.id, activeVariant?.sku, variantLabel]);
 
   const emitCartChange = (delta: number) => {
@@ -401,12 +399,19 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
     }
   };
 
-  const handlePlayVideo = () => {
-    setIsVideoPlaying(true);
-  };
-
   // Extract category/subtitle from taxonomy
   const categoryText = taxonomyFamily || taxonomyPath[taxonomyPath.length - 1] || 'Product';
+
+  const productCode = product.getAttributeValue<string>('product_code');
+
+  // Semantic query for the lifestyle section — taxonomy terms match the
+  // German AI image descriptions far better than model names do.
+  const lifestyleQuery = useMemo(() => {
+    const baseColor = activeVariant ? getVariantBaseColor(activeVariant) : undefined;
+    return [taxonomySport, taxonomyFamily || categoryText, baseColor, 'Action Lifestyle']
+      .filter(Boolean)
+      .join(' ');
+  }, [taxonomySport, taxonomyFamily, categoryText, activeVariant]);
 
   // Parse product name: Remove "O'NEAL" if first word, split first word (thin) from rest (bold)
   const parseProductName = (name: string): { firstWord: string; restWords: string } => {
@@ -866,84 +871,9 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
           </div>
         )}
 
-        {/* MX Video */}
-        <div
-          style={{
-            marginTop: '32px',
-            paddingTop: '40px',
-            borderTop: '1px solid rgba(0, 0, 0, 0.1)',
-            width: '100%',
-          }}
-        >
-          <h3 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '12px', color: '#1a1a1a' }}>
-            MX VIDEO
-          </h3>
-          <p style={{ fontSize: '14px', color: 'rgba(0, 0, 0, 0.6)', marginBottom: '16px' }}>
-            Press play to watch the MX experience with full audio.
-          </p>
-          <div
-            style={{
-              width: '100%',
-              borderRadius: '20px',
-              background: 'rgba(0, 0, 0, 0.04)',
-              padding: '24px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              minHeight: '300px',
-            }}
-          >
-            {isVideoPlaying ? (
-              <video
-                controls
-                autoPlay
-                playsInline
-                style={{ width: '100%', borderRadius: '16px', background: '#000', maxWidth: '720px' }}
-                src={mxVideoUrl}
-                poster={mxVideoPoster}
-              />
-            ) : (
-              <div
-                style={{
-                  width: '90%',
-                  maxWidth: '700px',
-                  minHeight: '260px',
-                  borderRadius: '16px',
-                  backgroundImage: `url(${mxVideoPoster})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                  position: 'relative',
-                  boxShadow: '0 12px 30px rgba(0, 0, 0, 0.12)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={handlePlayVideo}
-                  style={{
-                    width: '72px',
-                    height: '72px',
-                    borderRadius: '999px',
-                    border: 'none',
-                    background: 'rgba(17, 24, 39, 0.9)',
-                    color: 'white',
-                    cursor: 'pointer',
-                    fontSize: '26px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    boxShadow: '0 10px 30px rgba(0, 0, 0, 0.25)',
-                  }}
-                  aria-label="Play MX video"
-                >
-                  ▶
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
+        <LifestyleMediaSection query={lifestyleQuery} />
+
+        {productCode && <ProductDocumentsSection productCode={productCode} />}
 
         {/* Product Details (restored content) */}
         <div style={{
