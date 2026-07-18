@@ -4,7 +4,8 @@ import { STORAGE_API_BASE } from '../config/apiConfig';
 
 // Below this similarity the semantic hits stop being visually related to
 // the product — better to show nothing than an unrelated mood shot.
-const MIN_SIMILARITY = 40;
+// 45 matches the curation floor of the media-server catalog.
+const MIN_SIMILARITY = 45;
 const MAX_HITS = 6;
 
 type Props = {
