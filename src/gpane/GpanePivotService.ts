@@ -44,7 +44,7 @@ export type DrillDownState = {
   filters: DrillDownFilter[];
 };
 
-const HERO_THRESHOLD = 12;
+const HERO_THRESHOLD = 40; // Owner-Feedback 02.08.: nach Preis-Klick Produkte zeigen, keine weitere Dimension
 
 /**
  * GPANE-backed pivot service.

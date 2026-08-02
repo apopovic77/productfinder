@@ -33,11 +33,18 @@ export function buildBuckets(
     case 'identity':
       return identityBuckets(products, key, maxBuckets, override?.normalization);
     case 'range_equal_width':
-      return rangeBuckets(products, key, maxBuckets, 'equal_width', unit);
     case 'range_quantile':
-      return rangeBuckets(products, key, maxBuckets, 'quantile', unit);
-    case 'range_logarithmic':
-      return rangeBuckets(products, key, maxBuckets, 'logarithmic', unit);
+    case 'range_logarithmic': {
+      // Range-/Preis-UX (Owner-Feedback 02.08., Post 4427): wenige, gleich
+      // gefuellte Buckets statt vieler leerer — Quantile erzwingen und die
+      // Bucket-Zahl so waehlen, dass der naechste Klick moeglichst direkt in
+      // der Produktansicht landet (Zielgruppengroesse = heroThreshold).
+      const targetGroup = Math.max(1, config.heroThreshold);
+      const rangeBucketCount = override?.bucketCount
+        ?? Math.min(4, Math.max(2, Math.ceil(products.length / targetGroup)));
+      return rangeBuckets(products, key, rangeBucketCount, 'quantile', unit)
+        .filter(b => b.objectIds.length > 0);
+    }
     case 'discrete':
       return discreteBuckets(products, key, maxBuckets);
     case 'boolean_split':

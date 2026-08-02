@@ -241,7 +241,7 @@ export interface GPANEConfig {
 export const DEFAULT_CONFIG: GPANEConfig = {
   maxBuckets: 12,
   minCoverage: 0.5,
-  heroThreshold: 15,
+  heroThreshold: 40,
   scoring: {
     coverage: 0.25,
     diversity: 0.25,
