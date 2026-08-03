@@ -2,7 +2,7 @@
 import { ProductAttribute } from '../domain/ProductAttribute';
 import { globalImageQueue } from '../utils/GlobalImageQueue';
 import type { PrimitiveAttributeValue } from '../domain/ProductAttribute';
-import { STORAGE_API_BASE as CENTRAL_STORAGE_BASE } from '../config/apiConfig';
+import { buildHighResUrl, buildThumbnailUrl } from '../utils/MediaUrlBuilder';
 export { ProductAttribute } from '../domain/ProductAttribute';
 export type { PrimitiveAttributeValue } from '../domain/ProductAttribute';
 export { ProductValue } from '../domain/ProductValue';
@@ -226,12 +226,7 @@ export class Product {
 
     // Prefer Storage API for optimized images
     if (media.storage_id) {
-      const STORAGE_API_BASE = CENTRAL_STORAGE_BASE;
-      // Initial load = low resolution (micro 35px disabled for now).
-      // 180px: 130px looked visibly poor in the start grid (2026-07-18)
-      const size = 180;
-      const quality = 80;
-      return `${STORAGE_API_BASE}/storage/media/${media.storage_id}?width=${size}&format=webp&quality=${quality}&trim=true`;
+      return buildThumbnailUrl(media.storage_id);
     }
 
     // Fallback to Shopify CDN
@@ -242,10 +237,9 @@ export class Product {
     const media = this.primaryImage;
     if (!media?.src) return 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="800"%3E%3Crect fill="%23e0e0e0" width="800" height="800"/%3E%3Ctext x="400" y="400" text-anchor="middle" fill="%23999" font-size="24"%3ENo Image%3C/text%3E%3C/svg%3E';
 
-    // Prefer Storage API for optimized images (800px max dimension WebP)
+    // Prefer Storage API for the canonical high-resolution WebP preset.
     if (media.storage_id) {
-      const STORAGE_API_BASE = CENTRAL_STORAGE_BASE;
-      return `${STORAGE_API_BASE}/storage/media/${media.storage_id}?width=1300&format=webp&quality=85&trim=true`;
+      return buildHighResUrl(media.storage_id);
     }
 
     // Fallback to Shopify CDN

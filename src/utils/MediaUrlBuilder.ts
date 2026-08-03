@@ -5,6 +5,7 @@
 
 import { APP_CONFIG } from '../config/AppConfig';
 import { STORAGE_API_BASE as CENTRAL_STORAGE_BASE } from '../config/apiConfig';
+import { WEB_PRODUCT_IMAGE_PRESETS } from '../config/imagePresets';
 
 // Get storage API URL from environment or use default
 const STORAGE_API_BASE = CENTRAL_STORAGE_BASE;
@@ -49,23 +50,30 @@ export function buildMediaUrl(options: MediaUrlOptions): string {
 /**
  * Build a thumbnail URL (low resolution)
  */
-export function buildThumbnailUrl(storageId: number, size: number = 130): string {
+export function buildThumbnailUrl(
+  storageId: number,
+  size: number = WEB_PRODUCT_IMAGE_PRESETS.grid.width,
+  quality: number = WEB_PRODUCT_IMAGE_PRESETS.grid.quality,
+): string {
   // Width only — width+height with trim=true distorts non-square trimmed
   // images into the forced box (issue #249). Square fitting belongs in CSS.
   return buildMediaUrl({
     storageId,
     width: size,
-    quality: 75,
+    quality,
   });
 }
 
 /**
  * Build a high resolution URL
  */
-export function buildHighResUrl(storageId: number, size: number = 1300): string {
+export function buildHighResUrl(
+  storageId: number,
+  size: number = WEB_PRODUCT_IMAGE_PRESETS.hero.width,
+): string {
   return buildMediaUrl({
     storageId,
     width: size,
-    quality: 85,
+    quality: WEB_PRODUCT_IMAGE_PRESETS.hero.quality,
   });
 }

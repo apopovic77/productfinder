@@ -1,10 +1,45 @@
 import { useEffect, useRef, useState } from 'react';
+import { WEB_THUMBNAIL_WARMUP } from '../config/imagePresets';
 import { fetchProducts } from '../data/ProductRepository';
-import { buildMediaUrl } from '../utils/MediaUrlBuilder';
+import { globalImageQueue } from '../utils/GlobalImageQueue';
+import { buildThumbnailUrl } from '../utils/MediaUrlBuilder';
 import { imageCache } from '../utils/IndexedDBImageCache';
 
+const wait = (milliseconds: number) =>
+  new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
+
 /**
- * Preloads all product thumbnails directly into IndexedDB cache.
+ * Fill the remainder of the persistent thumbnail cache without delaying the
+ * first interactive render. All work goes through the shared queue at a lower
+ * priority than visible images and LOD upgrades.
+ */
+async function warmRemainingThumbnails(urls: string[]): Promise<void> {
+  if (urls.length === 0) return;
+  await wait(WEB_THUMBNAIL_WARMUP.backgroundStartDelayMs);
+
+  for (let start = 0; start < urls.length; start += WEB_THUMBNAIL_WARMUP.backgroundBatchSize) {
+    const batch = urls.slice(start, start + WEB_THUMBNAIL_WARMUP.backgroundBatchSize);
+    const cached = await Promise.all(batch.map((url) => imageCache.get(url)));
+
+    for (let index = 0; index < batch.length; index++) {
+      if (cached[index]) continue;
+      const url = batch[index];
+      void globalImageQueue.add({
+        id: `background-prewarm-${start + index}`,
+        url,
+        group: 'background-prewarm',
+        priority: WEB_THUMBNAIL_WARMUP.backgroundPriority,
+      }).catch(() => undefined);
+    }
+
+    // Yield regularly so cache inspection/enqueueing never monopolizes the UI.
+    await wait(WEB_THUMBNAIL_WARMUP.backgroundBatchDelayMs);
+  }
+}
+
+/**
+ * Preloads a bounded startup window directly into IndexedDB, then warms the
+ * remaining product thumbnails in the background through the shared queue.
  *
  * When the CanvasRenderer later requests images via ImageLoadQueue,
  * they're instant cache HITs — no network wait, no placeholders.
@@ -28,24 +63,30 @@ export function useProductPreloader() {
         const products = await fetchProducts({ limit: 10000 }); // API max; catalog has 6310+ products (issue #250)
 
         // Build URL list
-        const urls: string[] = [];
+        const urlSet = new Set<string>();
         for (const product of products) {
           const storageId = product.primaryImage?.storage_id;
           if (!storageId) continue;
-          urls.push(buildMediaUrl({ storageId, width: 130, quality: 75, trim: true }));
+          // Must be byte-identical to Product.imageUrl/LOD low tier. IndexedDB
+          // uses the complete URL as its key, so a 130px preload cannot warm a
+          // later 180px grid request (issue #841).
+          urlSet.add(buildThumbnailUrl(storageId));
         }
 
-        const total = urls.length;
+        const urls = Array.from(urlSet);
+        const startupUrls = urls.slice(0, WEB_THUMBNAIL_WARMUP.blockingCount);
+        const backgroundUrls = urls.slice(startupUrls.length);
+        const total = startupUrls.length;
         setState(s => ({ ...s, total }));
 
-        // Check which are already cached — parallel in chunks so the UI counter
+        // Check the startup window — parallel in chunks so the UI counter
         // updates while we work, instead of staying at 0/N until everything's done.
         let alreadyCached = 0;
         const toFetch: string[] = [];
         const CHECK_CHUNK = 64;
 
-        for (let i = 0; i < urls.length; i += CHECK_CHUNK) {
-          const chunk = urls.slice(i, i + CHECK_CHUNK);
+        for (let i = 0; i < startupUrls.length; i += CHECK_CHUNK) {
+          const chunk = startupUrls.slice(i, i + CHECK_CHUNK);
           const results = await Promise.all(chunk.map((url) => imageCache.get(url)));
           for (let j = 0; j < chunk.length; j++) {
             if (results[j]) alreadyCached++;
@@ -56,10 +97,14 @@ export function useProductPreloader() {
           setState({ isLoading: true, loaded: alreadyCached, total, progress: Math.round((alreadyCached / total) * 100) });
         }
 
-        console.log(`[Preloader] ${alreadyCached}/${total} cached, ${toFetch.length} to fetch`);
+        console.log(
+          `[Preloader] startup ${alreadyCached}/${total} cached, ` +
+          `${toFetch.length} to fetch; ${backgroundUrls.length} queued for background warmup`,
+        );
 
         if (toFetch.length === 0) {
           setState({ isLoading: false, progress: 100, loaded: total, total });
+          void warmRemainingThumbnails(backgroundUrls);
           return;
         }
 
@@ -91,6 +136,7 @@ export function useProductPreloader() {
         const elapsed = performance.now() - startTime;
         console.log(`[Preloader] Done: ${fetched} fetched, ${alreadyCached} cached, ${elapsed.toFixed(0)}ms`);
         setState({ isLoading: false, progress: 100, loaded: total, total });
+        void warmRemainingThumbnails(backgroundUrls);
 
       } catch (error) {
         console.error('[Preloader] Failed:', error);
