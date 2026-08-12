@@ -34,6 +34,7 @@ import {
 import { getImagesForVariant, getPrimaryVariant, getUniqueColorVariants } from './utils/variantImageHelpers';
 import { globalImageQueue } from './utils/GlobalImageQueue';
 import { buildMediaUrl } from './utils/MediaUrlBuilder';
+import { resolveProductTapStage } from './utils/ProductTapFlow';
 import QuickSearchCommandPalette from './components/QuickSearchCommandPalette';
 import { AiProductQueryService } from './services/AiProductQueryService';
 import { categoryMediaService } from './services/CategoryMediaService';
@@ -133,7 +134,7 @@ type State = {
   footerPosition: FooterPosition;
   footerFloatingPosition: { x: number; y: number } | null;
 
-  // V4 Dialog trigger (zoom-based, not hero-mode-based)
+  // V4 Dialog trigger (second tap on the already previewed product)
   shouldShowV4Dialog: boolean;
 
   // Hero product trim bounds (for text positioning)
@@ -1246,34 +1247,15 @@ export default class App extends React.Component<{}, State> {
   };
 
   private openProductDetails(product: Product, options: { pushHistory?: boolean } = {}) {
-    const canvas = this.canvasRef.current;
-
+    const tapStage = resolveProductTapStage(this.state.selectedProduct?.id, product.id);
     this.controller.centerOnProduct(product);
 
-    let shouldShowV4 = false;
-    const node = this.controller.getProductNode(product.id);
-    if (node && canvas) {
-      const productHeight = node.height.targetValue ?? node.height.value ?? 0;
-      const zoom = this.controller.getZoom();
-      const productScreenHeight = productHeight * zoom;
-      const viewportHeight = canvas.height;
-      const heightPercentage = productScreenHeight / viewportHeight;
-      shouldShowV4 = heightPercentage > 0.65;
-    }
-
-    const isHeroMode = this.controller.isPivotHeroMode();
-    if (isHeroMode) {
-      const uniqueVariants = getUniqueColorVariants(product);
-      if (uniqueVariants.length === 1) {
-        shouldShowV4 = true;
-      } else if (uniqueVariants.length > 1) {
-        const wasAlreadySelected = this.state.selectedProduct?.id === product.id;
-        shouldShowV4 = wasAlreadySelected;
-      }
-    }
-
     const primaryVariant = getPrimaryVariant(product);
-    this.setState({ selectedProduct: product, selectedVariant: primaryVariant, shouldShowV4Dialog: shouldShowV4 });
+    this.setState({
+      selectedProduct: product,
+      selectedVariant: primaryVariant,
+      shouldShowV4Dialog: tapStage === 'detail',
+    });
 
     const storageId = this.getProductStorageId(product);
     if (storageId) {
@@ -1290,7 +1272,7 @@ export default class App extends React.Component<{}, State> {
       }
     }
 
-    if (options.pushHistory !== false) {
+    if (options.pushHistory !== false && tapStage === 'preview') {
       this.pushHistoryState({ type: 'productSelect', productId: product.id });
     }
   }
@@ -1447,22 +1429,7 @@ export default class App extends React.Component<{}, State> {
     // Otherwise check for product click
     const product = this.controller.hitTest(x, y);
     if (product) {
-      this.controller.centerOnProduct(product);
-
-      // Calculate whether to show V4 dialog based on product size (zoom-based trigger)
-      let shouldShowV4 = false;
-      const node = this.controller.getProductNode(product.id);
-      if (node && canvas) {
-        const productHeight = node.height.targetValue ?? node.height.value ?? 0;
-        const zoom = this.controller.getZoom();
-        const productScreenHeight = productHeight * zoom;
-        const viewportHeight = canvas.height;
-        const heightPercentage = productScreenHeight / viewportHeight;
-        shouldShowV4 = heightPercentage > 0.65;
-      }
-
-      const primaryVariant = getPrimaryVariant(product);
-      this.setState({ selectedProduct: product, selectedVariant: primaryVariant, shouldShowV4Dialog: shouldShowV4 });
+      this.openProductDetails(product);
     } else {
       this.setState({ selectedProduct: null, selectedVariant: null, shouldShowV4Dialog: false });
     }
@@ -2421,7 +2388,7 @@ export default class App extends React.Component<{}, State> {
               .join(' ');
 
             return (
-              // V4 Dialog (zoom-based): Shown when product occupies >65% of screen height
+              // V4 Dialog: shown only after tapping the already previewed product again.
               this.state.shouldShowV4Dialog && !this.state.isPivotHeroMode ? (
                 <HeroVideoBackground
                   storageId={videoStorageId}
