@@ -12,6 +12,7 @@ import { InterpolatedProperty } from 'arkturian-typescript-utils';
 import { ProductLabelRenderer } from './ProductLabelRenderer';
 import { categoryMediaService } from '../services/CategoryMediaService';
 import { BUCKET_BUTTON_CONFIG } from '../config/BucketButtonConfig';
+import { calculateSelectedProductGlow } from './SelectedProductGlow';
 
 type LoadTask = {
   nodeId: string;
@@ -268,6 +269,47 @@ export class CanvasRenderer<T> {
     const drawY = boundsY + (boundsHeight - height) / 2;
     this.ctx.drawImage(img, drawX, drawY, width, height);
     return { x: drawX, y: drawY, width, height };
+  }
+
+  /**
+   * Paint a soft elliptical mask between the side perspectives and the main
+   * product. It acts like a Lightroom radial glow: no visible disc, just a
+   * bright center and a cool, fully feathered edge that creates depth.
+   */
+  private drawSelectedProductGlow(
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    opacity: number,
+  ): void {
+    const glow = calculateSelectedProductGlow(x, y, width, height);
+    const ellipseScale = glow.radiusY / glow.radiusX;
+
+    this.ctx.save();
+    this.ctx.globalAlpha = Math.max(0, Math.min(1, opacity));
+    this.ctx.translate(glow.centerX, glow.centerY);
+    this.ctx.scale(1, ellipseScale);
+
+    const gradient = this.ctx.createRadialGradient(
+      0,
+      0,
+      glow.radiusX * 0.04,
+      0,
+      0,
+      glow.radiusX,
+    );
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.98)');
+    gradient.addColorStop(0.38, 'rgba(250, 252, 255, 0.94)');
+    gradient.addColorStop(0.68, 'rgba(226, 235, 247, 0.58)');
+    gradient.addColorStop(0.86, 'rgba(208, 221, 239, 0.20)');
+    gradient.addColorStop(1, 'rgba(208, 221, 239, 0)');
+
+    this.ctx.fillStyle = gradient;
+    this.ctx.beginPath();
+    this.ctx.arc(0, 0, glow.radiusX, 0, Math.PI * 2);
+    this.ctx.fill();
+    this.ctx.restore();
   }
   
   start() {
@@ -1376,6 +1418,17 @@ export class CanvasRenderer<T> {
           const scaledHeight = h * animatedScale;
           const centerOffsetX = (w - scaledWidth) / 2;
           const centerOffsetY = (h - scaledHeight) / 2;
+
+          // Draw after the side perspectives but before the hero itself. The
+          // feathered mask gently veils overlapping side images and makes the
+          // selected product read as the foreground layer (issue #1076).
+          this.drawSelectedProductGlow(
+            x + centerOffsetX,
+            y + centerOffsetY,
+            scaledWidth,
+            scaledHeight,
+            opacity,
+          );
 
           this.drawImageFit(
             img,
