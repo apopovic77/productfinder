@@ -344,6 +344,10 @@ body {
   user-select: none;
 }
 
+.pf-mobile-breadcrumb-row {
+  display: none;
+}
+
 .pf-stage {
   position: relative;
   flex: 1 1 auto;
@@ -457,20 +461,44 @@ body {
   }
 
   .pf-header-breadcrumbs {
-    margin-left: 8px;
-    gap: 4px;
-    overflow-x: auto;
-    max-width: 40vw;
-    scrollbar-width: none;
+    display: none;
   }
 
-  .pf-header-breadcrumbs::-webkit-scrollbar {
+  .pf-mobile-breadcrumb-row {
+    display: flex;
+    flex: 0 0 34px;
+    min-width: 0;
+    padding: 0 12px;
+    background: #111;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    z-index: 99;
+  }
+
+  .pf-mobile-breadcrumb-scroll {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .pf-mobile-breadcrumb-scroll::-webkit-scrollbar {
     display: none;
   }
 
   .pf-header-breadcrumb {
     font-size: 11px;
     white-space: nowrap;
+    flex: 0 0 auto;
+  }
+
+  .pf-mobile-breadcrumb-scroll .pf-search-filter-chip {
+    flex: 0 0 auto;
   }
 
   /* === MOBILE SIDEBAR → force bottom on mobile === */

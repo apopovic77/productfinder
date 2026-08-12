@@ -1902,6 +1902,43 @@ export default class App extends React.Component<{}, State> {
           </div>
         </div>
 
+        {/* Mobile: breadcrumbs get their own row so the primary header stays usable. */}
+        <nav className="pf-mobile-breadcrumb-row" aria-label="Product navigation">
+          <div className="pf-mobile-breadcrumb-scroll">
+            {pivotBreadcrumbs.map((crumb, i) => (
+              <React.Fragment key={`mobile-header-${crumb}-${i}`}>
+                {i > 0 && <span className="pf-header-breadcrumb-sep">›</span>}
+                <span
+                  role="button"
+                  tabIndex={i === pivotBreadcrumbs.length - 1 ? -1 : 0}
+                  className={`pf-header-breadcrumb ${i === pivotBreadcrumbs.length - 1 ? 'active' : ''}`}
+                  onClick={() => this.handleBreadcrumbClick(i)}
+                  onKeyDown={evt => {
+                    if (evt.key === 'Enter' || evt.key === ' ') {
+                      evt.preventDefault();
+                      this.handleBreadcrumbClick(i);
+                    }
+                  }}
+                >
+                  {crumb}
+                </span>
+              </React.Fragment>
+            ))}
+            {searchFilterTerm && (
+              <span className="pf-search-filter-chip" title="Click ✕ to remove search filter">
+                <span className="pf-search-filter-chip-icon">🔍</span>
+                <span className="pf-search-filter-chip-text">{searchFilterTerm}</span>
+                <button
+                  type="button"
+                  className="pf-search-filter-chip-close"
+                  onClick={this.clearSearchFilter}
+                  aria-label="Remove search filter"
+                >×</button>
+              </span>
+            )}
+          </div>
+        </nav>
+
         {/* Mobile Pivot Overlay */}
         {this.state.mobilePivotOpen && (
           <div className="pf-mobile-pivot-overlay">
