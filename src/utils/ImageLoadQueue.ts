@@ -74,6 +74,7 @@ export interface ImageLoadQueueConfig {
   retryDelay?: number;           // Delay between retries in ms (default: 1000)
   priorityInterruptThreshold?: number; // Cancel active if new priority < active priority * threshold (default: 0.2)
   shouldLoad?: <T>(request: ImageLoadRequest<T>) => boolean; // Validation function called before each load
+  loader?: (url: string, timeout: number) => Promise<HTMLImageElement>; // Test/custom transport injection
 }
 
 interface QueuedRequest<T = any> {
@@ -83,14 +84,19 @@ interface QueuedRequest<T = any> {
   startTime?: number;
   retries: number;
   aborted: boolean;
+  abortController?: AbortController;
 }
 
 export class ImageLoadQueue<T = any> {
-  private config: Required<Omit<ImageLoadQueueConfig, 'shouldLoad'>> & { shouldLoad?: <T>(request: ImageLoadRequest<T>) => boolean };
+  private config: Required<Omit<ImageLoadQueueConfig, 'shouldLoad' | 'loader'>> & {
+    shouldLoad?: <T>(request: ImageLoadRequest<T>) => boolean;
+    loader?: (url: string, timeout: number) => Promise<HTMLImageElement>;
+  };
   private queue: QueuedRequest<T>[] = [];
   private activeRequests = new Map<string, QueuedRequest<T>>();
   private deadUrls = new Set<string>();
   private paused = false;
+  private processScheduled = false;
 
   // Event callbacks
   public onLoad?: (result: ImageLoadResult<T>) => void;
@@ -106,6 +112,7 @@ export class ImageLoadQueue<T = any> {
       retryDelay: config.retryDelay ?? 1000,
       priorityInterruptThreshold: config.priorityInterruptThreshold ?? 0.2,
       shouldLoad: config.shouldLoad,
+      loader: config.loader,
     };
   }
 
@@ -141,19 +148,29 @@ export class ImageLoadQueue<T = any> {
         }
       }
 
-      // Insert in priority order (lower priority number = higher priority)
-      const insertIndex = this.queue.findIndex(
-        q => (q.request.priority ?? 0) > (request.priority ?? 0)
-      );
+      this.insertByPriority(queued);
 
-      if (insertIndex === -1) {
-        this.queue.push(queued);
-      } else {
-        this.queue.splice(insertIndex, 0, queued);
-      }
-
-      this.processQueue();
+      // Batch all requests created in the same render turn before taking a
+      // concurrency slot. Otherwise the first six layout nodes start
+      // immediately and a later, more central visible node cannot overtake
+      // them even though it has the better priority.
+      this.scheduleProcessQueue();
     });
+  }
+
+  /**
+   * Raise or lower the priority of a request that has not started yet.
+   * Active network requests are deliberately not restarted.
+   */
+  reprioritize(id: string, priority: number): boolean {
+    const index = this.queue.findIndex(queued => queued.request.id === id);
+    if (index === -1) return false;
+
+    const [queued] = this.queue.splice(index, 1);
+    queued.request.priority = priority;
+    this.insertByPriority(queued);
+    this.scheduleProcessQueue();
+    return true;
   }
 
   /**
@@ -178,6 +195,7 @@ export class ImageLoadQueue<T = any> {
     const active = this.activeRequests.get(id);
     if (active) {
       active.aborted = true;
+      active.abortController?.abort();
       this.activeRequests.delete(id);
       active.reject({
         id: active.request.id,
@@ -185,7 +203,7 @@ export class ImageLoadQueue<T = any> {
         error: new Error('Request cancelled'),
         metadata: active.request.metadata,
       });
-      this.processQueue();
+      this.scheduleProcessQueue();
       return true;
     }
 
@@ -238,6 +256,7 @@ export class ImageLoadQueue<T = any> {
     // Cancel all active
     for (const [id, active] of this.activeRequests.entries()) {
       active.aborted = true;
+      active.abortController?.abort();
       active.reject({
         id: active.request.id,
         url: active.request.url,
@@ -262,19 +281,32 @@ export class ImageLoadQueue<T = any> {
    */
   resume(): void {
     this.paused = false;
-    this.processQueue();
+    this.scheduleProcessQueue();
   }
 
   /**
    * Get queue statistics
    */
   getStats() {
+    const summarizeGroups = (requests: QueuedRequest<T>[]) => requests.reduce<Record<string, number>>(
+      (groups, queued) => {
+        const group = queued.request.group ?? 'ungrouped';
+        groups[group] = (groups[group] ?? 0) + 1;
+        return groups;
+      },
+      {},
+    );
+    const active = Array.from(this.activeRequests.values());
     return {
       queued: this.queue.length,
       active: this.activeRequests.size,
       paused: this.paused,
       mode: this.config.mode,
       maxConcurrent: this.config.maxConcurrent,
+      queuedByGroup: summarizeGroups(this.queue),
+      activeByGroup: summarizeGroups(active),
+      nextPriorities: this.queue.slice(0, 12).map(item => item.request.priority ?? 0),
+      activePriorities: active.map(item => item.request.priority ?? 0),
     };
   }
 
@@ -285,6 +317,25 @@ export class ImageLoadQueue<T = any> {
     this.cancelAll();
     this.queue = [];
     this.activeRequests.clear();
+  }
+
+  private insertByPriority(queued: QueuedRequest<T>): void {
+    const priority = queued.request.priority ?? 0;
+    const insertIndex = this.queue.findIndex(
+      candidate => (candidate.request.priority ?? 0) > priority
+    );
+
+    if (insertIndex === -1) this.queue.push(queued);
+    else this.queue.splice(insertIndex, 0, queued);
+  }
+
+  private scheduleProcessQueue(): void {
+    if (this.processScheduled || this.paused) return;
+    this.processScheduled = true;
+    queueMicrotask(() => {
+      this.processScheduled = false;
+      this.processQueue();
+    });
   }
 
   /**
@@ -356,10 +407,13 @@ export class ImageLoadQueue<T = any> {
     const { request } = queued;
 
     queued.startTime = Date.now();
+    queued.abortController = new AbortController();
     this.activeRequests.set(request.id, queued);
 
     try {
-      const image = await this.loadImage(request.url, this.config.timeout);
+      const image = this.config.loader
+        ? await this.config.loader(request.url, this.config.timeout)
+        : await this.loadImage(request.url, this.config.timeout, queued.abortController);
 
       // Check if request was cancelled
       if (queued.aborted || !this.activeRequests.has(request.id)) {
@@ -382,9 +436,11 @@ export class ImageLoadQueue<T = any> {
       }
 
       this.emitProgress();
-      this.processQueue();
+      this.scheduleProcessQueue();
 
     } catch (error) {
+      if (queued.aborted) return;
+
       // Retry logic — pointless for permanent (404/410) failures
       const isPermanent = error instanceof PermanentImageError;
       if (!isPermanent && queued.retries < this.config.retryCount) {
@@ -394,8 +450,10 @@ export class ImageLoadQueue<T = any> {
         // Re-add to queue with delay
         setTimeout(() => {
           if (!queued.aborted) {
-            this.queue.unshift(queued);
-            this.processQueue();
+            // A retry retains its original priority. `unshift` used to let a
+            // failed background request jump ahead of newly visible images.
+            this.insertByPriority(queued);
+            this.scheduleProcessQueue();
           }
         }, this.config.retryDelay);
 
@@ -418,7 +476,7 @@ export class ImageLoadQueue<T = any> {
       }
 
       this.emitProgress();
-      this.processQueue();
+      this.scheduleProcessQueue();
     }
   }
 
@@ -432,7 +490,11 @@ export class ImageLoadQueue<T = any> {
    *
    * CORS is now enabled on share.arkturian.com/proxy.php
    */
-  private async loadImage(url: string, timeout: number): Promise<HTMLImageElement> {
+  private async loadImage(
+    url: string,
+    timeout: number,
+    abortController: AbortController,
+  ): Promise<HTMLImageElement> {
     // Known-dead URL (404/410 seen this session) — reject without network
     if (this.deadUrls.has(url)) {
       throw new PermanentImageError(url, 404);
@@ -442,19 +504,25 @@ export class ImageLoadQueue<T = any> {
     try {
       const cachedBlob = await imageCache.get(url);
 
+      if (abortController.signal.aborted) {
+        throw new DOMException('Request cancelled', 'AbortError');
+      }
+
       if (cachedBlob) {
         // Cache HIT - convert blob to Image instantly!
         return this.blobToImage(cachedBlob);
       }
     } catch (error) {
+      if (abortController.signal.aborted) throw error;
       // Cache read failed - fall back to network
       console.warn('[ImageLoadQueue] Cache read failed:', error);
     }
 
     // Step 2: Cache MISS - fetch from network with caching enabled
     try {
-      return await this.loadImageWithFetch(url, timeout);
+      return await this.loadImageWithFetch(url, timeout, abortController);
     } catch (error) {
+      if (abortController.signal.aborted) throw error;
       if (error instanceof PermanentImageError) {
         // 404/410: the resource does not exist — an <img> fallback or retry
         // would just repeat the same request (issue #262)
@@ -463,14 +531,18 @@ export class ImageLoadQueue<T = any> {
       }
       // Fetch failed (CORS or network error) - fall back to <img> tag
       console.warn('[ImageLoadQueue] Fetch failed, using <img> fallback:', error);
-      return this.loadImageWithImgTag(url, timeout);
+      return this.loadImageWithImgTag(url, timeout, abortController.signal);
     }
   }
 
   /**
    * Load image using fetch() - enables caching but requires CORS
    */
-  private async loadImageWithFetch(url: string, timeout: number): Promise<HTMLImageElement> {
+  private async loadImageWithFetch(
+    url: string,
+    timeout: number,
+    abortController: AbortController,
+  ): Promise<HTMLImageElement> {
     return new Promise((resolve, reject) => {
       let timer: ReturnType<typeof setTimeout> | null = null;
       let fetchAborted = false;
@@ -482,11 +554,12 @@ export class ImageLoadQueue<T = any> {
 
       timer = setTimeout(() => {
         cleanup();
+        abortController.abort();
         reject(new Error(`Image load timeout: ${url}`));
       }, timeout);
 
       // Fetch as blob to enable caching
-      fetch(url, { mode: 'cors' })
+      fetch(url, { mode: 'cors', signal: abortController.signal })
         .then(response => {
           if (!response.ok) {
             if (response.status === 404 || response.status === 410) {
@@ -503,7 +576,7 @@ export class ImageLoadQueue<T = any> {
           // High-res images (1300px) are NOT cached (too large, rarely reused)
           const shouldCache = this.shouldCacheImage(url, blob);
           if (shouldCache) {
-            imageCache.set(url, blob).catch(err => {
+            await imageCache.set(url, blob).catch(err => {
               console.warn('[ImageLoadQueue] Failed to cache image:', err);
             });
           }
@@ -532,7 +605,11 @@ export class ImageLoadQueue<T = any> {
   /**
    * Load image using <img> tag - works cross-origin but can't cache
    */
-  private loadImageWithImgTag(url: string, timeout: number): Promise<HTMLImageElement> {
+  private loadImageWithImgTag(
+    url: string,
+    timeout: number,
+    signal: AbortSignal,
+  ): Promise<HTMLImageElement> {
     return new Promise((resolve, reject) => {
       const img = new Image();
       let timer: ReturnType<typeof setTimeout> | null = null;
@@ -541,7 +618,20 @@ export class ImageLoadQueue<T = any> {
         if (timer) clearTimeout(timer);
         img.onload = null;
         img.onerror = null;
+        signal.removeEventListener('abort', onAbort);
       };
+
+      const onAbort = () => {
+        cleanup();
+        img.src = '';
+        reject(new DOMException('Request cancelled', 'AbortError'));
+      };
+
+      if (signal.aborted) {
+        onAbort();
+        return;
+      }
+      signal.addEventListener('abort', onAbort, { once: true });
 
       img.onload = () => {
         cleanup();

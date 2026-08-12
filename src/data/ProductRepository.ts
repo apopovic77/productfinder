@@ -678,7 +678,16 @@ function mapProduct(p: ApiProduct): Product | null {
   return new Product(data);
 }
 
-export async function fetchProducts(query: Query = {}): Promise<Product[]> {
+let fullCatalogPromise: Promise<Product[]> | null = null;
+
+function isFullCatalogQuery(query: Query): boolean {
+  if (query.limit !== 10000) return false;
+  return Object.entries(query).every(([key, value]) =>
+    key === 'limit' || value === undefined || value === null || value === ''
+  );
+}
+
+async function fetchProductsFromApi(query: Query): Promise<Product[]> {
   const response = await productsApi.listProductsV1ProductsGet({
     search: query.search,
     category: query.category,
@@ -698,10 +707,23 @@ export async function fetchProducts(query: Query = {}): Promise<Product[]> {
     .map(mapProduct)
     .filter((product: Product | null): product is Product => Boolean(product));
 
-  // Preload images for better UX (non-blocking)
-  Product.preloadImages(products);
-
   return products;
+}
+
+export function fetchProducts(query: Query = {}): Promise<Product[]> {
+  // The splash wrapper and live controller request the same full catalog.
+  // Share that request/result for the browser session instead of fetching and
+  // mapping 2,637 products twice. Image loading is intentionally NOT started
+  // here: only CanvasRenderer knows which products are visible (issue #1066).
+  if (!isFullCatalogQuery(query)) return fetchProductsFromApi(query);
+
+  if (!fullCatalogPromise) {
+    fullCatalogPromise = fetchProductsFromApi(query).catch(error => {
+      fullCatalogPromise = null;
+      throw error;
+    });
+  }
+  return fullCatalogPromise;
 }
 
 export async function fetchFacets(): Promise<any> {

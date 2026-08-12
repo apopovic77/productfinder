@@ -5,7 +5,8 @@ import type { GroupHeaderInfo } from '../layout/PivotLayouter';
 import { LOD_CONFIG } from '../config/LODConfig';
 import { ProductOverlayCanvas, DEFAULT_OVERLAY_STYLE } from './ProductOverlayCanvas';
 import { ProductOverlayCanvasV2, MODERN_OVERLAY_STYLE } from './ProductOverlayCanvasV2';
-import { globalImageQueue } from '../utils/GlobalImageQueue';
+import { backgroundImageQueue, globalImageQueue, lodImageQueue } from '../utils/GlobalImageQueue';
+import { calculateVisibleImagePriority } from './VisibleImagePriority';
 import { buildMediaUrl } from '../utils/MediaUrlBuilder';
 import { InterpolatedProperty } from 'arkturian-typescript-utils';
 import { ProductLabelRenderer } from './ProductLabelRenderer';
@@ -103,6 +104,7 @@ export class CanvasRenderer<T> {
 
   // Use global shared image queue for truly sequential loading
   private imageLoadQueue = globalImageQueue;
+  private lodImageLoadQueue = lodImageQueue;
 
   // Queue processing timing (non-blocking)
   private lastQueueProcessTime = 0;
@@ -347,6 +349,18 @@ export class CanvasRenderer<T> {
 
       if (!isVisible) continue; // Skip invisible nodes
 
+      const product = node.data as any as Product;
+      let currentSize = this.loadedImageSizes.get(node.id);
+
+      // Base thumbnails belong exclusively to the foreground draw path. The
+      // old scanner treated an unloaded node as an LOD task and could request
+      // the same 180px URL a second time from a different queue.
+      if (currentSize === undefined) {
+        if (!product.isImageReady) continue;
+        currentSize = LOD_CONFIG.lowResolution;
+        this.loadedImageSizes.set(node.id, currentSize);
+      }
+
       // Calculate screen space size
       const screenWidth = w * scale;
       const screenHeight = h * scale;
@@ -354,7 +368,6 @@ export class CanvasRenderer<T> {
 
       // Determine required LOD tier with HYSTERESIS to prevent flickering
       // 3 tiers: micro (35px) → low (130px) → high (1300px)
-      const currentSize = this.loadedImageSizes.get(node.id);
       let requiredSize: number;
 
       if (currentSize === LOD_CONFIG.highResolution) {
@@ -404,7 +417,7 @@ export class CanvasRenderer<T> {
 
           // CANCEL old pending request for this node to prevent race conditions
           const taskId = `lod-${node.id}`; // Simplified ID (no size) to enable cancellation
-          this.imageLoadQueue.cancel(taskId);
+          this.lodImageLoadQueue.cancel(taskId);
 
           const quality = requiredSize === LOD_CONFIG.highResolution ? LOD_CONFIG.highQuality
             : requiredSize === LOD_CONFIG.lowResolution ? LOD_CONFIG.lowQuality
@@ -417,7 +430,7 @@ export class CanvasRenderer<T> {
           });
 
           // Add to ImageLoadQueue (automatically handles duplicates and priority sorting)
-          this.imageLoadQueue.add({
+          this.lodImageLoadQueue.add({
             id: taskId,
             url: imageUrl,
             group: 'lod',
@@ -548,6 +561,48 @@ export class CanvasRenderer<T> {
       this.ctx.fillStyle = this.backgroundColor;
       this.ctx.fillRect(0, 0, c.width, c.height);
     }
+  }
+
+  private drawImageLoadingPlaceholder(x: number, y: number, width: number, height: number): void {
+    const centerX = x + width / 2;
+    const centerY = y + height / 2;
+    const radius = Math.min(width, height) / 2.5;
+    const phase = (performance.now() % 1200) / 1200;
+
+    this.ctx.beginPath();
+    this.ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+    this.ctx.fillStyle = `rgba(200, 200, 200, ${0.20 + Math.sin(phase * Math.PI * 2) * 0.06})`;
+    this.ctx.fill();
+
+    // A moving arc makes a queued/network load distinguishable from an empty
+    // cell without adding React state or blocking the render loop.
+    this.ctx.beginPath();
+    this.ctx.arc(
+      centerX,
+      centerY,
+      radius,
+      phase * Math.PI * 2,
+      phase * Math.PI * 2 + Math.PI * 0.7,
+    );
+    this.ctx.strokeStyle = 'rgba(230, 51, 18, 0.9)';
+    this.ctx.lineWidth = Math.max(2, Math.min(width, height) * 0.025);
+    this.ctx.lineCap = 'round';
+    this.ctx.stroke();
+  }
+
+  private requestVisibleProductImage(product: Product, priority: number): void {
+    if (performance.getEntriesByName('productfinder-visible-image-requested').length === 0) {
+      performance.mark('productfinder-visible-image-requested', {
+        detail: { productId: product.id, priority },
+      });
+    }
+
+    void product.loadImage(priority).then(image => {
+      if (!image || performance.getEntriesByName('productfinder-visible-first-image-ready').length > 0) return;
+      performance.mark('productfinder-visible-first-image-ready', {
+        detail: { productId: product.id, priority },
+      });
+    });
   }
 
   /**
@@ -1074,7 +1129,12 @@ export class CanvasRenderer<T> {
       const scale = n.scale.value ?? 1;
       const opacity = n.opacity.value ?? 1;
 
-      if (opacity <= 0.01) { culled++; continue; }
+      if (opacity <= 0.01) {
+        const hiddenProduct = n.data as any as Product;
+        if (hiddenProduct.isImageLoading) hiddenProduct.reprioritizeImageLoad(900);
+        culled++;
+        continue;
+      }
 
       // Viewport culling: skip nodes completely outside the visible area
       if (this.viewport && (
@@ -1082,7 +1142,15 @@ export class CanvasRenderer<T> {
         x > this.viewportRight ||
         y + h < this.viewportTop ||
         y > this.viewportBottom
-      )) { culled++; continue; }
+      )) {
+        const offscreenProduct = n.data as any as Product;
+        // An old viewport must not keep a real network slot. Cancellation is
+        // transport-level (AbortController); Product treats it as relevance,
+        // not as an image failure, so a later re-entry can enqueue cleanly.
+        if (offscreenProduct.isImageLoading) offscreenProduct.cancelImageLoad();
+        culled++;
+        continue;
+      }
 
       visible++;
 
@@ -1112,15 +1180,26 @@ export class CanvasRenderer<T> {
       }
 
       if (!product.isImageReady && !product.hasImageError) {
-        // Trigger async load (non-blocking) — skip if already failed
-        if (!product.isImageLoading) product.loadImage();
+        const visiblePriority = this.viewport
+          ? calculateVisibleImagePriority(
+            { x, y, width: w, height: h },
+            {
+              x: this.viewportLeft,
+              y: this.viewportTop,
+              width: this.viewportRight - this.viewportLeft,
+              height: this.viewportBottom - this.viewportTop,
+            },
+          )
+          : 10;
 
-        // Draw placeholder: gray circle
-        const circleRadius = Math.min(w, h) / 2.5;
-        this.ctx.beginPath();
-        this.ctx.arc(x + w / 2, y + h / 2, circleRadius, 0, Math.PI * 2);
-        this.ctx.fillStyle = 'rgba(200, 200, 200, 0.4)';
-        this.ctx.fill();
+        // Newly visible nodes enter the foreground band (10..49). Existing
+        // queued nodes are re-ranked after pan/zoom before a network slot is
+        // taken. ImageLoadQueue batches the whole render turn, so node-array
+        // order can no longer beat viewport relevance.
+        if (!product.isImageLoading) this.requestVisibleProductImage(product, visiblePriority);
+        else product.reprioritizeImageLoad(visiblePriority);
+
+        this.drawImageLoadingPlaceholder(x, y, w, h);
 
         continue;
       }
@@ -2006,21 +2085,18 @@ export class CanvasRenderer<T> {
     // Mark as loading
     this.groupHeaderImageLoading.add(imageKey);
 
-    // Load image
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-
-    img.onload = () => {
-      this.groupHeaderImages.set(imageKey, img);
+    void backgroundImageQueue.add({
+      id: `group-header-${imageKey}`,
+      url: imageUrl,
+      group: 'group-header',
+      priority: 500,
+    }).then(result => {
+      this.groupHeaderImages.set(imageKey, result.image);
       this.groupHeaderImageLoading.delete(imageKey);
-    };
-
-    img.onerror = () => {
+    }).catch(() => {
       console.warn(`[CanvasRenderer] Failed to load hero image for ${imageKey}`);
       this.groupHeaderImageLoading.delete(imageKey);
-    };
-
-    img.src = imageUrl;
+    });
   }
 
   /**

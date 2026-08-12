@@ -17,9 +17,8 @@ export const WEB_PRODUCT_IMAGE_PRESETS = {
 } as const;
 
 export const WEB_THUMBNAIL_WARMUP = {
-  blockingCount: 120,
   backgroundBatchSize: 48,
   backgroundPriority: 100_000,
-  backgroundStartDelayMs: 750,
+  backgroundStartDelayMs: 1500,
   backgroundBatchDelayMs: 100,
 } as const;

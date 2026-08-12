@@ -296,15 +296,27 @@ export class Product {
     return [...this.attributeKeys];
   }
 
-  async loadImage(): Promise<HTMLImageElement | null> {
+  async loadImage(priority = 50): Promise<HTMLImageElement | null> {
     const url = this.imageUrl;
-    return this.loadImageFromUrl(url);
+    return this.loadImageFromUrl(url, priority);
+  }
+
+  reprioritizeImageLoad(priority: number): boolean {
+    return globalImageQueue.reprioritize(this.getImageRequestId(this.imageUrl), priority);
+  }
+
+  cancelImageLoad(): boolean {
+    return globalImageQueue.cancel(this.getImageRequestId(this.imageUrl));
+  }
+
+  private getImageRequestId(url: string): string {
+    return `product-${this.id}-${url}`;
   }
 
   /**
    * Load image from a specific URL (for LOD system)
    */
-  async loadImageFromUrl(url: string): Promise<HTMLImageElement | null> {
+  async loadImageFromUrl(url: string, priority = 50): Promise<HTMLImageElement | null> {
     const failureMeta = Product.failedUrlAttempts.get(url);
     if (failureMeta) {
       const elapsed = Date.now() - failureMeta.lastFailed;
@@ -352,10 +364,10 @@ export class Product {
     const loadPromise = (async (): Promise<HTMLImageElement | null> => {
       try {
         const result = await globalImageQueue.add({
-          id: `product-${this.id}-${url}`,
+          id: this.getImageRequestId(url),
           url,
           group: 'product-grid',
-          priority: 50, // after hero (0), BEFORE spread alternatives (100+) — issue #261
+          priority, // visible Canvas thumbs occupy 10..49; default remains 50
         });
         if (isValid(result.image)) {
           this._image = result.image;
@@ -373,7 +385,7 @@ export class Product {
             id: `product-${this.id}-refresh-${url}`,
             url: refreshUrl,
             group: 'product-grid',
-            priority: 50,
+            priority,
           });
           if (isValid(retry.image)) {
             this._image = retry.image;
@@ -389,8 +401,14 @@ export class Product {
         if (!this._image) this._imageError = true;
         Product.loadingPromises.delete(url);
         return this._image ?? null;
-      } catch {
-        // Queue-level failure (network error after queue retries, timeout, cancel)
+      } catch (error: any) {
+        const message = error?.error?.message ?? error?.message;
+        if (message === 'Request cancelled' || message === 'Request no longer relevant') {
+          this._imageLoading = false;
+          Product.loadingPromises.delete(url);
+          return this._image ?? null;
+        }
+        // Queue-level failure (network error after queue retries or timeout)
         this._imageLoading = false;
         if (!this._image) this._imageError = true;
         Product.loadingPromises.delete(url);
@@ -427,7 +445,4 @@ export class Product {
     Product.loadingPromises.clear();
   }
 
-  static async preloadImages(products: Product[]): Promise<void> {
-    await Promise.allSettled(products.map(p => p.loadImage()));
-  }
 }

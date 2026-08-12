@@ -23,7 +23,7 @@ describe('canonical Productfinder image presets', () => {
   });
 
   it('keeps background warmup below every interactive image priority', () => {
-    expect(WEB_THUMBNAIL_WARMUP.blockingCount).toBeGreaterThan(0);
     expect(WEB_THUMBNAIL_WARMUP.backgroundPriority).toBeGreaterThan(10_000);
+    expect(WEB_THUMBNAIL_WARMUP.backgroundStartDelayMs).toBeGreaterThanOrEqual(1000);
   });
 });

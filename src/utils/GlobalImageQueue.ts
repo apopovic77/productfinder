@@ -13,10 +13,34 @@ export const globalImageQueue = new ImageLoadQueue({
   mode: 'parallel',
   timeout: 30000,
   retryCount: 1,
-  priorityInterruptThreshold: 0.2, // Allow high priority requests to interrupt low priority
+  priorityInterruptThreshold: 0,
+});
+
+// Background cache warming must never consume one of the six slots reserved
+// for images the user can currently see. It gets its own deliberately small
+// pool and may continue opportunistically after first paint.
+export const backgroundImageQueue = new ImageLoadQueue({
+  maxConcurrent: 2,
+  mode: 'parallel',
+  timeout: 30000,
+  retryCount: 1,
+  priorityInterruptThreshold: 0,
+});
+
+// High-resolution LOD upgrades are useful only after the 180px base image is
+// visible. Keeping them out of the foreground queue prevents a previous
+// zoom/pan from occupying all slots when a new viewport needs base thumbs.
+export const lodImageQueue = new ImageLoadQueue({
+  maxConcurrent: 2,
+  mode: 'parallel',
+  timeout: 30000,
+  retryCount: 1,
+  priorityInterruptThreshold: 0,
 });
 
 // For debugging: expose queue stats
 if (typeof window !== 'undefined') {
   (window as any).__imageQueue = globalImageQueue;
+  (window as any).__backgroundImageQueue = backgroundImageQueue;
+  (window as any).__lodImageQueue = lodImageQueue;
 }

@@ -15,6 +15,19 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       allowedHosts: ['productfinder-dev.oneal.arkturian.com'],
+      proxy: {
+        // Mirror the nginx same-origin contracts for local Playwright/dev.
+        '/oneal-api': {
+          target: 'http://127.0.0.1:8004',
+          changeOrigin: true,
+          rewrite: (requestPath) => requestPath.replace(/^\/oneal-api/, ''),
+        },
+        '/storage-api': {
+          target: 'http://127.0.0.1:8001',
+          changeOrigin: true,
+          rewrite: (requestPath) => requestPath.replace(/^\/storage-api/, ''),
+        },
+      },
     },
     build: {
       chunkSizeWarningLimit: 1000,
