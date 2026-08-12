@@ -2393,7 +2393,7 @@ export default class App extends React.Component<{}, State> {
                 <HeroVideoBackground
                   storageId={videoStorageId}
                   imageQuery={heroImageQuery}
-                  backdropOpacity={0}
+                  backdropOpacity={0.28}
                   onClose={() => this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false })}
                 >
                   <ProductOverlayModalV4
