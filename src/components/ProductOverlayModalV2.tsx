@@ -554,6 +554,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         top: isMobilePortrait ? 'auto' : `${dragPosition.y}px`,
         bottom: isMobilePortrait ? '8px' : 'auto',
         width: `${DIALOG_WIDTH}px`,
+        boxSizing: 'border-box',
         maxHeight: isMobilePortrait ? '48vh' : '80vh',
         cursor: isDragging ? 'grabbing' : 'grab',
         userSelect: isDragging ? 'none' : 'auto',
@@ -585,7 +586,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
             Cart
           </button>
         )}
-        <button className="pom-close" onClick={onClose} aria-label="Close" style={{ fontSize: '18px', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <button className="pom-close" onClick={onClose} aria-label="Close" style={{ position: 'static', flex: '0 0 auto', fontSize: '18px', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           ×
         </button>
       </div>

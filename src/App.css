@@ -338,6 +338,12 @@ body {
   text-decoration: none;
 }
 
+.pf-header-breadcrumb.home,
+.pf-header-breadcrumb.home.active {
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 .pf-header-breadcrumb-sep {
   color: rgba(255, 255, 255, 0.3);
   font-size: 12px;
@@ -424,6 +430,8 @@ body {
     padding: 0 12px;
     min-height: 44px;
     gap: 8px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
   }
 
   .pf-header-logo img {
@@ -431,8 +439,13 @@ body {
   }
 
   .pf-header-search {
-    flex: 1;
     min-width: 0;
+  }
+
+  .pf-header-search-inner,
+  .pf-header-search-input {
+    min-width: 0;
+    box-sizing: border-box;
   }
 
   .pf-header-search-input {

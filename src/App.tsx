@@ -918,21 +918,45 @@ export default class App extends React.Component<{}, State> {
   private handleBreadcrumbClick = (index: number) => {
     const { pivotBreadcrumbs } = this.state;
     if (index < 0 || index >= pivotBreadcrumbs.length) return;
-    if (index === pivotBreadcrumbs.length - 1) return; // current level
+
+    // The root crumb is a persistent Home action, even when it is the
+    // currently active (and only) breadcrumb.
+    if (index === 0) {
+      this.resetToInitialView();
+      return;
+    }
+
+    if (index === pivotBreadcrumbs.length - 1) return; // current non-root level
 
     // Close dialog immediately on pivot navigation
     this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false });
 
-    if (index === 0) {
-      this.controller.resetPivot();
-      // No need to set dimension — reset returns to taxonomy root
-    } else {
-      const levelsToRemove = pivotBreadcrumbs.length - 1 - index;
-      for (let i = 0; i < levelsToRemove; i++) {
-        this.controller.drillUpPivot();
-      }
+    const levelsToRemove = pivotBreadcrumbs.length - 1 - index;
+    for (let i = 0; i < levelsToRemove; i++) {
+      this.controller.drillUpPivot();
     }
     this.syncPivotUI();
+  };
+
+  private resetToInitialView = () => {
+    const initialState = createInitialState();
+    this.controller.clearAiFilterProductIds();
+    this.controller.resetPivot();
+    this.setState({
+      sortMode: initialState.sortMode,
+      pivotBreadcrumbs: initialState.pivotBreadcrumbs,
+      selectedProduct: null,
+      selectedVariant: null,
+      dialogPosition: null,
+      shouldShowV4Dialog: false,
+      aiFilterProductIds: [],
+      aiLastResultCount: null,
+      aiPrompt: '',
+      searchFilterTerm: null,
+      footerSearchTerm: '',
+      mobilePivotOpen: false,
+      cartPanelOpen: false,
+    }, () => this.syncPivotUI());
   };
 
   private handleDimensionClick = (dimension: GroupDimension) => {
@@ -1745,8 +1769,8 @@ export default class App extends React.Component<{}, State> {
                   {i > 0 && <span className="pf-header-breadcrumb-sep">›</span>}
                   <span
                     role="button"
-                    tabIndex={i === pivotBreadcrumbs.length - 1 ? -1 : 0}
-                    className={`pf-header-breadcrumb ${i === pivotBreadcrumbs.length - 1 ? 'active' : ''}`}
+                    tabIndex={i === 0 || i < pivotBreadcrumbs.length - 1 ? 0 : -1}
+                    className={`pf-header-breadcrumb ${i === pivotBreadcrumbs.length - 1 ? 'active' : ''} ${i === 0 ? 'home' : ''}`}
                     onClick={() => this.handleBreadcrumbClick(i)}
                     onKeyDown={evt => {
                       if (evt.key === 'Enter' || evt.key === ' ') {
@@ -1910,8 +1934,8 @@ export default class App extends React.Component<{}, State> {
                 {i > 0 && <span className="pf-header-breadcrumb-sep">›</span>}
                 <span
                   role="button"
-                  tabIndex={i === pivotBreadcrumbs.length - 1 ? -1 : 0}
-                  className={`pf-header-breadcrumb ${i === pivotBreadcrumbs.length - 1 ? 'active' : ''}`}
+                  tabIndex={i === 0 || i < pivotBreadcrumbs.length - 1 ? 0 : -1}
+                  className={`pf-header-breadcrumb ${i === pivotBreadcrumbs.length - 1 ? 'active' : ''} ${i === 0 ? 'home' : ''}`}
                   onClick={() => this.handleBreadcrumbClick(i)}
                   onKeyDown={evt => {
                     if (evt.key === 'Enter' || evt.key === ' ') {
@@ -2195,20 +2219,7 @@ export default class App extends React.Component<{}, State> {
                 if (pivotBreadcrumbs.length > 1) {
                   this.handleBreadcrumbClick(pivotBreadcrumbs.length - 2);
                 } else {
-                  // Already at start - reset everything
-                  const initialState = createInitialState();
-                  this.setState({
-                    sortMode: initialState.sortMode,
-                    pivotBreadcrumbs: initialState.pivotBreadcrumbs,
-                    selectedProduct: null,
-                    selectedVariant: null,
-                    dialogPosition: null,
-                    shouldShowV4Dialog: false,
-                    aiFilterProductIds: [],
-                    aiLastResultCount: null,
-                    aiPrompt: '',
-                  });
-                  this.controller.resetPivot();
+                  this.resetToInitialView();
                 }
               }}
               title={pivotBreadcrumbs.length > 1 ? `Zurück zu ${pivotBreadcrumbs[pivotBreadcrumbs.length - 2]}` : 'Reset to start view'}
