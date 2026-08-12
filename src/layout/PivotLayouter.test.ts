@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { calculateMobilePivotGeometry } from './MobilePivotGeometry';
+import { resolvePivotHeaderHeight } from './PivotHeaderGeometry';
+
+describe('PivotLayouter responsive bucket headers', () => {
+  it('keeps cinematic headers for desktop columns but compacts desktop portrait rows', () => {
+    expect(resolvePivotHeaderHeight(1297, 'columns')).toBe(105);
+    expect(resolvePivotHeaderHeight(1297, 'rows')).toBe(48);
+  });
+
+  it('leaves the dedicated mobile geometry contract in control', () => {
+    expect(resolvePivotHeaderHeight(390, 'rows')).toBe(32);
+  });
+});
 
 describe('PivotLayouter mobile portrait rows', () => {
   it('reserves the complete label height and fits the densest group', () => {

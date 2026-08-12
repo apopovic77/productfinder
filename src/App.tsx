@@ -559,12 +559,17 @@ export default class App extends React.Component<{}, State> {
 
                   // Fetch trim bounds for text positioning
                   const STORAGE_API_BASE = CENTRAL_STORAGE_BASE;
-                  const STORAGE_API_KEY = CENTRAL_STORAGE_KEY;
                   const trimBoundsUrl = `${STORAGE_API_BASE}/storage/media/${heroStorageId}/trim-bounds`;
                   console.log('[App] Fetching trim bounds for storage ID:', heroStorageId, 'URL:', trimBoundsUrl);
-                  fetch(trimBoundsUrl)
+                  const trimBoundsRequest: RequestInit = {
+                    headers: { 'X-API-Key': CENTRAL_STORAGE_KEY },
+                  };
+                  fetch(trimBoundsUrl, trimBoundsRequest)
                     .then(async res => {
                       console.log('[App] Trim bounds response status:', res.status);
+                      if (!res.ok && res.status !== 404) {
+                        throw new Error(`Trim bounds request failed (${res.status})`);
+                      }
                       const data = await res.json();
                       console.log('[App] Trim bounds data received:', JSON.stringify(data, null, 2));
 
@@ -573,7 +578,10 @@ export default class App extends React.Component<{}, State> {
                         // Trigger computation by calling with ?generate=true (default is already true, but being explicit)
                         const refreshUrl = `${trimBoundsUrl}?generate=true`;
                         console.log('[App] Fetching with generate=true:', refreshUrl);
-                        const refreshRes = await fetch(refreshUrl);
+                        const refreshRes = await fetch(refreshUrl, trimBoundsRequest);
+                        if (!refreshRes.ok) {
+                          throw new Error(`Trim bounds generation failed (${refreshRes.status})`);
+                        }
                         const refreshData = await refreshRes.json();
                         console.log('[App] Generate response:', JSON.stringify(refreshData, null, 2));
                         return refreshData;

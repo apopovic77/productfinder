@@ -83,23 +83,45 @@ export const LifestyleMediaSection: React.FC<Props> = ({ query }) => {
           <button
             type="button"
             aria-label="Close image"
-            onClick={() => setExpandedId(null)}
+            onClick={(event) => {
+              event.stopPropagation();
+              setExpandedId(null);
+            }}
             style={{
-              position: 'fixed',
-              top: '20px',
-              right: '24px',
-              width: '42px',
-              height: '42px',
-              border: '1px solid rgba(255,255,255,0.35)',
+              position: 'absolute',
+              top: 'max(16px, env(safe-area-inset-top))',
+              right: 'max(16px, env(safe-area-inset-right))',
+              width: '44px',
+              height: '44px',
+              minWidth: '44px',
+              minHeight: '44px',
+              padding: 0,
+              boxSizing: 'border-box',
+              border: '1px solid rgba(255,255,255,0.72)',
               borderRadius: '50%',
-              background: 'rgba(0,0,0,0.35)',
+              background: 'rgba(16,16,16,0.82)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              boxShadow: '0 8px 28px rgba(0,0,0,0.38)',
               color: '#fff',
-              fontSize: '28px',
-              lineHeight: 1,
               cursor: 'pointer',
+              display: 'grid',
+              placeItems: 'center',
+              zIndex: 1,
             }}
           >
-            ×
+            <svg
+              aria-hidden="true"
+              width="20"
+              height="20"
+              viewBox="0 0 20 20"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+            >
+              <path d="M4 4l12 12M16 4L4 16" />
+            </svg>
           </button>
           <img
             src={largeUrl(expandedId)}

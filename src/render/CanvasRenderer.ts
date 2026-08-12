@@ -1591,11 +1591,16 @@ export class CanvasRenderer<T> {
         this.ctx.fillStyle = BUCKET_BUTTON_CONFIG.font.color;
         const fontWeight = isHovered ? BUCKET_BUTTON_CONFIG.font.weightHover : BUCKET_BUTTON_CONFIG.font.weightNormal;
 
-        // Get individual padding values (scaled for mobile)
-        const paddingTop = BUCKET_BUTTON_CONFIG.spacing.paddingTop * mobileScale;
-        const paddingRight = BUCKET_BUTTON_CONFIG.spacing.paddingRight * mobileScale;
-        const paddingBottom = BUCKET_BUTTON_CONFIG.spacing.paddingBottom * mobileScale;
-        const paddingLeft = BUCKET_BUTTON_CONFIG.spacing.paddingLeft * mobileScale;
+        // Scale padding with the actual bucket height. Desktop portrait uses
+        // compact horizontal row headers; applying the cinematic 105px
+        // padding there would leave only a few pixels for the label.
+        const headerScale = isMobileCanvas
+          ? mobileScale
+          : Math.min(1, header.height / BUCKET_BUTTON_CONFIG.height);
+        const paddingTop = BUCKET_BUTTON_CONFIG.spacing.paddingTop * headerScale;
+        const paddingRight = BUCKET_BUTTON_CONFIG.spacing.paddingRight * headerScale;
+        const paddingBottom = BUCKET_BUTTON_CONFIG.spacing.paddingBottom * headerScale;
+        const paddingLeft = BUCKET_BUTTON_CONFIG.spacing.paddingLeft * headerScale;
 
         const maxTextWidth = header.width - paddingLeft - paddingRight;
         const maxTextHeight = header.height - paddingTop - paddingBottom;

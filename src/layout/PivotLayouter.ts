@@ -7,6 +7,7 @@ import { PivotGroup } from './PivotGroup';
 import { Vector2 } from 'arkturian-typescript-utils';
 import { BUCKET_BUTTON_CONFIG } from '../config/BucketButtonConfig';
 import { calculateMobilePivotGeometry } from './MobilePivotGeometry';
+import { resolvePivotHeaderHeight } from './PivotHeaderGeometry';
 
 export type Orientation = 'rows' | 'columns';
 export type Flow = 'ltr' | 'rtl' | 'ttb' | 'btt';
@@ -134,7 +135,7 @@ export class PivotLayouter<T> {
       // Global optimization: Find cell size that fits the LARGEST group, use for all groups
       
       const isMobile = view.width < 768;
-      const headerHeight = isMobile ? Math.round(BUCKET_BUTTON_CONFIG.height * 0.3) : BUCKET_BUTTON_CONFIG.height;
+      const headerHeight = resolvePivotHeaderHeight(view.width, orientation);
       const numGroups = keys.length;
 
       if (orientation === 'rows') {
