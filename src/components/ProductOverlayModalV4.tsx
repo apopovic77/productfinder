@@ -483,14 +483,18 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
           width: isMobile ? '100%' : `${DIALOG_WIDTH}px`,
           height: isMobile ? '100%' : 'auto',
           overflow: isMobile ? 'auto' : 'hidden',
-          background: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(30px)',
-          WebkitBackdropFilter: 'blur(30px)',
-          borderRadius: isMobile ? '0' : '24px 24px 0 0',
+          background: isMobile
+            ? 'linear-gradient(145deg, rgba(255,255,255,0.88), rgba(238,243,247,0.78))'
+            : 'linear-gradient(145deg, rgba(255,255,255,0.68), rgba(238,243,247,0.54))',
+          backdropFilter: 'blur(36px) saturate(155%)',
+          WebkitBackdropFilter: 'blur(36px) saturate(155%)',
+          borderRadius: isMobile ? '0' : '28px 28px 0 0',
           padding: '0',
-          border: isMobile ? 'none' : '1px solid rgba(255, 255, 255, 0.8)',
+          border: isMobile ? 'none' : '1px solid rgba(255,255,255,0.72)',
           borderBottom: 'none',
-          boxShadow: isMobile ? 'none' : '0 24px 64px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.5) inset',
+          boxShadow: isMobile
+            ? 'inset 0 1px 0 rgba(255,255,255,0.72)'
+            : '0 32px 96px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.9), inset 0 0 0 1px rgba(255,255,255,0.16)',
           display: 'flex',
           flexDirection: isMobile ? 'column' : 'row',
           transition: isMobile ? 'none' : 'top 0.05s linear',
@@ -522,8 +526,10 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          background: 'rgba(0, 0, 0, 0.05)',
-          border: 'none',
+          background: 'rgba(255, 255, 255, 0.38)',
+          backdropFilter: 'blur(14px) saturate(150%)',
+          WebkitBackdropFilter: 'blur(14px) saturate(150%)',
+          border: '1px solid rgba(255,255,255,0.58)',
           borderRadius: '50%',
           color: '#1a1a1a',
           cursor: 'pointer',
@@ -531,10 +537,10 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
           zIndex: 10,
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = 'rgba(0, 0, 0, 0.1)';
+          e.currentTarget.style.background = 'rgba(255,255,255,0.7)';
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)';
+          e.currentTarget.style.background = 'rgba(255,255,255,0.38)';
         }}
       >
         ×
