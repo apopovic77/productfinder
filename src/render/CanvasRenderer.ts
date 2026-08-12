@@ -56,6 +56,27 @@ export class CanvasRenderer<T> {
   // Variant-specific hero image (overrides product's primary image)
   public selectedVariantHeroImage: HTMLImageElement | null = null;
 
+  /** Apply an already loaded selected-product image without waiting for the LOD scan. */
+  public applySelectedHeroImage(image: HTMLImageElement, loadedSize: number): void {
+    this.selectedVariantHeroImage = image;
+    this.pivotHeroLoadedSize = loadedSize;
+  }
+
+  /** Reserve the selected-product LOD while its dedicated priority-0 load runs. */
+  public beginSelectedHeroImageLoad(targetSize: number): void {
+    this.pivotHeroLoadedSize = targetSize;
+  }
+
+  public failSelectedHeroImageLoad(): void {
+    if (!this.selectedVariantHeroImage) this.pivotHeroLoadedSize = null;
+  }
+
+  /** Clear both the selected image and its LOD state when selection changes. */
+  public resetSelectedHeroImage(): void {
+    this.selectedVariantHeroImage = null;
+    this.pivotHeroLoadedSize = null;
+  }
+
   // Dialog connection line (for React overlay mode)
   public dialogConnectionPoint: { x: number; y: number } | null = null; // Product center in canvas space
   public dialogPosition: { x: number; y: number } | null = null; // Dialog position in screen space
@@ -392,6 +413,12 @@ export class CanvasRenderer<T> {
       if (!isVisible) continue; // Skip invisible nodes
 
       const product = node.data as any as Product;
+      // The selected product owns a dedicated priority-0 hero request. Letting
+      // the general LOD scanner process the same node duplicated the 1300px
+      // request in the low-priority LOD pool.
+      if (this.selectedProduct && String(product.id) === String(this.selectedProduct.id)) {
+        continue;
+      }
       let currentSize = this.loadedImageSizes.get(node.id);
 
       // Base thumbnails belong exclusively to the foreground draw path. The

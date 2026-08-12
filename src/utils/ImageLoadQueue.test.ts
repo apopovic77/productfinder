@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { ImageLoadQueue } from './ImageLoadQueue';
+import { ImageLoadQueue, shouldUsePersistentImageCache } from './ImageLoadQueue';
 
 const image = {} as HTMLImageElement;
 
 describe('ImageLoadQueue visible-first ordering', () => {
+  it('bypasses persistent fetch caching for large hero and LOD media', () => {
+    expect(shouldUsePersistentImageCache('https://example.test/media/1?width=1300')).toBe(false);
+    expect(shouldUsePersistentImageCache('https://example.test/media/1?width=180')).toBe(true);
+    expect(shouldUsePersistentImageCache('https://example.test/media/1')).toBe(true);
+  });
+
   it('sorts all requests added in one render turn before starting work', async () => {
     const started: string[] = [];
     const queue = new ImageLoadQueue({
@@ -72,5 +78,31 @@ describe('ImageLoadQueue visible-first ordering', () => {
     await expect(offscreen).resolves.toBe('Request cancelled');
     await expect(visible).resolves.toMatchObject({ id: 'visible' });
     expect(started).toEqual(['offscreen', 'visible']);
+  });
+
+  it('preempts one lower-priority parallel request for selected hero media', async () => {
+    const started: string[] = [];
+    const releases = new Map<string, (value: HTMLImageElement) => void>();
+    const queue = new ImageLoadQueue({
+      maxConcurrent: 1,
+      mode: 'parallel',
+      priorityInterruptThreshold: 0.2,
+      loader: url => new Promise(resolve => {
+        started.push(url);
+        releases.set(url, resolve);
+      }),
+    });
+
+    const neighbour = queue.add({ id: 'neighbour', url: 'neighbour', priority: 30 })
+      .catch(error => error.error.message);
+    await Promise.resolve();
+
+    const hero = queue.add({ id: 'hero', url: 'hero', priority: 0 });
+    await expect(neighbour).resolves.toBe('Request cancelled');
+    await Promise.resolve();
+    expect(started).toEqual(['neighbour', 'hero']);
+
+    releases.get('hero')?.(image);
+    await expect(hero).resolves.toMatchObject({ id: 'hero' });
   });
 });

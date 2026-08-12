@@ -13,7 +13,8 @@ export const globalImageQueue = new ImageLoadQueue({
   mode: 'parallel',
   timeout: 30000,
   retryCount: 1,
-  priorityInterruptThreshold: 0,
+  // Priority-0 selection media may preempt one lower-priority visible image.
+  priorityInterruptThreshold: 0.2,
 });
 
 // Background cache warming must never consume one of the six slots reserved

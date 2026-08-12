@@ -87,6 +87,21 @@ interface QueuedRequest<T = any> {
   abortController?: AbortController;
 }
 
+/**
+ * Large LOD/hero images are intentionally not persisted. Loading them through
+ * fetch first therefore adds no cache value and, on storage origins without a
+ * matching CORS response, causes a failed request followed by an identical
+ * <img> retry. Send those URLs straight through the browser image loader.
+ */
+export function shouldUsePersistentImageCache(url: string): boolean {
+  try {
+    const width = new URL(url).searchParams.get('width');
+    return width === null || Number.parseInt(width, 10) <= 300;
+  } catch {
+    return true;
+  }
+}
+
 export class ImageLoadQueue<T = any> {
   private config: Required<Omit<ImageLoadQueueConfig, 'shouldLoad' | 'loader'>> & {
     shouldLoad?: <T>(request: ImageLoadRequest<T>) => boolean;
@@ -134,8 +149,7 @@ export class ImageLoadQueue<T = any> {
 
       const newPriority = request.priority ?? 0;
 
-      // Priority Interruption: Cancel active requests if new request has MUCH higher priority
-      // (only in sequential mode where this makes sense)
+      // Priority interruption for a sequential queue: replace the current job.
       if (this.config.mode === 'sequential' && this.config.priorityInterruptThreshold > 0) {
         for (const [id, active] of this.activeRequests.entries()) {
           const activePriority = active.request.priority ?? 0;
@@ -146,6 +160,28 @@ export class ImageLoadQueue<T = any> {
             this.cancel(id);
           }
         }
+      }
+
+      // A parallel queue can still have every slot occupied by low-value work
+      // when a user selects a product. In that case, free exactly one slot for
+      // the new high-priority request. Cancelling only the least important
+      // active request avoids a six-request restart storm while guaranteeing
+      // that priority-0 hero media does not wait behind neighbouring products.
+      if (
+        this.config.mode === 'parallel'
+        && this.config.priorityInterruptThreshold > 0
+        && this.activeRequests.size >= this.config.maxConcurrent
+      ) {
+        const interruptible = Array.from(this.activeRequests.entries())
+          .filter(([, active]) => {
+            const activePriority = active.request.priority ?? 0;
+            return activePriority > 0
+              && newPriority < activePriority * this.config.priorityInterruptThreshold;
+          })
+          .sort(([, a], [, b]) => (b.request.priority ?? 0) - (a.request.priority ?? 0));
+
+        const leastImportant = interruptible[0];
+        if (leastImportant) this.cancel(leastImportant[0]);
       }
 
       this.insertByPriority(queued);
@@ -498,6 +534,10 @@ export class ImageLoadQueue<T = any> {
     // Known-dead URL (404/410 seen this session) — reject without network
     if (this.deadUrls.has(url)) {
       throw new PermanentImageError(url, 404);
+    }
+
+    if (!shouldUsePersistentImageCache(url)) {
+      return this.loadImageWithImgTag(url, timeout, abortController.signal);
     }
 
     // Step 1: Try IndexedDB cache first

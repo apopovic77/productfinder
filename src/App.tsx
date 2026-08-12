@@ -237,6 +237,9 @@ export default class App extends React.Component<{}, State> {
 
   // Use global shared image queue for truly sequential loading
   private imageLoadQueue = globalImageQueue;
+  private selectedMediaGroup: string | null = null;
+  private selectedHeroRequestKey: string | null = null;
+  private selectedHeroRequestId: string | null = null;
   private _productAtlasIndex = new Map<string, number>();
 
   private useArcturianRenderer(): boolean {
@@ -355,6 +358,16 @@ export default class App extends React.Component<{}, State> {
   }
 
   componentDidUpdate(prevProps: {}, prevState: State): void {
+    const previousProductId = prevState.selectedProduct?.id ?? null;
+    const currentProductId = this.state.selectedProduct?.id ?? null;
+    const selectedProductChanged = previousProductId !== currentProductId;
+    const variantKey = (variant: any): string | null => {
+      if (!variant) return null;
+      return String(variant.sku ?? variant.id ?? variant.name ?? '');
+    };
+    const selectedVariantChanged = variantKey(prevState.selectedVariant)
+      !== variantKey(this.state.selectedVariant);
+
     // Update filter criteria
     if (
       prevState.search !== this.state.search ||
@@ -437,8 +450,8 @@ export default class App extends React.Component<{}, State> {
 
     // Update selected product overlay and load images (only when product/variant changes)
     if (
-      prevState.selectedProduct !== this.state.selectedProduct ||
-      prevState.selectedVariant !== this.state.selectedVariant ||
+      selectedProductChanged ||
+      selectedVariantChanged ||
       prevState.devSettings.heroDisplayMode !== this.state.devSettings.heroDisplayMode ||
       prevState.devSettings.overlayScaleMode !== this.state.devSettings.overlayScaleMode ||
       prevState.overlayMode !== this.state.overlayMode
@@ -455,11 +468,8 @@ export default class App extends React.Component<{}, State> {
           // Set selected product so renderer knows which product to draw stacked images for
           renderer.selectedProduct = this.state.selectedProduct;
 
-          // Reset pivot hero LOD tracking when product changes
-          (renderer as any).pivotHeroLoadedSize = null;
-
           // Reset trim bounds when product changes
-          if (prevState.selectedProduct !== this.state.selectedProduct) {
+          if (selectedProductChanged) {
             renderer.heroProductTrimBounds = null;
           }
 
@@ -531,16 +541,32 @@ export default class App extends React.Component<{}, State> {
                 imagesToLoad = getImagesForVariant(product, currentVariant);
               }
 
-              const variantImages = imagesToLoad;
+              // API payloads can repeat the same storage asset across media
+              // roles. A repeated first asset used to enqueue both the hero
+              // and an "alternative", wasting a slot and aborting/retrying the
+              // exact image the user is waiting for.
+              const seenStorageIds = new Set<number>();
+              const variantImages = imagesToLoad.filter(image => {
+                if (!image.storageId || seenStorageIds.has(image.storageId)) return false;
+                seenStorageIds.add(image.storageId);
+                return true;
+              });
 
-              // Cancel any pending image loads from previous product
-              const productGroup = `product-${this.state.selectedProduct.id}`;
-              this.imageLoadQueue.cancelGroup(productGroup);
+              // The media IDs form the visual identity. Size variants commonly
+              // share those IDs and must not cancel/restart the same hero load.
+              const mediaIdentity = variantImages.map(image => image.storageId).join('-') || 'none';
+              const productGroup = `product-${this.state.selectedProduct.id}-${mediaIdentity}`;
+              if (this.selectedMediaGroup !== productGroup) {
+                if (this.selectedMediaGroup) this.imageLoadQueue.cancelGroup(this.selectedMediaGroup);
+                this.selectedMediaGroup = productGroup;
+              }
 
               // IMMEDIATELY load hero image with HIGHEST priority (priority: 0)
               // This ensures the main selected product image loads BEFORE alternative images
               if (variantImages.length > 0 && variantImages[0].storageId) {
                 const heroStorageId = variantImages[0].storageId;
+                const selectedProductId = this.state.selectedProduct.id;
+                const heroRequestKey = `${selectedProductId}:${heroStorageId}`;
                 const heroSrc = buildMediaUrl({
                   storageId: heroStorageId,
                   width: 1300,
@@ -548,15 +574,36 @@ export default class App extends React.Component<{}, State> {
                   trim: false, // Keep full image as product images are not perfectly isolated
                 });
 
-                this.imageLoadQueue.add({
-                  id: `${productGroup}-hero`,
+                if (this.selectedHeroRequestKey !== heroRequestKey) {
+                  if (this.selectedHeroRequestId) this.imageLoadQueue.cancel(this.selectedHeroRequestId);
+                  const heroRequestId = `selected-hero-${heroRequestKey}`;
+                  this.selectedHeroRequestKey = heroRequestKey;
+                  this.selectedHeroRequestId = heroRequestId;
+                  renderer.resetSelectedHeroImage();
+                  renderer.beginSelectedHeroImageLoad(1300);
+                  performance.mark('productfinder-selected-hero-requested', {
+                    detail: { productId: selectedProductId, storageId: heroStorageId },
+                  });
+
+                  this.imageLoadQueue.add({
+                  id: heroRequestId,
                   url: heroSrc,
-                  group: productGroup,
+                  group: `selected-hero-${selectedProductId}`,
                   priority: 0, // HIGHEST PRIORITY - load hero image FIRST!
                   metadata: { storageId: heroStorageId, index: 0, isHero: true }
                 }).then(result => {
-                  // Hero image loaded - this is handled by LOD system
-                  // No need to set it here, LOD will pick it up
+                  // Use the completed request immediately. Previously this
+                  // result was discarded and the centred product stayed on its
+                  // 180px grid thumbnail until the independent LOD scan ran.
+                  if (
+                    this.state.selectedProduct?.id !== selectedProductId
+                    || this.selectedHeroRequestKey !== heroRequestKey
+                  ) return;
+                  this.selectedHeroRequestId = null;
+                  renderer.applySelectedHeroImage(result.image, 1300);
+                  performance.mark('productfinder-selected-hero-ready', {
+                    detail: { productId: selectedProductId, storageId: heroStorageId },
+                  });
 
                   // Fetch trim bounds for text positioning
                   const STORAGE_API_BASE = CENTRAL_STORAGE_BASE;
@@ -609,10 +656,19 @@ export default class App extends React.Component<{}, State> {
                       console.error('[App] Failed to load trim bounds for storage ID', heroStorageId, ':', err);
                     });
                 }).catch(error => {
+                  if (
+                    this.state.selectedProduct?.id === selectedProductId
+                    && this.selectedHeroRequestKey === heroRequestKey
+                  ) {
+                    renderer.failSelectedHeroImageLoad();
+                    this.selectedHeroRequestKey = null;
+                    this.selectedHeroRequestId = null;
+                  }
                   if (error.error?.message !== 'Request cancelled' && error.error?.message !== 'Request no longer relevant') {
                     console.warn('[App] Failed to load hero image:', heroStorageId, error.error);
                   }
-                });
+                  });
+                }
               }
 
               // Load alternative images for spread animation (skip first image as it's the hero image)
@@ -654,14 +710,22 @@ export default class App extends React.Component<{}, State> {
                 alternativeImages.push(imgObj);
               }
             } else {
-              renderer.selectedVariantHeroImage = null;
+              if (this.selectedHeroRequestId) this.imageLoadQueue.cancel(this.selectedHeroRequestId);
+              this.selectedHeroRequestKey = null;
+              this.selectedHeroRequestId = null;
+              renderer.resetSelectedHeroImage();
             }
 
           renderer.alternativeImages = alternativeImages.length > 0 ? alternativeImages : null;
         } else {
           // No selected product - clear images
+          if (this.selectedMediaGroup) this.imageLoadQueue.cancelGroup(this.selectedMediaGroup);
+          if (this.selectedHeroRequestId) this.imageLoadQueue.cancel(this.selectedHeroRequestId);
+          this.selectedMediaGroup = null;
+          this.selectedHeroRequestKey = null;
+          this.selectedHeroRequestId = null;
           renderer.alternativeImages = null;
-          renderer.selectedVariantHeroImage = null;
+          renderer.resetSelectedHeroImage();
           renderer.dialogConnectionPoint = null;
           renderer.dialogPosition = null;
         }
@@ -1248,9 +1312,19 @@ export default class App extends React.Component<{}, State> {
 
   private openProductDetails(product: Product, options: { pushHistory?: boolean } = {}) {
     const tapStage = resolveProductTapStage(this.state.selectedProduct?.id, product.id);
+    const primaryVariant = getPrimaryVariant(product);
+    // Establish selection ownership before the camera movement can trigger the
+    // periodic LOD scan. Otherwise that scan may start a duplicate 1300px load.
+    const renderer = this.controller.getRenderer();
+    if (renderer) {
+      renderer.selectedProduct = product;
+      const heroStorageId = primaryVariant
+        ? getImagesForVariant(product, primaryVariant)[0]?.storageId
+        : undefined;
+      if (heroStorageId) renderer.beginSelectedHeroImageLoad(1300);
+    }
     this.controller.centerOnProduct(product);
 
-    const primaryVariant = getPrimaryVariant(product);
     this.setState({
       selectedProduct: product,
       selectedVariant: primaryVariant,
