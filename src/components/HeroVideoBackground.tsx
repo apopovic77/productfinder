@@ -11,6 +11,8 @@ interface HeroVideoBackgroundProps {
   storageId: number;
   /** Semantic query for a product-related backdrop (top lifestyle hit). */
   imageQuery?: string;
+  /** Opacity of the optional lifestyle backdrop; zero keeps the product canvas visible. */
+  backdropOpacity?: number;
   onClose: () => void;
   children?: React.ReactNode;
 }
@@ -23,6 +25,7 @@ interface HeroVideoBackgroundProps {
 export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
   storageId,
   imageQuery,
+  backdropOpacity = 1,
   onClose,
   children
 }) => {
@@ -137,12 +140,16 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
       {bgImageUrl ? (
         <div
           className={`hero-bg-image ${isLoaded && !isClosing ? 'loaded' : ''}`}
-          style={{ backgroundImage: `url(${bgImageUrl})` }}
+          style={{
+            backgroundImage: `url(${bgImageUrl})`,
+            opacity: isLoaded && !isClosing ? backdropOpacity : 0,
+          }}
         />
       ) : bgResolved ? (
         <video
           ref={videoRef}
           className={`hero-video ${isLoaded && !isClosing ? 'loaded' : ''}`}
+          style={{ opacity: isLoaded && !isClosing ? backdropOpacity : 0 }}
           src={videoUrl}
           autoPlay
           loop
@@ -155,7 +162,7 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
       <div
         className="hero-video-overlay"
         style={{
-          opacity: overlayOpacity,
+          opacity: overlayOpacity * backdropOpacity,
           transition: 'opacity 1s ease-in-out'
         }}
       />
