@@ -8,6 +8,7 @@ import { STORAGE_API_BASE } from '../config/apiConfig';
 import { getVariantDesignName, getVariantSize, getVariantBaseColor } from '../utils/variantImageHelpers';
 import { LifestyleMediaSection } from './LifestyleMediaSection';
 import { ProductDocumentsSection } from './ProductDocumentsSection';
+import { getDesignFamilyLabel, selectExactDesignFamily } from '../utils/productDesignFamily';
 
 // Storage API base URL from environment
 const STORAGE_API_URL = STORAGE_API_BASE;
@@ -64,7 +65,7 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
   const [activeColorId, setActiveColorId] = useState<number | null>(null);
   const activeColorIdRef = React.useRef<number | null>(null);
 
-  // Fetch full variant details and exact product-code siblings when the modal opens.
+  // Fetch full variant details and exact design siblings when the modal opens.
   // The list payload owns taxonomy/properties; the detail payload owns variants.
   useEffect(() => {
     let cancelled = false;
@@ -79,37 +80,25 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
       setIsLoadingDetails(true);
 
       try {
-        const productCode = product.getAttributeValue<string>('product_code');
+        const designGroup = product.getAttributeValue<string>('design_group');
+        const familySize = product.getAttributeValue<number>('family_size') ?? 1;
         const [details, familyCandidates] = await Promise.all([
           fetchProductById(product.id),
-          productCode
-            ? fetchProducts({ search: productCode, limit: 100 })
+          designGroup && familySize > 1
+            ? fetchProducts({ search: designGroup, limit: Math.min(Math.max(familySize * 2, 10), 100) })
             : Promise.resolve([]),
         ]);
         if (cancelled) return;
 
         if (details) setFullProduct(details);
 
-        const family = familyCandidates.filter(
-          candidate => candidate.getAttributeValue<string>('product_code') === productCode,
-        );
-        const orderedFamily = family.length > 0 ? family : [product];
-        const names = orderedFamily.map(candidate => candidate.name.split(/\s+/));
-        let commonPrefixLength = names[0]?.length ?? 0;
-        for (let index = 0; index < commonPrefixLength; index += 1) {
-          const token = names[0][index]?.toLocaleLowerCase();
-          if (!names.every(parts => parts[index]?.toLocaleLowerCase() === token)) {
-            commonPrefixLength = index;
-            break;
-          }
-        }
+        const orderedFamily = selectExactDesignFamily(product, familyCandidates);
 
         setColorOptions(orderedFamily.map(candidate => {
           const raw = candidate.raw as any;
-          const shortName = candidate.name.split(/\s+/).slice(commonPrefixLength).join(' ');
           return {
             id: Number(candidate.id),
-            label: shortName || candidate.name,
+            label: getDesignFamilyLabel(candidate),
             storage: raw?.storage,
             product: candidate,
           };
