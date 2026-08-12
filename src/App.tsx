@@ -1698,7 +1698,10 @@ export default class App extends React.Component<{}, State> {
     const cats = this.controller.getUniqueCategories();
     const seasons = this.controller.getUniqueSeasons();
     const totalCartQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-    const getDimensionLabel = (dim: GroupDimension) => pivotDefinitions.find(d => d.key === dim)?.label ?? dim;
+    const getDimensionLabel = (dim: GroupDimension) => {
+      if (dim === '__taxonomy__') return 'Category';
+      return pivotDefinitions.find(d => d.key === dim)?.label ?? dim;
+    };
     const footerSearchResults = this.filterFooterSearchResults(footerSearchTerm);
 
     // Storage URLs from environment
