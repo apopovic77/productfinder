@@ -230,12 +230,61 @@ body {
   font-weight: 500;
   color: rgba(255, 255, 255, 0.9);
   letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .pf-header-actions {
   display: flex;
+  align-items: center;
   gap: 6px;
-  margin-right: 12px;
+  margin-left: auto;
+}
+
+.pf-header-select-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.pf-header-control-label {
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pf-header-select {
+  min-width: 0;
+}
+
+.pf-header-dimension-select {
+  width: 142px;
+}
+
+.pf-header-sort-select {
+  width: 104px;
+}
+
+.pf-header-select .custom-select-trigger {
+  min-height: 28px;
+  padding: 3px 7px 3px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.pf-header-select .custom-select-trigger:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.42);
+}
+
+.pf-header-select .custom-select-arrow {
+  width: 14px;
+  height: 14px;
 }
 
 .pf-header-btn {

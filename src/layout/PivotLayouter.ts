@@ -6,6 +6,7 @@ import { SCALE_CONFIG, resolveScaleEnabled } from '../config/ScaleConfig';
 import { PivotGroup } from './PivotGroup';
 import { Vector2 } from 'arkturian-typescript-utils';
 import { BUCKET_BUTTON_CONFIG } from '../config/BucketButtonConfig';
+import { calculateMobilePivotGeometry } from './MobilePivotGeometry';
 
 export type Orientation = 'rows' | 'columns';
 export type Flow = 'ltr' | 'rtl' | 'ttb' | 'btt';
@@ -143,30 +144,49 @@ export class PivotLayouter<T> {
         // Binary search cell size within screenWidth x (frameHeight - headerHeight)
         // Products fill top-to-bottom first, then add columns to the right (column-major)
         // Height bounded by frameHeight, width unbounded
-        // Mobile: compact gaps and header for more product rows
-        const mobileHeaderHeight = isMobile ? 20 : headerHeight;
-        const mobileFrameGap = isMobile ? 6 : this.config.frameGap;
-        const spacing = isMobile ? 3 : this.config.itemGap;
-
-        const rowsForSizing = numGroups;
-        const totalGaps = mobileFrameGap * Math.max(0, rowsForSizing - 1);
-        const totalVertPadding = this.paddingTop + this.paddingBottom;
-        const availableHeight = view.height - totalGaps - totalVertPadding;
-        const frameHeight = availableHeight / Math.max(1, rowsForSizing);
-        const matrixHeight = Math.max(1, frameHeight - mobileHeaderHeight);
-        const matrixWidth = Math.max(1, view.width - this.paddingLeft - this.paddingRight);
-
-        // Find the group with the MOST products
         let maxProductsInAnyGroup = 0;
         for (const k of keys) {
           maxProductsInAnyGroup = Math.max(maxProductsInAnyGroup, groups.get(k)!.length);
         }
 
+        // Portrait has its own geometry contract. The rendered mobile label
+        // needs 36px (20px font + padding/background), and desktop's minimum
+        // cell size must not force rows beyond the initial viewport.
+        const mobileGeometry = isMobile
+          ? calculateMobilePivotGeometry({
+              viewWidth: view.width,
+              viewHeight: view.height,
+              groupCount: numGroups,
+              maxProductsInGroup: maxProductsInAnyGroup,
+              cellSizeOverride: this.config.cellSizeOverride,
+            })
+          : null;
+        const mobileHeaderHeight = mobileGeometry?.headerHeight ?? headerHeight;
+        const mobileFrameGap = mobileGeometry?.frameGap ?? this.config.frameGap;
+        const spacing = mobileGeometry?.itemGap ?? this.config.itemGap;
+        const paddingTop = mobileGeometry?.paddingTop ?? this.paddingTop;
+        const paddingRight = mobileGeometry?.paddingRight ?? this.paddingRight;
+        const paddingBottom = mobileGeometry?.paddingBottom ?? this.paddingBottom;
+        const paddingLeft = mobileGeometry?.paddingLeft ?? this.paddingLeft;
+
+        const rowsForSizing = numGroups;
+        const totalGaps = mobileFrameGap * Math.max(0, rowsForSizing - 1);
+        const totalVertPadding = paddingTop + paddingBottom;
+        const availableHeight = view.height - totalGaps - totalVertPadding;
+        const frameHeight = mobileGeometry?.frameHeight
+          ?? availableHeight / Math.max(1, rowsForSizing);
+        const matrixHeight = mobileGeometry?.matrixHeight
+          ?? Math.max(1, frameHeight - mobileHeaderHeight);
+        const matrixWidth = mobileGeometry?.matrixWidth
+          ?? Math.max(1, view.width - paddingLeft - paddingRight);
+
         // Rows mode: try to fit all products in matrixWidth × matrixHeight first.
         // If they fit → use larger cells. If not → use minCellSize, overflow horizontally.
         let globalCellSize: number;
 
-        if (this.config.cellSizeOverride && this.config.cellSizeOverride > 0) {
+        if (mobileGeometry) {
+          globalCellSize = mobileGeometry.cellSize;
+        } else if (this.config.cellSizeOverride && this.config.cellSizeOverride > 0) {
           globalCellSize = this.config.cellSizeOverride;
         } else {
           const minCell = this.config.minCellSize ?? 5;
@@ -195,10 +215,11 @@ export class PivotLayouter<T> {
           }
         }
 
-        let globalRows = Math.max(1, Math.floor((matrixHeight + spacing) / (globalCellSize + spacing)));
+        let globalRows = mobileGeometry?.rows
+          ?? Math.max(1, Math.floor((matrixHeight + spacing) / (globalCellSize + spacing)));
 
         // Layout each group using same cell size
-        let offsetY = this.paddingTop;
+        let offsetY = paddingTop;
         for (const k of keys) {
           const list = groups.get(k)!;
           if (this.config.itemSort) list.sort((a, b) => this.config.itemSort!(a.data, b.data));
@@ -212,9 +233,9 @@ export class PivotLayouter<T> {
           this.groupHeaders.push({
             key: k,
             label: k,
-            x: this.paddingLeft,
+            x: paddingLeft,
             y: offsetY,
-            width: view.width - this.paddingLeft - this.paddingRight,
+            width: matrixWidth,
             height: mobileHeaderHeight
           });
 
@@ -228,7 +249,7 @@ export class PivotLayouter<T> {
               const node = list[productIndex];
               const scale = deriveScale(node);
               const finalSize = globalCellSize * scale;
-              const x = this.paddingLeft + col * (globalCellSize + spacing);
+              const x = paddingLeft + col * (globalCellSize + spacing);
               const y = baseY + row * (globalCellSize + spacing);
 
               node.posX.targetValue = x;

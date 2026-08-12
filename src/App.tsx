@@ -1698,8 +1698,6 @@ export default class App extends React.Component<{}, State> {
     const cats = this.controller.getUniqueCategories();
     const seasons = this.controller.getUniqueSeasons();
     const totalCartQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-    const isSidebarFooter = this.state.footerPosition === 'left' || this.state.footerPosition === 'right';
-
     const getDimensionLabel = (dim: GroupDimension) => pivotDefinitions.find(d => d.key === dim)?.label ?? dim;
     const footerSearchResults = this.filterFooterSearchResults(footerSearchTerm);
 
@@ -1816,7 +1814,55 @@ export default class App extends React.Component<{}, State> {
               )}
             </div>
           </div>
+          <div className="pf-header-title">Product Finder</div>
           <div className="pf-header-actions">
+            {(layoutMode === 'pivot' || layoutMode === 'lanes') && (
+              <>
+                <div className="pf-header-select-group">
+                  <span className="pf-header-control-label">Dimension</span>
+                  <CustomSelect
+                    className="pf-header-select pf-header-dimension-select"
+                    value={pivotDimension}
+                    onChange={(value) => this.handleDimensionClick(value as GroupDimension)}
+                    options={[
+                      ...(!pivotDimensions
+                        .filter(dim => availableDimsNow.includes(dim))
+                        .includes(pivotDimension)
+                        ? [{ value: pivotDimension, label: getDimensionLabel(pivotDimension) }]
+                        : []),
+                      ...pivotDimensions
+                        .filter(dim => availableDimsNow.includes(dim))
+                        .map(dim => ({ value: dim, label: getDimensionLabel(dim) })),
+                    ]}
+                  />
+                </div>
+                <div className="pf-header-select-group">
+                  <span className="pf-header-control-label">Sort</span>
+                  <CustomSelect
+                    className="pf-header-select pf-header-sort-select"
+                    value={sortMode}
+                    onChange={(value) => this.setState({
+                      sortMode: value as SortMode,
+                      selectedProduct: null,
+                      selectedVariant: null,
+                      dialogPosition: null,
+                      shouldShowV4Dialog: false,
+                    })}
+                    options={[
+                      { value: 'none', label: 'None' },
+                      { value: 'name-asc', label: 'Name ↑' },
+                      { value: 'name-desc', label: 'Name ↓' },
+                      { value: 'price-asc', label: 'Price ↑' },
+                      { value: 'price-desc', label: 'Price ↓' },
+                      { value: 'weight-asc', label: 'Weight ↑' },
+                      { value: 'weight-desc', label: 'Weight ↓' },
+                      { value: 'color-asc', label: 'Color ↑' },
+                      { value: 'color-desc', label: 'Color ↓' },
+                    ]}
+                  />
+                </div>
+              </>
+            )}
             <button
               type="button"
               className={`pf-header-btn ${this.controller.isFamilyGrouped() ? 'active' : ''}`}
@@ -1842,7 +1888,6 @@ export default class App extends React.Component<{}, State> {
               {this.controller.getLayoutMode() === 'lanes' ? 'Lanes' : 'Pivot'}
             </button>
           </div>
-          <div className="pf-header-title">Product Finder</div>
           {/* Mobile: hamburger menu + gear */}
           <div className="pf-mobile-icons">
             <button type="button" className="pf-mobile-icon-btn" onClick={() => this.setState({ mobilePivotOpen: !this.state.mobilePivotOpen })}>
@@ -2068,86 +2113,6 @@ export default class App extends React.Component<{}, State> {
               </div>
             )}
           </div>
-
-          {/* Desktop: DIMENSIONS section (always visible) */}
-          <div className="pf-bottom-section pf-bottom-center pf-bottom-desktop-section">
-            {isPivotHeroMode && (layoutMode === 'pivot' || layoutMode === 'lanes') ? (
-              <>
-                <span className="pf-bottom-label">Sort</span>
-                <div className="pf-bottom-sort-hero">
-                  {[
-                    { value: 'none', label: 'None', icon: '−' },
-                    { value: 'name-asc', label: 'Name ↑', icon: 'A↑' },
-                    { value: 'name-desc', label: 'Name ↓', icon: 'Z↓' },
-                    { value: 'price-asc', label: 'Price ↑', icon: '€↑' },
-                    { value: 'price-desc', label: 'Price ↓', icon: '€↓' },
-                    { value: 'weight-asc', label: 'Weight ↑', icon: '⚖↑' },
-                    { value: 'weight-desc', label: 'Weight ↓', icon: '⚖↓' },
-                    { value: 'color-asc', label: 'Color ↑', icon: '🎨↑' },
-                    { value: 'color-desc', label: 'Color ↓', icon: '🎨↓' },
-                  ].map(opt => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      className={`pf-sort-chip ${sortMode === opt.value ? 'active' : ''}`}
-                      onClick={() => this.setState({ sortMode: opt.value as SortMode, selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false })}
-                      title={opt.label}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <>
-                <span className="pf-bottom-label">Dimensions</span>
-                <div className={`pf-bottom-dimensions ${isSidebarFooter ? 'pf-bottom-dimensions-horizontal' : ''}`}>
-                  {(layoutMode === 'pivot' || layoutMode === 'lanes') ? (
-                    <div className={`pf-bottom-dimension-row ${isSidebarFooter ? 'pf-bottom-dimension-row-horizontal' : ''}`}>
-                      {pivotDimensions
-                        .filter(dim => availableDimsNow.includes(dim))
-                        .map(dim => (
-                          <button
-                            type="button"
-                            key={dim}
-                            className={`pf-pivot-chip ${dim === pivotDimension ? 'active' : ''}`}
-                            onClick={() => this.handleDimensionClick(dim)}
-                            aria-current={dim === pivotDimension}
-                            style={!isSidebarFooter ? { width: '100%' } : undefined}
-                          >
-                            {getDimensionLabel(dim)}
-                          </button>
-                        ))}
-                    </div>
-                  ) : (
-                    <span className="pf-bottom-placeholder">Dimensions available in Pivot layout</span>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Desktop: SORT section (hidden in Hero Mode) */}
-          {!(isPivotHeroMode && (layoutMode === 'pivot' || layoutMode === 'lanes')) && (
-            <div className="pf-bottom-section pf-bottom-right pf-bottom-desktop-section">
-              <label className="pf-bottom-label" htmlFor="pf-bottom-sort">Sort</label>
-              <CustomSelect
-                value={sortMode}
-                onChange={(value) => this.setState({ sortMode: value as SortMode, selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false })}
-                options={[
-                  { value: 'none', label: 'None' },
-                  { value: 'name-asc', label: 'Name (A-Z)' },
-                  { value: 'name-desc', label: 'Name (Z-A)' },
-                  { value: 'price-asc', label: 'Price (Low-High)' },
-                  { value: 'price-desc', label: 'Price (High-Low)' },
-                  { value: 'weight-asc', label: 'Weight (Light-Heavy)' },
-                  { value: 'weight-desc', label: 'Weight (Heavy-Light)' },
-                  { value: 'color-asc', label: 'Color (A-Z)' },
-                  { value: 'color-desc', label: 'Color (Z-A)' },
-                ]}
-              />
-            </div>
-          )}
 
           <div className="pf-bottom-section pf-bottom-right pf-bottom-desktop-section">
             <label className="pf-bottom-label">Cart</label>

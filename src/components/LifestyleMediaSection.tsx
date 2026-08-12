@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { searchLifestyleMedia, LIFESTYLE_MIN_SIMILARITY, type LifestyleMediaHit } from '../services/ProductMediaService';
 import { STORAGE_API_BASE } from '../config/apiConfig';
 
@@ -36,6 +37,22 @@ export const LifestyleMediaSection: React.FC<Props> = ({ query }) => {
     };
   }, [query]);
 
+  useEffect(() => {
+    if (expandedId === null) return;
+
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setExpandedId(null);
+    };
+
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [expandedId]);
+
   if (hits.length === 0) return null;
 
   const gridUrl = (storageId: number) =>
@@ -43,73 +60,111 @@ export const LifestyleMediaSection: React.FC<Props> = ({ query }) => {
   const largeUrl = (storageId: number) =>
     `${STORAGE_API_BASE}/storage/media/${storageId}?width=1400&format=webp&quality=85`;
 
-  return (
-    <div
-      style={{
-        marginTop: '32px',
-        paddingTop: '40px',
-        borderTop: '1px solid rgba(0, 0, 0, 0.1)',
-        width: '100%',
-      }}
-    >
-      <h3 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '12px', color: '#1a1a1a' }}>
-        LIFESTYLE &amp; ACTION
-      </h3>
-      <p style={{ fontSize: '14px', color: 'rgba(0, 0, 0, 0.6)', marginBottom: '16px' }}>
-        Matching impressions from the O&apos;Neal media library.
-      </p>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-          gap: '12px',
-        }}
-      >
-        {hits.map((hit) => (
-          <img
-            key={hit.storage_id}
-            src={gridUrl(hit.storage_id)}
-            alt={hit.source_description?.slice(0, 120) || 'O’Neal lifestyle'}
-            loading="lazy"
-            onClick={() => setExpandedId(hit.storage_id)}
-            style={{
-              width: '100%',
-              aspectRatio: '4 / 3',
-              objectFit: 'cover',
-              borderRadius: '14px',
-              cursor: 'zoom-in',
-              boxShadow: '0 6px 18px rgba(0, 0, 0, 0.10)',
-            }}
-          />
-        ))}
-      </div>
-      {expandedId !== null && (
+  const lightbox = expandedId !== null
+    ? createPortal(
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="O'Neal lifestyle image"
           onClick={() => setExpandedId(null)}
           style={{
             position: 'fixed',
             inset: 0,
-            background: 'rgba(0, 0, 0, 0.82)',
+            background: 'rgba(0, 0, 0, 0.86)',
             zIndex: 10000,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'zoom-out',
-            padding: '4vh 4vw',
+            padding: 'clamp(20px, 4vh, 48px) clamp(20px, 4vw, 64px)',
+            boxSizing: 'border-box',
           }}
         >
+          <button
+            type="button"
+            aria-label="Close image"
+            onClick={() => setExpandedId(null)}
+            style={{
+              position: 'fixed',
+              top: '20px',
+              right: '24px',
+              width: '42px',
+              height: '42px',
+              border: '1px solid rgba(255,255,255,0.35)',
+              borderRadius: '50%',
+              background: 'rgba(0,0,0,0.35)',
+              color: '#fff',
+              fontSize: '28px',
+              lineHeight: 1,
+              cursor: 'pointer',
+            }}
+          >
+            ×
+          </button>
           <img
             src={largeUrl(expandedId)}
             alt="O'Neal lifestyle"
+            onClick={(event) => event.stopPropagation()}
             style={{
-              maxWidth: '100%',
-              maxHeight: '100%',
+              display: 'block',
+              maxWidth: 'min(1400px, 92vw)',
+              maxHeight: '88vh',
+              width: 'auto',
+              height: 'auto',
+              objectFit: 'contain',
               borderRadius: '12px',
               boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
+              cursor: 'default',
             }}
           />
+        </div>,
+        document.body,
+      )
+    : null;
+
+  return (
+    <>
+      <div
+        style={{
+          marginTop: '32px',
+          paddingTop: '40px',
+          borderTop: '1px solid rgba(0, 0, 0, 0.1)',
+          width: '100%',
+        }}
+      >
+        <h3 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '12px', color: '#1a1a1a' }}>
+          LIFESTYLE &amp; ACTION
+        </h3>
+        <p style={{ fontSize: '14px', color: 'rgba(0, 0, 0, 0.6)', marginBottom: '16px' }}>
+          Matching impressions from the O&apos;Neal media library.
+        </p>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+            gap: '12px',
+          }}
+        >
+          {hits.map((hit) => (
+            <img
+              key={hit.storage_id}
+              src={gridUrl(hit.storage_id)}
+              alt={hit.source_description?.slice(0, 120) || 'O’Neal lifestyle'}
+              loading="lazy"
+              onClick={() => setExpandedId(hit.storage_id)}
+              style={{
+                width: '100%',
+                aspectRatio: '4 / 3',
+                objectFit: 'cover',
+                borderRadius: '14px',
+                cursor: 'zoom-in',
+                boxShadow: '0 6px 18px rgba(0, 0, 0, 0.10)',
+              }}
+            />
+          ))}
         </div>
-      )}
-    </div>
+      </div>
+      {lightbox}
+    </>
   );
 };

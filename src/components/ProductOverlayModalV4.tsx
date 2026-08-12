@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Product } from '../types/Product';
 import { useImageQueue } from '../hooks/useImageQueue';
-import { fetchProductById } from '../data/ProductRepository';
+import { fetchProductById, fetchProducts } from '../data/ProductRepository';
 import './ProductOverlayModal.css';
 import { STORAGE_API_BASE } from '../config/apiConfig';
 import { getVariantDesignName, getVariantSize, getVariantBaseColor } from '../utils/variantImageHelpers';
@@ -38,11 +38,12 @@ type Props = {
   }) => void;
 };
 
-interface ParsedFeature {
-  title: string;
-  subtitle: string;
-  icon: 'layer' | 'breathable' | 'sealed' | 'compatible' | 'waterproof' | 'default';
-}
+type ColorOption = {
+  id: number;
+  label: string;
+  storage: any;
+  product: Product;
+};
 
 /**
  * Product Overlay Modal V4 - HORIZONTAL GLASSMORPHISM LAYOUT
@@ -56,56 +57,83 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
 
   // State for full product details (fetched from API with variants)
   const [fullProduct, setFullProduct] = useState<Product | null>(null);
+  const [displayProduct, setDisplayProduct] = useState<Product>(product);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [isSiblingView, setIsSiblingView] = useState(false);
-  const [colorOptions, setColorOptions] = useState<Array<{ id: number; color_name: string; storage: any }>>([]);
+  const [colorOptions, setColorOptions] = useState<ColorOption[]>([]);
   const [activeColorId, setActiveColorId] = useState<number | null>(null);
+  const activeColorIdRef = React.useRef<number | null>(null);
 
-  // Fetch full product details when modal opens (list API doesn't include variants)
+  // Fetch full variant details and exact product-code siblings when the modal opens.
+  // The list payload owns taxonomy/properties; the detail payload owns variants.
   useEffect(() => {
+    let cancelled = false;
+
     const loadFullDetails = async () => {
       setIsSiblingView(false);
-      // Check if we already have variants with images
-      const existingVariants = (product as any).variants || [];
-      const hasVariantsWithImages = existingVariants.some((v: any) => v.images?.length > 0);
-
-      if (hasVariantsWithImages) {
-        console.log('[V4 Modal] Product already has variants with images, skipping fetch');
-        setFullProduct(null);
-        return;
-      }
-
-      console.log('[V4 Modal] Fetching full product details for:', product.id);
+      setDisplayProduct(product);
+      setFullProduct(null);
+      setColorOptions([]);
+      setActiveColorId(Number(product.id));
+      activeColorIdRef.current = Number(product.id);
       setIsLoadingDetails(true);
+
       try {
-        const details = await fetchProductById(product.id);
-        if (details) {
-          setFullProduct(details);
-          // Build fixed color options list (current + siblings) - never reorder
-          const raw = (details as any).raw || {};
-          const siblings = raw.siblings || [];
-          const current = { id: raw.id, color_name: raw.color_name, storage: raw.storage };
-          setColorOptions([current, ...siblings]);
-          setActiveColorId(raw.id);
+        const productCode = product.getAttributeValue<string>('product_code');
+        const [details, familyCandidates] = await Promise.all([
+          fetchProductById(product.id),
+          productCode
+            ? fetchProducts({ search: productCode, limit: 100 })
+            : Promise.resolve([]),
+        ]);
+        if (cancelled) return;
+
+        if (details) setFullProduct(details);
+
+        const family = familyCandidates.filter(
+          candidate => candidate.getAttributeValue<string>('product_code') === productCode,
+        );
+        const orderedFamily = family.length > 0 ? family : [product];
+        const names = orderedFamily.map(candidate => candidate.name.split(/\s+/));
+        let commonPrefixLength = names[0]?.length ?? 0;
+        for (let index = 0; index < commonPrefixLength; index += 1) {
+          const token = names[0][index]?.toLocaleLowerCase();
+          if (!names.every(parts => parts[index]?.toLocaleLowerCase() === token)) {
+            commonPrefixLength = index;
+            break;
+          }
         }
+
+        setColorOptions(orderedFamily.map(candidate => {
+          const raw = candidate.raw as any;
+          const shortName = candidate.name.split(/\s+/).slice(commonPrefixLength).join(' ');
+          return {
+            id: Number(candidate.id),
+            label: shortName || candidate.name,
+            storage: raw?.storage,
+            product: candidate,
+          };
+        }));
       } catch (error) {
         console.error('[V4 Modal] Failed to fetch product details:', error);
       } finally {
-        setIsLoadingDetails(false);
+        if (!cancelled) setIsLoadingDetails(false);
       }
     };
 
     loadFullDetails();
+    return () => {
+      cancelled = true;
+    };
   }, [product.id]);
 
   // Use full product if available, otherwise use the passed product
-  const activeProduct = fullProduct || product;
+  const activeProduct = fullProduct || displayProduct;
 
   // Extract variants from the active product
   const variants = (activeProduct as any).variants || [];
   const rawProduct = (activeProduct as any).raw || {};
-  const derivedTaxonomy = product.derived_taxonomy || (rawProduct as any)?.derived_taxonomy;
-  const metaInfo = (product.meta && Object.keys(product.meta).length ? product.meta : rawProduct?.meta) || {};
+  const derivedTaxonomy = displayProduct.derived_taxonomy || (rawProduct as any)?.derived_taxonomy;
   const taxonomyPath = Array.isArray(derivedTaxonomy?.path) ? derivedTaxonomy.path : [];
   const taxonomySport = derivedTaxonomy?.sport;
   const taxonomyFamily = derivedTaxonomy?.product_family;
@@ -164,11 +192,11 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
   const [selectedColor, setSelectedColor] = useState<string>(allColors[0] || '');
   const [selectedSize, setSelectedSize] = useState<string>('');
 
-  // Reset all state when product changes
+  // Reset selection when the displayed colorway changes.
   useEffect(() => {
     setSelectedColor(allColors[0] || '');
     setSelectedSize('');
-  }, [product.id, allColors]);
+  }, [displayProduct.id, allColors]);
 
   // Filter sizes based on selected color
   const availableSizes = useMemo(() => {
@@ -195,10 +223,21 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
     getColor(v) === selectedColor && getSize(v) === selectedSize
   ) || variants[0];
 
-  // Extract data
-  const keyFeatures = product.key_features || [];
-  const specs = product.specifications || {};
-  const material = specs.shell_material || specs.materials || '100% Polyester';
+  const specs = displayProduct.specifications || {};
+  const propertyFacts = [
+    'sport',
+    'target_group',
+    'body_part',
+    'product_function',
+    'product_type',
+    'product_line',
+    'season',
+    'model_year',
+  ].flatMap(key => {
+    const attribute = displayProduct.getAttribute(key);
+    if (!attribute || attribute.value === null || attribute.value === undefined || attribute.value === '') return [];
+    return [{ key, label: attribute.label, value: attribute.displayValue }];
+  });
 
   // State for thumbnail images
   const [thumbnailImages, setThumbnailImages] = useState<Array<{ storageId: number | null; src: string; label: string }>>([]);
@@ -208,7 +247,7 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
   useEffect(() => {
     setThumbnailsLoading(true);
     setThumbnailImages([]);
-  }, [product.id]);
+  }, [displayProduct.id]);
 
   // Load new thumbnails - filtered by selected color (v2 API structure)
   useEffect(() => {
@@ -219,14 +258,6 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
       // Find the active variant for selected color (use first size)
       const colorVariants = variants.filter((v: any) => getColor(v) === selectedColor);
       const activeColorVariant = colorVariants[0];
-
-      // DEBUG: Log variant data to understand the structure
-      console.log('[V4 Modal] variants count:', variants.length);
-      console.log('[V4 Modal] selectedColor:', selectedColor);
-      console.log('[V4 Modal] colorVariants count:', colorVariants.length);
-      console.log('[V4 Modal] activeColorVariant:', activeColorVariant);
-      console.log('[V4 Modal] activeColorVariant.images:', activeColorVariant?.images);
-      console.log('[V4 Modal] activeColorVariant.storage:', activeColorVariant?.storage);
 
       // V2 API: Get images from variant.images[] array
       if (activeColorVariant?.images && Array.isArray(activeColorVariant.images)) {
@@ -260,9 +291,9 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
         }
       }
 
-      // Legacy fallback: product.media (for old API compatibility)
+      // Legacy fallback: displayed product media (for old API compatibility)
       if (images.length === 0) {
-        const media = (product as any).media || [];
+        const media = (displayProduct as any).media || [];
         media.forEach((m: any, idx: number) => {
           const storageId = m.storage_id || null;
           const src = m.src || '';
@@ -281,7 +312,7 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
     }, 10);
 
     return () => clearTimeout(timer);
-  }, [product.id, variants, selectedColor, getColor]);
+  }, [displayProduct.id, variants, selectedColor, getColor]);
 
   const allImages = thumbnailsLoading ? [] : thumbnailImages;
 
@@ -297,7 +328,7 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
 
   // Load all images through ImageLoadQueue
   const { loadedImages } = useImageQueue(imageUrls, {
-    group: `product-images-${product.id}`,
+    group: `product-images-${displayProduct.id}`,
     priority: -20,
   });
 
@@ -328,13 +359,16 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
 
   const priceText = activeVariant?.price
     ? getVariantPrice(activeVariant)
-    : (product.price?.formatted || `€ ${product.price?.value?.toFixed(2) || '0.00'}`);
+    : (displayProduct.price?.formatted || displayProduct.priceText || '');
 
-  // Get availability
-  const availability = activeVariant?.availability || 'Unknown';
+  const availabilityLabel = typeof activeVariant?.is_available === 'boolean'
+    ? (activeVariant.is_available ? 'Available' : 'Not available')
+    : (activeVariant?.availability || 'Availability unknown');
+  const isAvailable = activeVariant?.is_available !== false
+    && String(activeVariant?.availability || '').toLocaleLowerCase() !== 'unavailable';
 
   // Get product URL
-  const productUrl = activeVariant?.url || (product as any).meta?.product_url;
+  const productUrl = activeVariant?.url || (displayProduct as any).meta?.product_url;
 
   const variantLabel = [selectedColor, selectedSize].filter(Boolean).join(' / ');
 
@@ -346,7 +380,7 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
     if (heroImage?.src) {
       return heroImage.src;
     }
-    const media = product.media || [];
+    const media = displayProduct.media || [];
     const fallback = media.find(m => (m as any).storage_id) || media[0];
     if (fallback && (fallback as any).storage_id) {
       return getStorageMediaUrl((fallback as any).storage_id, { width: 220, format: 'webp', quality: 85 });
@@ -358,12 +392,12 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
 
   useEffect(() => {
     setQuantity(0);
-  }, [product.id, activeVariant?.sku, variantLabel]);
+  }, [displayProduct.id, activeVariant?.sku, variantLabel]);
 
   const emitCartChange = (delta: number) => {
     if (!onBuy || delta === 0) return;
     onBuy({
-      product,
+      product: displayProduct,
       variant: activeVariant,
       priceText,
       imageUrl: getCartImageUrl(),
@@ -402,7 +436,7 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
   // Extract category/subtitle from taxonomy
   const categoryText = taxonomyFamily || taxonomyPath[taxonomyPath.length - 1] || 'Product';
 
-  const productCode = product.getAttributeValue<string>('product_code');
+  const productCode = displayProduct.getAttributeValue<string>('product_code');
 
   // Semantic query for the lifestyle section — taxonomy terms match the
   // German AI image descriptions far better than model names do.
@@ -432,7 +466,7 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
     return { firstWord, restWords };
   };
 
-  const { firstWord: productFirstWord, restWords: productRestWords } = parseProductName(product.name);
+  const { firstWord: productFirstWord, restWords: productRestWords } = parseProductName(displayProduct.name);
 
   return (
     <>
@@ -551,7 +585,7 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
                 {loadedImage ? (
                   <img
                     src={loadedImage.src}
-                    alt={`${product.name} - ${img.label || `Image ${idx + 1}`}`}
+                    alt={`${displayProduct.name} - ${img.label || `Image ${idx + 1}`}`}
                     style={{
                       width: '100%',
                       maxHeight: isMobile ? '50vh' : 'none',
@@ -630,13 +664,13 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
         </h2>
 
         {/* Description (if available) */}
-        {product.description && (
+        {displayProduct.description && (
           <div style={{
             fontSize: '14px',
             lineHeight: '1.6',
             color: 'rgba(0, 0, 0, 0.7)',
           }}>
-            {product.description}
+            {displayProduct.description}
           </div>
         )}
 
@@ -645,7 +679,7 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
           fontSize: '12px',
           color: 'rgba(0, 0, 0, 0.5)',
         }}>
-          Art. No. {activeVariant?.sku || product.id || '0000000000'}
+          Art. No. {activeVariant?.sku || displayProduct.id || '0000000000'}
         </div>
 
         {/* Material info from variant or descriptions */}
@@ -686,17 +720,18 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
             return null;
           }
 
-          const activeRaw = (activeProduct as any)?.raw || {};
-          const currentId = activeRaw?.id || activeColorId;
+          const currentId = activeColorId;
+          const activeOption = colorOptions.find(option => option.id === currentId);
 
           return (
             <div>
               <div style={{ fontSize: '12px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'rgba(0,0,0,0.5)', marginBottom: '8px' }}>
-                Color: <span style={{ color: '#1a1a1a' }}>{activeRaw?.color_name || selectedColor}</span>
+                Colorway: <span style={{ color: '#1a1a1a' }}>{activeOption?.label || selectedColor}</span>
               </div>
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                 {colorOptions.map((opt) => {
                   const isActive = opt.id === currentId;
+                  const imageId = opt.storage?.id;
                   return (
                     <button
                       key={opt.id}
@@ -705,24 +740,38 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
                         if (isActive) return;
                         setIsSiblingView(true);
                         setActiveColorId(opt.id);
+                        activeColorIdRef.current = opt.id;
+                        setDisplayProduct(opt.product);
+                        setIsLoadingDetails(true);
                         const sibProduct = await fetchProductById(opt.id);
-                        if (sibProduct) {
+                        if (sibProduct && activeColorIdRef.current === opt.id) {
                           setFullProduct(sibProduct);
                         }
+                        if (activeColorIdRef.current === opt.id) setIsLoadingDetails(false);
                       }}
+                      title={opt.product.name}
                       style={{
-                        padding: '6px 14px', fontSize: '12px', borderRadius: '6px',
+                        padding: imageId ? '5px 9px 5px 5px' : '7px 12px',
+                        fontSize: '11px', borderRadius: '9px',
                         border: isActive ? '2px solid #1a1a1a' : '1px solid rgba(0,0,0,0.2)',
-                        background: isActive ? '#1a1a1a' : 'rgba(0,0,0,0.03)',
-                        color: isActive ? 'white' : '#1a1a1a',
+                        background: isActive ? 'rgba(17,24,39,0.08)' : 'rgba(0,0,0,0.02)',
+                        color: '#1a1a1a',
                         fontWeight: isActive ? '600' : '400',
                         cursor: isActive ? 'default' : 'pointer',
-                        transition: 'all 0.15s ease'
+                        transition: 'all 0.15s ease',
+                        display: 'inline-flex', alignItems: 'center', gap: '7px', maxWidth: '190px',
                       }}
                       onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = 'rgba(0,0,0,0.08)'; }}
                       onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = 'rgba(0,0,0,0.03)'; }}
                     >
-                      {opt.color_name}
+                      {imageId && (
+                        <img
+                          src={getStorageMediaUrl(imageId, { width: 72, format: 'webp', quality: 80 })}
+                          alt=""
+                          style={{ width: '36px', height: '30px', objectFit: 'contain', borderRadius: '5px', background: '#fff' }}
+                        />
+                      )}
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{opt.label}</span>
                     </button>
                   );
                 })}
@@ -730,6 +779,80 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
             </div>
           );
         })()}
+
+        {availableSizes.length > 0 && (
+          <div>
+            <div style={{ fontSize: '12px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'rgba(0,0,0,0.5)', marginBottom: '8px' }}>
+              Size: <span style={{ color: '#1a1a1a' }}>{selectedSize}</span>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px' }}>
+              {availableSizes.map(size => (
+                <button
+                  key={size}
+                  type="button"
+                  onClick={() => setSelectedSize(size)}
+                  aria-pressed={size === selectedSize}
+                  style={{
+                    minWidth: '54px', padding: '8px 12px', borderRadius: '8px',
+                    border: size === selectedSize ? '2px solid #111827' : '1px solid rgba(0,0,0,0.18)',
+                    background: size === selectedSize ? '#111827' : '#fff',
+                    color: size === selectedSize ? '#fff' : '#111827',
+                    fontSize: '12px', fontWeight: '700', cursor: 'pointer',
+                  }}
+                >
+                  {size}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+          gap: '10px',
+        }}>
+          {priceText && (
+            <div style={{ padding: '12px 14px', borderRadius: '10px', background: 'rgba(17,24,39,0.05)' }}>
+              <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(0,0,0,0.5)' }}>Price incl. VAT</div>
+              <div style={{ marginTop: '4px', fontSize: '18px', fontWeight: '800', color: '#111827' }}>{priceText}</div>
+            </div>
+          )}
+          {activeVariant && (
+            <div style={{ padding: '12px 14px', borderRadius: '10px', background: isAvailable ? 'rgba(22,163,74,0.09)' : 'rgba(220,38,38,0.08)' }}>
+              <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'rgba(0,0,0,0.5)' }}>Availability</div>
+              <div style={{ marginTop: '4px', fontSize: '13px', fontWeight: '800', color: isAvailable ? '#15803d' : '#b91c1c' }}>{availabilityLabel}</div>
+            </div>
+          )}
+        </div>
+
+        {(propertyFacts.length > 0 || activeVariant?.ean || activeVariant?.weight_grams) && (
+          <div>
+            <div style={{ fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.06em', color: 'rgba(0,0,0,0.5)', marginBottom: '10px' }}>
+              Product properties
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '7px 18px' }}>
+              {propertyFacts.map(fact => (
+                <div key={fact.key} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', paddingBottom: '6px', borderBottom: '1px solid rgba(0,0,0,0.07)', fontSize: '12px' }}>
+                  <span style={{ color: 'rgba(0,0,0,0.5)' }}>{fact.label}</span>
+                  <span style={{ color: '#111827', fontWeight: '600', textAlign: 'right' }}>{fact.value}</span>
+                </div>
+              ))}
+              {activeVariant?.ean && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', paddingBottom: '6px', borderBottom: '1px solid rgba(0,0,0,0.07)', fontSize: '12px' }}>
+                  <span style={{ color: 'rgba(0,0,0,0.5)' }}>EAN</span>
+                  <span style={{ color: '#111827', fontWeight: '600' }}>{activeVariant.ean}</span>
+                </div>
+              )}
+              {activeVariant?.weight_grams != null && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', paddingBottom: '6px', borderBottom: '1px solid rgba(0,0,0,0.07)', fontSize: '12px' }}>
+                  <span style={{ color: 'rgba(0,0,0,0.5)' }}>Weight</span>
+                  <span style={{ color: '#111827', fontWeight: '600' }}>{activeVariant.weight_grams} g</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Specifications Section */}
         {Object.keys(specs).length > 0 && (
@@ -761,7 +884,7 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
           </div>
         )}
 
-        {/* CTA Button — simple "In Warenkorb legen", no size/quantity selection here */}
+        {/* CTA Button */}
         <div style={{ paddingTop: '20px', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'flex-start', width: '100%' }}>
           <button
             onClick={handleAddToCartClick}
@@ -820,144 +943,15 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
           )}
         </div>
 
-        {/* Horizontal Line */}
-        <div style={{
-          width: '100%',
-          height: '1px',
-          background: 'rgba(0, 0, 0, 0.1)',
-          marginTop: '24px',
-          marginBottom: '16px',
-        }} />
-
-        {/* Color & Size Selectors */}
-        {variants.length > 0 && (allColors.length > 1 || availableSizes.length > 1) && (
-          <div style={{ display: 'flex', gap: '12px' }}>
-            {allColors.length > 1 && (
-              <div style={{ flex: 1 }}>
-                <label style={{
-                  display: 'block',
-                  fontSize: '11px',
-                  fontWeight: '600',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  color: 'rgba(0, 0, 0, 0.6)',
-                  marginBottom: '6px',
-                }}>
-                  Color
-                </label>
-                <select
-                  value={selectedColor}
-                  onChange={(e) => setSelectedColor(e.target.value)}
-                  style={{
-                    fontSize: '14px',
-                    padding: '10px 12px',
-                    background: 'rgba(255, 255, 255, 0.8)',
-                    border: '1px solid rgba(0, 0, 0, 0.15)',
-                    borderRadius: '8px',
-                    color: '#1a1a1a',
-                    width: '100%',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {allColors.map((color, idx) => (
-                    <option key={idx} value={color}>
-                      {color}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
-          </div>
-        )}
-
         <LifestyleMediaSection query={lifestyleQuery} />
 
         {productCode && <ProductDocumentsSection productCode={productCode} />}
 
-        {/* Product Details (restored content) */}
-        <div style={{
-          marginTop: '40px',
-          paddingTop: '40px',
-          borderTop: '1px solid rgba(0, 0, 0, 0.1)',
-        }}>
-          <h3 style={{
-            fontSize: '24px',
-            fontWeight: '700',
-            marginBottom: '16px',
-            color: '#1a1a1a',
-          }}>
-            Product Details
-          </h3>
-          <p style={{
-            fontSize: '14px',
-            lineHeight: '1.8',
-            color: 'rgba(0, 0, 0, 0.7)',
-            marginBottom: '24px',
-          }}>
-            Experience unmatched performance and durability with this premium product.
-            Engineered with cutting-edge materials and innovative design, it delivers
-            exceptional comfort and reliability in any condition.
-          </p>
-
-          <h3 style={{
-            fontSize: '24px',
-            fontWeight: '700',
-            marginTop: '40px',
-            marginBottom: '16px',
-            color: '#1a1a1a',
-          }}>
-            Advanced Technology
-          </h3>
-          <p style={{
-            fontSize: '14px',
-            lineHeight: '1.8',
-            color: 'rgba(0, 0, 0, 0.7)',
-            marginBottom: '24px',
-          }}>
-            Built with state-of-the-art components that push the boundaries of what's possible.
-            Every detail has been meticulously crafted to provide you with the best experience.
-          </p>
-
-          <h3 style={{
-            fontSize: '24px',
-            fontWeight: '700',
-            marginTop: '40px',
-            marginBottom: '16px',
-            color: '#1a1a1a',
-          }}>
-            Premium Materials
-          </h3>
-          <p style={{
-            fontSize: '14px',
-            lineHeight: '1.8',
-            color: 'rgba(0, 0, 0, 0.7)',
-            marginBottom: '24px',
-          }}>
-            Constructed from the finest materials available, ensuring longevity and
-            performance that stands the test of time.
-          </p>
-
-          <h3 style={{
-            fontSize: '24px',
-            fontWeight: '700',
-            marginTop: '40px',
-            marginBottom: '16px',
-            color: '#1a1a1a',
-          }}>
-            Designed for Performance
-          </h3>
-          <p style={{
-            fontSize: '14px',
-            lineHeight: '1.8',
-            color: 'rgba(0, 0, 0, 0.7)',
-            marginBottom: '24px',
-          }}>
-            Every aspect of this product has been optimized for maximum performance.
-            From the ergonomic design to the high-performance materials, nothing has
-            been left to chance.
-          </p>
-        </div>
+        {isLoadingDetails && (
+          <div style={{ fontSize: '12px', color: 'rgba(0,0,0,0.45)', padding: '8px 0' }}>
+            Loading complete variant data…
+          </div>
+        )}
       </div>
     </motion.div>
     </>
