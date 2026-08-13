@@ -54,7 +54,7 @@ async function warmRemainingThumbnails(urls: string[]): Promise<void> {
  * to block the first interactive Canvas render: the Canvas owns foreground
  * order because it is the only component that knows what is actually visible.
  */
-export function useProductPreloader() {
+export function useProductPreloader(brand: string) {
   const hasStarted = useRef(false);
   const [state, setState] = useState({
     isLoading: true,
@@ -69,7 +69,7 @@ export function useProductPreloader() {
 
     async function preloadToIndexedDB() {
       try {
-        const products = await fetchProducts({ limit: 10000 }); // API max; catalog has 6310+ products (issue #250)
+        const products = await fetchProducts({ limit: 10000, brand });
 
         // Build URL list
         const urlSet = new Set<string>();
@@ -95,7 +95,7 @@ export function useProductPreloader() {
     }
 
     preloadToIndexedDB();
-  }, []);
+  }, [brand]);
 
   return state;
 }

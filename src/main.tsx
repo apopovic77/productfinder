@@ -10,6 +10,7 @@ import { ProductFinderV3 } from './v3/ProductFinderV3.tsx'
 import { CartDemo } from './pages/CartDemo.tsx'
 import { PreloaderProvider } from './libs/react-asset-preloader'
 import { AppPreloaderWrapper } from './components/AppPreloaderWrapper'
+import { BrandSelectionGate } from './components/BrandSelectionGate'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -36,9 +37,17 @@ createRoot(document.getElementById('root')!).render(
           </PreloaderProvider>
         } />
         <Route path="*" element={
-          <AppPreloaderWrapper>
-            <App />
-          </AppPreloaderWrapper>
+          <BrandSelectionGate>
+            {({ brand, canChangeBrand, requestBrandSelection }) => (
+              <AppPreloaderWrapper brand={brand}>
+                <App
+                  brand={brand}
+                  canChangeBrand={canChangeBrand}
+                  onRequestBrandSelection={requestBrandSelection}
+                />
+              </AppPreloaderWrapper>
+            )}
+          </BrandSelectionGate>
         } />
       </Routes>
     </BrowserRouter>

@@ -66,6 +66,7 @@ export class ProductFinderController {
     minCellSize?: number;
     cellSizeOverride?: number;
     orientation?: Orientation;
+    brand?: string;
   } = {};
 
   async initialize(canvas: HTMLCanvasElement): Promise<void> {
@@ -130,7 +131,7 @@ export class ProductFinderController {
 
     // Load products
     try {
-      const results = await fetchProducts({ limit: 10000 }); // API max; catalog has 6310+ products (issue #250)
+      const results = await fetchProducts({ limit: 10000, brand: this.preConfig.brand });
       this.products = results || [];
       this.pivotModel = this.pivotAnalyzer.analyze(this.products);
       this.layoutService.setPivotModel(this.pivotModel);

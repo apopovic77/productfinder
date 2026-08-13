@@ -62,6 +62,12 @@ type CartItem = {
   sizes?: Record<string, number>;
 };
 
+type Props = {
+  brand: string;
+  canChangeBrand: boolean;
+  onRequestBrandSelection: () => void;
+};
+
 type State = {
   loading: boolean;
   error: string | null;
@@ -227,7 +233,7 @@ const createInitialState = (): State => {
   };
 };
 
-export default class App extends React.Component<{}, State> {
+export default class App extends React.Component<Props, State> {
   private canvasRef = React.createRef<HTMLCanvasElement>();
   private footerRef = React.createRef<HTMLDivElement>();
   private controller = new ProductFinderController();
@@ -272,6 +278,7 @@ export default class App extends React.Component<{}, State> {
       minCellSize: this.useArcturianRenderer() ? 0 : this.state.devSettings.minCellSize,
       cellSizeOverride: this.state.devSettings.cellSizeOverride,
       orientation: this.computePivotOrientation(),
+      brand: this.props.brand,
     };
     await this.controller.initialize(canvas);
     await mediaPromise;
@@ -357,7 +364,7 @@ export default class App extends React.Component<{}, State> {
     window.removeEventListener('resize', this.handleOrientationChange);
   }
 
-  componentDidUpdate(prevProps: {}, prevState: State): void {
+  componentDidUpdate(prevProps: Props, prevState: State): void {
     const previousProductId = prevState.selectedProduct?.id ?? null;
     const currentProductId = this.state.selectedProduct?.id ?? null;
     const selectedProductChanged = previousProductId !== currentProductId;
@@ -1813,6 +1820,22 @@ export default class App extends React.Component<{}, State> {
               <img src={logoUrl} alt="O'NEAL" height="25" />
             </div>
             <div className="pf-header-breadcrumbs">
+              <span
+                role={this.props.canChangeBrand ? 'button' : undefined}
+                tabIndex={this.props.canChangeBrand ? 0 : -1}
+                className={`pf-header-breadcrumb pf-brand-breadcrumb ${this.props.canChangeBrand ? 'changeable' : ''}`}
+                onClick={this.props.canChangeBrand ? this.props.onRequestBrandSelection : undefined}
+                onKeyDown={evt => {
+                  if (this.props.canChangeBrand && (evt.key === 'Enter' || evt.key === ' ')) {
+                    evt.preventDefault();
+                    this.props.onRequestBrandSelection();
+                  }
+                }}
+                title={this.props.canChangeBrand ? 'Change brand' : `Brand: ${this.props.brand}`}
+              >
+                {this.props.brand}
+              </span>
+              <span className="pf-header-breadcrumb-sep">›</span>
               {pivotBreadcrumbs.map((crumb, i) => (
                 <React.Fragment key={`header-${crumb}-${i}`}>
                   {i > 0 && <span className="pf-header-breadcrumb-sep">›</span>}
@@ -1978,6 +2001,21 @@ export default class App extends React.Component<{}, State> {
         {/* Mobile: breadcrumbs get their own row so the primary header stays usable. */}
         <nav className="pf-mobile-breadcrumb-row" aria-label="Product navigation">
           <div className="pf-mobile-breadcrumb-scroll">
+            <span
+              role={this.props.canChangeBrand ? 'button' : undefined}
+              tabIndex={this.props.canChangeBrand ? 0 : -1}
+              className={`pf-header-breadcrumb pf-brand-breadcrumb ${this.props.canChangeBrand ? 'changeable' : ''}`}
+              onClick={this.props.canChangeBrand ? this.props.onRequestBrandSelection : undefined}
+              onKeyDown={evt => {
+                if (this.props.canChangeBrand && (evt.key === 'Enter' || evt.key === ' ')) {
+                  evt.preventDefault();
+                  this.props.onRequestBrandSelection();
+                }
+              }}
+            >
+              {this.props.brand}
+            </span>
+            <span className="pf-header-breadcrumb-sep">›</span>
             {pivotBreadcrumbs.map((crumb, i) => (
               <React.Fragment key={`mobile-header-${crumb}-${i}`}>
                 {i > 0 && <span className="pf-header-breadcrumb-sep">›</span>}

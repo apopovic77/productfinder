@@ -33,6 +33,7 @@ function isRealMedia(item: any): boolean {
 }
 
 export type Query = {
+  brand?: string;
   search?: string;
   category?: string;
   season?: number;
@@ -678,16 +679,42 @@ function mapProduct(p: ApiProduct): Product | null {
   return new Product(data);
 }
 
-let fullCatalogPromise: Promise<Product[]> | null = null;
+const fullCatalogPromises = new Map<string, Promise<Product[]>>();
 
 function isFullCatalogQuery(query: Query): boolean {
   if (query.limit !== 10000) return false;
   return Object.entries(query).every(([key, value]) =>
-    key === 'limit' || value === undefined || value === null || value === ''
+    key === 'limit' || key === 'brand' || value === undefined || value === null || value === ''
   );
 }
 
+export function buildProductsRequestUrl(query: Query): string {
+  const params = new URLSearchParams();
+  if (query.brand) params.set('brand', query.brand);
+  if (query.search) params.set('search', query.search);
+  if (query.category) params.set('category', query.category);
+  if (query.price_min !== undefined) params.set('price_min', String(query.price_min));
+  if (query.price_max !== undefined) params.set('price_max', String(query.price_max));
+  if (query.sort) params.set('sort', query.sort);
+  if (query.order) params.set('order', query.order);
+  if (query.limit !== undefined) params.set('limit', String(query.limit));
+  if (query.offset !== undefined) params.set('offset', String(query.offset));
+  params.set('has_image', 'true');
+  return `${API_BASE}/products?${params.toString()}`;
+}
+
 async function fetchProductsFromApi(query: Query): Promise<Product[]> {
+  if (query.brand) {
+    const response = await fetch(buildProductsRequestUrl(query), {
+      headers: { 'X-API-Key': API_KEY },
+    });
+    if (!response.ok) throw new Error(`Product API failed (${response.status})`);
+    const payload = await response.json();
+    return (payload.results || [])
+      .map(mapProduct)
+      .filter((product: Product | null): product is Product => Boolean(product));
+  }
+
   const response = await productsApi.listProductsV1ProductsGet({
     search: query.search,
     category: query.category,
@@ -717,13 +744,14 @@ export function fetchProducts(query: Query = {}): Promise<Product[]> {
   // here: only CanvasRenderer knows which products are visible (issue #1066).
   if (!isFullCatalogQuery(query)) return fetchProductsFromApi(query);
 
-  if (!fullCatalogPromise) {
-    fullCatalogPromise = fetchProductsFromApi(query).catch(error => {
-      fullCatalogPromise = null;
+  const cacheKey = query.brand ?? '__all__';
+  if (!fullCatalogPromises.has(cacheKey)) {
+    fullCatalogPromises.set(cacheKey, fetchProductsFromApi(query).catch(error => {
+      fullCatalogPromises.delete(cacheKey);
       throw error;
-    });
+    }));
   }
-  return fullCatalogPromise;
+  return fullCatalogPromises.get(cacheKey)!;
 }
 
 export async function fetchFacets(): Promise<any> {

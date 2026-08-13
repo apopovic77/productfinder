@@ -2088,3 +2088,20 @@ body {
   align-items: center;
   justify-content: center;
 }
+.pf-brand-breadcrumb {
+  flex: 0 0 auto;
+  color: #e63312;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.pf-brand-breadcrumb.changeable {
+  cursor: pointer;
+}
+
+.pf-brand-breadcrumb.changeable:hover,
+.pf-brand-breadcrumb.changeable:focus-visible {
+  color: #ff5a36;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

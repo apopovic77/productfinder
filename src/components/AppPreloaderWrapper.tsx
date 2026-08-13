@@ -11,8 +11,8 @@ const LOGO_STORAGE_ID = 6615;
  * Preloads product thumbnails into IndexedDB with the original video overlay.
  * Logo scales down as progress increases, glassmorphism dialog in lower third.
  */
-export const AppPreloaderWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const state = useProductPreloader();
+export const AppPreloaderWrapper: React.FC<{ children: React.ReactNode; brand: string }> = ({ children, brand }) => {
+  const state = useProductPreloader(brand);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
