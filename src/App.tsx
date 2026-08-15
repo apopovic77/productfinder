@@ -1,6 +1,7 @@
 import React, { lazy, Suspense } from 'react';
 import './App.css';
 import { CartView } from './components/cart/CartView';
+import { submitOrder } from './services/OrderService';
 import { SlidePanel, SlidePanelBackdrop } from './components/cart/SlidePanel';
 import './components/cart/CartView.css';
 import type { CartItem as CartViewItem, ProductSearchResult } from './components/cart/types';
@@ -151,6 +152,9 @@ type State = {
   footerSearchTerm: string;
   searchFilterTerm: string | null;
   cartItems: CartItem[];
+  orderSubmitting: boolean;
+  orderResult: string | null;
+  orderError: string | null;
   cartPanelOpen: boolean;
   cartFullOverlay: boolean;
 };
@@ -228,6 +232,9 @@ const createInitialState = (): State => {
     footerSearchTerm: '',
     searchFilterTerm: null,
     cartItems: [],
+    orderSubmitting: false,
+    orderResult: null,
+    orderError: null,
     cartPanelOpen: false,
     cartFullOverlay: false,
   };
@@ -1267,12 +1274,33 @@ export default class App extends React.Component<Props, State> {
     });
   };
 
-  private handleCartUploadB2B = () => {
-    const total = this.state.cartItems.reduce(
-      (sum, item) => sum + Object.values(item.sizes || {}).reduce((s, q) => s + (q || 0), item.quantity || 0),
-      0
-    );
-    alert(`B2B Upload: ${this.state.cartItems.length} Positionen, ${total} Stk.`);
+  private handleCartUploadB2B = async () => {
+    if (this.state.orderSubmitting) return;
+    const items = this.state.cartItems.flatMap(item => {
+      const price = item.priceText ? parseFloat(item.priceText.replace(/[^0-9.,]/g, '').replace(',', '.')) : undefined;
+      const base = {
+        product_id: item.productId,
+        product_code: item.articleNumber || undefined,
+        product_name: item.name,
+        color: item.color || item.variantLabel || undefined,
+        price_gross: Number.isFinite(price) ? price : undefined,
+      };
+      const sizeEntries = Object.entries(item.sizes || {}).filter(([, q]) => (q || 0) > 0);
+      if (sizeEntries.length > 0) {
+        return sizeEntries.map(([size, qty]) => ({ ...base, size, quantity: qty as number }));
+      }
+      return item.quantity > 0 ? [{ ...base, quantity: item.quantity }] : [];
+    });
+    if (items.length === 0) return;
+
+    this.setState({ orderSubmitting: true, orderResult: null, orderError: null });
+    try {
+      const result = await submitOrder({ items });
+      // Success: clear the cart, keep the confirmation visible
+      this.setState({ orderSubmitting: false, orderResult: result.order_number, cartItems: [] });
+    } catch (e: any) {
+      this.setState({ orderSubmitting: false, orderError: String(e?.message || e) });
+    }
   };
 
   private toCartViewItems = (): CartViewItem[] => {
@@ -2585,6 +2613,10 @@ export default class App extends React.Component<Props, State> {
                 onSearchProducts={this.handleCartSearchProducts}
                 onAddProduct={this.handleCartAddProduct}
                 onUploadB2B={this.handleCartUploadB2B}
+                orderSubmitting={this.state.orderSubmitting}
+                orderResult={this.state.orderResult}
+                orderError={this.state.orderError}
+                onDismissOrderStatus={() => this.setState({ orderResult: null, orderError: null })}
                 onClose={() => this.setState({ cartPanelOpen: false, cartFullOverlay: false })}
               />
             </div>

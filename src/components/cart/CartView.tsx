@@ -34,12 +34,17 @@ function sortSizes(sizes: string[]): string[] {
 interface CartViewProps extends CartViewCallbacks {
   items: CartItem[];
   title?: string;
+  orderSubmitting?: boolean;
+  orderResult?: string | null;
+  orderError?: string | null;
+  onDismissOrderStatus?: () => void;
 }
 
 export function CartView({
   items, title = 'Bestellübersicht',
   onSetQuantity, onChangeColor, onRemoveItem,
   onSearchProducts, onAddProduct, onUploadB2B, onClose,
+  orderSubmitting, orderResult, orderError, onDismissOrderStatus,
 }: CartViewProps) {
   // Compute union of all sizes across all items (column headers)
   const allSizes = useMemo(() => {
@@ -238,12 +243,22 @@ export function CartView({
 
       {/* Footer Actions */}
       <div className="cart-footer">
+        {orderResult && (
+          <div className="cart-order-status cart-order-success" onClick={onDismissOrderStatus}>
+            ✓ Bestellung übermittelt — Nr. <strong>{orderResult}</strong>
+          </div>
+        )}
+        {orderError && (
+          <div className="cart-order-status cart-order-error" onClick={onDismissOrderStatus}>
+            ✕ Übermittlung fehlgeschlagen — bitte erneut versuchen.
+          </div>
+        )}
         <button
           className="cart-upload-btn"
           onClick={onUploadB2B}
-          disabled={items.length === 0 || grandTotal === 0}
+          disabled={orderSubmitting || items.length === 0 || grandTotal === 0}
         >
-          B2B-System hochladen →
+          {orderSubmitting ? 'Wird übermittelt …' : 'Bestellung absenden →'}
         </button>
       </div>
     </div>
