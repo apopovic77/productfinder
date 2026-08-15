@@ -8,7 +8,8 @@ import { ProductOverlayCanvasV2, MODERN_OVERLAY_STYLE } from './ProductOverlayCa
 import { backgroundImageQueue, globalImageQueue, lodImageQueue } from '../utils/GlobalImageQueue';
 import { calculateVisibleImagePriority } from './VisibleImagePriority';
 import { buildMediaUrl } from '../utils/MediaUrlBuilder';
-import { InterpolatedProperty } from 'arkturian-typescript-utils';
+// deep imports: the package barrel re-exports three-dependent types (Vector3/Color)
+import { InterpolatedProperty } from 'arkturian-typescript-utils/dist/properties/InterpolatedProperty';
 import { ProductLabelRenderer } from './ProductLabelRenderer';
 import { categoryMediaService } from '../services/CategoryMediaService';
 import { BUCKET_BUTTON_CONFIG } from '../config/BucketButtonConfig';

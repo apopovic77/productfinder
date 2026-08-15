@@ -6,7 +6,8 @@ import { PivotLayouter, type PivotConfig, type Orientation } from '../layout/Piv
 import { PivotGroup } from '../layout/PivotGroup';
 import { ShelfLayoutStrategy } from '../layout/ShelfLayoutStrategy';
 import { LayoutEngine } from '../layout/LayoutEngine';
-import { Vector2 } from 'arkturian-typescript-utils';
+// deep imports: the package barrel re-exports three-dependent types (Vector3/Color)
+import { Vector2 } from 'arkturian-typescript-utils/dist/types/Vector2';
 import { GpanePivotService, type GroupDimension, type PriceBucketConfig } from '../gpane/GpanePivotService';
 import { ONEAL_TAXONOMY } from '../gpane';
 // Legacy import kept for type compatibility

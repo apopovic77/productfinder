@@ -23,6 +23,7 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
+      "arkturian-typescript-utils/dist/*": ["./node_modules/arkturian-typescript-utils/dist/*"],
       "@arcturian/*": ["./libs/arcturian/src/engine/*"],
       "@arcturian": ["./libs/arcturian/src/engine/index.ts"]
     }

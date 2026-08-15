@@ -1,4 +1,7 @@
-import { InterpolatedProperty, Easing, Vector2 } from 'arkturian-typescript-utils';
+// deep imports: the package barrel re-exports three-dependent types (Vector3/Color)
+import { InterpolatedProperty } from 'arkturian-typescript-utils/dist/properties/InterpolatedProperty';
+import { Easing } from 'arkturian-typescript-utils/dist/types/easing';
+import { Vector2 } from 'arkturian-typescript-utils/dist/types/Vector2';
 
 /**
  * LayoutNode represents a persistent visual element in the layout.

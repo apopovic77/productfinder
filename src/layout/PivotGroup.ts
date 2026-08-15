@@ -1,4 +1,5 @@
-import { InterpolatedProperty } from 'arkturian-typescript-utils';
+// deep imports: the package barrel re-exports three-dependent types (Vector3/Color)
+import { InterpolatedProperty } from 'arkturian-typescript-utils/dist/properties/InterpolatedProperty';
 
 /**
  * Represents a hierarchical pivot group (e.g., category, subcategory)

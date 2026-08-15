@@ -1,5 +1,6 @@
 import { ViewportTransform, type ContentBounds } from '../utils/ViewportTransform';
-import { Vector2 } from 'arkturian-typescript-utils';
+// deep imports: the package barrel re-exports three-dependent types (Vector3/Color)
+import { Vector2 } from 'arkturian-typescript-utils/dist/types/Vector2';
 
 export class ViewportService {
   private transform: ViewportTransform | null = null;

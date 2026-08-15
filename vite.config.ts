@@ -11,6 +11,9 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         '@arcturian': path.resolve(__dirname, 'libs/arcturian/src/engine'),
+        // bypass the package exports map: deep imports keep three out of
+        // the eager bundle (the barrel re-exports three-dependent types)
+        'arkturian-typescript-utils/dist': path.resolve(__dirname, 'node_modules/arkturian-typescript-utils/dist'),
       },
     },
     server: {
@@ -36,7 +39,10 @@ export default defineConfig(({ mode }) => {
           manualChunks: {
             'vendor-react': ['react', 'react-dom'],
             'vendor-framer': ['framer-motion'],
-            'vendor-three': ['three', '@react-three/fiber', '@react-three/drei'],
+            // NOTE: no manual three chunk — the object-syntax manualChunk
+            // became a static entry import and preloaded 1.1MB for every
+            // visitor although only lazy routes (v2/v3/arcturian) use three.
+            // Rollup now splits three naturally into the lazy chunks.
           },
         },
       },

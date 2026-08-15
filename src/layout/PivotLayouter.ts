@@ -4,7 +4,8 @@ import { ShelfLayoutStrategy } from './ShelfLayoutStrategy';
 import { WeightScalePolicy, type ScaleContext } from './ScalePolicy';
 import { SCALE_CONFIG, resolveScaleEnabled } from '../config/ScaleConfig';
 import { PivotGroup } from './PivotGroup';
-import { Vector2 } from 'arkturian-typescript-utils';
+// deep imports: the package barrel re-exports three-dependent types (Vector3/Color)
+import { Vector2 } from 'arkturian-typescript-utils/dist/types/Vector2';
 import { BUCKET_BUTTON_CONFIG } from '../config/BucketButtonConfig';
 import { calculateMobilePivotGeometry } from './MobilePivotGeometry';
 import { resolvePivotHeaderHeight } from './PivotHeaderGeometry';

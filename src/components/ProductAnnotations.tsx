@@ -1,7 +1,8 @@
 import React, { useRef, useMemo, useState, useCallback } from 'react';
 import { ForceLabels } from 'react-force-labels';
 import type { Label } from 'react-force-labels';
-import { Vector2 } from 'arkturian-typescript-utils';
+// deep imports: the package barrel re-exports three-dependent types (Vector3/Color)
+import { Vector2 } from 'arkturian-typescript-utils/dist/types/Vector2';
 import type { Product } from '../types/Product';
 import type { ForceLabelsConfig } from './DeveloperOverlay';
 

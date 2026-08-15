@@ -1,12 +1,14 @@
-import { StrictMode } from 'react'
+import { StrictMode, lazy, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import './index.css'
 import App from './App.tsx'
 import AnnotationTester from './pages/AnnotationTester.tsx'
 import GpaneDoku from './pages/GpaneDoku.tsx'
-import { ProductFinderV2 } from './v2/ProductFinderV2.tsx'
-import { ProductFinderV3 } from './v3/ProductFinderV3.tsx'
+// v2/v3 are alternative GPU pipelines (issue #260) — lazy so the 1.1MB
+// three.js vendor chunk never loads for normal visitors
+const ProductFinderV2 = lazy(() => import('./v2/ProductFinderV2.tsx').then(m => ({ default: m.ProductFinderV2 })))
+const ProductFinderV3 = lazy(() => import('./v3/ProductFinderV3.tsx').then(m => ({ default: m.ProductFinderV3 })))
 import { CartDemo } from './pages/CartDemo.tsx'
 import { PreloaderProvider } from './libs/react-asset-preloader'
 import { AppPreloaderWrapper } from './components/AppPreloaderWrapper'
@@ -16,8 +18,8 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <Routes>
-        <Route path="/v2" element={<ProductFinderV2 />} />
-        <Route path="/v3" element={<ProductFinderV3 />} />
+        <Route path="/v2" element={<Suspense fallback={null}><ProductFinderV2 /></Suspense>} />
+        <Route path="/v3" element={<Suspense fallback={null}><ProductFinderV3 /></Suspense>} />
         <Route path="/cart" element={<CartDemo />} />
         <Route path="/doku" element={<GpaneDoku />} />
         <Route path="/annot" element={
