@@ -1437,33 +1437,13 @@ export class CanvasRenderer<T> {
       if (isSelectedProduct && this.alternativeImages && this.alternativeImages.length > 0) {
         const loadedImages = this.alternativeImages.filter(img => img.loadedImage);
         if (loadedImages.length > 0) {
-          // Use animated scale value (already set above in alternative images section)
-          const animatedScale = this.imageScaleFactor.value ?? 1.0;
+          // Owner feedback (119479/119480): the SELECTED product must never
+          // render smaller than its normal-mode size. The card-fan shrink
+          // (imageScaleFactor) now applies only to the alternatives fanning
+          // out BEHIND it — the foremost card stays full size.
+          this.drawSelectedProductGlow(drawX, drawY, drawW, drawH, opacity);
 
-          // Center the scaled image
-          const scaledWidth = w * animatedScale;
-          const scaledHeight = h * animatedScale;
-          const centerOffsetX = (w - scaledWidth) / 2;
-          const centerOffsetY = (h - scaledHeight) / 2;
-
-          // Draw after the side perspectives but before the hero itself. The
-          // feathered mask gently veils overlapping side images and makes the
-          // selected product read as the foreground layer (issue #1076).
-          this.drawSelectedProductGlow(
-            x + centerOffsetX,
-            y + centerOffsetY,
-            scaledWidth,
-            scaledHeight,
-            opacity,
-          );
-
-          this.drawImageFit(
-            img,
-            x + centerOffsetX,
-            y + centerOffsetY,
-            scaledWidth,
-            scaledHeight
-          );
+          this.drawImageFit(img, drawX, drawY, drawW, drawH);
         } else {
           // No loaded images yet - reset scale to 1.0
           this.imageScaleFactor.targetValue = 1.0;
@@ -1986,20 +1966,8 @@ export class CanvasRenderer<T> {
     let width = node.width.targetValue ?? node.width.value ?? 0;
     let height = node.height.targetValue ?? node.height.value ?? 0;
 
-    // Account for image scaling when multiple images are stacked
-    if (this.alternativeImages && this.alternativeImages.length > 0) {
-      const loadedImages = this.alternativeImages.filter(img => img.loadedImage);
-      if (loadedImages.length > 0) {
-        const totalImages = loadedImages.length + 1;
-        const overlapFactor = 0.7;
-        const spreadFactor = 1 + (totalImages - 1) * (1 - overlapFactor);
-        let targetScale = 1 / spreadFactor;
-        targetScale = Math.max(targetScale, 0.85);
-
-        width = width * targetScale;
-        height = height * targetScale;
-      }
-    }
+    // The selected main image renders full size again (no spread shrink),
+    // so labels/annotations use the unscaled bounds.
 
     this.ctx.save();
 
