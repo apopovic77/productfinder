@@ -54,8 +54,8 @@ export class ViewportTransform {
   private offsetStart = new Vector2(0, 0);
   
   constructor(private canvas: HTMLCanvasElement) {
-    this.viewportWidth = canvas.width;
-    this.viewportHeight = canvas.height;
+    this.viewportWidth = canvas.clientWidth;
+    this.viewportHeight = canvas.clientHeight;
     this.setupEventListeners();
   }
 
@@ -73,8 +73,8 @@ export class ViewportTransform {
    * Update viewport size (called on canvas resize)
    */
   updateViewportSize(): void {
-    this.viewportWidth = this.canvas.width;
-    this.viewportHeight = this.canvas.height;
+    this.viewportWidth = this.canvas.clientWidth;
+    this.viewportHeight = this.canvas.clientHeight;
     this.calculateFitToContentScale();
   }
 

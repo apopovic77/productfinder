@@ -385,8 +385,8 @@ export class CanvasRenderer<T> {
     // Calculate visible viewport bounds in world space
     const viewportLeft = -this.viewport.offset.x / scale;
     const viewportTop = -this.viewport.offset.y / scale;
-    const viewportRight = viewportLeft + (canvas.width / scale);
-    const viewportBottom = viewportTop + (canvas.height / scale);
+    const viewportRight = viewportLeft + (canvas.clientWidth / scale);
+    const viewportBottom = viewportTop + (canvas.clientHeight / scale);
 
     // Store viewport bounds for shouldLoad validation
     this.viewportLeft = viewportLeft;
@@ -624,13 +624,18 @@ export class CanvasRenderer<T> {
   public backgroundColor: string | null = null;
   public productLabels = new ProductLabelRenderer({ enabled: false });
 
+  private dpr = 1;
+
   private clear() {
     const c = this.ctx.canvas;
+    // physical clear, then re-establish the CSS-pixel base transform
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.ctx.clearRect(0, 0, c.width, c.height);
     if (this.backgroundColor) {
       this.ctx.fillStyle = this.backgroundColor;
       this.ctx.fillRect(0, 0, c.width, c.height);
     }
+    this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
   }
 
   private drawImageLoadingPlaceholder(x: number, y: number, width: number, height: number): void {
@@ -1102,9 +1107,18 @@ export class CanvasRenderer<T> {
     const drawStart = performance.now();
 
     const c = this.ctx.canvas;
-    if (c.width !== c.clientWidth || c.height !== c.clientHeight) {
-      c.width = c.clientWidth;
-      c.height = c.clientHeight;
+    // Crisp rendering: scale the backing store by devicePixelRatio (capped
+    // at 2, desktop only — mobile stays 1x to protect fill-rate) while ALL
+    // layout/interaction math keeps working in CSS pixels via the base
+    // transform applied in clear().
+    this.dpr = (typeof window !== 'undefined' && window.innerWidth >= 768)
+      ? Math.min(window.devicePixelRatio || 1, 2)
+      : 1;
+    const targetW = Math.round(c.clientWidth * this.dpr);
+    const targetH = Math.round(c.clientHeight * this.dpr);
+    if (c.width !== targetW || c.height !== targetH) {
+      c.width = targetW;
+      c.height = targetH;
     }
 
     this.clear();
@@ -1127,8 +1141,8 @@ export class CanvasRenderer<T> {
       const scale = this.viewport.scale;
       this.viewportLeft = -this.viewport.offset.x / scale;
       this.viewportTop = -this.viewport.offset.y / scale;
-      this.viewportRight = this.viewportLeft + (c.width / scale);
-      this.viewportBottom = this.viewportTop + (c.height / scale);
+      this.viewportRight = this.viewportLeft + (c.clientWidth / scale);
+      this.viewportBottom = this.viewportTop + (c.clientHeight / scale);
       this.zoomFactor = scale;
     }
 
@@ -1186,7 +1200,7 @@ export class CanvasRenderer<T> {
     // curve each frame and the scale oscillates forever (issue #300).
     // (Mobile skips the spread block entirely, so it resets here too.)
     if (!this.selectedProduct || !this.alternativeImages || this.alternativeImages.length === 0
-        || this.ctx.canvas.width < 768) {
+        || this.ctx.canvas.clientWidth < 768) {
       this.imageScaleFactor.targetValue = 1.0;
     }
 
@@ -1293,7 +1307,7 @@ export class CanvasRenderer<T> {
       this.ctx.translate(-centerX, -centerY);
 
       // Draw alternative images stacked behind (desktop only - skip on mobile)
-      const isMobileSpread = this.ctx.canvas.width < 768;
+      const isMobileSpread = this.ctx.canvas.clientWidth < 768;
       if (!isMobileSpread && isSelectedProduct && this.alternativeImages && this.alternativeImages.length > 0) {
         // Count loaded images
         const loadedImages = this.alternativeImages.filter(img => img.loadedImage);

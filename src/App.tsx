@@ -2226,8 +2226,8 @@ export default class App extends React.Component<Props, State> {
                 anchorY={anchorY}
                 productWidth={productWidth}
                 productHeight={productHeight}
-                canvasWidth={canvas.width}
-                canvasHeight={canvas.height}
+                canvasWidth={canvas.clientWidth}
+                canvasHeight={canvas.clientHeight}
                 viewportScale={viewport.getTargetScale()}
                 viewportOffsetX={viewport.getTargetOffset().x}
                 viewportOffsetY={viewport.getTargetOffset().y}

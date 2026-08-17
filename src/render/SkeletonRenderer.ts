@@ -7,6 +7,9 @@ export class SkeletonRenderer {
     const c = this.ctx.canvas;
 
     // Clear canvas - transparent, body background shows through
+    // (identity transform: the skeleton draws 1:1 regardless of the
+    // DPR base transform the main renderer installs)
+    this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.ctx.clearRect(0, 0, c.width, c.height);
     
     // Calculate grid layout

@@ -237,7 +237,7 @@ export class ProductFinderController {
     }
 
     // Pass viewport size to LayoutService for fixed bounds calculation in Pivot Mode
-    const bounds = this.layoutService.getContentBounds(this.canvas.width, this.canvas.height);
+    const bounds = this.layoutService.getContentBounds(this.canvas.clientWidth, this.canvas.clientHeight);
 
     if (!bounds) {
       // No bounds available yet (e.g., during initial load) - this is normal
@@ -257,7 +257,7 @@ export class ProductFinderController {
       if (this.canvas) {
         this.renderer.debugBoundsAuto = {
           x: 0, y: 0,
-          w: this.canvas.width, h: this.canvas.height,
+          w: this.canvas.clientWidth, h: this.canvas.clientHeight,
         };
       }
       // Pass bucket bounds from group headers
@@ -556,9 +556,8 @@ export class ProductFinderController {
              return;
            }
 
-           // Set canvas size to match calculated viewport
-           this.canvas.width = viewportWidth;
-           this.canvas.height = viewportHeight;
+           // Backing-store sizing is owned by CanvasRenderer.draw()
+           // (DPR-aware); the CSS box is defined by inset/insets.
 
            console.log(`[Resize] parent=${parentWidth}x${parentHeight} insets L=${left} R=${right} → canvas=${viewportWidth}x${viewportHeight}`);
 
