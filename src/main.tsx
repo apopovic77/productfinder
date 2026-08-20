@@ -13,6 +13,9 @@ import { CartDemo } from './pages/CartDemo.tsx'
 import { PreloaderProvider } from './libs/react-asset-preloader'
 import { AppPreloaderWrapper } from './components/AppPreloaderWrapper'
 import { BrandSelectionGate } from './components/BrandSelectionGate'
+import { CatalogLanguageGate } from './components/CatalogLanguageGate'
+import { CatalogNavigationGate } from './components/CatalogNavigationGate'
+import { CATALOG_ENTRY_CONFIG } from './config/CatalogEntryConfig'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -39,17 +42,49 @@ createRoot(document.getElementById('root')!).render(
           </PreloaderProvider>
         } />
         <Route path="*" element={
-          <BrandSelectionGate>
-            {({ brand, canChangeBrand, requestBrandSelection }) => (
-              <AppPreloaderWrapper brand={brand}>
-                <App
-                  brand={brand}
-                  canChangeBrand={canChangeBrand}
-                  onRequestBrandSelection={requestBrandSelection}
-                />
-              </AppPreloaderWrapper>
+          <CatalogLanguageGate>
+            {({ locale, requestLanding }) => (
+              <BrandSelectionGate locale={locale}>
+                {({ brand, canChangeBrand, requestBrandSelection }) => (
+                  <CatalogNavigationGate
+                    brand={brand}
+                    locale={locale}
+                    canChangeBrand={canChangeBrand}
+                    onRequestBrandSelection={requestBrandSelection}
+                    onRequestLanding={requestLanding}
+                  >
+                    {({
+                      selection,
+                      sportLabel,
+                      categoryLabel,
+                      requestSportSelection,
+                      requestCategorySelection,
+                    }) => (
+                      <AppPreloaderWrapper
+                        key={`${brand}:${selection.sportId}:${selection.categoryId}`}
+                        brand={brand}
+                        entrySelection={selection}
+                      >
+                        <App
+                          brand={brand}
+                          canChangeBrand={canChangeBrand}
+                          onRequestBrandSelection={requestBrandSelection}
+                          locale={locale}
+                          catalogYear={CATALOG_ENTRY_CONFIG.year}
+                          entrySelection={selection}
+                          sportLabel={sportLabel}
+                          categoryLabel={categoryLabel}
+                          onRequestCatalogLanding={requestLanding}
+                          onRequestSportSelection={requestSportSelection}
+                          onRequestCategorySelection={requestCategorySelection}
+                        />
+                      </AppPreloaderWrapper>
+                    )}
+                  </CatalogNavigationGate>
+                )}
+              </BrandSelectionGate>
             )}
-          </BrandSelectionGate>
+          </CatalogLanguageGate>
         } />
       </Routes>
     </BrowserRouter>

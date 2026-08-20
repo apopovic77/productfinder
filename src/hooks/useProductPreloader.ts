@@ -4,6 +4,8 @@ import { fetchProducts } from '../data/ProductRepository';
 import { backgroundImageQueue, globalImageQueue } from '../utils/GlobalImageQueue';
 import { buildThumbnailUrl } from '../utils/MediaUrlBuilder';
 import { imageCache } from '../utils/IndexedDBImageCache';
+import type { CatalogEntrySelection } from '../config/CatalogEntryConfig';
+import { filterCatalogProducts } from '../utils/catalogEntry';
 
 const wait = (milliseconds: number) =>
   new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
@@ -54,7 +56,7 @@ async function warmRemainingThumbnails(urls: string[]): Promise<void> {
  * to block the first interactive Canvas render: the Canvas owns foreground
  * order because it is the only component that knows what is actually visible.
  */
-export function useProductPreloader(brand: string) {
+export function useProductPreloader(brand: string, entrySelection: CatalogEntrySelection) {
   const hasStarted = useRef(false);
   const [state, setState] = useState({
     isLoading: true,
@@ -69,7 +71,8 @@ export function useProductPreloader(brand: string) {
 
     async function preloadToIndexedDB() {
       try {
-        const products = await fetchProducts({ limit: 10000, brand });
+        const catalogProducts = await fetchProducts({ limit: 10000, brand });
+        const products = filterCatalogProducts(catalogProducts, entrySelection);
 
         // Build URL list
         const urlSet = new Set<string>();
@@ -95,7 +98,7 @@ export function useProductPreloader(brand: string) {
     }
 
     preloadToIndexedDB();
-  }, [brand]);
+  }, [brand, entrySelection.sportId, entrySelection.categoryId]);
 
   return state;
 }

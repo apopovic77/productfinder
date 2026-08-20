@@ -35,6 +35,19 @@ describe('buildBrandUrl', () => {
       .toBe('/?renderer=arcturian&brand=O%27Neal#demo');
   });
 
+  it('can clear sport and category when the user changes brand', () => {
+    const result = buildBrandUrl(
+      'https://example.test/catalog?lang=en&brand=Old&sport=moto&category=mx-gear',
+      "O'Neal",
+      { clearDependents: true },
+    );
+    const url = new URL(result, 'https://example.test');
+    expect(url.searchParams.get('lang')).toBe('en');
+    expect(url.searchParams.get('brand')).toBe("O'Neal");
+    expect(url.searchParams.has('sport')).toBe(false);
+    expect(url.searchParams.has('category')).toBe(false);
+  });
+
   it('removes only the brand parameter', () => {
     expect(buildBrandUrl('https://example.test/?brand=O%27Neal&renderer=arcturian', null))
       .toBe('/?renderer=arcturian');

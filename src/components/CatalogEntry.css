@@ -1,0 +1,268 @@
+.pf-catalog-entry {
+  min-height: 100dvh;
+  box-sizing: border-box;
+  color: #fff;
+  background:
+    radial-gradient(circle at 82% 16%, rgba(230, 51, 18, 0.22), transparent 34%),
+    linear-gradient(145deg, #171717 0%, #050505 72%);
+}
+
+.pf-catalog-landing {
+  position: relative;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.pf-catalog-landing-media,
+.pf-catalog-landing-shade {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.pf-catalog-landing-media { object-fit: cover; z-index: -3; }
+.pf-catalog-landing-shade {
+  z-index: -2;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.34), rgba(0, 0, 0, 0.82));
+}
+
+.pf-catalog-landing-content {
+  width: min(1120px, calc(100vw - 48px));
+  padding: 48px 0;
+  display: grid;
+  gap: clamp(42px, 9vh, 92px);
+}
+
+.pf-catalog-wordmark {
+  justify-self: center;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  font-weight: 900;
+  font-size: clamp(22px, 4vw, 54px);
+  line-height: 0.95;
+}
+
+.pf-catalog-wordmark span {
+  display: block;
+  margin-top: 10px;
+  color: #e63312;
+  font-size: 0.34em;
+  letter-spacing: 0.54em;
+}
+
+.pf-catalog-landing-copy { text-align: center; }
+.pf-catalog-landing-copy h1,
+.pf-catalog-page-title {
+  margin: 0;
+  text-transform: uppercase;
+  font-size: clamp(48px, 9vw, 118px);
+  line-height: 0.88;
+  letter-spacing: -0.055em;
+}
+
+.pf-catalog-language-panel { display: grid; gap: 16px; }
+.pf-catalog-language-title {
+  margin: 0;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.pf-catalog-language-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
+}
+
+.pf-catalog-language {
+  min-height: 60px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+  text-transform: uppercase;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.pf-catalog-language:hover:not(:disabled),
+.pf-catalog-language:focus-visible:not(:disabled) {
+  border-color: #e63312;
+  background: rgba(230, 51, 18, 0.22);
+  outline: none;
+}
+
+.pf-catalog-language:disabled {
+  color: rgba(255, 255, 255, 0.28);
+  border-color: rgba(255, 255, 255, 0.08);
+  cursor: not-allowed;
+}
+
+.pf-catalog-page {
+  width: min(1120px, calc(100vw - 48px));
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 32px 0 72px;
+  box-sizing: border-box;
+}
+
+.pf-catalog-entry-breadcrumbs {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pf-catalog-entry-breadcrumbs button {
+  padding: 6px 0;
+  border: 0;
+  color: inherit;
+  background: none;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.pf-catalog-entry-breadcrumbs button:hover,
+.pf-catalog-entry-breadcrumbs button:focus-visible { color: #fff; outline: none; }
+.pf-catalog-entry-breadcrumbs span { white-space: nowrap; }
+
+.pf-catalog-page-header {
+  padding: clamp(56px, 10vh, 110px) 0 clamp(38px, 7vh, 72px);
+}
+
+.pf-catalog-page-kicker {
+  display: block;
+  margin-bottom: 12px;
+  color: #e63312;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.pf-catalog-page-title { font-size: clamp(46px, 8vw, 96px); }
+.pf-catalog-page-subtitle { margin: 18px 0 0; color: rgba(255, 255, 255, 0.58); }
+
+.pf-catalog-sport-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.pf-catalog-sport-card {
+  position: relative;
+  min-height: min(44vw, 420px);
+  padding: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  display: flex;
+  align-items: flex-end;
+  color: #fff;
+  background: linear-gradient(145deg, #242424, #0b0b0b);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.pf-catalog-sport-card:not(:disabled):hover,
+.pf-catalog-sport-card:not(:disabled):focus-visible {
+  border-color: #e63312;
+  outline: none;
+}
+
+.pf-catalog-sport-card:disabled { color: rgba(255, 255, 255, 0.36); cursor: not-allowed; }
+.pf-catalog-sport-name { font-size: clamp(44px, 8vw, 94px); font-weight: 900; letter-spacing: -0.05em; }
+.pf-catalog-coming-soon {
+  position: absolute;
+  top: 22px;
+  right: 22px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.pf-catalog-category-list { display: grid; gap: 30px; }
+.pf-catalog-category-banner {
+  position: relative;
+  width: 100%;
+  min-height: 72px;
+  aspect-ratio: 15.55 / 1;
+  padding: 0 clamp(20px, 4vw, 46px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  color: #fff;
+  background-color: #141414;
+  background-position: center;
+  background-size: cover;
+  box-sizing: border-box;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.pf-catalog-category-banner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.86), rgba(0, 0, 0, 0.28));
+}
+
+.pf-catalog-category-banner:not(:disabled):hover,
+.pf-catalog-category-banner:not(:disabled):focus-visible { border-color: #e63312; outline: none; }
+.pf-catalog-category-banner:disabled { color: rgba(255, 255, 255, 0.34); cursor: not-allowed; }
+.pf-catalog-category-name,
+.pf-catalog-category-count { position: relative; z-index: 1; }
+.pf-catalog-category-name { font-size: clamp(16px, 2.1vw, 28px); font-weight: 900; letter-spacing: 0.025em; }
+.pf-catalog-category-count { font-size: 13px; font-weight: 800; white-space: nowrap; }
+
+.pf-catalog-entry-state {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 32px;
+  text-align: center;
+}
+
+.pf-catalog-entry-state button { margin-top: 18px; }
+
+@media (max-width: 768px) {
+  .pf-catalog-landing-content,
+  .pf-catalog-page { width: min(100% - 32px, 1120px); }
+  .pf-catalog-landing-content { padding: 32px 0; gap: 48px; }
+  .pf-catalog-language-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pf-catalog-sport-grid { grid-template-columns: 1fr; }
+  .pf-catalog-sport-card { min-height: 230px; }
+  .pf-catalog-category-list { gap: 18px; }
+  .pf-catalog-category-banner {
+    min-height: 128px;
+    aspect-ratio: 2.5 / 1;
+    padding: 20px;
+  }
+  .pf-catalog-category-name { max-width: 72%; }
+}
+

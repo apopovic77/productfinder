@@ -41,6 +41,7 @@ import { AiProductQueryService } from './services/AiProductQueryService';
 import { categoryMediaService } from './services/CategoryMediaService';
 import { FOOTER_CONFIG, type FooterPosition } from './config/FooterConfig';
 import { STORAGE_API_BASE as CENTRAL_STORAGE_BASE, STORAGE_API_KEY as CENTRAL_STORAGE_KEY } from './config/apiConfig';
+import type { CatalogEntrySelection } from './config/CatalogEntryConfig';
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -67,6 +68,14 @@ type Props = {
   brand: string;
   canChangeBrand: boolean;
   onRequestBrandSelection: () => void;
+  locale: string;
+  catalogYear: number;
+  entrySelection: CatalogEntrySelection;
+  sportLabel: string;
+  categoryLabel: string;
+  onRequestCatalogLanding: () => void;
+  onRequestSportSelection: () => void;
+  onRequestCategorySelection: () => void;
 };
 
 type State = {
@@ -286,6 +295,7 @@ export default class App extends React.Component<Props, State> {
       cellSizeOverride: this.state.devSettings.cellSizeOverride,
       orientation: this.computePivotOrientation(),
       brand: this.props.brand,
+      entrySelection: this.props.entrySelection,
     };
     await this.controller.initialize(canvas);
     await mediaPromise;
@@ -343,8 +353,14 @@ export default class App extends React.Component<Props, State> {
 
     // Setup browser history management for back button
     window.addEventListener('popstate', this.handlePopState);
-    // Push initial state so first back doesn't leave the app
-    this.pushHistoryState({ type: 'initial', breadcrumbs: this.state.pivotBreadcrumbs });
+    // The entry shell already owns the preceding browser-history steps.
+    // Replace the current catalog state instead of duplicating the URL, so a
+    // single Back returns from the catalog to category selection.
+    history.replaceState(
+      { ...(history.state ?? {}), type: 'initial', breadcrumbs: this.state.pivotBreadcrumbs },
+      '',
+      window.location.href,
+    );
 
     // Start FPS counter
     this.startFPSCounter();
@@ -1849,6 +1865,21 @@ export default class App extends React.Component<Props, State> {
             </div>
             <div className="pf-header-breadcrumbs">
               <span
+                role="button"
+                tabIndex={0}
+                className="pf-header-breadcrumb pf-catalog-breadcrumb"
+                onClick={this.props.onRequestCatalogLanding}
+                onKeyDown={evt => {
+                  if (evt.key === 'Enter' || evt.key === ' ') {
+                    evt.preventDefault();
+                    this.props.onRequestCatalogLanding();
+                  }
+                }}
+              >
+                Catalog {this.props.catalogYear}
+              </span>
+              <span className="pf-header-breadcrumb-sep">›</span>
+              <span
                 role={this.props.canChangeBrand ? 'button' : undefined}
                 tabIndex={this.props.canChangeBrand ? 0 : -1}
                 className={`pf-header-breadcrumb pf-brand-breadcrumb ${this.props.canChangeBrand ? 'changeable' : ''}`}
@@ -1862,6 +1893,36 @@ export default class App extends React.Component<Props, State> {
                 title={this.props.canChangeBrand ? 'Change brand' : `Brand: ${this.props.brand}`}
               >
                 {this.props.brand}
+              </span>
+              <span className="pf-header-breadcrumb-sep">›</span>
+              <span
+                role="button"
+                tabIndex={0}
+                className="pf-header-breadcrumb pf-catalog-breadcrumb"
+                onClick={this.props.onRequestSportSelection}
+                onKeyDown={evt => {
+                  if (evt.key === 'Enter' || evt.key === ' ') {
+                    evt.preventDefault();
+                    this.props.onRequestSportSelection();
+                  }
+                }}
+              >
+                {this.props.sportLabel}
+              </span>
+              <span className="pf-header-breadcrumb-sep">›</span>
+              <span
+                role="button"
+                tabIndex={0}
+                className="pf-header-breadcrumb pf-catalog-breadcrumb"
+                onClick={this.props.onRequestCategorySelection}
+                onKeyDown={evt => {
+                  if (evt.key === 'Enter' || evt.key === ' ') {
+                    evt.preventDefault();
+                    this.props.onRequestCategorySelection();
+                  }
+                }}
+              >
+                {this.props.categoryLabel}
               </span>
               <span className="pf-header-breadcrumb-sep">›</span>
               {pivotBreadcrumbs.map((crumb, i) => (
@@ -2030,6 +2091,21 @@ export default class App extends React.Component<Props, State> {
         <nav className="pf-mobile-breadcrumb-row" aria-label="Product navigation">
           <div className="pf-mobile-breadcrumb-scroll">
             <span
+              role="button"
+              tabIndex={0}
+              className="pf-header-breadcrumb pf-catalog-breadcrumb"
+              onClick={this.props.onRequestCatalogLanding}
+              onKeyDown={evt => {
+                if (evt.key === 'Enter' || evt.key === ' ') {
+                  evt.preventDefault();
+                  this.props.onRequestCatalogLanding();
+                }
+              }}
+            >
+              Catalog {this.props.catalogYear}
+            </span>
+            <span className="pf-header-breadcrumb-sep">›</span>
+            <span
               role={this.props.canChangeBrand ? 'button' : undefined}
               tabIndex={this.props.canChangeBrand ? 0 : -1}
               className={`pf-header-breadcrumb pf-brand-breadcrumb ${this.props.canChangeBrand ? 'changeable' : ''}`}
@@ -2042,6 +2118,36 @@ export default class App extends React.Component<Props, State> {
               }}
             >
               {this.props.brand}
+            </span>
+            <span className="pf-header-breadcrumb-sep">›</span>
+            <span
+              role="button"
+              tabIndex={0}
+              className="pf-header-breadcrumb pf-catalog-breadcrumb"
+              onClick={this.props.onRequestSportSelection}
+              onKeyDown={evt => {
+                if (evt.key === 'Enter' || evt.key === ' ') {
+                  evt.preventDefault();
+                  this.props.onRequestSportSelection();
+                }
+              }}
+            >
+              {this.props.sportLabel}
+            </span>
+            <span className="pf-header-breadcrumb-sep">›</span>
+            <span
+              role="button"
+              tabIndex={0}
+              className="pf-header-breadcrumb pf-catalog-breadcrumb"
+              onClick={this.props.onRequestCategorySelection}
+              onKeyDown={evt => {
+                if (evt.key === 'Enter' || evt.key === ' ') {
+                  evt.preventDefault();
+                  this.props.onRequestCategorySelection();
+                }
+              }}
+            >
+              {this.props.categoryLabel}
             </span>
             <span className="pf-header-breadcrumb-sep">›</span>
             {pivotBreadcrumbs.map((crumb, i) => (
@@ -2630,7 +2736,7 @@ export default class App extends React.Component<Props, State> {
    * Push a new history state for back button navigation
    */
   private pushHistoryState(state: { type: string; [key: string]: any }) {
-    history.pushState(state, '', window.location.href);
+    history.pushState({ ...(history.state ?? {}), ...state }, '', window.location.href);
   }
 
   /**

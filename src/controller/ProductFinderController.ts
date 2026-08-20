@@ -11,6 +11,8 @@ import type { GroupDimension, PriceBucketMode } from '../types/pivot';
 import { PivotDimensionAnalyzer, type PivotAnalysisResult, type PivotDimensionDefinition } from '../services/PivotDimensionAnalyzer';
 import type { Orientation } from '../layout/PivotLayouter';
 import type { PivotGroup } from '../layout/PivotGroup';
+import type { CatalogEntrySelection } from '../config/CatalogEntryConfig';
+import { filterCatalogProducts } from '../utils/catalogEntry';
 
 export type ControllerState = {
   loading: boolean;
@@ -67,6 +69,7 @@ export class ProductFinderController {
     cellSizeOverride?: number;
     orientation?: Orientation;
     brand?: string;
+    entrySelection?: CatalogEntrySelection;
   } = {};
 
   async initialize(canvas: HTMLCanvasElement): Promise<void> {
@@ -132,7 +135,9 @@ export class ProductFinderController {
     // Load products
     try {
       const results = await fetchProducts({ limit: 10000, brand: this.preConfig.brand });
-      this.products = results || [];
+      this.products = this.preConfig.entrySelection
+        ? filterCatalogProducts(results || [], this.preConfig.entrySelection)
+        : results || [];
       this.pivotModel = this.pivotAnalyzer.analyze(this.products);
       this.layoutService.setPivotModel(this.pivotModel);
       this.loading = false;
@@ -719,7 +724,7 @@ export class ProductFinderController {
     // Push history state for browser back button
     if (!this.ignoreNextHistoryPush) {
       const state = this.layoutService.getPivotBreadcrumbs();
-      window.history.pushState({ pivotDepth: state.length - 1, breadcrumbs: state }, '');
+      window.history.pushState({ ...(window.history.state ?? {}), pivotDepth: state.length - 1, breadcrumbs: state }, '');
     }
     this.ignoreNextHistoryPush = false;
   }
@@ -731,7 +736,7 @@ export class ProductFinderController {
     // Push history state for browser back button
     if (!this.ignoreNextHistoryPush) {
       const state = this.layoutService.getPivotBreadcrumbs();
-      window.history.pushState({ pivotDepth: state.length - 1, breadcrumbs: state }, '');
+      window.history.pushState({ ...(window.history.state ?? {}), pivotDepth: state.length - 1, breadcrumbs: state }, '');
     }
     this.ignoreNextHistoryPush = false;
   }
@@ -742,7 +747,7 @@ export class ProductFinderController {
 
     // Replace history state (don't push)
     const state = this.layoutService.getPivotBreadcrumbs();
-    window.history.replaceState({ pivotDepth: state.length - 1, breadcrumbs: state }, '');
+    window.history.replaceState({ ...(window.history.state ?? {}), pivotDepth: state.length - 1, breadcrumbs: state }, '');
   }
   
   getPivotBreadcrumbs(): string[] {
@@ -825,7 +830,7 @@ export class ProductFinderController {
     // Push history state for browser back button
     if (!this.ignoreNextHistoryPush) {
       const state = this.layoutService.getPivotBreadcrumbs();
-      window.history.pushState({ pivotDepth: state.length - 1, breadcrumbs: state }, '');
+      window.history.pushState({ ...(window.history.state ?? {}), pivotDepth: state.length - 1, breadcrumbs: state }, '');
     }
     this.ignoreNextHistoryPush = false;
   }
@@ -837,7 +842,7 @@ export class ProductFinderController {
   private setupHistoryIntegration(): void {
     // Initialize history with current state
     const initialState = this.layoutService.getPivotBreadcrumbs();
-    window.history.replaceState({ pivotDepth: initialState.length - 1, breadcrumbs: initialState }, '');
+    window.history.replaceState({ ...(window.history.state ?? {}), pivotDepth: initialState.length - 1, breadcrumbs: initialState }, '');
 
     // Handle browser back/forward
     this.historyPopStateHandler = (e: PopStateEvent) => {

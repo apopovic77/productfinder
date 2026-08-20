@@ -2,6 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import type { CSSProperties } from 'react';
 import { useProductPreloader } from '../hooks/useProductPreloader';
 import { STORAGE_API_BASE } from '../config/apiConfig';
+import type { CatalogEntrySelection } from '../config/CatalogEntryConfig';
 
 const STORAGE_API_URL = STORAGE_API_BASE;
 const VIDEO_STORAGE_ID = 6617;
@@ -11,8 +12,12 @@ const LOGO_STORAGE_ID = 6615;
  * Preloads product thumbnails into IndexedDB with the original video overlay.
  * Logo scales down as progress increases, glassmorphism dialog in lower third.
  */
-export const AppPreloaderWrapper: React.FC<{ children: React.ReactNode; brand: string }> = ({ children, brand }) => {
-  const state = useProductPreloader(brand);
+export const AppPreloaderWrapper: React.FC<{
+  children: React.ReactNode;
+  brand: string;
+  entrySelection: CatalogEntrySelection;
+}> = ({ children, brand, entrySelection }) => {
+  const state = useProductPreloader(brand, entrySelection);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {

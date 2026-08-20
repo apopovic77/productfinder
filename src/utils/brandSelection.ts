@@ -29,9 +29,17 @@ export function resolveBrandEntry(
     : { selectedBrand: null, showSelector: true, autoSelected: false };
 }
 
-export function buildBrandUrl(currentHref: string, brand: string | null): string {
+export function buildBrandUrl(
+  currentHref: string,
+  brand: string | null,
+  options: { clearDependents?: boolean } = {},
+): string {
   const url = new URL(currentHref);
   if (brand) url.searchParams.set('brand', brand);
   else url.searchParams.delete('brand');
+  if (options.clearDependents) {
+    url.searchParams.delete('sport');
+    url.searchParams.delete('category');
+  }
   return `${url.pathname}${url.search}${url.hash}`;
 }

@@ -10,19 +10,50 @@ export type BrandSelectionContext = {
 };
 
 type Props = {
+  locale?: string;
   children: (context: BrandSelectionContext) => React.ReactNode;
 };
 
-function updateBrandUrl(brand: string | null, mode: 'push' | 'replace'): void {
-  const nextUrl = buildBrandUrl(window.location.href, brand);
+function updateBrandUrl(
+  brand: string | null,
+  mode: 'push' | 'replace',
+  clearDependents = false,
+): void {
+  const nextUrl = buildBrandUrl(window.location.href, brand, { clearDependents });
   window.history[mode === 'push' ? 'pushState' : 'replaceState'](
-    { ...(window.history.state ?? {}), brand },
+    { brand },
     '',
     nextUrl,
   );
 }
 
-export const BrandSelectionGate: React.FC<Props> = ({ children }) => {
+const messages: Record<string, Record<string, string>> = {
+  de: {
+    loading: 'Marken werden geladen…',
+    empty: 'Aktuell sind keine Marken verfügbar.',
+    failed: 'Marken konnten nicht geladen werden.',
+    retry: 'Erneut versuchen',
+    kicker: 'Katalog',
+    title: 'Wähle deine Marke',
+    subtitle: 'Wähle die Kollektion, die du entdecken möchtest.',
+    products: 'Produkte',
+    action: 'Kollektion öffnen',
+  },
+  en: {
+    loading: 'Loading brands…',
+    empty: 'No brands are currently available.',
+    failed: 'Could not load brands.',
+    retry: 'Try again',
+    kicker: 'Catalog',
+    title: 'Choose your brand',
+    subtitle: 'Choose the collection you want to explore.',
+    products: 'products',
+    action: 'Explore collection',
+  },
+};
+
+export const BrandSelectionGate: React.FC<Props> = ({ children, locale = 'en' }) => {
+  const text = messages[locale] ?? messages.en;
   const [brands, setBrands] = useState<BrandFacet[]>([]);
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
   const [showSelector, setShowSelector] = useState(false);
@@ -37,6 +68,8 @@ export const BrandSelectionGate: React.FC<Props> = ({ children }) => {
     setShowSelector(resolution.showSelector);
     if (resolution.autoSelected && resolution.selectedBrand) {
       updateBrandUrl(resolution.selectedBrand, 'replace');
+    } else if (requestedBrand && resolution.showSelector) {
+      updateBrandUrl(null, 'replace', true);
     }
   }, []);
 
@@ -57,17 +90,17 @@ export const BrandSelectionGate: React.FC<Props> = ({ children }) => {
           : [];
         setBrands(availableBrands);
         applyLocation(availableBrands);
-        if (availableBrands.length === 0) setError('No brands are currently available.');
+        if (availableBrands.length === 0) setError(text.empty);
       })
       .catch(reason => {
-        if (!cancelled) setError(reason instanceof Error ? reason.message : 'Could not load brands.');
+        if (!cancelled) setError(reason instanceof Error ? reason.message : text.failed);
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false);
       });
 
     return () => { cancelled = true; };
-  }, [applyLocation, reloadKey]);
+  }, [applyLocation, reloadKey, text.empty, text.failed]);
 
   useEffect(() => {
     const handlePopState = () => applyLocation(brands);
@@ -76,14 +109,14 @@ export const BrandSelectionGate: React.FC<Props> = ({ children }) => {
   }, [applyLocation, brands]);
 
   const chooseBrand = (brand: string) => {
-    updateBrandUrl(brand, 'replace');
+    updateBrandUrl(brand, 'replace', true);
     setSelectedBrand(brand);
     setShowSelector(false);
   };
 
   const requestBrandSelection = () => {
     if (brands.length <= 1) return;
-    updateBrandUrl(null, 'push');
+    updateBrandUrl(null, 'push', true);
     setSelectedBrand(null);
     setShowSelector(true);
   };
@@ -92,7 +125,7 @@ export const BrandSelectionGate: React.FC<Props> = ({ children }) => {
     return (
       <main className="pf-brand-entry pf-brand-entry-state" aria-live="polite">
         <div className="pf-brand-entry-spinner" />
-        <p>Loading brands…</p>
+        <p>{text.loading}</p>
       </main>
     );
   }
@@ -101,7 +134,7 @@ export const BrandSelectionGate: React.FC<Props> = ({ children }) => {
     return (
       <main className="pf-brand-entry pf-brand-entry-state" role="alert">
         <p>{error}</p>
-        <button type="button" className="pf-brand-retry" onClick={() => setReloadKey(key => key + 1)}>Try again</button>
+        <button type="button" className="pf-brand-retry" onClick={() => setReloadKey(key => key + 1)}>{text.retry}</button>
       </main>
     );
   }
@@ -110,9 +143,9 @@ export const BrandSelectionGate: React.FC<Props> = ({ children }) => {
     return (
       <main className="pf-brand-entry">
         <div className="pf-brand-entry-copy">
-          <span className="pf-brand-entry-kicker">Product Finder</span>
-          <h1>Select your brand</h1>
-          <p>Choose the collection you want to explore.</p>
+          <span className="pf-brand-entry-kicker">{text.kicker}</span>
+          <h1>{text.title}</h1>
+          <p>{text.subtitle}</p>
         </div>
         <div className="pf-brand-grid" aria-label="Available brands">
           {brands.map(brand => (
@@ -124,9 +157,9 @@ export const BrandSelectionGate: React.FC<Props> = ({ children }) => {
             >
               <span className="pf-brand-card-name">{brand.name}</span>
               <span className="pf-brand-card-count">
-                {new Intl.NumberFormat('en').format(brand.count_with_image)} products
+                {new Intl.NumberFormat(locale).format(brand.count_with_image)} {text.products}
               </span>
-              <span className="pf-brand-card-action">Explore collection <span aria-hidden="true">→</span></span>
+              <span className="pf-brand-card-action">{text.action} <span aria-hidden="true">→</span></span>
             </button>
           ))}
         </div>

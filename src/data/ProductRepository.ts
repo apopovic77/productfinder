@@ -47,6 +47,22 @@ export type Query = {
   offset?: number;
 };
 
+export type ContentLanguageFacet = {
+  locale: string;
+  category_coverage: number;
+  product_coverage: number;
+  available: boolean;
+};
+
+export type FacetsData = {
+  brands?: Array<{ name: string; count: number; count_with_image: number }>;
+  categories?: Array<Record<string, unknown>>;
+  colors?: Array<Record<string, unknown>>;
+  sizes?: Array<Record<string, unknown>>;
+  price_range?: Record<string, unknown>;
+  content_languages?: ContentLanguageFacet[];
+};
+
 /**
  * Map SDK Product to our OOP Product class instance
  */
@@ -754,9 +770,20 @@ export function fetchProducts(query: Query = {}): Promise<Product[]> {
   return fullCatalogPromises.get(cacheKey)!;
 }
 
-export async function fetchFacets(): Promise<any> {
-  const response = await facetsApi.getFacetsV1FacetsGet();
-  return response.data;
+let facetsPromise: Promise<FacetsData> | null = null;
+
+export function fetchFacets(): Promise<FacetsData> {
+  // Landing and BrandSelectionGate both need the same contract. Share the
+  // request instead of making the entry sequence fetch /facets twice.
+  if (!facetsPromise) {
+    facetsPromise = facetsApi.getFacetsV1FacetsGet()
+      .then(response => response.data as FacetsData)
+      .catch(error => {
+        facetsPromise = null;
+        throw error;
+      });
+  }
+  return facetsPromise;
 }
 
 /**
