@@ -625,6 +625,8 @@ export class CanvasRenderer<T> {
   public productLabels = new ProductLabelRenderer({ enabled: false });
 
   private dpr = 1;
+  private cssWidth = 0;
+  private cssHeight = 0;
 
   private clear() {
     const c = this.ctx.canvas;
@@ -1114,12 +1116,27 @@ export class CanvasRenderer<T> {
     this.dpr = (typeof window !== 'undefined' && window.innerWidth >= 768)
       ? Math.min(window.devicePixelRatio || 1, 2)
       : 1;
-    const targetW = Math.round(c.clientWidth * this.dpr);
-    const targetH = Math.round(c.clientHeight * this.dpr);
+    // Measure the CONTAINER, never the canvas itself. Reading clientWidth of
+    // the element we are about to resize is a feedback loop: the width
+    // attribute feeds back into layout, so each frame doubled the canvas
+    // (1620 -> 3240 -> … -> 2^26) until the browser capped it and the whole
+    // catalog collapsed into a few pixels in the top-left corner.
+    const box = c.parentElement ?? c;
+    const cssW = Math.max(1, Math.round(box.clientWidth || c.clientWidth));
+    const cssH = Math.max(1, Math.round(box.clientHeight || c.clientHeight));
+    // Hard ceiling: even with a broken layout the canvas must stay usable.
+    const MAX_BACKING = 8192;
+    const targetW = Math.min(Math.round(cssW * this.dpr), MAX_BACKING);
+    const targetH = Math.min(Math.round(cssH * this.dpr), MAX_BACKING);
     if (c.width !== targetW || c.height !== targetH) {
       c.width = targetW;
       c.height = targetH;
     }
+    // The CSS box is owned by the stylesheet (absolute + insets); pin it so a
+    // stray width attribute can never define layout again.
+    if (c.style.width !== '100%') { c.style.width = '100%'; c.style.height = '100%'; }
+    this.cssWidth = cssW;
+    this.cssHeight = cssH;
 
     this.clear();
 
@@ -1141,8 +1158,8 @@ export class CanvasRenderer<T> {
       const scale = this.viewport.scale;
       this.viewportLeft = -this.viewport.offset.x / scale;
       this.viewportTop = -this.viewport.offset.y / scale;
-      this.viewportRight = this.viewportLeft + (c.clientWidth / scale);
-      this.viewportBottom = this.viewportTop + (c.clientHeight / scale);
+      this.viewportRight = this.viewportLeft + ((this.cssWidth || c.clientWidth) / scale);
+      this.viewportBottom = this.viewportTop + ((this.cssHeight || c.clientHeight) / scale);
       this.zoomFactor = scale;
     }
 
