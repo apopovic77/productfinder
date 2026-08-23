@@ -179,6 +179,8 @@ export interface PropertyOverride {
   label?: string;
   priority?: number;
   hidden?: boolean;
+  /** Set by engine.setHiddenKeys(); distinguishes runtime locks from static config. */
+  __upstreamLock?: boolean;
   customBuckets?: string[];
   normalization?: Record<string, string>;
 }

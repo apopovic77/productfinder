@@ -49,6 +49,7 @@ export class GPANEEngine {
 
   // Taxonomy state
   private _mode: EngineMode = 'gpane';
+  private _skipTaxonomy = false;
   private _heroMode = false;
   private _taxonomyPath: TaxonomyNode[] = [];
   private _navigationStack: NavigationEntry[] = [];  // single source of truth for breadcrumbs
@@ -56,6 +57,26 @@ export class GPANEEngine {
 
   constructor(config: Partial<GPANEConfig> = {}) {
     this._config = { ...DEFAULT_CONFIG, ...config };
+  }
+
+  /**
+   * Hide attribute keys from dimension discovery, e.g. a dimension the
+   * catalog entry has already decided. Takes effect on the next load().
+   */
+  /** Start in GPANE mode on next load() instead of at the taxonomy root. */
+  setSkipTaxonomy(skip: boolean): void {
+    this._skipTaxonomy = skip;
+  }
+
+  setHiddenKeys(keys: string[]): void {
+    const overrides = { ...this._config.overrides };
+    for (const k of Object.keys(overrides)) {
+      if (overrides[k]?.hidden && overrides[k]?.__upstreamLock) delete overrides[k];
+    }
+    for (const k of keys) {
+      overrides[k] = { ...(overrides[k] ?? {}), hidden: true, __upstreamLock: true };
+    }
+    this._config = { ...this._config, overrides };
   }
 
   // ==========================================================================
@@ -70,7 +91,12 @@ export class GPANEEngine {
     this._taxonomyPath = [];
     this._navigationStack = [];
 
-    if (this._config.taxonomy?.length) {
+    // The taxonomy tree starts at MTB | MX. When the catalog entry has
+    // already answered that question (sport -> category dialog), replaying
+    // the tree's root is exactly the bug the owner reported: "I chose MOTO
+    // and still see MX | MTB". Entry-driven sessions skip the tree and
+    // start in GPANE mode, where locked dimensions are honoured.
+    if (this._config.taxonomy?.length && !this._skipTaxonomy) {
       this._mode = 'taxonomy';
       this._currentTaxonomyNodes = this._config.taxonomy;
       this._buildTaxonomyBuckets();

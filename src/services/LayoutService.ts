@@ -332,6 +332,10 @@ export class LayoutService {
     this.applyAnimationDuration();
   }
 
+  setLockedDimensions(keys: string[]): void {
+    this.drillDownService.setLockedDimensions(keys);
+  }
+
   setPivotModel(model: PivotAnalysisResult | null): void {
     const previousState = this.drillDownService.getState();
     this.pivotModel = model;

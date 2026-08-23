@@ -138,6 +138,16 @@ export class ProductFinderController {
       this.products = this.preConfig.entrySelection
         ? filterCatalogProducts(results || [], this.preConfig.entrySelection)
         : results || [];
+      // The catalog entry has already answered "which sport" — the grid must
+      // not ask it again. Filtering alone is not enough: accessories with
+      // sport=MX+MTB (visors, screw sets) survive the ANY(sport) match and
+      // give the analyzer two values to split on. Lock the dimension instead.
+      const locked = this.preConfig.entrySelection ? ['sport'] : [];
+      this.pivotAnalyzer.setExcludedDimensions(locked);
+      // Two engines decide grouping: the legacy analyzer feeds the dimension
+      // list, but the GPANE engine inside LayoutService picks the actual
+      // split. Locking only the first one changed nothing on screen.
+      this.layoutService.setLockedDimensions(locked);
       this.pivotModel = this.pivotAnalyzer.analyze(this.products);
       this.layoutService.setPivotModel(this.pivotModel);
       this.loading = false;

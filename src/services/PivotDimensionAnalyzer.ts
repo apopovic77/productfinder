@@ -48,12 +48,23 @@ type AnalyzerOptions = {
   minCoverage?: number;
   maxMetadata?: number;
   numericBucketCount?: number;
+  /**
+   * Dimension keys that are already decided upstream and must never be
+   * offered as a pivot. The catalog entry (sport -> category) fixes sport
+   * before the grid exists; a handful of accessories carry sport=MX+MTB
+   * (visors, screw sets, cheek pads fit both helmet worlds) and were enough
+   * for the analyzer to split "MX helmets" into MX | MTB again (owner
+   * report 2026-08-23, storage 120426). The data is right; the analyzer
+   * simply wasn't told that the question was already answered.
+   */
+  excludeDimensions?: string[];
 };
 
 const DEFAULT_OPTIONS: Required<AnalyzerOptions> = {
   minCoverage: 0.1,
   maxMetadata: 6,
   numericBucketCount: 5,
+  excludeDimensions: [],
 };
 
 const ROLE_PRIORITIES: Record<PivotDimensionKind, number> = {
@@ -241,8 +252,17 @@ export class PivotDimensionAnalyzer {
     return `${products.length}:${h}`;
   }
 
+  /** Replace the upstream-decided dimensions; invalidates the memo. */
+  setExcludedDimensions(keys: string[]): void {
+    this.options = { ...this.options, excludeDimensions: [...keys] };
+    this._memoKey = null;
+    this._memoResult = null;
+  }
+
   analyze(products: Product[]): PivotAnalysisResult {
-    const key = PivotDimensionAnalyzer.computeSetKey(products);
+    // The exclusion list is part of the identity of a result: the same
+    // product set with a different lock yields different dimensions.
+    const key = `${this.options.excludeDimensions.join(',')}|${PivotDimensionAnalyzer.computeSetKey(products)}`;
     if (this._memoResult && this._memoKey === key) {
       return this._memoResult;
     }
@@ -266,7 +286,11 @@ export class PivotDimensionAnalyzer {
       };
     }
 
-    const candidates = this.collectCandidates(products);
+    let candidates = this.collectCandidates(products);
+    if (this.options.excludeDimensions.length) {
+      const locked = new Set(this.options.excludeDimensions);
+      candidates = candidates.filter(c => !locked.has(c.key) && !locked.has(c.rawAttributeKey ?? ''));
+    }
     this.computeStats(candidates, products.length);
     this.assignRoles(candidates, products.length);
     this.computeNumericBuckets(candidates);

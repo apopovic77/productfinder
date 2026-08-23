@@ -90,6 +90,14 @@ export class GpanePivotService {
     // Engine gets loaded when products change (via sync), not here
   }
 
+  /** Dimensions decided upstream (catalog entry) must never be offered. */
+  setLockedDimensions(keys: string[]): void {
+    this.engine.setHiddenKeys(keys);
+    // A lock only exists when an upstream dialog already navigated; the
+    // taxonomy root would re-ask the same question, so skip it.
+    this.engine.setSkipTaxonomy(keys.length > 0);
+  }
+
   setHeroThreshold(threshold: number): void {
     this._heroThreshold = Math.max(1, Math.floor(threshold));
   }
