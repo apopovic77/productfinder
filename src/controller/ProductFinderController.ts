@@ -195,6 +195,7 @@ export class ProductFinderController {
       if (this.renderer) {
         const isHero = this.layoutService.isPivotHeroMode();
         this.renderer.isHeroMode = isHero;
+        this.syncProductLabels(isHero);
         // Column headers drop the prefix of the group we drilled into
         // ("3SRS Helmet STREAM" under "3SRS" -> "STREAM"); raw label, not
         // the already-shortened breadcrumb.
@@ -232,21 +233,7 @@ export class ProductFinderController {
       if (this.renderer) {
         const isHero = this.layoutService.isPivotHeroMode();
         this.renderer.isHeroMode = isHero;
-        // Enable labels in hero mode (name + color)
-        if (isHero && this.layoutService.getMode() !== 'lanes') {
-          // Desktop hero dock: the card carries name + colour, the canvas
-          // caption would duplicate it and collide with the "01 / 04" counter.
-          const captionOnCanvas = (this.canvas?.clientWidth ?? 0) < 768;
-          this.renderer.productLabels.update({
-            enabled: captionOnCanvas,
-            fields: ['name', 'color'],
-            position: 'below',
-            nameColor: 'rgba(0, 0, 0, 0.85)',
-            detailColor: 'rgba(0, 0, 0, 0.5)',
-          });
-        } else if (this.layoutService.getMode() !== 'lanes') {
-          this.renderer.productLabels.enabled = false;
-        }
+        this.syncProductLabels(isHero);
       }
 
       // Calculate and set content bounds after layout
@@ -855,6 +842,29 @@ export class ProductFinderController {
     this.layoutService.setPivotDimension(dimension);
     this.syncRendererHeaderLabels();
     this.onDataChanged();
+  }
+
+  /**
+   * Hero caption on by default (owner 2026-08-23: the lanes-style
+   * category/name/price line under the product should not need the lanes
+   * toggle). Runs from BOTH onDataChanged and onPivotChanged — the drill
+   * into hero goes through the latter only, which is why the first
+   * version (onDataChanged only) never showed the caption.
+   */
+  private syncProductLabels(isHero: boolean): void {
+    if (!this.renderer || this.layoutService.getMode() === 'lanes') return;
+    if (isHero) {
+      this.renderer.productLabels.update({
+        enabled: true,
+        fields: ['category', 'name', 'price'],
+        position: 'below',
+        nameColor: 'rgba(0, 0, 0, 0.85)',
+        detailColor: 'rgba(0, 0, 0, 0.45)',
+        priceColor: '#ff6b00',
+      });
+    } else {
+      this.renderer.productLabels.enabled = false;
+    }
   }
 
   /** Column-header labelling context for the renderer (parent prefix + noise-word rule). */
