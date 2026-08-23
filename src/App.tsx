@@ -403,6 +403,10 @@ export default class App extends React.Component<Props, State> {
   componentDidUpdate(prevProps: Props, prevState: State): void {
     // Phone bottom sheet: publish its real height so the hero arrows and
     // counter sit just above it (48vh is only the sheet's maximum).
+    if ((prevState.selectedProduct !== this.state.selectedProduct
+        || prevState.selectedVariant !== this.state.selectedVariant) && this.state.selectedProduct) {
+      this.preloadDialogGallery();
+    }
     if (prevState.selectedProduct !== this.state.selectedProduct && this.isMobileLayout()) {
       this.sheetObserver?.disconnect();
       this.sheetObserver = null;
@@ -890,6 +894,43 @@ export default class App extends React.Component<Props, State> {
     }
   };
 
+  /**
+   * 1300 px gallery images already fetched for the open card, by storage id.
+   * Fed by the background preload below and by handleDialogImageSelect's
+   * on-demand loads; read by the card's auto-cycle so it only ever advances
+   * to an image that is fully downloaded.
+   */
+  private heroHiResCache = new Map<number, HTMLImageElement>();
+
+  /** Queue 1300 px loads for the card's gallery (perspectives of the active variant). */
+  private preloadDialogGallery = () => {
+    const product = this.state.selectedProduct as any;
+    if (!product) return;
+    const variant = this.state.selectedVariant || getPrimaryVariant(product);
+    if (!variant) return;
+    if (this.heroHiResCache.size > 80) this.heroHiResCache.clear();
+    const images = getImagesForVariant(product, variant).filter(i => i.storageId);
+    images.forEach((im, i) => {
+      const sid = im.storageId as number;
+      if (this.heroHiResCache.has(sid)) return;
+      const url = buildMediaUrl({ storageId: sid, width: 1300, quality: 85, trim: true });
+      this.imageLoadQueue.add({
+        id: `dialog-hires-${sid}`,
+        url,
+        group: 'dialog-hires',
+        priority: 150 + i, // behind the selected hero (0) and alternatives (100+)
+      }).then(r => { this.heroHiResCache.set(sid, r.image); }).catch(() => {});
+    });
+  };
+
+  /** Is the 1300 px version of this gallery image already in memory? */
+  private isHiResReady = (storageId: number): boolean => {
+    const ready = (i?: HTMLImageElement | null) => !!(i && i.complete && i.naturalWidth > 0);
+    if (ready(this.heroHiResCache.get(storageId))) return true;
+    const renderer = this.controller.getRenderer();
+    return ready(renderer?.alternativeImages?.find(a => a.storageId === storageId)?.loadedImage);
+  };
+
   private handleDialogImageSelect = (storageId: number, thumbnailImage?: HTMLImageElement) => {
     const renderer = this.controller.getRenderer();
     if (!renderer) return;
@@ -900,8 +941,9 @@ export default class App extends React.Component<Props, State> {
     // ignored the cache, showed the 130 px dialog thumbnail stretched to
     // ~900 px and re-fetched the large file (owner report 2026-08-23,
     // storage 120467).
-    const preloaded = renderer.alternativeImages?.find(a => a.storageId === storageId)?.loadedImage;
-    if (preloaded) {
+    const preloaded = this.heroHiResCache.get(storageId)
+      ?? renderer.alternativeImages?.find(a => a.storageId === storageId)?.loadedImage;
+    if (preloaded && preloaded.complete && preloaded.naturalWidth > 0) {
       renderer.selectedVariantHeroImage = preloaded;
       return;
     }
@@ -917,6 +959,7 @@ export default class App extends React.Component<Props, State> {
     const src = buildMediaUrl({ storageId, width: 1300, quality: 85, trim: true });
     const img = new Image();
     img.onload = () => {
+      this.heroHiResCache.set(storageId, img);
       if (renderer) {
         renderer.selectedVariantHeroImage = img;
       }
@@ -2828,6 +2871,7 @@ export default class App extends React.Component<Props, State> {
                 onPositionChange={this.handleDialogPositionChange}
                 onVariantChange={this.handleDialogVariantChange}
                 onImageSelect={this.handleDialogImageSelect}
+                isHiResReady={this.isHiResReady}
                 onBuy={this.handleProductBuy}
               />
             )

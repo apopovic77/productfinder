@@ -63,7 +63,50 @@ export class CanvasRenderer<T> {
 
 
   // Variant-specific hero image (overrides product's primary image)
-  public selectedVariantHeroImage: HTMLImageElement | null = null;
+  private _selectedVariantHeroImage: HTMLImageElement | null = null;
+
+  // Crossfade between two READY hero images (owner 2026-08-23: blend only
+  // when the target is already downloaded — a fade to a loading image is
+  // exactly the flash this replaces).
+  private heroFadeFrom: HTMLImageElement | null = null;
+  private heroFadeStart = 0;
+  private static readonly HERO_FADE_MS = 450;
+
+  public get selectedVariantHeroImage(): HTMLImageElement | null {
+    return this._selectedVariantHeroImage;
+  }
+
+  public set selectedVariantHeroImage(img: HTMLImageElement | null) {
+    const prev = this._selectedVariantHeroImage;
+    if (img === prev) return;
+    const ready = (i: HTMLImageElement | null): boolean => !!(i && i.complete && i.naturalWidth > 0);
+    if (ready(img) && ready(prev)) {
+      this.heroFadeFrom = prev;
+      this.heroFadeStart = performance.now();
+    } else {
+      this.heroFadeFrom = null;
+    }
+    this._selectedVariantHeroImage = img;
+  }
+
+  /** drawImageFit, crossfading from the previous hero image while a fade runs. */
+  private drawImageFitFaded(img: HTMLImageElement, x: number, y: number, w: number, h: number) {
+    const base = this.ctx.globalAlpha;
+    if (img === this._selectedVariantHeroImage && this.heroFadeFrom) {
+      const t = (performance.now() - this.heroFadeStart) / CanvasRenderer.HERO_FADE_MS;
+      if (t >= 1) {
+        this.heroFadeFrom = null;
+      } else {
+        this.drawImageFit(this.heroFadeFrom, x, y, w, h);
+        const e = t * t * (3 - 2 * t); // smoothstep
+        this.ctx.globalAlpha = base * e;
+        this.drawImageFit(img, x, y, w, h);
+        this.ctx.globalAlpha = base;
+        return;
+      }
+    }
+    this.drawImageFit(img, x, y, w, h);
+  }
 
   /** Apply an already loaded selected-product image without waiting for the LOD scan. */
   public applySelectedHeroImage(image: HTMLImageElement, loadedSize: number): void {
@@ -83,6 +126,7 @@ export class CanvasRenderer<T> {
   /** Clear both the selected image and its LOD state when selection changes. */
   public resetSelectedHeroImage(): void {
     this.selectedVariantHeroImage = null;
+    this.heroFadeFrom = null;
     this.pivotHeroLoadedSize = null;
   }
 
@@ -1606,16 +1650,16 @@ export class CanvasRenderer<T> {
           // out BEHIND it — the foremost card stays full size.
           this.drawSelectedProductGlow(drawX, drawY, drawW, drawH, opacity);
 
-          this.drawImageFit(img, drawX, drawY, drawW, drawH);
+          this.drawImageFitFaded(img, drawX, drawY, drawW, drawH);
         } else {
           // No loaded images yet - reset scale to 1.0
           this.imageScaleFactor.targetValue = 1.0;
-          this.drawImageFit(img, drawX, drawY, drawW, drawH);
+          this.drawImageFitFaded(img, drawX, drawY, drawW, drawH);
         }
       } else {
         // Non-selected cells must NOT touch the shared imageScaleFactor —
         // the frame-level reset above owns the "no selection" case (issue #300).
-        this.drawImageFit(img, drawX, drawY, drawW, drawH);
+        this.drawImageFitFaded(img, drawX, drawY, drawW, drawH);
       }
 
       this.ctx.globalAlpha = 1;

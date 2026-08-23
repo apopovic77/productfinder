@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Product } from '../types/Product';
 import { useImageQueue } from '../hooks/useImageQueue';
@@ -17,6 +17,8 @@ type Props = {
   onPositionChange?: (position: { x: number; y: number }) => void;
   onVariantChange?: (variant: any) => void;
   onImageSelect?: (storageId: number, thumbnailImage?: HTMLImageElement) => void;
+  /** Auto-cycle gate: true when the 1300 px version of this image is downloaded. */
+  isHiResReady?: (storageId: number) => boolean;
   /**
    * Desktop hero presentation (design 2026-08-23): dark card docked to the
    * right of the stage, not floating over the product. Layout reserves the
@@ -43,7 +45,7 @@ interface ParsedFeature {
  * Product Overlay Modal V2 - HALF WIDTH VERSION (240px)
  * Same design as V1, but with compact half-width layout
  */
-export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false }) => {
+export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady }) => {
   const isMobilePortrait = window.innerWidth <= 768 && window.innerHeight > window.innerWidth;
   // Phone: the dark hero card as a full-width bottom sheet (owner 2026-08-23,
   // "die Karte auch im Desktop-Style"). Same markup as the desktop dock,
@@ -266,6 +268,43 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
 
   const allImages = thumbnailsLoading ? [] : thumbnailImages;
 
+  // Auto-cycle through the gallery while the card is open (owner
+  // 2026-08-23): advance every few seconds, but ONLY to an image whose
+  // high-res file is already downloaded (isHiResReady) — never blend to a
+  // still-loading image. A manual thumb click pauses the cycle for a while.
+  const selectedImageIndexRef = useRef(selectedImageIndex);
+  selectedImageIndexRef.current = selectedImageIndex;
+  const manualHoldUntilRef = useRef(0);
+  // The cycle keeps its own position: the variant-sync effect below may
+  // snap the highlight back, and cycling from the snapped-back index would
+  // pick the same image forever.
+  const cyclePosRef = useRef(-1);
+  const autoSelectedRef = useRef(-1);
+
+  useEffect(() => {
+    cyclePosRef.current = -1;
+    autoSelectedRef.current = -1;
+  }, [product.id]);
+
+  useEffect(() => {
+    if (!onImageSelect || !isHiResReady || allImages.length < 2) return;
+    const timer = setInterval(() => {
+      if (Date.now() < manualHoldUntilRef.current) return;
+      const cur = cyclePosRef.current >= 0 ? cyclePosRef.current : selectedImageIndexRef.current;
+      for (let step = 1; step < allImages.length; step++) {
+        const idx = (cur + step) % allImages.length;
+        const sid = allImages[idx].storageId;
+        if (!sid || !isHiResReady(sid)) continue;
+        cyclePosRef.current = idx;
+        autoSelectedRef.current = idx;
+        setSelectedImageIndex(idx);
+        onImageSelect(sid);
+        break;
+      }
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [product.id, allImages, onImageSelect, isHiResReady]);
+
   // Thumbnail URL builder — width only, NO height: with trim=true the server
   // crops to (non-square) trim bounds first; forcing width+height would
   // distort the image into a square (issue #249). Aspect fit happens in CSS.
@@ -293,6 +332,9 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   // canvas-synced initial index set in the thumbnail-load effect above).
   useEffect(() => {
     if (activeVariant?.image_storage_id) {
+      // Don't fight the gallery auto-cycle: a selection it just made is
+      // intentional, not a variant change to correct.
+      if (selectedImageIndex === autoSelectedRef.current) return;
       const imgIndex = allImages.findIndex(img => img.storageId === activeVariant.image_storage_id);
       if (imgIndex !== -1 && imgIndex !== selectedImageIndex) {
         setSelectedImageIndex(imgIndex);
@@ -695,6 +737,9 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
               <button
                 key={idx}
                 onClick={() => {
+                  manualHoldUntilRef.current = Date.now() + 12000;
+                  cyclePosRef.current = idx;
+                  autoSelectedRef.current = -1;
                   setSelectedImageIndex(idx);
                   if (onImageSelect && allImages[idx]?.storageId) {
                     const cachedThumb = loadedThumbnails.get(buildThumbUrl(allImages[idx].storageId!));
