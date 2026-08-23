@@ -577,8 +577,15 @@ body {
   display: block;
   position: absolute;
   inset: 0;
-  /* width/height removed - inset defines size automatically */
-  /* When left/right insets are modified in JS, the canvas will automatically resize */
+  /* A <canvas> is a replaced element with an intrinsic 300x150 size; inset
+     alone does NOT stretch it (unlike a div). Without explicit width/height
+     it stayed 300x150 and only looked right because CanvasRenderer wrote
+     style.width='100%' at runtime. The GPU path has no CanvasRenderer, so
+     the layout measured a 300x150 stage and laid 14 px tiles (issue #260).
+     Percentages resolve against the inset box, so JS-modified insets still
+     resize it. */
+  width: 100%;
+  height: 100%;
   z-index: 1;
   background: transparent;
 }

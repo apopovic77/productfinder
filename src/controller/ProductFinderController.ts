@@ -60,6 +60,11 @@ export class ProductFinderController {
   private ignoreNextHistoryPush = false;
 
   skipCanvasRenderer = false;
+
+  /** The 2D transform every input handler writes to; the GPU renderer mirrors it. */
+  getViewportTransform() {
+    return this.viewportService.getTransform();
+  }
   preConfig: {
     gridConfig?: { spacing: number; margin: number; minCellSize: number; maxCellSize: number };
     animationDuration?: number;
@@ -307,13 +312,25 @@ export class ProductFinderController {
         vt.minScaleOverride = 0.8;
         vt.panWithLeftButton = true;
       }
-      this.viewportService.centerOn(bounds.minX + (this.canvas?.width ?? 0) / 2, bounds.minY + (this.canvas?.height ?? 0) / 2, 1);
+      // CSS size, not the backing store: canvas.width is DPR-scaled by the
+      // Canvas2D renderer (2x on desktop) and stays at the 300x150 default
+      // under the GPU renderer, which has no reason to touch it. Either way
+      // it is the wrong number for a viewport that works in CSS pixels.
+      this.viewportService.centerOn(
+        bounds.minX + (this.canvas?.clientWidth ?? 0) / 2,
+        bounds.minY + (this.canvas?.clientHeight ?? 0) / 2,
+        1,
+      );
     } else {
       // Pivot mode: free panning
       this.viewportService.setLockVerticalPan(false);
       const vt = this.viewportService.getTransform();
-      const vw = this.canvas?.width ?? 800;
-      const vh = this.canvas?.height ?? 600;
+      // CSS pixels — the viewport's unit. canvas.width/height is the backing
+      // store: DPR-scaled under Canvas2D (1722 for an 861 px stage on a 2x
+      // screen, so the start position sat half a page too low on phones)
+      // and the untouched 300x150 default under the GPU renderer.
+      const vw = this.canvas?.clientWidth ?? 800;
+      const vh = this.canvas?.clientHeight ?? 600;
 
       if (vt) {
         vt.panWithLeftButton = true;

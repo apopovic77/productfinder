@@ -262,15 +262,9 @@ export default class App extends React.Component<Props, State> {
   private selectedMediaGroup: string | null = null;
   private selectedHeroRequestKey: string | null = null;
   private selectedHeroRequestId: string | null = null;
-  private _productAtlasIndex = new Map<string, number>();
-
   private useArcturianRenderer(): boolean {
     if (typeof window === 'undefined') return false;
     return new URLSearchParams(window.location.search).get('renderer') === 'arcturian';
-  }
-
-  private getProductAtlasIndex(): Map<string, number> {
-    return this._productAtlasIndex;
   }
 
   state: State = createInitialState();
@@ -291,7 +285,7 @@ export default class App extends React.Component<Props, State> {
       animationDuration: this.state.devSettings.animationDuration,
       priceBucketMode: this.state.devSettings.priceBucketMode,
       priceBucketCount: this.state.devSettings.priceBucketCount,
-      minCellSize: this.useArcturianRenderer() ? 0 : this.state.devSettings.minCellSize,
+      minCellSize: this.state.devSettings.minCellSize,
       cellSizeOverride: this.state.devSettings.cellSizeOverride,
       orientation: this.computePivotOrientation(),
       brand: this.props.brand,
@@ -308,12 +302,6 @@ export default class App extends React.Component<Props, State> {
       const sequence = groupKey
         ? this.controller.getDisplayOrderForGroup(groupKey).map(p => p.id)
         : this.controller.getDisplayOrder().map(p => p.id);
-      // Update atlas index for Arcturian renderer
-      if (this.useArcturianRenderer()) {
-        this._productAtlasIndex.clear();
-        state.filteredProducts.forEach((p, i) => this._productAtlasIndex.set(p.id, i));
-      }
-
       this.setState({
         loading: state.loading,
         error: state.error,
@@ -2248,18 +2236,22 @@ export default class App extends React.Component<Props, State> {
             <Suspense fallback={<div className="pf-canvas" style={{ background: '#fff' }} />}>
               <ArcturianRendererComponent
                 getNodes={() => this.controller.getLayoutEngine()?.all() ?? []}
-                getHeaders={() => this.controller.getLayoutService()?.getGroupHeaders() ?? []}
-                productToAtlasIndex={this.getProductAtlasIndex()}
-                onBucketClick={(label) => {
-                  this.controller.handleGroupHeaderClick_byLabel?.(label);
-                  this.syncPivotUI();
+                getViewport={() => this.controller.getViewportTransform()}
+                getSize={() => {
+                  // The input canvas itself, not the stage: CSS insets (e.g. the
+                  // 300 px sidebar) shrink the canvas but not its parent, and
+                  // the layout + viewport are computed for the canvas box.
+                  const el = this.canvasRef.current;
+                  return { width: el?.clientWidth || window.innerWidth, height: el?.clientHeight || window.innerHeight };
                 }}
-                width={window.innerWidth}
-                height={window.innerHeight}
               />
             </Suspense>
           ) : null}
-          <canvas ref={this.canvasRef} className="pf-canvas" style={this.useArcturianRenderer() ? { position: 'absolute', opacity: 0, pointerEvents: 'none', zIndex: -1 } : undefined} />
+          {/* GPU mode: the canvas stays full-size and ON TOP — it is the input
+              surface (pinch, drag, click, hit-testing) and the layout measures
+              itself by its clientWidth/Height. Only its pixels are hidden;
+              the WebGL layer beneath paints what this canvas' transform says. */}
+          <canvas ref={this.canvasRef} className="pf-canvas" style={this.useArcturianRenderer() ? { opacity: 0, zIndex: 2 } : undefined} />
 
           {/* Navigation arrows - visible when a product is selected */}
           {selectedProduct && this.state.modalSequence.length > 1 && (

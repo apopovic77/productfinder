@@ -1,634 +1,243 @@
 /**
- * ArcturianRenderer — GPU Instanced Renderer for ProductFinder v1
+ * ArcturianRenderer — GPU grid renderer for the ProductFinder (issue #260).
  *
- * Drop-in alternative to CanvasRenderer. Renders the same LayoutNodes
- * from the LayoutEngine but via Arcturian's MorphShader + InstancedMesh.
+ * A drawing backend only. It reads the same LayoutNodes the Canvas2D
+ * renderer reads and mirrors the same ViewportTransform — so zoom, pinch,
+ * pan, bounds clamping, hit-testing and the pivot engine stay exactly
+ * where they are. The hidden <canvas> keeps receiving every pointer event;
+ * this component just paints what that state says.
  *
- * Mounted as a React component that overlays/replaces the Canvas element.
- * Reads LayoutNodes from the controller and writes to GPU buffers.
+ * Why this shape (owner decision 2026-08-15, refined 2026-08-23):
+ *  - Canvas2D cannot be sharp AND smooth on mobile: at devicePixelRatio 3
+ *    it has to fill 9x the pixels for ~2,600 drawImage calls per frame.
+ *    One instanced draw call does not care how many pixels a tile covers.
+ *  - The previous GPU path had its own 3D camera (perspective, orbit,
+ *    middle-drag). That would have meant rebuilding pinch and bounds
+ *    checking a second time. An orthographic camera driven by the existing
+ *    2D transform (screen = world * scale + offset) is an exact mirror.
+ *  - Product images are flat. The old path drew lit BoxGeometry cubes;
+ *    unlit quads are what the Canvas2D grid shows and cost a fraction.
+ *
+ * Images come from ProductAtlas, built at runtime from the catalog, so the
+ * atlas grows with the product set instead of being baked at build time.
  */
-import { useRef, useEffect, useMemo, useCallback, useState } from 'react';
+import { useRef, useMemo, useEffect } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { MapControls, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
-import { createUniforms, applyShaderToMaterial, MAX_PARTICLES, CameraLight, ClickPicker, SmoothZoomControls, atlasRegistry, LodManager } from '@arcturian';
-import { ParticleAnimator } from '@arcturian/core/ParticleAnimator';
-import type { FlyTarget } from '@arcturian/core/types';
-import type { MorphShaderUniforms } from '@arcturian/core/MorphShader';
 import type { LayoutNode } from '../layout/LayoutNode';
 import type { Product } from '../types/Product';
-import type { GroupHeaderInfo } from '../layout/PivotLayouter';
+import type { ViewportTransform } from '../utils/ViewportTransform';
+import { ProductAtlas } from './ProductAtlas';
 
-const ATLAS_ID = 'oneal_pf';
-
-// ============================================================
-// 3D Bucket Buttons — text on planes, clickable
-// ============================================================
-function createTextTexture(text: string, width: number, height: number): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext('2d')!;
-
-  // Background
-  ctx.fillStyle = '#111111';
-  ctx.fillRect(0, 0, width, height);
-
-  // Text
-  ctx.fillStyle = '#ffffff';
-  ctx.font = `bold ${Math.floor(height * 0.45)}px system-ui, sans-serif`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(text.toUpperCase(), width / 2, height / 2, width - 20);
-
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.minFilter = THREE.LinearFilter;
-  return tex;
-}
-
-function BucketButton({ label, x, y, width, height, onClick }: {
-  label: string; x: number; y: number; width: number; height: number; onClick: () => void;
-}) {
-  const meshRef = useRef<THREE.Mesh>(null!);
-  const texture = useMemo(() => createTextTexture(label, 512, 128), [label]);
-  const [hovered, setHovered] = useState(false);
-
-  return (
-    <mesh
-      ref={meshRef}
-      position={[x + width / 2, -(y + height / 2), 0.1]}
-      onClick={(e) => { e.stopPropagation(); onClick(); }}
-      onPointerEnter={() => setHovered(true)}
-      onPointerLeave={() => setHovered(false)}
-    >
-      <planeGeometry args={[width, height]} />
-      <meshBasicMaterial
-        map={texture}
-        color={hovered ? '#3388ff' : '#ffffff'}
-        toneMapped={false}
-      />
-    </mesh>
-  );
-}
-
-function BucketButtons({ getHeaders, onBucketClick }: {
-  getHeaders: () => GroupHeaderInfo[];
-  onBucketClick: (label: string) => void;
-}) {
-  const [headers, setHeaders] = useState<GroupHeaderInfo[]>([]);
-
-  useFrame(function updateHeaders() {
-    const h = getHeaders();
-    if (h.length !== headers.length) setHeaders([...h]);
-  });
-
-  return (
-    <>
-      {headers.map(h => (
-        <BucketButton
-          key={h.key}
-          label={h.label}
-          x={h.x}
-          y={h.y}
-          width={h.width}
-          height={h.height}
-          onClick={() => onBucketClick(h.label)}
-        />
-      ))}
-    </>
-  );
-}
-
-// ============================================================
-// GPU Scene — reads LayoutNodes and renders via InstancedMesh
-// ============================================================
-function GPUScene({
-  getNodes,
-  getHeaders,
-  productToAtlasIndex,
-  flyTargetRef,
-  onBucketClick,
-  spotlightNodeId,
-  animator,
-}: {
-  getNodes: () => LayoutNode<Product>[];
-  getHeaders: () => GroupHeaderInfo[];
-  productToAtlasIndex: Map<string, number>;
-  flyTargetRef: React.MutableRefObject<FlyTarget>;
-  onBucketClick: (label: string) => void;
-  spotlightNodeId: string | null;
-  animator: ParticleAnimator;
-}) {
-  const meshRef = useRef<THREE.InstancedMesh>(null!);
-
-  // Register atlas in Arcturian AtlasRegistry
-  useMemo(function registerAtlas() {
-    if (atlasRegistry.has(ATLAS_ID)) atlasRegistry.remove(ATLAS_ID);
-    atlasRegistry.register({
-      id: ATLAS_ID,
-      tileCount: 2603,
-      lods: [
-        { urls: ['/atlas/64/atlas_0.png'], rows: 64, cols: 64, tilesPerAtlas: 4096 },
-        { urls: ['/atlas/128/atlas_0.png', '/atlas/128/atlas_1.png', '/atlas/128/atlas_2.png'], rows: 32, cols: 32, tilesPerAtlas: 1024 },
-        { urls: Array.from({ length: 11 }, (_, i) => `/atlas/256/atlas_${i}.png`), rows: 16, cols: 16, tilesPerAtlas: 256 },
-      ],
-    });
-  }, []);
-
-  // Uniforms
-  const uniforms = useRef<MorphShaderUniforms>(null!);
-  if (!uniforms.current) {
-    uniforms.current = createUniforms();
-    uniforms.current.uUseAtlas.value = 1.0;
-    uniforms.current.uAtlasFaceMode.value = 2.0;
-    uniforms.current.uColor1.value.set('#ffffff');
-    uniforms.current.uColor2.value.set('#ffffff');
-    uniforms.current.uLayoutMix.value = 1.0;
-    (uniforms.current as any).uAlphaEnabled.value = 1.0;
-    uniforms.current.uLodThreshold.value = 800;
-    uniforms.current.uLod2Threshold.value = 300;
-  }
-
-  // Load LOD 0 + LOD 1 textures
-  useEffect(function loadAtlasTextures() {
-    const entry = atlasRegistry.get(ATLAS_ID);
-    if (!entry) return;
-    const loader = new THREE.TextureLoader();
-    const loadTex = (url: string): Promise<THREE.Texture> => new Promise((resolve) => {
-      loader.load(url, (t) => {
-        t.minFilter = THREE.LinearFilter;
-        t.magFilter = THREE.LinearFilter;
-        t.colorSpace = THREE.SRGBColorSpace;
-        t.generateMipmaps = false;
-        resolve(t);
-      });
-    });
-
-    // LOD 0
-    loadTex(entry.lods[0].urls[0]).then(tex => {
-      uniforms.current.uAtlasTexture.value = tex;
-    });
-
-    // LOD 1
-    const lod1 = entry.lods[1];
-    const targets = [uniforms.current.uAtlasLod1_0, uniforms.current.uAtlasLod1_1, uniforms.current.uAtlasLod1_2, uniforms.current.uAtlasLod1_3];
-    lod1.urls.forEach((url, i) => {
-      if (i < 4) {
-        loadTex(url).then(tex => {
-          targets[i].value = tex;
-          uniforms.current.uLodEnabled.value = 1.0;
-          uniforms.current.uLod1Cols.value = lod1.cols;
-          uniforms.current.uLod1TilesPerAtlas.value = lod1.tilesPerAtlas;
-        });
-      }
-    });
-  }, []);
-
-  // Geometry
-  const geometry = useMemo(() => {
-    const geo = new THREE.BoxGeometry(1, 1, 1);
-    geo.setAttribute('aLayout', new THREE.InstancedBufferAttribute(new Float32Array(MAX_PARTICLES * 4), 4));
-    geo.setAttribute('aOldLayout', new THREE.InstancedBufferAttribute(new Float32Array(MAX_PARTICLES * 4), 4));
-    geo.setAttribute('aQuaternion', new THREE.InstancedBufferAttribute(new Float32Array(MAX_PARTICLES * 4), 4));
-    geo.setAttribute('aOldQuaternion', new THREE.InstancedBufferAttribute(new Float32Array(MAX_PARTICLES * 4), 4));
-    geo.setAttribute('aTarget', new THREE.InstancedBufferAttribute(new Float32Array(MAX_PARTICLES * 4), 4));
-    geo.setAttribute('aOldTarget', new THREE.InstancedBufferAttribute(new Float32Array(MAX_PARTICLES * 4), 4));
-    geo.setAttribute('aTarget2', new THREE.InstancedBufferAttribute(new Float32Array(MAX_PARTICLES * 4), 4));
-    geo.setAttribute('aUVOffset', new THREE.InstancedBufferAttribute(new Float32Array(MAX_PARTICLES * 4), 4));
-    return geo;
-  }, []);
-
-  const onBeforeCompile = useCallback((shader: THREE.WebGLProgramParametersWithUniforms) => {
-    applyShaderToMaterial(shader, uniforms.current);
-    // Add ParticleAnimator uniforms
-    Object.assign(shader.uniforms, animator.getUniforms());
-  }, [animator]);
-
-  // Write static attributes ONCE (UVs, quaternions)
-  const staticWritten = useRef(false);
-  const lastNodeCount = useRef(0);
-
-  // Sync LayoutNodes → GPU buffers
-  useFrame(function syncBuffers(_, delta) {
-    if (delta > 0.05) console.warn(`[Perf] Frame drop: ${(delta*1000).toFixed(0)}ms`);
-    const nodes = getNodes();
-    if (!nodes || nodes.length === 0) return;
-
-    const count = Math.min(nodes.length, MAX_PARTICLES);
-    const aLayout = geometry.getAttribute('aLayout') as THREE.InstancedBufferAttribute;
-
-    // Write static attributes only once or when node count changes
-    if (!staticWritten.current || count !== lastNodeCount.current) {
-      const aQuaternion = geometry.getAttribute('aQuaternion') as THREE.InstancedBufferAttribute;
-      const aTarget = geometry.getAttribute('aTarget') as THREE.InstancedBufferAttribute;
-      const aTarget2 = geometry.getAttribute('aTarget2') as THREE.InstancedBufferAttribute;
-      const aUVOffset = geometry.getAttribute('aUVOffset') as THREE.InstancedBufferAttribute;
-
-      for (let i = 0; i < count; i++) {
-        const node = nodes[i];
-        const side = Math.min(node.width.targetValue ?? 0, node.height.targetValue ?? 0);
-
-        aQuaternion.setXYZW(i, 0, 0, 0, 1);
-        aTarget.setXYZW(i, side, 1, 0, 0);
-        aTarget2.setXYZW(i, 0, side, 0, side);
-
-        const atlasIdx = productToAtlasIndex.get(node.id) ?? 0;
-        const lod0Cols = 64;
-        const col = atlasIdx % lod0Cols;
-        const row = Math.floor(atlasIdx / lod0Cols);
-        const su = 1 / lod0Cols;
-        aUVOffset.setXYZW(i, col * su, 1 - (row + 1) * su, su, su);
-      }
-
-      // Hide remaining
-      for (let i = count; i < lastNodeCount.current; i++) {
-        aLayout.setXYZW(i, 0, 0, 0, 0);
-      }
-
-      aQuaternion.needsUpdate = true;
-      aTarget.needsUpdate = true;
-      aTarget2.needsUpdate = true;
-      aUVOffset.needsUpdate = true;
-
-      lastNodeCount.current = count;
-      staticWritten.current = true;
-    }
-
-    // Positions update every frame (InterpolatedProperty animates on CPU)
-    let dirty = false;
-    for (let i = 0; i < count; i++) {
-      const node = nodes[i];
-      const x = node.posX.value ?? 0;
-      const y = -(node.posY.value ?? 0);
-      const opacity = node.opacity.value ?? 1;
-      const scale = node.scale.value ?? 1;
-
-      const oldX = aLayout.getX(i);
-      const oldY = aLayout.getY(i);
-      if (Math.abs(x - oldX) > 0.01 || Math.abs(y - oldY) > 0.01) {
-        dirty = true;
-      }
-
-      aLayout.setXYZW(i, x, y, 0, opacity > 0.01 ? scale : 0);
-    }
-
-    if (dirty || !staticWritten.current) {
-      aLayout.needsUpdate = true;
-    }
-
-    if (meshRef.current) meshRef.current.count = count;
-
-    // uTime for ParticleAnimator
-    (uniforms.current as any).uTime.value = performance.now() / 1000;
-  });
-
-  return (
-    <>
-      <instancedMesh ref={meshRef} args={[geometry, undefined!, MAX_PARTICLES]} frustumCulled={false}>
-        <meshStandardMaterial
-          onBeforeCompile={onBeforeCompile}
-          roughness={0.8}
-          metalness={0.0}
-          transparent
-          alphaTest={0.01}
-        />
-      </instancedMesh>
-      <CameraLight intensity={2.0} />
-      <LodManager meshRef={meshRef} activeAtlasId={ATLAS_ID} particleCount={getNodes().length} uniforms={uniforms.current} />
-      <BucketButtons getHeaders={getHeaders} onBucketClick={onBucketClick} />
-    </>
-  );
-}
-
-// ============================================================
-// Public Component — replaces the <canvas> element
-// ============================================================
 export interface ArcturianRendererProps {
   getNodes: () => LayoutNode<Product>[];
-  getHeaders: () => GroupHeaderInfo[];
-  productToAtlasIndex: Map<string, number>;
-  onBucketClick?: (label: string) => void;
-  width: number;
-  height: number;
+  /** The transform the Canvas2D grid and all input handlers use. */
+  getViewport: () => ViewportTransform | null;
+  /** CSS size of the stage; read per frame so resizes and rotation just work. */
+  getSize: () => { width: number; height: number };
 }
 
-// ============================================================
-// SmoothMouseCamera — translates camera toward mouse position on product plane
-// ============================================================
-function SmoothMouseCamera({ enabled, flyTargetRef, onDblClickWorld }: {
-  enabled: boolean;
-  flyTargetRef: React.MutableRefObject<FlyTarget>;
-  onDblClickWorld?: (worldPos: THREE.Vector3) => void;
-}) {
+// Hard cap for the instance buffers; catalog is ~6,400 products.
+const MAX_INSTANCES = 8192;
+
+const VERT = /* glsl */ `
+  attribute vec4 aRect;      // x, y (world, top-left), w, h
+  attribute vec4 aUV;        // u, v, w, h in atlas space
+  attribute float aOpacity;
+  varying vec2 vUv;
+  varying float vOpacity;
+  void main() {
+    // Unit quad in [0,1]² → world rect. Y is flipped because layout space
+    // grows downward (screen-like) while GL grows upward.
+    vec2 p = aRect.xy + position.xy * aRect.zw;
+    vUv = aUV.xy + vec2(uv.x, uv.y) * aUV.zw;
+    vOpacity = aOpacity;
+    gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(p.x, -p.y, 0.0, 1.0);
+  }
+`;
+
+const FRAG = /* glsl */ `
+  precision mediump float;
+  uniform sampler2D uAtlas;
+  varying vec2 vUv;
+  varying float vOpacity;
+  void main() {
+    vec4 c = texture2D(uAtlas, vUv);
+    if (c.a < 0.02) discard;
+    gl_FragColor = vec4(c.rgb, c.a * vOpacity);
+  }
+`;
+
+function GridScene({ getNodes, getViewport, getSize }: ArcturianRendererProps) {
   const { camera, gl } = useThree();
-  const raycaster = useRef(new THREE.Raycaster());
-  const mouse = useRef(new THREE.Vector2());
-  const plane = useRef(new THREE.Plane(new THREE.Vector3(0, 0, 1), 0)); // z=0 plane
-  const targetPos = useRef(new THREE.Vector3());
-  const hasTarget = useRef(false);
+  const atlas = useMemo(() => new ProductAtlas(), []);
+  useEffect(() => () => atlas.dispose(), [atlas]);
 
-  const zoomTarget = useRef(camera.position.z);
-  const MIN_DIST = 50;
-  const MAX_DIST = 5000;
+  // Unit quad with instanced attributes. position is [0,1]² so the vertex
+  // shader can place it with a top-left origin like the layout engine.
+  const geometry = useMemo(() => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0], 3));
+    // Tile row 0 is uploaded first = texture v 0; world y grows downward and
+    // position.y 0 is the tile's top edge, so v follows position.y directly.
+    g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 1], 2));
+    g.setIndex([0, 1, 2, 0, 2, 3]);
+    g.setAttribute('aRect', new THREE.InstancedBufferAttribute(new Float32Array(MAX_INSTANCES * 4), 4));
+    g.setAttribute('aUV', new THREE.InstancedBufferAttribute(new Float32Array(MAX_INSTANCES * 4), 4));
+    g.setAttribute('aOpacity', new THREE.InstancedBufferAttribute(new Float32Array(MAX_INSTANCES), 1));
+    return g;
+  }, []);
 
-  const dragging = useRef(false);
-  const rotating = useRef(false);
-  const lastMouse = useRef({ x: 0, y: 0 });
-  const orbitAngles = useRef({ theta: 0, phi: Math.PI / 2 }); // azimuth, polar
-  const orbitCenter = useRef(new THREE.Vector3());
+  const material = useMemo(() => new THREE.ShaderMaterial({
+    vertexShader: VERT,
+    fragmentShader: FRAG,
+    uniforms: { uAtlas: { value: atlas.texture } },
+    transparent: true,
+    depthTest: false,
+    depthWrite: false,
+    // The vertex shader negates Y, which reverses the winding of the unit
+    // quad: every instance faces away from the camera and default FrontSide
+    // culling drops all of them. Two-sided is the honest setting for a flat
+    // sprite anyway.
+    side: THREE.DoubleSide,
+  }), [atlas]);
 
-  useEffect(function setupMouseListener() {
-    if (!enabled) return;
-    const canvas = gl.domElement;
+  // Built imperatively: through the JSX reconciler the element arrived as a
+  // plain Mesh with zero compiled programs (measured: scene child
+  // "Mesh:ShaderMaterial", gl.info.programs.length === 0) and nothing was
+  // ever drawn. A real InstancedMesh handed to <primitive> sidesteps that.
+  const mesh = useMemo(() => {
+    const m = new THREE.InstancedMesh(geometry, material, MAX_INSTANCES);
+    // Our shader places instances via aRect; the instance matrices must be
+    // identity, not the zero-initialised default that collapses every vertex.
+    const id = new THREE.Matrix4();
+    for (let i = 0; i < MAX_INSTANCES; i++) m.setMatrixAt(i, id);
+    m.instanceMatrix.needsUpdate = true;
+    m.frustumCulled = false;
+    m.count = 0;
+    return m;
+  }, [geometry, material]);
+  const meshRef = useRef<THREE.InstancedMesh>(mesh);
+  meshRef.current = mesh;
+  const lastSize = useRef({ w: 0, h: 0 });
 
-    function onMouseMove(e: MouseEvent) {
-      const rect = canvas.getBoundingClientRect();
-      mouse.current.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      mouse.current.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-      hasTarget.current = true;
-
-      // Left-click drag → pan camera on product plane
-      if (dragging.current) {
-        const dx = e.clientX - lastMouse.current.x;
-        const dy = e.clientY - lastMouse.current.y;
-
-        const dist = camera.position.distanceTo(orbitCenter.current);
-        const fov = (camera as THREE.PerspectiveCamera).fov ?? 60;
-        const vFov = (fov * Math.PI) / 180;
-        const visibleHeight = 2 * Math.tan(vFov / 2) * dist;
-        const pixelToWorld = visibleHeight / canvas.clientHeight;
-
-        // Pan in camera-local right/up directions
-        const right = new THREE.Vector3();
-        const up = new THREE.Vector3();
-        camera.getWorldDirection(new THREE.Vector3());
-        right.setFromMatrixColumn(camera.matrixWorld, 0);
-        up.setFromMatrixColumn(camera.matrixWorld, 1);
-
-        camera.position.addScaledVector(right, -dx * pixelToWorld);
-        camera.position.addScaledVector(up, dy * pixelToWorld);
-        orbitCenter.current.addScaledVector(right, -dx * pixelToWorld);
-        orbitCenter.current.addScaledVector(up, dy * pixelToWorld);
-      }
-
-      // Middle-click drag → orbit camera around center
-      if (rotating.current) {
-        const dx = e.clientX - lastMouse.current.x;
-        const dy = e.clientY - lastMouse.current.y;
-
-        orbitAngles.current.theta -= dx * 0.005;
-        orbitAngles.current.phi = Math.max(0.1, Math.min(Math.PI - 0.1, orbitAngles.current.phi - dy * 0.005));
-
-        const dist = camera.position.distanceTo(orbitCenter.current);
-        const { theta, phi } = orbitAngles.current;
-        camera.position.set(
-          orbitCenter.current.x + dist * Math.sin(phi) * Math.sin(theta),
-          orbitCenter.current.y + dist * Math.cos(phi),
-          orbitCenter.current.z + dist * Math.sin(phi) * Math.cos(theta),
-        );
-        camera.lookAt(orbitCenter.current);
-      }
-
-      lastMouse.current = { x: e.clientX, y: e.clientY };
-    }
-
-    function onMouseDown(e: MouseEvent) {
-      if (e.button === 0) { // left click → pan
-        dragging.current = true;
-        lastMouse.current = { x: e.clientX, y: e.clientY };
-        canvas.style.cursor = 'grabbing';
-      } else if (e.button === 1) { // middle click → orbit
-        e.preventDefault();
-        rotating.current = true;
-        lastMouse.current = { x: e.clientX, y: e.clientY };
-        canvas.style.cursor = 'move';
-      }
-    }
-
-    function onMouseUp() {
-      dragging.current = false;
-      rotating.current = false;
-      canvas.style.cursor = 'default';
-    }
-
-    function onContextMenu(e: Event) {
-      if (rotating.current) e.preventDefault();
-    }
-
-    function onDblClick(e: MouseEvent) {
-      if (!onDblClickWorld) return;
-      const rect = canvas.getBoundingClientRect();
-      const ndcX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      const ndcY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-      raycaster.current.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera);
-      const worldPt = new THREE.Vector3();
-      const hit = raycaster.current.ray.intersectPlane(plane.current, worldPt);
-      if (hit) onDblClickWorld(worldPt);
-    }
-
-    function onMouseLeave() {
-      hasTarget.current = false;
-      dragging.current = false;
-      rotating.current = false;
-      canvas.style.cursor = 'default';
-    }
-
-    function onWheel(e: WheelEvent) {
-      e.preventDefault();
-      const zoomSpeed = 0.1;
-      const delta = e.deltaY > 0 ? 1 + zoomSpeed : 1 - zoomSpeed;
-      zoomTarget.current = Math.max(MIN_DIST, Math.min(MAX_DIST, zoomTarget.current * delta));
-    }
-
-    canvas.addEventListener('mousemove', onMouseMove);
-    canvas.addEventListener('mousedown', onMouseDown);
-    canvas.addEventListener('mouseup', onMouseUp);
-    canvas.addEventListener('mouseleave', onMouseLeave);
-    canvas.addEventListener('wheel', onWheel, { passive: false });
-    canvas.addEventListener('contextmenu', onContextMenu);
-    canvas.addEventListener('dblclick', onDblClick);
-    return () => {
-      canvas.removeEventListener('mousemove', onMouseMove);
-      canvas.removeEventListener('mousedown', onMouseDown);
-      canvas.removeEventListener('mouseup', onMouseUp);
-      canvas.removeEventListener('mouseleave', onMouseLeave);
-      canvas.removeEventListener('wheel', onWheel);
-      canvas.removeEventListener('contextmenu', onContextMenu);
-      canvas.removeEventListener('dblclick', onDblClick);
-    };
-  }, [enabled, gl, camera]);
-
-  useFrame(function updateSmoothCamera() {
-    if (!enabled) return;
-
-    // Fly-to from ClickPicker (double-click)
-    const fly = flyTargetRef.current;
-    if (fly.active) {
-      camera.position.lerp(fly.position, 0.08);
-      if (camera.position.distanceTo(fly.position) < 1) {
-        fly.active = false;
-        zoomTarget.current = camera.position.z;
-      }
-      return;
-    }
-
-    // Zoom: move camera along vector (camera → mouse world pos on plane)
-    const currentZ = camera.position.z;
-    const dz = zoomTarget.current - currentZ;
-    if (Math.abs(dz) > 0.5) {
-      // Get mouse world position on product plane
-      raycaster.current.setFromCamera(mouse.current, camera);
-      const mouseWorld = new THREE.Vector3();
-      const hit = raycaster.current.ray.intersectPlane(plane.current, mouseWorld);
-
-      if (hit) {
-        // Direction from camera to mouse world pos
-        const dir = mouseWorld.clone().sub(camera.position).normalize();
-
-        // Move along that direction (negative dz = zoom in = move toward mouse)
-        const step = -dz * 0.1;
-        camera.position.addScaledVector(dir, step);
-      }
-    }
-  });
-
-  return null;
-}
-
-function CameraSetup({ getNodes, width, height, controlsRef }: {
-  getNodes: () => LayoutNode<Product>[];
-  width: number;
-  height: number;
-  controlsRef: React.MutableRefObject<any>;
-}) {
-  const { camera } = useThree();
-  const initialized = useRef(false);
-
-  useFrame(function fitCameraToContent() {
-    if (initialized.current) return;
+  useFrame(function drawGrid() {
+    const vp = getViewport();
     const nodes = getNodes();
-    if (nodes.length === 0) return;
-    initialized.current = true;
-
-    // Content bounds in pixel coordinates
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (const n of nodes) {
-      const x = n.posX.targetValue ?? 0;
-      const y = n.posY.targetValue ?? 0;
-      const w = n.width.targetValue ?? 0;
-      const h = n.height.targetValue ?? 0;
-      if (x < minX) minX = x;
-      if (x + w > maxX) maxX = x + w;
-      if (y < minY) minY = y;
-      if (y + h > maxY) maxY = y + h;
+    if (!vp || !nodes) return;
+    const { width, height } = getSize();
+    if (lastSize.current.w !== width || lastSize.current.h !== height) {
+      gl.setSize(width, height, false);
+      lastSize.current = { w: width, h: height };
     }
 
-    const contentW = maxX - minX || 1;
-    const contentH = maxY - minY || 1;
-    const centerX = (minX + maxX) / 2;
-    const centerY = -(minY + maxY) / 2;
+    // The transform is not passive: update() runs the rubber-band clamp and
+    // the zoom/pan interpolation every frame. CanvasRenderer called it from
+    // its own loop; without it here the camera sat at offset 0/0 while the
+    // Canvas2D grid had already been pulled into view (measured: oy 0 vs 861).
+    vp.update();
 
-    // Calculate distance to fit content in view
-    const fov = (camera as THREE.PerspectiveCamera).fov ?? 60;
-    const vFov = (fov * Math.PI) / 180;
-    const aspect = width / height || 1;
-    const distH = contentH / (2 * Math.tan(vFov / 2));
-    const distW = contentW / (2 * Math.tan(vFov / 2) * aspect);
-    const dist = Math.max(distH, distW) * 1.1;
+    // ---- camera mirrors the 2D transform exactly --------------------------
+    // Canvas2D: screen = world * scale + offset. An orthographic camera that
+    // shows the world rect [(-offset)/scale, (-offset + css)/scale] produces
+    // the same picture. Y negated because the vertex shader flips it.
+    const cam = camera as THREE.OrthographicCamera;
+    // R3F re-applies left/right/top/bottom from the canvas size (centred at
+    // the origin) on every size change unless the camera is marked manual —
+    // which silently replaced this frustum and left the grid off-screen.
+    cam.manual = true;
+    const s = vp.scale || 1;
+    const left = -vp.offset.x / s;
+    const top = -vp.offset.y / s;
+    cam.left = left;
+    cam.right = left + width / s;
+    cam.top = -top;
+    cam.bottom = -(top + height / s);
+    cam.near = -10;
+    cam.far = 10;
+    cam.updateProjectionMatrix();
 
-    camera.position.set(centerX, centerY, dist);
-    camera.lookAt(centerX, centerY, 0);
-    camera.updateProjectionMatrix();
+    // ---- instances ---------------------------------------------------------
+    const aRect = geometry.getAttribute('aRect') as THREE.InstancedBufferAttribute;
+    const aUV = geometry.getAttribute('aUV') as THREE.InstancedBufferAttribute;
+    const aOpacity = geometry.getAttribute('aOpacity') as THREE.InstancedBufferAttribute;
 
-    // Update OrbitControls target to content center
-    if (controlsRef.current) {
-      controlsRef.current.target.set(centerX, centerY, 0);
-      controlsRef.current.update();
+    const viewL = left, viewT = top, viewR = left + width / s, viewB = top + height / s;
+    const cx = (viewL + viewR) / 2, cy = (viewT + viewB) / 2;
+
+    let count = 0;
+    for (let i = 0; i < nodes.length && count < MAX_INSTANCES; i++) {
+      const node = nodes[i];
+      const opacity = node.opacity.value ?? 1;
+      if (opacity <= 0.01) continue;
+      const w = (node.width.value ?? 0) * (node.scale.value ?? 1);
+      const h = (node.height.value ?? 0) * (node.scale.value ?? 1);
+      if (w <= 0 || h <= 0) continue;
+      const x = node.posX.value ?? 0;
+      const y = node.posY.value ?? 0;
+
+      // Request the image; visible tiles first, nearer to centre first.
+      const storageId = node.data?.primaryImage?.storage_id;
+      if (!storageId) continue;
+      const inView = x + w >= viewL && x <= viewR && y + h >= viewT && y <= viewB;
+      const dist = Math.hypot(x + w / 2 - cx, y + h / 2 - cy);
+      atlas.request(node.id, storageId, inView ? dist : 1e9 + dist);
+      if (!atlas.isReady(node.id)) continue;
+
+      const slot = atlas.slotFor(node.id);
+      const [u, v, uw, uh] = atlas.uvFor(slot);
+      aRect.setXYZW(count, x, y, w, h);
+      aUV.setXYZW(count, u, v, uw, uh);
+      aOpacity.setX(count, opacity);
+      count++;
     }
+
+    aRect.needsUpdate = true;
+    aUV.needsUpdate = true;
+    aOpacity.needsUpdate = true;
+    if (meshRef.current) meshRef.current.count = count;
+
+    atlas.tick(gl);
   });
-
-  return null;
-}
-
-export function ArcturianRendererComponent({
-  getNodes, getHeaders, productToAtlasIndex, onBucketClick, width, height,
-}: ArcturianRendererProps) {
-  const controlsRef = useRef<any>(null);
-  const flyTargetRef = useRef<FlyTarget>({ active: false, position: new THREE.Vector3(), lookAt: new THREE.Vector3() });
-  const [spotlightNodeId, setSpotlightNodeId] = useState<string | null>(null);
-  const animator = useMemo(() => new ParticleAnimator(), []);
 
   return (
-    <Canvas
-      camera={{ position: [0, 0, 1000], fov: 60, near: 1, far: 10000 }}
-      gl={{ antialias: true, alpha: false }}
-      style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }}
-    >
-      <color attach="background" args={['#ffffff']} />
-      <ambientLight intensity={0.8} />
+    <primitive object={mesh} />
+  );
+}
 
-      <CameraSetup getNodes={getNodes} width={width} height={height} controlsRef={controlsRef} />
-
-      <GPUScene
-        getNodes={getNodes}
-        getHeaders={getHeaders}
-        productToAtlasIndex={productToAtlasIndex}
-        flyTargetRef={flyTargetRef}
-        onBucketClick={onBucketClick || (() => {})}
-        spotlightNodeId={spotlightNodeId}
-        animator={animator}
-      />
-
-      <SmoothMouseCamera
-        enabled
-        flyTargetRef={flyTargetRef}
-        onDblClickWorld={(worldPos) => {
-          const nodes = getNodes();
-          let bestIdx = -1;
-          let bestDist = Infinity;
-          for (let i = 0; i < nodes.length; i++) {
-            const n = nodes[i];
-            const nx = (n.posX.value ?? 0) + (n.width.value ?? 0) / 2;
-            const ny = -(n.posY.value ?? 0) - (n.height.value ?? 0) / 2;
-            const dx = worldPos.x - nx;
-            const dy = worldPos.y - ny;
-            const dist = dx * dx + dy * dy;
-            if (dist < bestDist) {
-              bestDist = dist;
-              bestIdx = i;
-            }
-          }
-          if (bestIdx >= 0) {
-            const n = nodes[bestIdx];
-            const nx = (n.posX.value ?? 0) + (n.width.value ?? 0) / 2;
-            const ny = -(n.posY.value ?? 0) - (n.height.value ?? 0) / 2;
-            const side = Math.min(n.width.value ?? 60, n.height.value ?? 60);
-
-            // Fly camera to product
-            flyTargetRef.current.active = true;
-            flyTargetRef.current.position.set(nx, ny, side * 3);
-            flyTargetRef.current.lookAt.set(nx, ny, 0);
-
-            // Particle animation (when shader supports it)
-            const currentTime = performance.now() / 1000;
-            const alreadyAnimated = spotlightNodeId === n.id;
-            if (alreadyAnimated) {
-              animator.resetParticle(bestIdx);
-              setSpotlightNodeId(null);
-            } else {
-              if (spotlightNodeId) {
-                const prevIdx = nodes.findIndex(nd => nd.id === spotlightNodeId);
-                if (prevIdx >= 0) animator.resetParticle(prevIdx);
-              }
-              animator.animateParticle(bestIdx, currentTime, {
-                targetOffset: { x: 0, y: 0, z: 5 },
-                duration: 1.0,
-              });
-              setSpotlightNodeId(n.id);
-            }
-          }
-        }}
-      />
-    </Canvas>
+export function ArcturianRendererComponent(props: ArcturianRendererProps) {
+  // Track the input canvas' box so the GL layer sits exactly underneath it,
+  // insets included. Read once per animation frame — cheap, and it follows
+  // sidebar toggles without a resize listener.
+  const hostRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    let raf = 0;
+    const sync = () => {
+      const host = hostRef.current;
+      const input = host?.parentElement?.querySelector('canvas.pf-canvas') as HTMLElement | null;
+      if (host && input) {
+        const cs = getComputedStyle(input);
+        host.style.left = cs.left; host.style.top = cs.top;
+        host.style.width = `${input.clientWidth}px`; host.style.height = `${input.clientHeight}px`;
+      }
+      raf = requestAnimationFrame(sync);
+    };
+    raf = requestAnimationFrame(sync);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+  return (
+    <div ref={hostRef} style={{ position: 'absolute', left: 0, top: 0, pointerEvents: 'none', zIndex: 1 }}>
+      <Canvas
+        orthographic
+        // Sharp on phones: that is the whole point of the GPU path. Capped at
+        // 3 to stay inside the 8192² atlas budget on the largest iPads.
+        dpr={Math.min(typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1, 3)}
+        gl={{ alpha: true, antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: true }}
+        style={{ background: 'transparent' }}
+        frameloop="always"
+      >
+        <GridScene {...props} />
+      </Canvas>
+    </div>
   );
 }
