@@ -266,8 +266,15 @@ export class ProductFinderController {
       return;
     }
 
-    // Pass viewport size to LayoutService for fixed bounds calculation in Pivot Mode
-    const bounds = this.layoutService.getContentBounds(this.canvas.clientWidth, this.canvas.clientHeight);
+    // Pass viewport size to LayoutService for fixed bounds calculation in Pivot Mode.
+    // Hero mode extends the bounds so edge products can reach the viewport
+    // centre — in WORLD units, so the extension has to be divided by the
+    // zoom: at scale 0.45 (phone tap) a scale-1 extension clamped the first
+    // product to the left edge (120518).
+    const s = this.layoutService.isPivotHeroMode()
+      ? Math.max(0.05, this.viewportService.getTransform()?.getTargetScale() ?? 1)
+      : 1;
+    const bounds = this.layoutService.getContentBounds(this.canvas.clientWidth / s, this.canvas.clientHeight / s);
 
     if (!bounds) {
       // No bounds available yet (e.g., during initial load) - this is normal
@@ -634,10 +641,24 @@ export class ProductFinderController {
       targetScale = Math.min(targetScale, (leftStage * 0.78) / w);
     }
 
-    const clampedScale = Math.min(targetScale, viewport.maxScale);
+    // Phone: the card is a bottom sheet (48vh, see ProductOverlayModalV2).
+    // The product has to fit the stage ABOVE it — 60 % of the full height
+    // shoved upward put the helmet half under the sheet and half under the
+    // header (120518). Fit into the free band, centre it there.
+    let focusY = centerY;
+    if (isMobile && h > 0 && w > 0) {
+      const sheetH = (typeof window !== 'undefined' ? window.innerHeight : screenHeight) * 0.48 + 8;
+      const freeH = Math.max(120, screenHeight - sheetH);
+      targetScale = Math.min((freeH * 0.82) / h, (screenWidth * 0.84) / w);
+      // World point that must land on the screen centre so that the product
+      // centre lands at freeH / 2.
+      focusY = centerY + (screenHeight / 2 - freeH / 2) / targetScale;
+    }
 
-    // On mobile: position product in upper third (leave space for V2 dialog below)
-    const focusY = isMobile ? centerY + h * 0.4 : centerY;
+    const clampedScale = Math.min(targetScale, viewport.maxScale);
+    this.viewportService.centerOn(centerX, focusY, clampedScale);
+    // Bounds depend on the target zoom (see updateContentBounds).
+    this.updateContentBounds();
     this.viewportService.centerOn(centerX, focusY, clampedScale);
     // Desktop dock: focal point is the centre of the left stage, not the screen.
     if (!isMobile && dockShift > 0) {

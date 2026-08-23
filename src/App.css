@@ -2314,3 +2314,10 @@ body {
   cursor: default;
   pointer-events: none;
 }
+
+/* Phone: while the bottom sheet (48vh) is open, the hero arrows and counter
+   sit just above it instead of underneath it. */
+@media (max-width: 767px) {
+  .pf-stage-card-open .pf-hero-arrow { bottom: calc(var(--pf-sheet-h, 48vh) + 16px); }
+  .pf-stage-card-open .pf-hero-counter { bottom: calc(var(--pf-sheet-h, 48vh) + 24px); }
+}

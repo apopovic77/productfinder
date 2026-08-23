@@ -397,7 +397,28 @@ export default class App extends React.Component<Props, State> {
     window.removeEventListener('resize', this.handleOrientationChange);
   }
 
+  private sheetObserver: ResizeObserver | null = null;
+
   componentDidUpdate(prevProps: Props, prevState: State): void {
+    // Phone bottom sheet: publish its real height so the hero arrows and
+    // counter sit just above it (48vh is only the sheet's maximum).
+    if (prevState.selectedProduct !== this.state.selectedProduct && this.isMobileLayout()) {
+      this.sheetObserver?.disconnect();
+      this.sheetObserver = null;
+      requestAnimationFrame(() => {
+        const sheet = document.querySelector<HTMLElement>('.pom-info-panel');
+        const stage = document.querySelector<HTMLElement>('.pf-stage');
+        if (!stage) return;
+        if (!sheet || !this.state.selectedProduct) { stage.style.removeProperty('--pf-sheet-h'); return; }
+        const publish = () => stage.style.setProperty('--pf-sheet-h', `${Math.round(sheet.getBoundingClientRect().height + 8)}px`);
+        publish();
+        // The sheet animates in and grows as its content loads — follow it.
+        if (typeof ResizeObserver !== 'undefined') {
+          this.sheetObserver = new ResizeObserver(publish);
+          this.sheetObserver.observe(sheet);
+        }
+      });
+    }
     const previousProductId = prevState.selectedProduct?.id ?? null;
     const currentProductId = this.state.selectedProduct?.id ?? null;
     const selectedProductChanged = previousProductId !== currentProductId;
@@ -1419,7 +1440,7 @@ export default class App extends React.Component<Props, State> {
    * does nothing when no card is open or the focus did not change.
    */
   private syncHeroCardToFocus = () => {
-    if (this.isMobileLayout() || !this.state.isPivotHeroMode || !this.state.selectedProduct) return;
+    if (!this.state.isPivotHeroMode || !this.state.selectedProduct) return;
     const hp = this.controller.getHeroPosition();
     if (!hp) return;
     const focused = this.controller.getHeroProductAt(hp.index);
@@ -2349,7 +2370,7 @@ export default class App extends React.Component<Props, State> {
           </div>
         )}
 
-        <div className={`pf-stage pf-stage-${this.state.footerPosition}`}>
+        <div className={`pf-stage pf-stage-${this.state.footerPosition} ${selectedProduct ? 'pf-stage-card-open' : ''}`}>
           {this.useArcturianRenderer() ? (
             <Suspense fallback={<div className="pf-canvas" style={{ background: '#fff' }} />}>
               <ArcturianRendererComponent
