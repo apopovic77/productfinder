@@ -70,7 +70,7 @@ export class CanvasRenderer<T> {
   // exactly the flash this replaces).
   private heroFadeFrom: HTMLImageElement | null = null;
   private heroFadeStart = 0;
-  private static readonly HERO_FADE_MS = 450;
+  private static readonly HERO_FADE_MS = 750;
 
   public get selectedVariantHeroImage(): HTMLImageElement | null {
     return this._selectedVariantHeroImage;
@@ -97,8 +97,12 @@ export class CanvasRenderer<T> {
       if (t >= 1) {
         this.heroFadeFrom = null;
       } else {
-        this.drawImageFit(this.heroFadeFrom, x, y, w, h);
+        // True crossfade: the old image fades OUT while the new fades IN.
+        // Drawing the old one at full alpha underneath (first version) showed
+        // no fade-out at all — the old image just popped away at the end.
         const e = t * t * (3 - 2 * t); // smoothstep
+        this.ctx.globalAlpha = base * (1 - e);
+        this.drawImageFit(this.heroFadeFrom, x, y, w, h);
         this.ctx.globalAlpha = base * e;
         this.drawImageFit(img, x, y, w, h);
         this.ctx.globalAlpha = base;
