@@ -861,14 +861,36 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         );
       })()}
 
-      {/* Sizes — info only (selection happens later in cart) */}
+      {/* Sizes — selectable chips; the chosen size goes into the cart via
+          activeVariant (owner 2026-08-23: plain text left no way to pick). */}
       {availableSizes.length > 0 && (
         <div style={{ marginBottom: '12px' }}>
           <div style={{ fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.8, marginBottom: '6px' }}>
-            Available sizes
+            Size: <span style={{ opacity: 1 }}>{selectedSize || availableSizes[0]}</span>
           </div>
-          <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.85)' }}>
-            {availableSizes.join(' · ')}
+          <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+            {availableSizes.map(size => {
+              const isActive = size === selectedSize;
+              return (
+                <button
+                  key={size}
+                  type="button"
+                  onClick={() => setSelectedSize(size)}
+                  style={{
+                    padding: '5px 10px', fontSize: '11px', borderRadius: '6px',
+                    border: isActive ? '2px solid #ff6b00' : '1px solid rgba(255,255,255,0.25)',
+                    background: isActive ? 'rgba(255,107,0,0.18)' : 'rgba(255,255,255,0.08)',
+                    color: isActive ? '#fff' : 'rgba(255,255,255,0.85)',
+                    fontWeight: isActive ? 600 : 400,
+                    cursor: isActive ? 'default' : 'pointer',
+                    transition: 'all 0.15s ease',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  {size}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
