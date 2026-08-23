@@ -275,8 +275,13 @@ export class CanvasRenderer<T> {
    * Compute the best-fit size for an image within a bounding box while preserving aspect ratio.
    */
   private getFittedDimensions(img: HTMLImageElement, boundsWidth: number, boundsHeight: number) {
-    const naturalWidth = img.naturalWidth || boundsWidth || 1;
-    const naturalHeight = img.naturalHeight || boundsHeight || 1;
+    // iOS Safari reports naturalWidth/Height 0 until the bitmap is decoded.
+    // Falling back to the BOUNDS stretched the image into the tile box
+    // (120519: helmet 0.65:1 drawn as 0.48:1). Never fall back to the box —
+    // use the element size, and refuse to draw when nothing is known.
+    const naturalWidth = img.naturalWidth || img.width || 0;
+    const naturalHeight = img.naturalHeight || img.height || 0;
+    if (!naturalWidth || !naturalHeight) return { width: 0, height: 0 };
     const scale = Math.min(boundsWidth / naturalWidth, boundsHeight / naturalHeight);
     const fittedWidth = naturalWidth * scale;
     const fittedHeight = naturalHeight * scale;
@@ -295,6 +300,7 @@ export class CanvasRenderer<T> {
     boundsHeight: number
   ) {
     const { width, height } = this.getFittedDimensions(img, boundsWidth, boundsHeight);
+    if (!width || !height) return { x: boundsX, y: boundsY, width: 0, height: 0 };
     const drawX = boundsX + (boundsWidth - width) / 2;
     const drawY = boundsY + (boundsHeight - height) / 2;
     this.ctx.drawImage(img, drawX, drawY, width, height);
@@ -440,8 +446,12 @@ export class CanvasRenderer<T> {
       }
 
       // Calculate screen space size
-      const screenWidth = w * scale;
-      const screenHeight = h * scale;
+      // Physical pixels: a 350 CSS-px helmet on a 3x phone is 1050 device
+      // pixels — judged in CSS px it stayed on the 180 px grid image and
+      // looked blurred (120521).
+      const devicePx = (typeof window !== 'undefined' ? window.devicePixelRatio : 1) || 1;
+      const screenWidth = w * scale * devicePx;
+      const screenHeight = h * scale * devicePx;
       const screenSize = Math.max(screenWidth, screenHeight);
 
       // Determine required LOD tier with HYSTERESIS to prevent flickering

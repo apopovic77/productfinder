@@ -341,6 +341,18 @@ export class ViewportTransform {
   private isPotentialDrag = false; // mousedown happened, waiting for movement
   private dragThreshold = 4; // pixels before drag starts
   private wasDragging = false; // true after a drag ended, consumed by next click
+  private wasDraggingTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * Arm the click-suppression after a drag. Browsers fire no click after a
+   * moved touch, so without an expiry the flag survived the swipe and
+   * swallowed the NEXT real tap (phone: first tap after a swipe did nothing).
+   */
+  private armDragSuppression(): void {
+    this.wasDragging = true;
+    if (this.wasDraggingTimer) clearTimeout(this.wasDraggingTimer);
+    this.wasDraggingTimer = setTimeout(() => { this.wasDragging = false; this.wasDraggingTimer = null; }, 500);
+  }
 
   private handleMouseDown = (e: MouseEvent) => {
     const canPan = e.button === 1 || e.button === 2 || e.ctrlKey || e.metaKey || (this.panWithLeftButton && e.button === 0);
@@ -386,7 +398,7 @@ export class ViewportTransform {
   private handleMouseUp = () => {
     this.isPotentialDrag = false;
     if (this.isDragging) {
-      this.wasDragging = true;
+      this.armDragSuppression();
       this.isDragging = false;
       this.canvas.style.cursor = 'default';
       // Apply momentum
@@ -511,13 +523,13 @@ export class ViewportTransform {
   private handleTouchEnd = (e: TouchEvent) => {
     this.isPotentialDrag = false;
     if (this.isDragging) {
-      this.wasDragging = true;
+      this.armDragSuppression();
       this.isDragging = false;
       this.applyMomentum();
     }
     // Also suppress click after pinch-zoom
     if (this.touchStartDistance > 0) {
-      this.wasDragging = true;
+      this.armDragSuppression();
     }
     // Only reset pinch distance when all fingers are up
     if (e.touches.length === 0) {

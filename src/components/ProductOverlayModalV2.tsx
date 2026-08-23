@@ -45,6 +45,10 @@ interface ParsedFeature {
  */
 export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false }) => {
   const isMobilePortrait = window.innerWidth <= 768 && window.innerHeight > window.innerWidth;
+  // Phone: the dark hero card as a full-width bottom sheet (owner 2026-08-23,
+  // "die Karte auch im Desktop-Style"). Same markup as the desktop dock,
+  // different geometry — no side dock, no 3D, badges inline.
+  const heroSheet = heroDock && isMobilePortrait;
   const DIALOG_WIDTH = isMobilePortrait ? Math.min(window.innerWidth - 16, 380) : 240;
 
   // State for full product details (fetched from API with variants)
@@ -589,18 +593,18 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
 
   return (
     <motion.div
-      className={`pom-info-panel pom-panel-standalone ${heroDock ? 'pom-hero-dock' : ''}`}
+      className={`pom-info-panel pom-panel-standalone ${heroDock ? 'pom-hero-dock' : ''} ${heroSheet ? 'pom-hero-sheet' : ''}`}
       style={{
         position: 'fixed',
-        left: heroDock ? 'auto' : isMobilePortrait ? `${(window.innerWidth - DIALOG_WIDTH) / 2}px` : `${dragPosition.x}px`,
-        right: heroDock ? '172px' : 'auto', // 64 margin + 96 badge column + 12 gap
+        left: heroSheet ? '8px' : heroDock ? 'auto' : isMobilePortrait ? `${(window.innerWidth - DIALOG_WIDTH) / 2}px` : `${dragPosition.x}px`,
+        right: heroSheet ? '8px' : heroDock ? '172px' : 'auto', // 64 margin + 96 badge column + 12 gap
         // Dock: pinned to the bottom edge with a margin, growing upward. A
         // percentage anchor looked right at 900 px and put ADD TO CART below
         // the fold at 800 px (measured: button bottom 814 of 800).
         top: heroDock ? 'auto' : isMobilePortrait ? 'auto' : `${dragPosition.y}px`,
         transform: undefined,
-        bottom: heroDock ? '88px' : isMobilePortrait ? '8px' : 'auto',
-        width: `${heroDock ? 340 : DIALOG_WIDTH}px`,
+        bottom: heroSheet ? '8px' : heroDock ? '88px' : isMobilePortrait ? '8px' : 'auto',
+        width: heroSheet ? 'auto' : `${heroDock ? 340 : DIALOG_WIDTH}px`,
         boxSizing: 'border-box',
         maxHeight: isMobilePortrait ? '48vh' : heroDock ? 'calc(100vh - 150px)' : '80vh',
         cursor: heroDock ? 'default' : isDragging ? 'grabbing' : 'grab',
@@ -628,7 +632,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         gap: '4px',
         zIndex: 10,
       }}>
-        {isMobilePortrait && (
+        {isMobilePortrait && !heroSheet && (
           <button className="pom-button pom-button-primary" onClick={handleAddToCart} style={{ fontSize: '10px', padding: '4px 10px', borderRadius: '6px' }}>
             Cart
           </button>
@@ -872,7 +876,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       )}
 
       {/* Buttons - hidden on mobile portrait (moved to top right) */}
-      {!isMobilePortrait && (
+      {(!isMobilePortrait || heroSheet) && (
         <div className="pom-actions" style={{ gap: '6px' }}>
           <button className="pom-button pom-button-primary" onClick={handleAddToCart} style={{ fontSize: '11px', padding: '8px 12px' }}>
             Add to Cart

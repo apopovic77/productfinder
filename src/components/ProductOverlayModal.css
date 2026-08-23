@@ -555,3 +555,22 @@
 }
 .pom-hero-badge-label { font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255, 255, 255, 0.5) !important; font-weight: 700; }
 .pom-hero-badge-value { font-family: 'ITC Avant Garde Gothic Condensed', 'ITC Avant Garde Gothic', sans-serif; font-size: 17px; font-weight: 700; color: #fff !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ---- Phone: hero card as bottom sheet (same dark style, flat, badges inline) ---- */
+.pom-info-panel.pom-hero-dock.pom-hero-sheet {
+  transform: none !important;
+  border-radius: 18px;
+  padding: 16px 16px 14px;
+  gap: 10px;
+}
+.pom-hero-sheet .pom-hero-model { font-size: 34px; }
+.pom-hero-sheet .pom-price { font-size: 22px; }
+.pom-hero-sheet .pom-hero-badges {
+  position: static;
+  flex-direction: row;
+  width: auto;
+  gap: 8px;
+  order: 2;
+}
+.pom-hero-sheet .pom-hero-badge { flex: 1 1 0; padding: 8px 6px; }
+.pom-hero-sheet .pom-button-primary { font-size: 13px; padding: 12px; }

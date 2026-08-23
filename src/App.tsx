@@ -302,6 +302,7 @@ export default class App extends React.Component<Props, State> {
     // Dev/diagnostics handle: lets a test or the owner inspect the live pivot
     // engine (which dimension, which buckets) from the console. Read-only use.
     if (typeof window !== 'undefined') (window as any).__pfController = this.controller;
+    if (typeof window !== "undefined") (window as any).__pfApp = this;
     this.controller.preConfig = {
       gridConfig: this.state.devSettings.gridConfig,
       animationDuration: this.state.devSettings.animationDuration,
@@ -2822,7 +2823,7 @@ export default class App extends React.Component<Props, State> {
               // V2 Dialog: Default dialog for normal zoom levels
               <ProductOverlayModal
                 product={selectedProduct}
-                heroDock={this.usesHeroDock()}
+                heroDock={this.usesHeroDock() || this.isMobileLayout()}
                 onClose={() => this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false })}
                 onPositionChange={this.handleDialogPositionChange}
                 onVariantChange={this.handleDialogVariantChange}
