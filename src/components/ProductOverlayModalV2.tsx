@@ -570,14 +570,15 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         position: 'fixed',
         left: heroDock ? 'auto' : isMobilePortrait ? `${(window.innerWidth - DIALOG_WIDTH) / 2}px` : `${dragPosition.x}px`,
         right: heroDock ? '64px' : 'auto',
-        // Dock: anchored to the stage centre but nudged up, so the tall card
-        // (title, thumbs, sizes, CTA) never runs off the bottom edge.
-        top: heroDock ? '44%' : isMobilePortrait ? 'auto' : `${dragPosition.y}px`,
-        transform: heroDock ? 'translateY(-50%)' : undefined,
-        bottom: isMobilePortrait && !heroDock ? '8px' : 'auto',
+        // Dock: pinned to the bottom edge with a margin, growing upward. A
+        // percentage anchor looked right at 900 px and put ADD TO CART below
+        // the fold at 800 px (measured: button bottom 814 of 800).
+        top: heroDock ? 'auto' : isMobilePortrait ? 'auto' : `${dragPosition.y}px`,
+        transform: undefined,
+        bottom: heroDock ? '88px' : isMobilePortrait ? '8px' : 'auto',
         width: `${heroDock ? 340 : DIALOG_WIDTH}px`,
         boxSizing: 'border-box',
-        maxHeight: isMobilePortrait ? '48vh' : heroDock ? '78vh' : '80vh',
+        maxHeight: isMobilePortrait ? '48vh' : heroDock ? 'calc(100vh - 150px)' : '80vh',
         cursor: heroDock ? 'default' : isDragging ? 'grabbing' : 'grab',
         userSelect: isDragging ? 'none' : 'auto',
         fontSize: isMobilePortrait ? '12px' : '11px',
