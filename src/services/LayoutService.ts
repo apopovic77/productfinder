@@ -91,9 +91,21 @@ export class LayoutService {
       overrides: {
         variant_colors: { hidden: true },
         variant_sizes: { hidden: true },
+        // Count dimensions group by HOW MANY colours/sizes/variants a product
+        // has (1, 2, 3 … 15). Never a buying question; they surfaced on level
+        // two for gloves, gear and street helmets (pivot-tree audit 2026-08-23).
+        family_size: { hidden: true },
+        color_variant_count: { hidden: true },
+        variant_count: { hidden: true },
+        size_count: { hidden: true },
         has_image: { hidden: true },
         product_code: { hidden: true },
         family_name: { hidden: true },
+        // Model names are categories, not prose. Auto-detected as text they
+        // were bucketed by first word: "3SRS Helmet VISION" collapsed into
+        // "3SRS" — one group for 65 designs, a wasted click (audit 2026-08-23).
+        design_group: { label: 'Design', dataType: 'categorical' },
+        product_line: { label: 'Produktlinie', dataType: 'categorical' },
         is_spare: { label: 'Ersatzteil' },
         model_year: { label: 'Jahrgang', dataType: 'numeric_discrete' },
       },
@@ -334,6 +346,10 @@ export class LayoutService {
 
   setLockedDimensions(keys: string[]): void {
     this.drillDownService.setLockedDimensions(keys);
+  }
+
+  setGroupingPath(keys: string[]): void {
+    this.drillDownService.setGroupingPath(keys);
   }
 
   setPivotModel(model: PivotAnalysisResult | null): void {

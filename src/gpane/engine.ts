@@ -50,6 +50,52 @@ export class GPANEEngine {
   // Taxonomy state
   private _mode: EngineMode = 'gpane';
   private _skipTaxonomy = false;
+
+  /**
+   * Prescribed grouping order for the current entry (issue #260 follow-up,
+   * owner decision 2026-08-23). The taxonomy tree ends exactly where the
+   * catalog entry dialog drops the dealer (MX -> Helme etc.); below that,
+   * pure scoring picked "Design" (one group per model) or "Preis" first.
+   * A dealer reads a category the way the B2B shop lays it out: series or
+   * line, then model, then colour. This list is consulted depth by depth;
+   * scoring only takes over where the prescription yields nothing usable.
+   */
+  private _groupingPath: string[] = [];
+
+  setGroupingPath(keys: string[]): void {
+    this._groupingPath = [...keys];
+  }
+
+  /**
+   * Dimension the prescription wants at the current depth, if it splits the
+   * visible products into at least two real groups. Returns null when the
+   * path is exhausted or the dimension is degenerate here (one value, or
+   * a value on fewer than two products) — then scoring decides.
+   */
+  private _prescribedDimension(products: Product[]): ScoredDimension | null {
+    const depth = this._focusStack.length;
+    for (let i = depth; i < this._groupingPath.length; i++) {
+      const key = this._groupingPath[i];
+      const dim = this._scoredDimensions.find(d => d.key === key);
+      if (!dim) continue;
+      // The level must actually divide: at least two groups that each hold
+      // two or more products. cardinality alone lied twice in the audit —
+      // "Design" under 3SRS had two values, one of them empty (one group,
+      // a wasted click), and goggles designs carried colours in their
+      // names (one product per group, a list).
+      const groups = new Map<string, number>();
+      for (const prod of products) {
+        const v = getProductValue(prod, key);
+        const k = v === null || v === undefined || v === '' ? '' : String(v);
+        if (k) groups.set(k, (groups.get(k) ?? 0) + 1);
+      }
+      let real = 0;
+      for (const n of groups.values()) if (n >= 2) real++;
+      if (real < 2) continue;
+      return dim;
+    }
+    return null;
+  }
   private _heroMode = false;
   private _taxonomyPath: TaxonomyNode[] = [];
   private _navigationStack: NavigationEntry[] = [];  // single source of truth for breadcrumbs
@@ -510,7 +556,7 @@ export class GPANEEngine {
       this._buckets = buildBuckets(products, restored, this._config);
     } else if (this._scoredDimensions.length > 0) {
       const viable = this._scoredDimensions.filter(d => d.entropy > 0 && d.cardinality > 1);
-      this._activeDimension = viable[0] || this._scoredDimensions[0];
+      this._activeDimension = this._prescribedDimension(products) || viable[0] || this._scoredDimensions[0];
       this._buckets = buildBuckets(products, this._activeDimension, this._config);
     } else {
       this._activeDimension = null;
@@ -538,7 +584,7 @@ export class GPANEEngine {
     );
 
     if (this._scoredDimensions.length > 0) {
-      this._activeDimension = this._scoredDimensions[0];
+      this._activeDimension = this._prescribedDimension(products) || this._scoredDimensions[0];
       this._buckets = buildBuckets(products, this._activeDimension, this._config);
     } else {
       this._activeDimension = null;
@@ -568,8 +614,9 @@ export class GPANEEngine {
     this._heroMode = false;
 
     if (this._scoredDimensions.length > 0) {
+      const prescribed = this._prescribedDimension(products);
       const viable = this._scoredDimensions.filter(d => d.entropy > 0 && d.cardinality > 1);
-      this._activeDimension = viable[0] || this._scoredDimensions[0];
+      this._activeDimension = prescribed || viable[0] || this._scoredDimensions[0];
       this._buckets = buildBuckets(products, this._activeDimension, this._config);
     } else {
       this._activeDimension = null;

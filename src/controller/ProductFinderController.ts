@@ -12,7 +12,7 @@ import { PivotDimensionAnalyzer, type PivotAnalysisResult, type PivotDimensionDe
 import type { Orientation } from '../layout/PivotLayouter';
 import type { PivotGroup } from '../layout/PivotGroup';
 import type { CatalogEntrySelection } from '../config/CatalogEntryConfig';
-import { filterCatalogProducts } from '../utils/catalogEntry';
+import { filterCatalogProducts, getCatalogCategory } from '../utils/catalogEntry';
 
 export type ControllerState = {
   loading: boolean;
@@ -146,6 +146,12 @@ export class ProductFinderController {
       // give the analyzer two values to split on. Lock the dimension instead.
       const locked = this.preConfig.entrySelection ? ['sport'] : [];
       this.pivotAnalyzer.setExcludedDimensions(locked);
+      // The entry category prescribes how the grid groups (series > model >
+      // colour, the B2B shop's order). Scoring only fills in below that.
+      const entryCategory = this.preConfig.entrySelection
+        ? getCatalogCategory(this.preConfig.entrySelection.sportId, this.preConfig.entrySelection.categoryId)
+        : undefined;
+      this.layoutService.setGroupingPath(entryCategory?.grouping ?? []);
       // Two engines decide grouping: the legacy analyzer feeds the dimension
       // list, but the GPANE engine inside LayoutService picks the actual
       // split. Locking only the first one changed nothing on screen.

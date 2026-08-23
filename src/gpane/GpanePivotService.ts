@@ -90,6 +90,11 @@ export class GpanePivotService {
     // Engine gets loaded when products change (via sync), not here
   }
 
+  /** Prescribed grouping order for the current catalog entry (see CatalogCategoryConfig.grouping). */
+  setGroupingPath(keys: string[]): void {
+    this.engine.setGroupingPath(keys);
+  }
+
   /** Dimensions decided upstream (catalog entry) must never be offered. */
   setLockedDimensions(keys: string[]): void {
     this.engine.setHiddenKeys(keys);
