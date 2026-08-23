@@ -262,6 +262,11 @@ export default class App extends React.Component<Props, State> {
   private selectedMediaGroup: string | null = null;
   private selectedHeroRequestKey: string | null = null;
   private selectedHeroRequestId: string | null = null;
+  /** Phone layout: the footer is a collapsed bottom bar there and stays. */
+  private isMobileLayout(): boolean {
+    return typeof window !== 'undefined' && window.innerWidth < 768;
+  }
+
   private useArcturianRenderer(): boolean {
     if (typeof window === 'undefined') return false;
     return new URLSearchParams(window.location.search).get('renderer') === 'arcturian';
@@ -1993,7 +1998,6 @@ export default class App extends React.Component<Props, State> {
               )}
             </div>
           </div>
-          <div className="pf-header-title">Product Finder</div>
           <div className="pf-header-actions">
             {(layoutMode === 'pivot' || layoutMode === 'lanes') && (
               <>
@@ -2066,6 +2070,30 @@ export default class App extends React.Component<Props, State> {
             >
               {this.controller.getLayoutMode() === 'lanes' ? 'Lanes' : 'Pivot'}
             </button>
+            {/* Desktop: the right pane is gone (owner, 2026-08-23 — it only took
+                space; back is the breadcrumb, dimension/sort already live here).
+                Its two functions move up: AI search and the cart. */}
+            {!this.isMobileLayout() && (
+              <>
+                <button
+                  type="button"
+                  className="pf-header-btn pf-header-ai-btn"
+                  onClick={() => this.setState({ isQuickSearchOpen: true })}
+                  title="Ask AI"
+                >
+                  Ask AI
+                </button>
+                <button
+                  type="button"
+                  className={`pf-header-btn pf-header-cart-btn ${cartItems.length ? 'has-items' : ''}`}
+                  onClick={() => this.setState({ cartPanelOpen: true })}
+                  title={cartItems.length ? `${cartItems.length} ${cartItems.length === 1 ? 'Position' : 'Positionen'}` : 'Warenkorb leer'}
+                >
+                  <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg>
+                  {cartItems.length > 0 && <span className="pf-header-cart-count">{cartItems.length}</span>}
+                </button>
+              </>
+            )}
           </div>
           {/* Mobile: hamburger menu + gear */}
           <div className="pf-mobile-icons">
@@ -2350,7 +2378,11 @@ export default class App extends React.Component<Props, State> {
           })()}
         </div>
 
-        <div
+        {/* Desktop: no side pane (owner, 2026-08-23). Its functions sit in
+            the header (Ask AI, cart) and the breadcrumbs (back/reset). With
+            no footer element mounted, handleResize leaves the canvas inset
+            at 0 and the grid gets the full width. Phones keep the bottom bar. */}
+        {this.isMobileLayout() && <div
           ref={this.footerRef}
           className={`pf-bottom-bar pf-footer-${this.state.footerPosition} ${this.state.mobileFooterExpanded ? 'expanded' : 'collapsed'}`}
           style={
@@ -2619,7 +2651,7 @@ export default class App extends React.Component<Props, State> {
               </div>
             </>
           )}
-        </div>
+        </div>}
 
         {/* React Product Info Panel (fixed right side OR zoom-based V4 Dialog with Video) */}
         <AnimatePresence>
