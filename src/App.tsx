@@ -265,6 +265,17 @@ export default class App extends React.Component<Props, State> {
   private selectedMediaGroup: string | null = null;
   private selectedHeroRequestKey: string | null = null;
   private selectedHeroRequestId: string | null = null;
+  /**
+   * Desktop product presentation = the hero dock (dark card right, product
+   * free on the left, backdrop word), regardless of whether the product was
+   * clicked in hero mode or straight in the pivot grid (owner, 2026-08-23,
+   * storage 120476: the grid still opened the old light card on top of
+   * the helmet with a connection line and fan-out).
+   */
+  private usesHeroDock(): boolean {
+    return !this.isMobileLayout();
+  }
+
   /** Phone layout: the footer is a collapsed bottom bar there and stays. */
   private isMobileLayout(): boolean {
     return typeof window !== 'undefined' && window.innerWidth < 768;
@@ -461,8 +472,8 @@ export default class App extends React.Component<Props, State> {
           const productCenterX = nodeX + nodeW / 2;
           const productCenterY = nodeY + nodeH / 2;
 
-          // Update connection line (but NOT in Hero Mode with video)
-          if (!this.state.isPivotHeroMode) {
+          // Update connection line (but NOT in Hero Mode with video / desktop dock)
+          if (!this.state.isPivotHeroMode && !this.usesHeroDock()) {
             renderer.dialogConnectionPoint = { x: productCenterX, y: productCenterY };
             renderer.dialogPosition = {
               x: this.state.dialogPosition.x,
@@ -514,7 +525,7 @@ export default class App extends React.Component<Props, State> {
             renderer.selectedProductBounds = { x: nodeX, y: nodeY, width: nodeW, height: nodeH };
 
             // Update connection line position (but NOT in Hero Mode with video)
-            if (this.state.dialogPosition && !this.state.isPivotHeroMode) {
+            if (this.state.dialogPosition && !this.state.isPivotHeroMode && !this.usesHeroDock()) {
               const productCenterX = nodeX + nodeW / 2;
               const productCenterY = nodeY + nodeH / 2;
 
@@ -523,8 +534,8 @@ export default class App extends React.Component<Props, State> {
                 x: this.state.dialogPosition.x,
                 y: this.state.dialogPosition.y + 150
               };
-            } else if (this.state.isPivotHeroMode) {
-              // Clear connection line in Hero Mode
+            } else if (this.state.isPivotHeroMode || this.usesHeroDock()) {
+              // Clear connection line in Hero Mode / desktop dock
               renderer.dialogConnectionPoint = null;
               renderer.dialogPosition = null;
             }
@@ -2777,7 +2788,7 @@ export default class App extends React.Component<Props, State> {
               // V2 Dialog: Default dialog for normal zoom levels
               <ProductOverlayModal
                 product={selectedProduct}
-                heroDock={this.state.isPivotHeroMode && !this.isMobileLayout()}
+                heroDock={this.usesHeroDock()}
                 onClose={() => this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false })}
                 onPositionChange={this.handleDialogPositionChange}
                 onVariantChange={this.handleDialogVariantChange}

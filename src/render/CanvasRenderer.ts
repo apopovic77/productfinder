@@ -1075,12 +1075,21 @@ export class CanvasRenderer<T> {
     const dockShift = this.ctx.canvas.clientWidth >= 768 ? (340 + 172 + 40) / 2 : 0;
     const viewCenterX = (vp.viewportWidth / 2 - dockShift - vp.offset.x) / vp.scale;
     let nearest: LayoutNode<T> | null = null;
-    let best = Infinity;
-    for (const n of nodes) {
-      if ((n.opacity.value ?? 1) <= 0.01) continue;
-      const cx = (n.posX.value ?? 0) + (n.width.value ?? 0) / 2;
-      const d = Math.abs(cx - viewCenterX);
-      if (d < best) { best = d; nearest = n; }
+    // A selected product owns the word (pivot grid: hundreds of nodes, the
+    // one nearest the focal point would be arbitrary). Hero mode without a
+    // selection: the product in focus.
+    if (this.selectedProduct) {
+      const sel = this.selectedProduct;
+      nearest = nodes.find(n => (n.data as any)?.id === (sel as any).id) ?? null;
+    }
+    if (!nearest) {
+      let best = Infinity;
+      for (const n of nodes) {
+        if ((n.opacity.value ?? 1) <= 0.01) continue;
+        const cx = (n.posX.value ?? 0) + (n.width.value ?? 0) / 2;
+        const d = Math.abs(cx - viewCenterX);
+        if (d < best) { best = d; nearest = n; }
+      }
     }
     if (!nearest) return;
     const raw = (nearest.data as any)?.raw ?? {};
@@ -1294,7 +1303,7 @@ export class CanvasRenderer<T> {
     // product (design direction 2026-08-23, storage 120472). Drawn before
     // the products so they sit on top of it. Desktop only — on a phone the
     // product fills the width and the word would just be noise behind it.
-    if (this.isHeroMode && this.ctx.canvas.clientWidth >= 768) {
+    if ((this.isHeroMode || this.selectedProduct) && this.ctx.canvas.clientWidth >= 768) {
       this.drawHeroBackdropWord(nodes);
     }
 
@@ -1401,9 +1410,13 @@ export class CanvasRenderer<T> {
       this.ctx.scale(scale, scale);
       this.ctx.translate(-centerX, -centerY);
 
-      // Draw alternative images stacked behind (desktop only - skip on mobile)
+      // Alternative images fanned out behind the product — that was the old
+      // desktop presentation. The desktop dock (2026-08-23) shows the
+      // variants as thumbnails in the card instead; fanning them out on the
+      // stage on top of that is noise. Off on desktop; phones never had it.
       const isMobileSpread = this.ctx.canvas.clientWidth < 768;
-      if (!isMobileSpread && isSelectedProduct && this.alternativeImages && this.alternativeImages.length > 0) {
+      const fanOut = false;
+      if (fanOut && !isMobileSpread && isSelectedProduct && this.alternativeImages && this.alternativeImages.length > 0) {
         // Count loaded images
         const loadedImages = this.alternativeImages.filter(img => img.loadedImage);
         const imageCount = loadedImages.length;
@@ -1926,7 +1939,7 @@ export class CanvasRenderer<T> {
     }
 
     // Draw AI annotations on hero image (in canvas, VOR restore)
-    if (this.heroImageAnnotations && this.selectedProduct && this.viewport) {
+    if (this.heroImageAnnotations && this.selectedProduct && this.viewport && this.ctx.canvas.clientWidth < 768) {
       const node = this.getNodes().find(n => {
         const product = n.data as any as Product;
         return product && product.id === this.selectedProduct!.id;
