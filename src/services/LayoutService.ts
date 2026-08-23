@@ -221,7 +221,9 @@ export class LayoutService {
   private createHeroLayouter(): HeroLayouter<Product> {
     const desktop = typeof window !== 'undefined' && window.innerWidth >= 768;
     return new HeroLayouter<Product>({
-      spacing: 100, // Gap between products in hero mode
+      // Desktop: wide gap so the neighbour peeks in at the edge (as in the
+      // design) instead of sitting under the docked card. Phone: tight.
+      spacing: desktop ? 360 : 100,
       targetHeightRatio: 0.8,
       // Desktop: the dark product card docks on the right (340 px + 96 px
       // margin); the hero stays in the left ~58 % so it never sits under it.

@@ -569,13 +569,15 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       style={{
         position: 'fixed',
         left: heroDock ? 'auto' : isMobilePortrait ? `${(window.innerWidth - DIALOG_WIDTH) / 2}px` : `${dragPosition.x}px`,
-        right: heroDock ? '96px' : 'auto',
-        top: heroDock ? '50%' : isMobilePortrait ? 'auto' : `${dragPosition.y}px`,
+        right: heroDock ? '64px' : 'auto',
+        // Dock: anchored to the stage centre but nudged up, so the tall card
+        // (title, thumbs, sizes, CTA) never runs off the bottom edge.
+        top: heroDock ? '44%' : isMobilePortrait ? 'auto' : `${dragPosition.y}px`,
         transform: heroDock ? 'translateY(-50%)' : undefined,
         bottom: isMobilePortrait && !heroDock ? '8px' : 'auto',
         width: `${heroDock ? 340 : DIALOG_WIDTH}px`,
         boxSizing: 'border-box',
-        maxHeight: isMobilePortrait ? '48vh' : '80vh',
+        maxHeight: isMobilePortrait ? '48vh' : heroDock ? '78vh' : '80vh',
         cursor: heroDock ? 'default' : isDragging ? 'grabbing' : 'grab',
         userSelect: isDragging ? 'none' : 'auto',
         fontSize: isMobilePortrait ? '12px' : '11px',

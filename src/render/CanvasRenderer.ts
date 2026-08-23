@@ -1072,7 +1072,7 @@ export class CanvasRenderer<T> {
     const vp = this.viewport;
     // Focal point = screen centre minus the docked card's half width (see
     // ProductFinderController.heroDockShift — same constant).
-    const dockShift = this.ctx.canvas.clientWidth >= 768 ? (340 + 96 + 48) / 2 : 0;
+    const dockShift = this.ctx.canvas.clientWidth >= 768 ? (340 + 64 + 40) / 2 : 0;
     const viewCenterX = (vp.viewportWidth / 2 - dockShift - vp.offset.x) / vp.scale;
     let nearest: LayoutNode<T> | null = null;
     let best = Infinity;

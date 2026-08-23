@@ -534,7 +534,10 @@ export class ProductFinderController {
    */
   private heroDockShift(): number {
     const w = this.canvas?.clientWidth ?? 0;
-    return w >= 768 ? (340 + 96 + 48) / 2 : 0;
+    // Card column = 340 px card + 64 px outer margin + 40 px inner gap.
+    // The focal point moves left by half of that, so the product sits in
+    // the centre of what remains.
+    return w >= 768 ? (340 + 64 + 40) / 2 : 0;
   }
 
   /** World x of every hero product centre, sorted left to right. */

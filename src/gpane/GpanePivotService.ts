@@ -237,12 +237,21 @@ export class GpanePivotService {
   }
 
   getBreadcrumbs(): string[] {
+    // Group names only. "2SRS nach Design › 2SRS Helmet RUSH nach design"
+    // told the dealer which dimension the engine used — developer info that
+    // doubled the trail's width and collided with the search field
+    // (design 2026-08-23). A crumb repeats its parent as prefix when the
+    // child's label starts with it ("2SRS" › "2SRS Helmet RUSH"); strip it
+    // so the trail reads "2SRS › Helmet RUSH".
     const crumbs = ['Alle'];
+    let prev = '';
     for (const entry of this.engine.navigationStack) {
-      const dimInfo = entry.dimensionLabel
-        ? (entry.source === 'taxonomy' ? ` (${entry.dimensionLabel})` : ` nach ${entry.dimensionLabel}`)
-        : '';
-      crumbs.push(`${entry.label}${dimInfo}`);
+      let label = entry.label;
+      if (prev && label.toLowerCase().startsWith(prev.toLowerCase() + ' ')) {
+        label = label.slice(prev.length).trim();
+      }
+      crumbs.push(label);
+      prev = entry.label;
     }
     return crumbs;
   }

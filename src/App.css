@@ -2233,7 +2233,9 @@ body {
 }
 .pf-hero-counter b { color: #e3261b; font-weight: 700; }
 @media (min-width: 768px) {
-  .pf-hero-arrow { width: 56px; height: 56px; min-width: 56px; font-size: 34px; bottom: 28px; }
+  .pf-hero-arrow { width: 56px; height: 56px; min-width: 56px; font-size: 34px; bottom: 28px; z-index: 10001; /* above the docked card (10000) */ }
   .pf-hero-arrow-prev { left: 28px; }
-  .pf-hero-arrow-next { right: 28px; }
+  /* The docked card (fixed, 340 px + 64 px) owns the bottom-right corner;
+     the next-arrow sits just left of it. */
+  .pf-hero-arrow-next { right: 432px; }
 }
