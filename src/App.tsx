@@ -280,6 +280,9 @@ export default class App extends React.Component<Props, State> {
 
     // Configure controller BEFORE initialize (avoids multiple layout re-triggers)
     this.controller.productsOnGpu = this.useArcturianRenderer();
+    // Dev/diagnostics handle: lets a test or the owner inspect the live pivot
+    // engine (which dimension, which buckets) from the console. Read-only use.
+    if (typeof window !== 'undefined') (window as any).__pfController = this.controller;
     this.controller.preConfig = {
       gridConfig: this.state.devSettings.gridConfig,
       animationDuration: this.state.devSettings.animationDuration,
