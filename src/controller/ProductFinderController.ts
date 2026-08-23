@@ -61,11 +61,6 @@ export class ProductFinderController {
 
   /** GPU mode: product images come from the WebGL layer (#260). */
   productsOnGpu = false;
-
-  /** The 2D transform every input handler writes to; the GPU renderer mirrors it. */
-  getViewportTransform() {
-    return this.viewportService.getTransform();
-  }
   preConfig: {
     gridConfig?: { spacing: number; margin: number; minCellSize: number; maxCellSize: number };
     animationDuration?: number;

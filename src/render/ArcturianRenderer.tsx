@@ -145,7 +145,7 @@ function GridScene({ getNodes, getViewport, getSize }: ArcturianRendererProps) {
     // R3F re-applies left/right/top/bottom from the canvas size (centred at
     // the origin) on every size change unless the camera is marked manual —
     // which silently replaced this frustum and left the grid off-screen.
-    cam.manual = true;
+    (cam as THREE.OrthographicCamera & { manual?: boolean }).manual = true; // R3F flag, not in three's types
     const s = vp.scale || 1;
     const left = -vp.offset.x / s;
     const top = -vp.offset.y / s;
