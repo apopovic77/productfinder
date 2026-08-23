@@ -394,8 +394,27 @@ export class ViewportTransform {
     }
   };
 
+  /**
+   * Snap hook for paged views (hero mode). Given the release velocity and the
+   * world x currently at the viewport centre, returns the world x to settle
+   * on — or null to leave the viewport where the finger left it. Set by the
+   * controller while the hero layout is active, cleared otherwise.
+   */
+  public snapResolver: ((centerWorldX: number, velocityX: number) => number | null) | null = null;
+
   private applyMomentum(): void {
-    // No artificial momentum — let the interpolation handle deceleration naturally
+    // No artificial momentum — the interpolation decelerates on its own.
+    // But a paged view must not stop BETWEEN pages: without a snap the
+    // viewport came to rest wherever the finger lifted, half-way between
+    // two products, and every swipe needed a correction (owner report
+    // 2026-08-23, storage 120441).
+    if (this.snapResolver) {
+      const centerWorldX = (this.viewportWidth / 2 - this.targetOffset.x) / this.targetScale;
+      const target = this.snapResolver(centerWorldX, this.velocityX);
+      if (target !== null) {
+        this.targetOffset.x = this.viewportWidth / 2 - target * this.targetScale;
+      }
+    }
     this.velocityX = 0;
     this.velocityY = 0;
   }

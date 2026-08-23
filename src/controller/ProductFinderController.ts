@@ -301,9 +301,29 @@ export class ProductFinderController {
       const centerX = bounds.minX + bounds.width / 2;
       const centerY = bounds.minY + bounds.height / 2;
       this.viewportService.centerOn(centerX, centerY, 1);
+      // Paged swiping: on release, settle on a product centre. A flick
+      // (|velocity| above threshold) advances one product in its direction;
+      // a slow drag snaps to whichever product is nearest the centre.
+      const vt = this.viewportService.getTransform();
+      if (vt) {
+        vt.snapResolver = (centerWorldX, velocityX) => {
+          const centers = this.heroProductCenters();
+          if (centers.length === 0) return null;
+          let nearest = 0;
+          for (let i = 1; i < centers.length; i++) {
+            if (Math.abs(centers[i] - centerWorldX) < Math.abs(centers[nearest] - centerWorldX)) nearest = i;
+          }
+          const FLICK = 6; // px per frame at ~60fps; below this it is a drag, not a flick
+          // Finger moves content: positive velocity = content moved right = previous product
+          if (velocityX < -FLICK) nearest = Math.min(centers.length - 1, nearest + 1);
+          else if (velocityX > FLICK) nearest = Math.max(0, nearest - 1);
+          return centers[nearest];
+        };
+      }
     } else if (isLanesMode) {
       // Lanes mode: Fixed scale 1.0, free vertical scrolling, start at top, no zoom-out
       this.viewportService.setLockVerticalPan(false);
+      const vtl = this.viewportService.getTransform(); if (vtl) vtl.snapResolver = null;
       const vt = this.viewportService.getTransform();
       if (vt) {
         vt.minScaleOverride = 0.8;
@@ -322,6 +342,7 @@ export class ProductFinderController {
       // Pivot mode: free panning
       this.viewportService.setLockVerticalPan(false);
       const vt = this.viewportService.getTransform();
+      if (vt) vt.snapResolver = null;
       // CSS pixels — the viewport's unit. canvas.width/height is the backing
       // store: DPR-scaled under Canvas2D (1722 for an 861 px stage on a 2x
       // screen, so the start position sat half a page too low on phones)
@@ -481,6 +502,35 @@ export class ProductFinderController {
    * Zooms in so product takes 80% of screen height
    * Rubberband system automatically prevents bounds violations
    */
+  /** World x of every hero product centre, sorted left to right. */
+  private heroProductCenters(): number[] {
+    return this.layoutService.getEngine().all()
+      .filter(n => (n.opacity.targetValue ?? 1) > 0.01 && (n.width.targetValue ?? 0) > 0)
+      .map(n => (n.posX.targetValue ?? 0) + (n.width.targetValue ?? 0) / 2)
+      .sort((a, b) => a - b);
+  }
+
+  /**
+   * Hero mode: move to the previous/next product. Used by the on-screen
+   * arrows; shares the snap targets with the swipe so both agree on where
+   * "next" is.
+   */
+  stepHeroProduct(direction: -1 | 1): boolean {
+    const vt = this.viewportService.getTransform();
+    if (!vt || !this.layoutService.isPivotHeroMode()) return false;
+    const centers = this.heroProductCenters();
+    if (centers.length === 0) return false;
+    const centerWorldX = (vt.viewportWidth / 2 - vt.getTargetOffset().x) / vt.getTargetScale();
+    let nearest = 0;
+    for (let i = 1; i < centers.length; i++) {
+      if (Math.abs(centers[i] - centerWorldX) < Math.abs(centers[nearest] - centerWorldX)) nearest = i;
+    }
+    const next = Math.max(0, Math.min(centers.length - 1, nearest + direction));
+    if (next === nearest) return false;
+    vt.centerOn(centers[next], (vt.viewportHeight / 2 - vt.getTargetOffset().y) / vt.getTargetScale());
+    return true;
+  }
+
   centerOnProduct(product: Product): void {
     const viewport = this.viewportService.getTransform();
     if (!viewport) return;

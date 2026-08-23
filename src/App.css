@@ -2112,3 +2112,28 @@ body {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+/* Hero mode (phone): previous/next product arrows, bottom corners of the stage */
+.pf-hero-arrow {
+  position: absolute;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  width: 48px;
+  min-width: 48px; /* global button rules set min-width/padding; keep it round */
+  height: 48px;
+  padding: 0;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(17, 17, 17, 0.82);
+  color: #fff;
+  font-size: 30px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  z-index: 3; /* above the input canvas (2 in GPU mode) so taps reach the button */
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+.pf-hero-arrow:active { background: rgba(17, 17, 17, 1); }
+.pf-hero-arrow-prev { left: 14px; }
+.pf-hero-arrow-next { right: 14px; }

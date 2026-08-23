@@ -2253,6 +2253,17 @@ export default class App extends React.Component<Props, State> {
               headers, hover and selection. Only the product images move to
               the WebGL layer beneath, which mirrors this canvas' transform. */}
           <canvas ref={this.canvasRef} className="pf-canvas" style={this.useArcturianRenderer() ? { zIndex: 2, background: 'transparent' } : undefined} />
+          {/* Hero mode on phones: previous/next arrows. Swiping works too, but
+              a flick between bildfüllend products is easy to overshoot; the
+              arrows share the snap targets with the swipe (stepHeroProduct). */}
+          {this.state.isPivotHeroMode && window.innerWidth < 768 && (
+            <>
+              <button type="button" className="pf-hero-arrow pf-hero-arrow-prev" aria-label="Vorheriges Produkt"
+                onClick={() => this.controller.stepHeroProduct(-1)}>‹</button>
+              <button type="button" className="pf-hero-arrow pf-hero-arrow-next" aria-label="Nächstes Produkt"
+                onClick={() => this.controller.stepHeroProduct(1)}>›</button>
+            </>
+          )}
 
           {/* Navigation arrows - visible when a product is selected */}
           {selectedProduct && this.state.modalSequence.length > 1 && (
