@@ -72,6 +72,30 @@ export class GPANEEngine {
    * path is exhausted or the dimension is degenerate here (one value, or
    * a value on fewer than two products) — then scoring decides.
    */
+  /**
+   * Does this dimension split the given products into at least two groups
+   * of two or more? Shared by the grouping prescription and the dimension
+   * menu: a dimension with one bucket (e.g. "Körperteil" on helmets — always
+   * "Kopf") is not a choice, it is a no-op that costs the dealer a click.
+   */
+  splitsProducts(key: string, products: Product[]): boolean {
+    const groups = new Map<string, number>();
+    for (const prod of products) {
+      const v = getProductValue(prod, key);
+      const k = v === null || v === undefined || v === '' ? '' : String(v);
+      if (k) groups.set(k, (groups.get(k) ?? 0) + 1);
+    }
+    let real = 0;
+    for (const n of groups.values()) if (n >= 2) real++;
+    return real >= 2;
+  }
+
+  /** Dimensions that actually divide the currently visible products. */
+  get usefulDimensions(): ScoredDimension[] {
+    const products = this._getVisibleProducts();
+    return this._scoredDimensions.filter(d => this.splitsProducts(d.key, products));
+  }
+
   private _prescribedDimension(products: Product[]): ScoredDimension | null {
     const depth = this._focusStack.length;
     for (let i = depth; i < this._groupingPath.length; i++) {
@@ -83,15 +107,7 @@ export class GPANEEngine {
       // "Design" under 3SRS had two values, one of them empty (one group,
       // a wasted click), and goggles designs carried colours in their
       // names (one product per group, a list).
-      const groups = new Map<string, number>();
-      for (const prod of products) {
-        const v = getProductValue(prod, key);
-        const k = v === null || v === undefined || v === '' ? '' : String(v);
-        if (k) groups.set(k, (groups.get(k) ?? 0) + 1);
-      }
-      let real = 0;
-      for (const n of groups.values()) if (n >= 2) real++;
-      if (real < 2) continue;
+      if (!this.splitsProducts(key, products)) continue;
       return dim;
     }
     return null;

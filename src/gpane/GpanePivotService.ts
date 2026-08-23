@@ -167,15 +167,18 @@ export class GpanePivotService {
     return this.engine.scoredDimensions.map(d => d.key);
   }
 
-  getAvailableDimensions(products: Product[]): GroupDimension[] {
-    // Show ALL scored dimensions — user can manually choose any
-    return this.engine.scoredDimensions.map(d => d.key);
+  getAvailableDimensions(_products: Product[]): GroupDimension[] {
+    // Only dimensions that divide what is on screen. Owner report 2026-08-23
+    // (storage 120460): "Körperteil" was offered on 42 MX helmets and put
+    // all of them under one header, KOPF. A dimension with one column is
+    // not selectable — it is not a grouping.
+    return this.engine.usefulDimensions.map(d => d.key);
   }
 
   canUseDimension(dimension: GroupDimension): boolean {
     if (dimension === '__taxonomy__') return true;
     if (dimension === 'poster:group') return false; // not supported in GPANE
-    return this.engine.scoredDimensions.some(d => d.key === dimension);
+    return this.engine.usefulDimensions.some(d => d.key === dimension);
   }
 
   // ==========================================================================
