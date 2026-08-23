@@ -271,8 +271,16 @@ export class PivotLayouter<T> {
 
       // Calculate frame width: divide viewport among ALL groups
       const columnsForSizing = numGroups;
-      const totalGaps = this.config.frameGap * Math.max(0, columnsForSizing - 1);
       const totalPadding = this.paddingLeft + this.paddingRight;
+      // The gap between frames is a fixed px value (50 on mobile). With 12
+      // groups on an 844 px phone that is 550 px of gaps and 19 px frames —
+      // one cell per row where three fit (120523). Cap the gaps at 12 % of
+      // the width so the frames keep the space.
+      const gapCount = Math.max(0, columnsForSizing - 1);
+      const frameGap = gapCount > 0
+        ? Math.min(this.config.frameGap, ((view.width - totalPadding) * 0.12) / gapCount)
+        : this.config.frameGap;
+      const totalGaps = frameGap * gapCount;
       const availableWidth = view.width - totalGaps - totalPadding;
       const frameWidth = availableWidth / Math.max(1, columnsForSizing);
 
@@ -423,7 +431,7 @@ export class PivotLayouter<T> {
           }
         }
 
-        offsetX += frameWidth + this.config.frameGap;
+        offsetX += frameWidth + frameGap;
       }
     } else {
       // GRID LAYOUT: Original grid-based layout
