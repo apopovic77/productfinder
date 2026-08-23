@@ -534,10 +534,10 @@ export class ProductFinderController {
    */
   private heroDockShift(): number {
     const w = this.canvas?.clientWidth ?? 0;
-    // Card column = 340 px card + 64 px outer margin + 40 px inner gap.
+    // Card column = 340 px card + 172 px right (margin + badge column) + 40 px inner gap.
     // The focal point moves left by half of that, so the product sits in
     // the centre of what remains.
-    return w >= 768 ? (340 + 64 + 40) / 2 : 0;
+    return w >= 768 ? (340 + 172 + 40) / 2 : 0;
   }
 
   /** World x of every hero product centre, sorted left to right. */
@@ -553,6 +553,14 @@ export class ProductFinderController {
    * arrows; shares the snap targets with the swipe so both agree on where
    * "next" is.
    */
+  /** Hero mode: the product at position i (left to right), or null. */
+  getHeroProductAt(index: number): Product | null {
+    const nodes = this.layoutService.getEngine().all()
+      .filter(n => (n.opacity.targetValue ?? 1) > 0.01 && (n.width.targetValue ?? 0) > 0)
+      .sort((a, b) => ((a.posX.targetValue ?? 0) + (a.width.targetValue ?? 0) / 2) - ((b.posX.targetValue ?? 0) + (b.width.targetValue ?? 0) / 2));
+    return nodes[index]?.data ?? null;
+  }
+
   /** Hero mode: index of the product nearest the viewport centre (target), and count. */
   getHeroPosition(): { index: number; count: number } | null {
     const vt = this.viewportService.getTransform();

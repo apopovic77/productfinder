@@ -1072,7 +1072,7 @@ export class CanvasRenderer<T> {
     const vp = this.viewport;
     // Focal point = screen centre minus the docked card's half width (see
     // ProductFinderController.heroDockShift — same constant).
-    const dockShift = this.ctx.canvas.clientWidth >= 768 ? (340 + 64 + 40) / 2 : 0;
+    const dockShift = this.ctx.canvas.clientWidth >= 768 ? (340 + 172 + 40) / 2 : 0;
     const viewCenterX = (vp.viewportWidth / 2 - dockShift - vp.offset.x) / vp.scale;
     let nearest: LayoutNode<T> | null = null;
     let best = Infinity;
@@ -1108,8 +1108,16 @@ export class CanvasRenderer<T> {
     }
     this.ctx.textAlign = 'center';
     this.ctx.textBaseline = 'middle';
-    this.ctx.fillStyle = 'rgba(17, 17, 17, 0.06)';
-    this.ctx.fillText(word, cx, cy - h * 0.12);
+    // Fade to white towards the bottom (as in the design): the word is
+    // strongest behind the product's top and dissolves into the ground
+    // beneath it, so it never competes with the product's underside.
+    const wordY = cy - h * 0.12;
+    const grad = this.ctx.createLinearGradient(0, wordY - fontPx * 0.5, 0, wordY + fontPx * 0.45);
+    grad.addColorStop(0, 'rgba(17, 17, 17, 0.085)');
+    grad.addColorStop(0.55, 'rgba(17, 17, 17, 0.05)');
+    grad.addColorStop(1, 'rgba(17, 17, 17, 0)');
+    this.ctx.fillStyle = grad;
+    this.ctx.fillText(word, cx, wordY);
     this.ctx.restore();
   }
 

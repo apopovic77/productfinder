@@ -523,6 +523,30 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     return { series: line, model, colour: (rawProduct.color_name || '') as string };
   }, [rawProduct.product_line, rawProduct.design_group, rawProduct.color_name, product.name]);
 
+  // Hero dock badges (design 2026-08-23): only what the data really carries.
+  // Weight = the selected variant's (helmets differ by size, 2087-2117 g),
+  // falling back to the first variant with one. Size range = first to last
+  // size as the API orders them; helmets carry head circumference in
+  // brackets ("XS (53/54)" … "2XL (63/64)") -> "53-64 cm", apparel -> "S-2XL".
+  const heroBadges = useMemo(() => {
+    const out: { label: string; value: string }[] = [];
+    const w = activeVariant?.weight_grams ?? variants.find((v: any) => v.weight_grams > 0)?.weight_grams;
+    if (w > 0) out.push({ label: 'Gewicht', value: `${Math.round(w)} g` });
+    const sizes: string[] = variants.map((v: any) => v.size).filter((x: any) => typeof x === 'string' && x.trim());
+    if (sizes.length >= 2) {
+      const first = sizes[0], last = sizes[sizes.length - 1];
+      const cm = (t: string) => t.match(/\((\d+)\s*\/\s*(\d+)\)/);
+      const a = cm(first), b = cm(last);
+      out.push({
+        label: 'Größen',
+        value: a && b ? `${a[1]}–${b[2]} cm` : `${first.replace(/\s*\(.*$/, '')}–${last.replace(/\s*\(.*$/, '')}`,
+      });
+    } else if (sizes.length === 1) {
+      out.push({ label: 'Größe', value: sizes[0] });
+    }
+    return out;
+  }, [activeVariant?.weight_grams, variants]);
+
   // Icon mapping
   const getFeatureIcon = (icon: ParsedFeature['icon']) => {
     const iconMap = {
@@ -569,7 +593,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       style={{
         position: 'fixed',
         left: heroDock ? 'auto' : isMobilePortrait ? `${(window.innerWidth - DIALOG_WIDTH) / 2}px` : `${dragPosition.x}px`,
-        right: heroDock ? '64px' : 'auto',
+        right: heroDock ? '172px' : 'auto', // 64 margin + 96 badge column + 12 gap
         // Dock: pinned to the bottom edge with a margin, growing upward. A
         // percentage anchor looked right at 900 px and put ADD TO CART below
         // the fold at 800 px (measured: button bottom 814 of 800).
@@ -835,6 +859,17 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
           <div className="pom-material-item">{activeVariant.description_short}</div>
         )}
       </div>
+
+      {heroDock && heroBadges.length > 0 && (
+        <aside className="pom-hero-badges" aria-label="Produktdaten">
+          {heroBadges.map(b => (
+            <div key={b.label} className="pom-hero-badge">
+              <span className="pom-hero-badge-label">{b.label}</span>
+              <span className="pom-hero-badge-value">{b.value}</span>
+            </div>
+          ))}
+        </aside>
+      )}
 
       {/* Buttons - hidden on mobile portrait (moved to top right) */}
       {!isMobilePortrait && (

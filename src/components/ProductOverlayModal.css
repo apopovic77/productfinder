@@ -500,6 +500,11 @@
 
 /* ---- Desktop hero dock (design 2026-08-23): dark card, right of the stage ---- */
 .pom-info-panel.pom-hero-dock {
+  /* Slight 3D: the card turns a few degrees toward the product, like a
+     panel standing on the stage (design 2026-08-23). transform-origin on
+     the left edge keeps the right edge (badges) where it is. */
+  transform: perspective(1400px) rotateY(-7deg) !important;
+  transform-origin: 0% 50%;
   background: rgba(20, 20, 22, 0.92);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
@@ -527,3 +532,26 @@
 .pom-hero-dock div, .pom-hero-dock span, .pom-hero-dock label { color: inherit; }
 .pom-hero-dock [style*="rgba(0, 0, 0"] { color: rgba(255, 255, 255, 0.65) !important; }
 .pom-hero-dock [style*="color: #1a1a1a"], .pom-hero-dock [style*="color:#1a1a1a"] { color: #fff !important; }
+
+/* Hero dock badges: a stacked column hanging off the card's right edge */
+.pom-hero-badges {
+  position: absolute;
+  left: calc(100% + 12px);
+  top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 96px;
+}
+.pom-hero-badge {
+  background: rgba(20, 20, 22, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 10px 8px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pom-hero-badge-label { font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255, 255, 255, 0.5) !important; font-weight: 700; }
+.pom-hero-badge-value { font-family: 'ITC Avant Garde Gothic Condensed', 'ITC Avant Garde Gothic', sans-serif; font-size: 17px; font-weight: 700; color: #fff !important; font-variant-numeric: tabular-nums; white-space: nowrap; }

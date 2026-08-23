@@ -1007,6 +1007,10 @@ export default class App extends React.Component<Props, State> {
         } else if (fpsChanged) {
           this.setState({ fps });
         }
+        // Desktop hero dock: the card belongs to the product in focus. When a
+        // swipe, arrow or dot moves the focus, the open card follows — else
+        // it kept showing "BLACK / PINK" next to the orange helmet.
+        if (heroChanged) this.syncHeroCardToFocus();
 
         this.fpsFrameCount = 0;
         this.fpsLastSample = now;
@@ -1382,6 +1386,21 @@ export default class App extends React.Component<Props, State> {
     const nextProduct = filteredProducts.find(p => p.id === nextId) || this.controller.getDisplayOrder().find(p => p.id === nextId);
     if (!nextProduct) return;
     this.setState({ selectedProduct: nextProduct, selectedIndex: nextIndex, modalDirection: Math.sign(delta) });
+  };
+
+  /**
+   * Desktop hero dock: keep the open card on the product in focus. Called
+   * after every focus move (arrow, dot, swipe via the FPS tick). Silently
+   * does nothing when no card is open or the focus did not change.
+   */
+  private syncHeroCardToFocus = () => {
+    if (this.isMobileLayout() || !this.state.isPivotHeroMode || !this.state.selectedProduct) return;
+    const hp = this.controller.getHeroPosition();
+    if (!hp) return;
+    const focused = this.controller.getHeroProductAt(hp.index);
+    if (focused && focused.id !== this.state.selectedProduct.id) {
+      this.setState({ selectedProduct: focused, selectedVariant: null, heroPosition: hp });
+    }
   };
 
   private openProductDetails(product: Product, options: { pushHistory?: boolean } = {}) {
@@ -2317,16 +2336,37 @@ export default class App extends React.Component<Props, State> {
           {this.state.isPivotHeroMode && (
             <>
               <button type="button" className="pf-hero-arrow pf-hero-arrow-prev" aria-label="Vorheriges Produkt"
-                onClick={() => { this.controller.stepHeroProduct(-1); this.setState({ heroPosition: this.controller.getHeroPosition() }); }}>‹</button>
+                onClick={() => { this.controller.stepHeroProduct(-1); this.setState({ heroPosition: this.controller.getHeroPosition() }, this.syncHeroCardToFocus); }}>‹</button>
               <button type="button" className="pf-hero-arrow pf-hero-arrow-next" aria-label="Nächstes Produkt"
-                onClick={() => { this.controller.stepHeroProduct(1); this.setState({ heroPosition: this.controller.getHeroPosition() }); }}>›</button>
+                onClick={() => { this.controller.stepHeroProduct(1); this.setState({ heroPosition: this.controller.getHeroPosition() }, this.syncHeroCardToFocus); }}>›</button>
               {/* "01 / 04" — position within the hero row, desktop only; the
                   phone has no room below the product for it. */}
               {!this.isMobileLayout() && this.state.heroPosition && (
-                <div className="pf-hero-counter" aria-live="polite">
-                  <b>{String(this.state.heroPosition.index + 1).padStart(2, '0')}</b>
-                  <span> / {String(this.state.heroPosition.count).padStart(2, '0')}</span>
-                </div>
+                <>
+                  {/* Footer as in the design reference (storage 120473): the
+                      counter bottom-left under the arrow, the dots centred. */}
+                  <div className="pf-hero-counter" aria-live="polite">
+                    <b>{String(this.state.heroPosition.index + 1).padStart(2, '0')}</b>
+                    <span> / {String(this.state.heroPosition.count).padStart(2, '0')}</span>
+                  </div>
+                  {this.state.heroPosition.count > 1 && this.state.heroPosition.count <= 12 && (
+                    <div className="pf-hero-dots" aria-hidden="true">
+                      {Array.from({ length: this.state.heroPosition.count }, (_, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          className={`pf-hero-dot ${i === this.state.heroPosition!.index ? 'active' : ''}`}
+                          onClick={() => {
+                            const cur = this.state.heroPosition!.index;
+                            const steps = i - cur;
+                            for (let k = 0; k < Math.abs(steps); k++) this.controller.stepHeroProduct(steps > 0 ? 1 : -1);
+                            this.setState({ heroPosition: this.controller.getHeroPosition() }, this.syncHeroCardToFocus);
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </>
           )}

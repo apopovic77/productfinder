@@ -2217,12 +2217,12 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Hero mode (desktop): "01 / 04" position, bottom centre, next to the dots */
+/* Hero mode (desktop) footer, as in the design reference: counter
+   bottom-left beneath the arrow, dots centred. */
 .pf-hero-counter {
   position: absolute;
-  left: 50%;
-  bottom: max(22px, env(safe-area-inset-bottom));
-  transform: translateX(-50%);
+  left: 32px;
+  bottom: 22px;
   z-index: 3;
   font-family: 'ITC Avant Garde Gothic', system-ui, sans-serif;
   font-size: 14px;
@@ -2234,8 +2234,32 @@ body {
 .pf-hero-counter b { color: #e3261b; font-weight: 700; }
 @media (min-width: 768px) {
   .pf-hero-arrow { width: 56px; height: 56px; min-width: 56px; font-size: 34px; bottom: 28px; z-index: 10001; /* above the docked card (10000) */ }
+  .pf-hero-counter { bottom: 22px; left: 32px; }
+  .pf-hero-arrow { bottom: 64px; } /* above the counter/dots row, as in the reference */
   .pf-hero-arrow-prev { left: 28px; }
-  /* The docked card (fixed, 340 px + 64 px) owns the bottom-right corner;
-     the next-arrow sits just left of it. */
-  .pf-hero-arrow-next { right: 432px; }
+  /* Both arrows at the outer page edges (design 2026-08-23). The docked
+     card ends 88 px above the bottom, the arrows sit in that strip. */
+  .pf-hero-arrow-next { right: 28px; }
 }
+
+.pf-hero-dots {
+  position: absolute;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  z-index: 3;
+}
+.pf-hero-dot {
+  width: 9px;
+  height: 9px;
+  min-width: 9px;
+  padding: 0;
+  border-radius: 50%;
+  border: none;
+  background: rgba(17, 17, 17, 0.22);
+  cursor: pointer;
+}
+.pf-hero-dot.active { background: #e3261b; }
+.pf-hero-dot:focus-visible { outline: 2px solid #e3261b; outline-offset: 3px; }
