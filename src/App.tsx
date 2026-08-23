@@ -1165,7 +1165,9 @@ export default class App extends React.Component<Props, State> {
     this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false });
     if (this.isMobileLayout()) {
       const vt = this.controller.getViewportTransform();
-      vt?.reset();
+      // Scale 1 = the grid's own CSS-pixel layout; the clamp centres a
+      // short grid and top-aligns a long one.
+      vt?.setPosition(0, 0, 1);
     }
   };
 

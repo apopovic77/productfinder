@@ -100,34 +100,29 @@ export class HeroLayouter<T> implements ILayouter<T> {
   /** Full-page grid for narrow viewports: pick the column count whose cells
    *  best fill the page, centre the block. */
   private computePhoneGrid(nodes: LayoutNode<T>[], view: { width: number; height: number }): void {
-    const gap = 10;
-    const pad = 14;
+    const gap = 12;
+    const pad = 16;
+    // Room under every tile for its caption (name + price). Without it the
+    // next row's helmets sat ON the text (owner 2026-08-23, 120530).
+    const captionH = 48;
     const n = nodes.length;
     const cellAspect = 0.8; // product tiles slightly taller than wide
-    // Smallest column count whose rows fit the page height — that yields the
-    // biggest cells WITHOUT vertical overflow. Fallback: 4 columns, shrunk.
-    let cols = Math.min(n, 4);
-    let cellW = 0;
-    for (let c = 1; c <= Math.min(n, 4); c++) {
-      const rows = Math.ceil(n / c);
-      const wCell = (view.width - pad * 2 - (c - 1) * gap) / c;
-      const totalH = rows * (wCell / cellAspect) + (rows - 1) * gap;
-      if (totalH <= view.height - pad * 2) { cols = c; cellW = wCell; break; }
-    }
-    if (!cellW) {
-      const rows = Math.ceil(n / cols);
-      cellW = Math.min(
-        (view.width - pad * 2 - (cols - 1) * gap) / cols,
-        ((view.height - pad * 2 - (rows - 1) * gap) / rows) * cellAspect,
-      );
-    }
-    cellW = Math.max(40, cellW);
+    // 1 or 2 products get one roomy row; everything else is a 2-column
+    // grid that scrolls vertically when it outgrows the page. Cramming 17
+    // helmets onto one screen made 84 px thumbnails (120530).
+    const cols = Math.min(n, 2);
+    const cellW = (view.width - pad * 2 - (cols - 1) * gap) / cols;
     const cellH = cellW / cellAspect;
+    const rowStep = cellH + captionH + gap;
     const rows = Math.ceil(n / cols);
     const gridW = cols * cellW + (cols - 1) * gap;
-    const gridH = rows * cellH + (rows - 1) * gap;
+    const gridH = rows * rowStep - gap;
     const startX = Math.max(pad, (view.width - gridW) / 2);
-    const startY = Math.max(pad, (view.height - gridH) / 2);
+    // Centre vertically only when everything fits; otherwise start at the
+    // top and let the user scroll.
+    const startY = gridH + pad * 2 <= view.height
+      ? Math.max(pad, (view.height - gridH) / 2)
+      : pad;
     for (let i = 0; i < n; i++) {
       const node = nodes[i];
       const col = i % cols;
@@ -138,7 +133,7 @@ export class HeroLayouter<T> implements ILayouter<T> {
       const rowOffset = inLastRow && lastRowCount < cols
         ? ((cols - lastRowCount) * (cellW + gap)) / 2 : 0;
       node.posX.targetValue = startX + rowOffset + col * (cellW + gap);
-      node.posY.targetValue = startY + row * (cellH + gap);
+      node.posY.targetValue = startY + row * rowStep;
       node.width.targetValue = cellW;
       node.height.targetValue = cellH;
       node.scale.targetValue = 1;

@@ -908,7 +908,10 @@ export class LayoutService {
     }
 
     // Hero Mode: Also extend vertical bounds to allow vertical centering when zoomed out
-    if (viewportHeight && minY !== Infinity && maxY !== -Infinity) {
+    // (desktop hero row only — for the phone leaf grid this REPLACED the
+    // 4700 px pannable range with the middle screenful: the view started
+    // mid-grid and the rest was unreachable, 120530)
+    if (viewportHeight && minY !== Infinity && maxY !== -Infinity && !phoneGrid) {
       // Calculate current content vertical center
       const contentHeight = maxY - minY;
       const contentCenterY = minY + contentHeight / 2;

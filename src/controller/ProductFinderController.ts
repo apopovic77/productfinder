@@ -321,7 +321,14 @@ export class ProductFinderController {
       // free vertical pan, no paged snapping.
       this.viewportService.setLockVerticalPan(false);
       const vtp = this.viewportService.getTransform();
-      if (vtp) { vtp.snapResolver = null; vtp.reset(); }
+      if (vtp) {
+        vtp.snapResolver = null;
+        // The grid is laid out in CSS pixels for this viewport — scale 1,
+        // start at the top. reset() would apply the fit-to-content scale
+        // and shrink a long grid back into one screen.
+        vtp.setPosition(0, 0, 1);
+        setTimeout(() => { this.updateContentBounds(); vtp.setPosition(0, 0, 1); }, 350);
+      }
     } else if (isHeroMode) {
       // Hero mode: Horizontal-only scrolling, scale 1.0 (no zoom)
       this.viewportService.setLockVerticalPan(true);
@@ -874,9 +881,11 @@ export class ProductFinderController {
   private syncProductLabels(isHero: boolean): void {
     if (!this.renderer || this.layoutService.getMode() === 'lanes') return;
     if (isHero) {
+      // Phone: the category line is noise on a leaf that is all one type.
+      const phone = (this.canvas?.clientWidth ?? 0) < 768;
       this.renderer.productLabels.update({
         enabled: true,
-        fields: ['category', 'name', 'price'],
+        fields: phone ? ['name', 'price'] : ['category', 'name', 'price'],
         position: 'below',
         nameColor: 'rgba(0, 0, 0, 0.85)',
         detailColor: 'rgba(0, 0, 0, 0.45)',
