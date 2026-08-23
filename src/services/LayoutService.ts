@@ -888,7 +888,10 @@ export class LayoutService {
     }
 
     // Hero Mode: Extend bounds to allow first/last product center to reach viewport center
-    if (viewportWidth && firstProduct && lastProduct) {
+    // (desktop hero row only — the phone leaf shows a fitted grid and the
+    // extension would zoom the fit far out)
+    const phoneGrid = typeof window !== 'undefined' && window.innerWidth < 768;
+    if (viewportWidth && firstProduct && lastProduct && !phoneGrid) {
       // Horizontal extension: To center first product: its center must be at viewportWidth/2
       // This requires: minX = firstProductCenter - viewportWidth/2
       const firstProductCenter = firstProduct.x + firstProduct.w / 2;

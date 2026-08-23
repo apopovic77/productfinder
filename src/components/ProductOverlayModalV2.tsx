@@ -650,11 +650,12 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         bottom: heroSheet ? '8px' : heroDock ? '88px' : isMobilePortrait ? '8px' : 'auto',
         width: heroSheet ? 'auto' : `${heroDock ? 340 : DIALOG_WIDTH}px`,
         boxSizing: 'border-box',
-        maxHeight: isMobilePortrait ? '48vh' : heroDock ? 'calc(100vh - 150px)' : '80vh',
+        height: heroSheet ? '50vh' : undefined,
+        maxHeight: heroSheet ? '50vh' : isMobilePortrait ? '48vh' : heroDock ? 'calc(100vh - 150px)' : '80vh',
         cursor: heroDock ? 'default' : isDragging ? 'grabbing' : 'grab',
         userSelect: isDragging ? 'none' : 'auto',
         fontSize: isMobilePortrait ? '12px' : '11px',
-        overflowY: isMobilePortrait ? 'auto' : 'visible',
+        overflowY: heroSheet ? 'hidden' : isMobilePortrait ? 'auto' : 'visible',
       }}
       initial={{ opacity: 0, x: 50 }}
       animate={{ opacity: 1, x: 0 }}

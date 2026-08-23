@@ -560,11 +560,37 @@
 .pom-info-panel.pom-hero-dock.pom-hero-sheet {
   transform: none !important;
   border-radius: 18px;
-  padding: 16px 16px 14px;
-  gap: 10px;
+  padding: 14px 16px 12px;
+  /* Two-column grid — the sheet must never scroll (owner 2026-08-23,
+     120527: the right half was empty grey while ADD TO CART sat below the
+     fold). Row-wise auto flow pairs the stacked blocks side by side. */
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 14px;
+  align-content: start;
+  overflow: hidden;
 }
-.pom-hero-sheet .pom-hero-model { font-size: 34px; }
-.pom-hero-sheet .pom-price { font-size: 22px; }
+.pom-hero-sheet > * { min-width: 0; }
+.pom-hero-sheet .pom-actions {
+  grid-column: 1 / -1;
+  align-self: end;
+  margin-top: 2px;
+}
+/* The floating close button must not sit on the second column's content. */
+.pom-hero-sheet .pom-close { background: rgba(60, 60, 64, 0.9); }
+/* Empty blocks must not occupy grid cells. */
+.pom-hero-sheet > *:empty { display: none; }
+/* One primary action is enough — the X closes. */
+.pom-hero-sheet .pom-actions .pom-button:not(.pom-button-primary) { display: none; }
+.pom-hero-sheet .pom-title-hero { padding-right: 34px; }
+/* Sheet: the colour line and the badges duplicate the chip blocks below —
+   drop them, the sheet has to fit 50vh without scrolling. */
+.pom-hero-sheet .pom-hero-colour { display: none; }
+.pom-hero-sheet .pom-hero-badges { display: none; }
+.pom-hero-sheet .pom-material { display: none; }
+.pom-hero-sheet .pom-thumbs img, .pom-hero-sheet button > img { width: 40px !important; height: 40px !important; }
+.pom-hero-sheet .pom-hero-model { font-size: 22px; }
+.pom-hero-sheet .pom-price { font-size: 20px; }
 .pom-hero-sheet .pom-hero-badges {
   position: static;
   flex-direction: row;

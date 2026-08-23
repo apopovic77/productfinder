@@ -1156,6 +1156,19 @@ export default class App extends React.Component<Props, State> {
    * own). Drilled in → the category crumb returns to the category's
    * overview; at the root → it opens the category selection.
    */
+  /**
+   * Closing the card: on the phone the tap had zoomed the product into the
+   * band above the sheet — zoom back out to the fitted overview, else the
+   * stage stayed stuck at the top with a white gap below (120528).
+   */
+  private handleProductDialogClose = () => {
+    this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false });
+    if (this.isMobileLayout()) {
+      const vt = this.controller.getViewportTransform();
+      vt?.reset();
+    }
+  };
+
   private handleCategoryCrumbClick = () => {
     if (this.state.pivotBreadcrumbs.length > 1) this.handleBreadcrumbClick(0);
     else this.props.onRequestCategorySelection();
@@ -2448,7 +2461,7 @@ export default class App extends React.Component<Props, State> {
           {/* Hero mode on phones: previous/next arrows. Swiping works too, but
               a flick between bildfüllend products is easy to overshoot; the
               arrows share the snap targets with the swipe (stepHeroProduct). */}
-          {this.state.isPivotHeroMode && (
+          {this.state.isPivotHeroMode && (!this.isMobileLayout() || this.state.selectedProduct) && (
             <>
               <button type="button" className="pf-hero-arrow pf-hero-arrow-prev" aria-label="Vorheriges Produkt"
                 onClick={() => { this.controller.stepHeroProduct(-1); this.setState({ heroPosition: this.controller.getHeroPosition() }, this.syncHeroCardToFocus); }}>‹</button>
@@ -2860,12 +2873,12 @@ export default class App extends React.Component<Props, State> {
                   storageId={videoStorageId}
                   imageQuery={heroImageQuery}
                   backdropOpacity={1}
-                  onClose={() => this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false })}
+                  onClose={this.handleProductDialogClose}
                 >
                   <ProductOverlayModalV4
                     locale={this.props.locale}
                     product={selectedProduct}
-                    onClose={() => this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false })}
+                    onClose={this.handleProductDialogClose}
                     onPositionChange={this.handleDialogPositionChange}
                     onVariantChange={this.handleDialogVariantChange}
                     onBuy={this.handleProductBuy}
@@ -2876,7 +2889,7 @@ export default class App extends React.Component<Props, State> {
               <ProductOverlayModal
                 product={selectedProduct}
                 heroDock={this.usesHeroDock() || this.isMobileLayout()}
-                onClose={() => this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false })}
+                onClose={this.handleProductDialogClose}
                 onPositionChange={this.handleDialogPositionChange}
                 onVariantChange={this.handleDialogVariantChange}
                 onImageSelect={this.handleDialogImageSelect}

@@ -268,6 +268,19 @@ export class ProductFinderController {
       return;
     }
 
+    // Phone, card open: the sheet covers the lower half and the product is
+    // centred in the band ABOVE it. Content smaller than the viewport gets
+    // hard-centred by the clamp, which shoved the product back under the
+    // sheet — extend the vertical bounds so the focal point is reachable.
+    if ((this.canvas?.clientWidth ?? 0) < 768 && this.renderer?.selectedProduct) {
+      const vt = this.viewportService.getTransform();
+      const sc = Math.max(0.05, vt?.getTargetScale() ?? 1);
+      const ext = (this.canvas?.clientHeight ?? 600) / sc;
+      bounds.minY -= ext;
+      bounds.maxY += ext;
+      (bounds as any).height = bounds.maxY - bounds.minY;
+    }
+
     // Set content bounds on viewport
     this.viewportService.setContentBounds(bounds);
 
@@ -302,7 +315,14 @@ export class ProductFinderController {
 
     const isLanesMode = this.layoutService.getMode() === 'lanes';
 
-    if (isHeroMode) {
+    const isPhone = (this.canvas?.clientWidth ?? 0) < 768;
+    if (isHeroMode && isPhone) {
+      // Phone leaf grid (HeroLayouter.computePhoneGrid): plain fitted view,
+      // free vertical pan, no paged snapping.
+      this.viewportService.setLockVerticalPan(false);
+      const vtp = this.viewportService.getTransform();
+      if (vtp) { vtp.snapResolver = null; vtp.reset(); }
+    } else if (isHeroMode) {
       // Hero mode: Horizontal-only scrolling, scale 1.0 (no zoom)
       this.viewportService.setLockVerticalPan(true);
       // Start on the FIRST product, not the middle of the row. Centring the
@@ -634,7 +654,7 @@ export class ProductFinderController {
     // header (120518). Fit into the free band, centre it there.
     let focusY = centerY;
     if (isMobile && h > 0 && w > 0) {
-      const sheetH = (typeof window !== 'undefined' ? window.innerHeight : screenHeight) * 0.48 + 8;
+      const sheetH = (typeof window !== 'undefined' ? window.innerHeight : screenHeight) * 0.52 + 8;
       const freeH = Math.max(120, screenHeight - sheetH);
       targetScale = Math.min((freeH * 0.82) / h, (screenWidth * 0.84) / w);
       // World point that must land on the screen centre so that the product
