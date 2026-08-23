@@ -2002,10 +2002,11 @@ export default class App extends React.Component<Props, State> {
           </div>
           <div className="pf-header-search">
             <div className="pf-header-search-inner">
+              <svg className="pf-header-search-icon" aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
               <input
                 type="text"
                 className="pf-header-search-input"
-                placeholder="Search visible products..."
+                placeholder="Search products…"
                 value={footerSearchTerm}
                 onChange={(e) => this.handleFooterSearchChange(e.target.value)}
                 onKeyDown={this.handleFooterSearchKeyDown}
@@ -2048,7 +2049,6 @@ export default class App extends React.Component<Props, State> {
             {(layoutMode === 'pivot' || layoutMode === 'lanes') && (
               <>
                 <div className="pf-header-select-group">
-                  <span className="pf-header-control-label">Dimension</span>
                   <CustomSelect
                     className="pf-header-select pf-header-dimension-select"
                     value={pivotDimension}
@@ -2066,7 +2066,6 @@ export default class App extends React.Component<Props, State> {
                   />
                 </div>
                 <div className="pf-header-select-group">
-                  <span className="pf-header-control-label">Sort</span>
                   <CustomSelect
                     className="pf-header-select pf-header-sort-select"
                     value={sortMode}
@@ -2078,7 +2077,8 @@ export default class App extends React.Component<Props, State> {
                       shouldShowV4Dialog: false,
                     })}
                     options={[
-                      { value: 'none', label: 'None' },
+                      // Without the "SORT" caption the field must name itself
+                      { value: 'none', label: 'Sort' },
                       { value: 'name-asc', label: 'Name ↑' },
                       { value: 'name-desc', label: 'Name ↓' },
                       { value: 'price-asc', label: 'Price ↑' },
@@ -2101,7 +2101,11 @@ export default class App extends React.Component<Props, State> {
               }}
               title={this.controller.isFamilyGrouped() ? 'Grouped by product family' : 'Showing all color variants'}
             >
-              {this.controller.isFamilyGrouped() ? 'Grouped' : 'All Colors'}
+              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                {this.controller.isFamilyGrouped()
+                  ? <><rect x="3" y="3" width="18" height="18" rx="3"/></>
+                  : <><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></>}
+              </svg>
             </button>
             <button
               type="button"
@@ -2114,7 +2118,11 @@ export default class App extends React.Component<Props, State> {
               }}
               title={this.controller.getLayoutMode() === 'lanes' ? 'Lane view (shop style)' : 'Pivot view'}
             >
-              {this.controller.getLayoutMode() === 'lanes' ? 'Lanes' : 'Pivot'}
+              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                {this.controller.getLayoutMode() === 'lanes'
+                  ? <><path d="M4 7h16M4 12h16M4 17h16"/></>
+                  : <><path d="M5 20V9M12 20V4M19 20v-7"/><path d="M3 20h18"/></>}
+              </svg>
             </button>
             {/* Desktop: the right pane is gone (owner, 2026-08-23 — it only took
                 space; back is the breadcrumb, dimension/sort already live here).

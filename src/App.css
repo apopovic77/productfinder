@@ -220,8 +220,11 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 38px;
-  padding: 0 32px;
+  /* One calm 56 px row (design reference 2026-08-23, storage 120474):
+     small uppercase trail, pill search, two quiet dropdowns, orange
+     Ask AI pill, cart icon. Nothing underlined, nothing boxed twice. */
+  min-height: 56px;
+  padding: 0 28px;
   background: #000000;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   z-index: 100;
@@ -306,15 +309,19 @@ body {
 }
 
 .pf-header-select .custom-select-trigger {
-  min-height: 28px;
-  padding: 3px 7px 3px 9px;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: 5px;
-  background: rgba(255, 255, 255, 0.1);
+  min-height: 34px;
+  padding: 0 6px 0 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
   color: rgba(255, 255, 255, 0.9);
-  font-size: 11px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   line-height: 1;
 }
+.pf-header-select .custom-select-trigger:hover { background: rgba(255, 255, 255, 0.08); }
 
 .pf-header-select .custom-select-trigger:hover {
   background: rgba(255, 255, 255, 0.18);
@@ -357,36 +364,38 @@ body {
 }
 
 .pf-header-breadcrumb {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 1);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.62);
   cursor: pointer;
-  white-space: nowrap; /* "Catalog 2027" wrapped to two lines once the header filled up */
-  padding: 2px 6px;
+  white-space: nowrap;
+  padding: 4px 4px;
   border-radius: 4px;
-  transition: all 0.2s ease;
-  text-decoration: underline;
+  transition: color 0.15s ease;
+  text-decoration: none;
 }
 
 .pf-header-breadcrumb:hover:not(.active) {
   color: rgba(255, 255, 255, 1);
-  background: rgba(255, 255, 255, 0.1);
 }
 
+/* Only the current crumb is full white; the brand is no longer orange —
+   the reference highlights position, not identity. */
 .pf-header-breadcrumb.active {
   color: rgba(255, 255, 255, 1);
   cursor: default;
-  text-decoration: none;
 }
 
 .pf-header-breadcrumb.home,
 .pf-header-breadcrumb.home.active {
   cursor: pointer;
-  text-decoration: underline;
 }
 
 .pf-header-breadcrumb-sep {
-  color: rgba(255, 255, 255, 0.3);
-  font-size: 12px;
+  color: rgba(255, 255, 255, 0.28);
+  font-size: 11px;
   user-select: none;
 }
 
@@ -1004,7 +1013,7 @@ body {
   min-width: 160px; /* two more header buttons since the side pane went; keep the field usable */
   max-width: 300px;
 }
-.pf-header-search { margin: 0 12px; min-width: 0; }
+.pf-header-search { margin: 0 28px 0 12px; min-width: 0; }
 
 .pf-header-search-input {
   width: 100%;
@@ -2140,8 +2149,8 @@ body {
 }
 .pf-brand-breadcrumb {
   flex: 0 0 auto;
-  color: #e63312;
-  font-weight: 800;
+  /* was brand orange; the reference highlights the current crumb, not the brand */
+  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -2183,11 +2192,11 @@ body {
 
 /* Header buttons that replaced the desktop side pane (Ask AI, cart) */
 .pf-header-btn {
-  height: 34px;
-  padding: 0 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  background: rgba(255, 255, 255, 0.08);
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
   color: #fff;
   font: inherit;
   font-size: 13px;
@@ -2200,9 +2209,11 @@ body {
 }
 .pf-header-btn:hover { background: rgba(255, 255, 255, 0.16); }
 .pf-header-btn:focus-visible { outline: 2px solid #ff7a45; outline-offset: 2px; }
-.pf-header-ai-btn { color: #ffb27a; border-color: rgba(255, 178, 122, 0.45); }
-.pf-header-cart-btn { position: relative; padding: 0 10px; }
-.pf-header-cart-btn.has-items { border-color: #fff; }
+.pf-header-ai-btn { background: #ff5a1f; color: #fff; font-weight: 700; }
+.pf-header-ai-btn:hover { background: #ff6f3c; }
+.pf-header-cart-btn { position: relative; padding: 0 8px; }
+.pf-header-cart-btn svg { width: 20px; height: 20px; }
+.pf-header-cart-btn.has-items { color: #fff; }
 .pf-header-cart-count {
   min-width: 18px;
   height: 18px;
@@ -2263,3 +2274,37 @@ body {
 }
 .pf-hero-dot.active { background: #e3261b; }
 .pf-hero-dot:focus-visible { outline: 2px solid #e3261b; outline-offset: 3px; }
+
+/* Header search: pill with a magnifier, light on black (reference 120474) */
+.pf-header-search-inner { position: relative; }
+.pf-header-search-icon {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(255, 255, 255, 0.55);
+  pointer-events: none;
+}
+.pf-header-search-input {
+  padding: 9px 36px 9px 16px;
+  /* width:100% + 52 px padding overflowed the 300 px pill by 54 px and sat
+     on top of the magnifier (measured: input 354 wide in a 300 container) */
+  box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 13px;
+}
+.pf-header-search-icon { z-index: 1; }
+.pf-header-search-input:focus { outline: none; border-color: rgba(255, 255, 255, 0.4); background: rgba(255, 255, 255, 0.14); }
+
+/* View toggles as quiet icon buttons; an active state is a filled pill */
+.pf-header-actions > .pf-header-btn:not(.pf-header-ai-btn):not(.pf-header-cart-btn) {
+  width: 36px;
+  padding: 0;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.75);
+}
+.pf-header-actions > .pf-header-btn.active { background: rgba(255, 255, 255, 0.14); color: #fff; }
+.pf-header-actions { gap: 4px; }
+.pf-header-select-group + .pf-header-select-group { margin-left: 2px; }
+.pf-header-ai-btn { margin-left: 8px; }
