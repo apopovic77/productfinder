@@ -2643,6 +2643,7 @@ export default class App extends React.Component<Props, State> {
                   onClose={() => this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false })}
                 >
                   <ProductOverlayModalV4
+                    locale={this.props.locale}
                     product={selectedProduct}
                     onClose={() => this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false })}
                     onPositionChange={this.handleDialogPositionChange}

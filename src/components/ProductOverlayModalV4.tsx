@@ -26,6 +26,8 @@ const getStorageMediaUrl = (storageId: number, params: Record<string, string | n
 type Props = {
   product: Product;
   onClose: () => void;
+  /** Catalog language chosen on the landing page; picks the description text. */
+  locale?: string;
   position?: { x: number; y: number };
   onPositionChange?: (position: { x: number; y: number }) => void;
   onVariantChange?: (variant: any) => void;
@@ -52,7 +54,7 @@ type ColorOption = {
  * Layout: Product image LEFT | Product info RIGHT
  * Light glassmorphism theme with blur background
  */
-export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onBuy }) => {
+export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, locale, position, onPositionChange, onVariantChange, onBuy }) => {
   const isMobile = window.innerWidth <= 768;
   const DIALOG_WIDTH = isMobile ? window.innerWidth : 1100;
 
@@ -681,17 +683,36 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, posit
         {(() => {
           const activeRaw = (activeProduct as any)?.raw || {};
           const materialFromVariant = activeVariant?.material;
-          const descriptions = activeRaw?.descriptions || [];
-          // Language 6 = German, 26 = English
-          const descDE = descriptions.find((d: any) => d.language_id === 6);
-          const descEN = descriptions.find((d: any) => d.language_id === 26);
-          const materialText = materialFromVariant || descDE?.material || descEN?.material;
-          const descText = descDE?.short_text || descEN?.short_text || activeVariant?.description_short;
+          const descriptions: any[] = activeRaw?.descriptions || [];
+          // LIUS language ids (listSprache): the catalog locale picks the
+          // text, English is the fallback -- coverage per language ranges
+          // from 21 % (cs) to 89 % (en), so an empty slot is common.
+          const LIUS_LANG: Record<string, number> = { de: 6, fr: 20, it: 22, es: 23, en: 26, pl: 31, cs: 45 };
+          const wanted = LIUS_LANG[(locale || 'en').toLowerCase()] ?? 26;
+          const pick = (id: number) => descriptions.find((d: any) => d.language_id === id);
+          const descLocale = pick(wanted);
+          const descEN = pick(26);
+          const descDE = pick(6);
+          const materialText = materialFromVariant || descLocale?.material || descEN?.material || descDE?.material;
+          // long_text is the product copy. short_text is NOT a summary: in
+          // 89 % of LIUS rows it merely repeats the design name ("HEXX
+          // black/green") -- which is why this block used to show nothing
+          // useful. Prefer the localized long text, then English, then the
+          // variant's German field from the old sync.
+          const longOf = (d: any) => (d?.long_text || '').trim();
+          const descText = longOf(descLocale) || longOf(descEN) || longOf(descDE) || activeVariant?.description_long || '';
 
           if (!materialText && !descText) return null;
           return (
             <div style={{ fontSize: '13px', lineHeight: '1.5', color: 'rgba(0, 0, 0, 0.6)' }}>
-              {descText && <div style={{ marginBottom: '4px' }}>{descText}</div>}
+              {descText && (
+                <div style={{ marginBottom: '4px' }}>
+                  {/* LIUS delivers "- item<br>- item"; render one line per bullet */}
+                  {descText.split(/<br\s*\/?>/i).map((line: string) => line.replace(/^\s*-\s*/, '').trim()).filter(Boolean).map((line: string, i: number) => (
+                    <div key={i}>{line}</div>
+                  ))}
+                </div>
+              )}
               {materialText && (
                 <div style={{ fontSize: '12px', color: 'rgba(0, 0, 0, 0.45)' }}>
                   {materialText}
