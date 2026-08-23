@@ -839,6 +839,24 @@ export class CanvasRenderer<T> {
    * Calculate optimal font size and determine if line breaks are needed
    * Returns: { fontSize, lines }
    */
+  /**
+   * Column header text. Model names repeat the series and a generic noun
+   * ("3SRS Helmet STREAM") — the series is already the breadcrumb, the
+   * noun is the category. In a 90 px column the full name broke into
+   * "1SR / S H / ELM / ET S / TRE / AM" (owner report 2026-08-23, 120478).
+   * Show the part that distinguishes: "STREAM".
+   */
+  private headerDisplayLabel(label: string): string {
+    let t = label;
+    const parent = this.headerParentLabel;
+    if (parent && t.toLowerCase().startsWith(parent.toLowerCase() + ' ')) t = t.slice(parent.length).trim();
+    t = t.replace(/\b(Helmet|Helm|Youth|Glove|Gloves|Jersey|Pants|Pant|Boot|Boots|Goggle|Jacket|Polyacrylite|Hyperlite|Fidlock®?)\b/gi, ' ').replace(/\s+/g, ' ').trim();
+    return t || label;
+  }
+
+  /** Label of the group currently drilled into (set by the controller), or null at the top. */
+  public headerParentLabel: string | null = null;
+
   private calculateOptimalTextLayout(
     text: string,
     maxWidth: number,
@@ -879,8 +897,10 @@ export class CanvasRenderer<T> {
       fontSize -= 0.5;
     }
 
-    // Last resort: use min size
-    const lines = this.breakTextIntoLines(text, maxWidth, minSize, fontWeight);
+    // Last resort: smallest size, words kept whole. A word that still does
+    // not fit overflows its column slightly — that reads better than
+    // syllable soup ("S H / ELM / ET").
+    const lines = this.breakTextIntoLines(text, maxWidth, minSize, fontWeight, true);
     return { fontSize: minSize, lines };
   }
 
@@ -891,7 +911,8 @@ export class CanvasRenderer<T> {
     text: string,
     maxWidth: number,
     fontSize: number,
-    fontWeight: string | number
+    fontWeight: string | number,
+    keepWordsWhole = false
   ): string[] {
     this.ctx.font = `${fontWeight} ${fontSize}px ${BUCKET_BUTTON_CONFIG.font.family}`;
 
@@ -954,7 +975,11 @@ export class CanvasRenderer<T> {
       return bestLines;
     }
 
-    // Fallback: force word-wrapping at character boundaries
+    // Fallback: force word-wrapping at character boundaries — unless the
+    // caller asked for whole words (column headers), then one word per line.
+    if (keepWordsWhole) {
+      return text.split(/\s+/).filter(Boolean);
+    }
     const lines: string[] = [];
     let currentLine = '';
 
@@ -1791,7 +1816,7 @@ export class CanvasRenderer<T> {
         const maxFontSize = (isHovered ? BUCKET_BUTTON_CONFIG.font.sizeHover : BUCKET_BUTTON_CONFIG.font.sizeNormal) * mobileFontScale;
         const minFontSize = 4; // Minimum readable size
         const { fontSize, lines } = this.calculateOptimalTextLayout(
-          header.label,
+          this.headerDisplayLabel(header.label),
           maxTextWidth,
           maxTextHeight,
           maxFontSize,

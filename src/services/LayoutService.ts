@@ -106,6 +106,8 @@ export class LayoutService {
         // "3SRS" — one group for 65 designs, a wasted click (audit 2026-08-23).
         design_group: { label: 'Design', dataType: 'categorical' },
         product_line: { label: 'Produktlinie', dataType: 'categorical' },
+        color_base: { label: 'Farbe', dataType: 'categorical' },
+        color_name: { label: 'Farbton', dataType: 'categorical' },
         is_spare: { label: 'Ersatzteil' },
         model_year: { label: 'Jahrgang', dataType: 'numeric_discrete' },
       },

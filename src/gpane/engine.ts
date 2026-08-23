@@ -85,9 +85,19 @@ export class GPANEEngine {
       const k = v === null || v === undefined || v === '' ? '' : String(v);
       if (k) groups.set(k, (groups.get(k) ?? 0) + 1);
     }
-    let real = 0;
-    for (const n of groups.values()) if (n >= 2) real++;
-    return real >= 2;
+    let real = 0, singles = 0;
+    for (const n of groups.values()) { if (n >= 2) real++; else singles += n; }
+    if (real < 2) return false;
+    // A level where most products would stand alone is a list, not a
+    // grouping — it fills the stage with one-helmet columns or, capped by
+    // maxBuckets, stuffs everything into "Sonstige" (owner report
+    // 2026-08-23, storage 120478: 3SRS has 65 designs, 42 of them with a
+    // single product). Skip it; the next level (colour) groups properly.
+    if (singles > products.length * 0.4) return false;
+    // More groups than the stage can show as columns is the same failure
+    // from the other side: the overflow lands in "Sonstige".
+    if (groups.size > this._config.maxBuckets * 1.5) return false;
+    return true;
   }
 
   /** Dimensions that actually divide the currently visible products. */
@@ -571,9 +581,9 @@ export class GPANEEngine {
       this._activeDimension = restored;
       this._buckets = buildBuckets(products, restored, this._config);
     } else if (this._scoredDimensions.length > 0) {
-      const viable = this._scoredDimensions.filter(d => d.entropy > 0 && d.cardinality > 1);
-      this._activeDimension = this._prescribedDimension(products) || viable[0] || this._scoredDimensions[0];
-      this._buckets = buildBuckets(products, this._activeDimension, this._config);
+      const viable = this._scoredDimensions.filter(d => d.entropy > 0 && d.cardinality > 1 && this.splitsProducts(d.key, products));
+      this._activeDimension = this._prescribedDimension(products) || viable[0] || null;
+      this._buckets = this._activeDimension ? buildBuckets(products, this._activeDimension, this._config) : [];
     } else {
       this._activeDimension = null;
       this._buckets = [];
@@ -600,8 +610,9 @@ export class GPANEEngine {
     );
 
     if (this._scoredDimensions.length > 0) {
-      this._activeDimension = this._prescribedDimension(products) || this._scoredDimensions[0];
-      this._buckets = buildBuckets(products, this._activeDimension, this._config);
+      const viable0 = this._scoredDimensions.filter(d => d.entropy > 0 && d.cardinality > 1 && this.splitsProducts(d.key, products));
+      this._activeDimension = this._prescribedDimension(products) || viable0[0] || null;
+      this._buckets = this._activeDimension ? buildBuckets(products, this._activeDimension, this._config) : [];
     } else {
       this._activeDimension = null;
       this._buckets = [];
@@ -631,9 +642,13 @@ export class GPANEEngine {
 
     if (this._scoredDimensions.length > 0) {
       const prescribed = this._prescribedDimension(products);
-      const viable = this._scoredDimensions.filter(d => d.entropy > 0 && d.cardinality > 1);
-      this._activeDimension = prescribed || viable[0] || this._scoredDimensions[0];
-      this._buckets = buildBuckets(products, this._activeDimension, this._config);
+      // Scoring may only pick what actually groups (same rule as the
+      // prescription) — else "Design" returns with 42 singletons and a
+      // 68-item "Sonstige" the moment the prescription declines it.
+      // Nothing groups -> no dimension -> the products show as a hero row.
+      const viable = this._scoredDimensions.filter(d => d.entropy > 0 && d.cardinality > 1 && this.splitsProducts(d.key, products));
+      this._activeDimension = prescribed || viable[0] || null;
+      this._buckets = this._activeDimension ? buildBuckets(products, this._activeDimension, this._config) : [];
     } else {
       this._activeDimension = null;
       this._buckets = [];

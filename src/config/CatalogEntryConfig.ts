@@ -34,12 +34,12 @@ export type CatalogCategoryConfig = {
 };
 
 // Shared grouping orders (owner decision 2026-08-23, from the pivot-tree audit)
-const HELMETS = ['product_line', 'design_group', 'color_name'];          // 3SRS > design > colour
-const GEAR = ['product_type', 'product_line', 'design_group', 'color_name']; // jersey/pants > ELEMENT > design > colour
-const LINE_FIRST = ['product_line', 'design_group', 'color_name'];       // gloves, boots, goggles
-const PROTECTION = ['body_part', 'product_line', 'color_name'];           // chest/knee > line > colour
-const TYPE_COLOUR = ['product_type', 'color_name'];                        // jackets, accessories
-const RAIN = ['design_group', 'color_name'];                                // product_type is one value here; jacket/pants live in the model name
+const HELMETS = ['product_line', 'design_group', 'color_base', 'color_name']; // 3SRS > design > base colour > colour
+const GEAR = ['product_type', 'product_line', 'design_group', 'color_base', 'color_name']; // jersey/pants > ELEMENT > design > base colour > colour
+const LINE_FIRST = ['product_line', 'design_group', 'color_base', 'color_name']; // gloves, boots, goggles
+const PROTECTION = ['body_part', 'product_line', 'color_base', 'color_name']; // chest/knee > line > base colour > colour
+const TYPE_COLOUR = ['product_type', 'color_base', 'color_name'];            // jackets, accessories
+const RAIN = ['design_group', 'color_base', 'color_name'];                                // product_type is one value here; jacket/pants live in the model name
 
 export type CatalogEntrySelection = {
   sportId: string;

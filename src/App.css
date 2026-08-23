@@ -223,8 +223,8 @@ body {
   /* One calm 56 px row (design reference 2026-08-23, storage 120474):
      small uppercase trail, pill search, two quiet dropdowns, orange
      Ask AI pill, cart icon. Nothing underlined, nothing boxed twice. */
-  min-height: 56px;
-  padding: 0 28px;
+  min-height: 48px;
+  padding: 0 24px;
   background: #000000;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   z-index: 100;
@@ -309,7 +309,7 @@ body {
 }
 
 .pf-header-select .custom-select-trigger {
-  min-height: 34px;
+  min-height: 32px;
   padding: 0 6px 0 8px;
   border: none;
   border-radius: 6px;
@@ -2192,8 +2192,8 @@ body {
 
 /* Header buttons that replaced the desktop side pane (Ask AI, cart) */
 .pf-header-btn {
-  height: 36px;
-  padding: 0 14px;
+  height: 32px;
+  padding: 0 13px;
   border-radius: 999px;
   border: 1px solid transparent;
   background: transparent;
@@ -2286,7 +2286,7 @@ body {
   pointer-events: none;
 }
 .pf-header-search-input {
-  padding: 9px 36px 9px 16px;
+  padding: 7px 36px 7px 16px;
   /* width:100% + 52 px padding overflowed the 300 px pill by 54 px and sat
      on top of the magnifier (measured: input 354 wide in a 300 container) */
   box-sizing: border-box;

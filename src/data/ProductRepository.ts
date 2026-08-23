@@ -500,6 +500,24 @@ function mapProduct(p: ApiProduct): Product | null {
       }
     : undefined);
 
+  // Base colour — the grouping a dealer expects. The full name
+  // ("black/gray/neon yellow") is as unique as the design: under 3SRS,
+  // 49 colour names for 119 helmets, 32 of them singletons. The first
+  // colour before the slash gives black 54 / blue 14 / white 11 / red 10 …
+  // (audit 2026-08-23). Derived here, not stored — LIUS has no such field.
+  const baseColor = typeof apiAny.color_name === 'string'
+    ? apiAny.color_name.split('/')[0].trim().toLowerCase()
+    : '';
+  addAttribute(attributes, baseColor
+    ? {
+        key: 'color_base',
+        label: 'Grundfarbe',
+        type: 'string',
+        value: baseColor,
+        sourcePath: 'color_name',
+      }
+    : undefined);
+
   const aiTags = Array.isArray(apiAny.ai_tags)
     ? apiAny.ai_tags.filter((tag: unknown) => typeof tag === 'string' && tag.trim().length)
     : [];

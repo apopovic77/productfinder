@@ -195,6 +195,11 @@ export class ProductFinderController {
       if (this.renderer) {
         const isHero = this.layoutService.isPivotHeroMode();
         this.renderer.isHeroMode = isHero;
+        // Column headers drop the prefix of the group we drilled into
+        // ("3SRS Helmet STREAM" under "3SRS" -> "STREAM"); raw label, not
+        // the already-shortened breadcrumb.
+        const stack = (this.layoutService as any).drillDownService?.engine?.navigationStack as { label: string }[] | undefined;
+        this.renderer.headerParentLabel = stack && stack.length ? stack[stack.length - 1].label : null;
       }
     }
     this.notifyListeners();
