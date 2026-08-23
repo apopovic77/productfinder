@@ -230,8 +230,11 @@ export class ProductFinderController {
         this.renderer.isHeroMode = isHero;
         // Enable labels in hero mode (name + color)
         if (isHero && this.layoutService.getMode() !== 'lanes') {
+          // Desktop hero dock: the card carries name + colour, the canvas
+          // caption would duplicate it and collide with the "01 / 04" counter.
+          const captionOnCanvas = (this.canvas?.clientWidth ?? 0) < 768;
           this.renderer.productLabels.update({
-            enabled: true,
+            enabled: captionOnCanvas,
             fields: ['name', 'color'],
             position: 'below',
             nameColor: 'rgba(0, 0, 0, 0.85)',
@@ -313,12 +316,22 @@ export class ProductFinderController {
       const centerX = centers.length ? centers[0] : bounds.minX + bounds.width / 2;
       const centerY = bounds.minY + bounds.height / 2;
       this.viewportService.centerOn(centerX, centerY, 1);
+      // Desktop: the card docks on the right, so the focal point is the
+      // centre of the LEFT part of the stage, not the screen centre. Shift
+      // the target offset by the dock width so the hero lands beside the card.
+      const vtd = this.viewportService.getTransform();
+      if (vtd && this.canvas && this.canvas.clientWidth >= 768) {
+        const shift = this.heroDockShift();
+        vtd.setPosition(vtd.getTargetOffset().x - shift, vtd.getTargetOffset().y, vtd.getTargetScale());
+      }
       // Paged swiping: on release, settle on a product centre. A flick
       // (|velocity| above threshold) advances one product in its direction;
       // a slow drag snaps to whichever product is nearest the centre.
       const vt = this.viewportService.getTransform();
       if (vt) {
         vt.snapResolver = (centerWorldX, velocityX) => {
+          // centerWorldX is the screen centre; the focal point sits left of it.
+          centerWorldX -= this.heroDockShift() / vt.getTargetScale();
           const centers = this.heroProductCenters();
           if (centers.length === 0) return null;
           let nearest = 0;
@@ -329,7 +342,7 @@ export class ProductFinderController {
           // Finger moves content: positive velocity = content moved right = previous product
           if (velocityX < -FLICK) nearest = Math.min(centers.length - 1, nearest + 1);
           else if (velocityX > FLICK) nearest = Math.max(0, nearest - 1);
-          return centers[nearest];
+          return centers[nearest] + this.heroDockShift() / vt.getTargetScale();
         };
       }
     } else if (isLanesMode) {
@@ -514,6 +527,16 @@ export class ProductFinderController {
    * Zooms in so product takes 80% of screen height
    * Rubberband system automatically prevents bounds violations
    */
+  /**
+   * Desktop hero dock: half the width the docked card takes (card 340 px +
+   * 96 px right margin + 48 px gap) — the hero's focal point moves left by
+   * this much. 0 on phones (no dock).
+   */
+  private heroDockShift(): number {
+    const w = this.canvas?.clientWidth ?? 0;
+    return w >= 768 ? (340 + 96 + 48) / 2 : 0;
+  }
+
   /** World x of every hero product centre, sorted left to right. */
   private heroProductCenters(): number[] {
     return this.layoutService.getEngine().all()
@@ -527,19 +550,34 @@ export class ProductFinderController {
    * arrows; shares the snap targets with the swipe so both agree on where
    * "next" is.
    */
+  /** Hero mode: index of the product nearest the viewport centre (target), and count. */
+  getHeroPosition(): { index: number; count: number } | null {
+    const vt = this.viewportService.getTransform();
+    if (!vt || !this.layoutService.isPivotHeroMode()) return null;
+    const centers = this.heroProductCenters();
+    if (centers.length === 0) return null;
+    const cx = (vt.viewportWidth / 2 - this.heroDockShift() - vt.getTargetOffset().x) / vt.getTargetScale();
+    let nearest = 0;
+    for (let i = 1; i < centers.length; i++) {
+      if (Math.abs(centers[i] - cx) < Math.abs(centers[nearest] - cx)) nearest = i;
+    }
+    return { index: nearest, count: centers.length };
+  }
+
   stepHeroProduct(direction: -1 | 1): boolean {
     const vt = this.viewportService.getTransform();
     if (!vt || !this.layoutService.isPivotHeroMode()) return false;
     const centers = this.heroProductCenters();
     if (centers.length === 0) return false;
-    const centerWorldX = (vt.viewportWidth / 2 - vt.getTargetOffset().x) / vt.getTargetScale();
+    const shift = this.heroDockShift() / vt.getTargetScale();
+    const centerWorldX = (vt.viewportWidth / 2 - vt.getTargetOffset().x) / vt.getTargetScale() - shift;
     let nearest = 0;
     for (let i = 1; i < centers.length; i++) {
       if (Math.abs(centers[i] - centerWorldX) < Math.abs(centers[nearest] - centerWorldX)) nearest = i;
     }
     const next = Math.max(0, Math.min(centers.length - 1, nearest + direction));
     if (next === nearest) return false;
-    vt.centerOn(centers[next], (vt.viewportHeight / 2 - vt.getTargetOffset().y) / vt.getTargetScale());
+    vt.centerOn(centers[next] + shift, (vt.viewportHeight / 2 - vt.getTargetOffset().y) / vt.getTargetScale());
     return true;
   }
 
@@ -570,14 +608,27 @@ export class ProductFinderController {
     const screenWidth = viewport.viewportWidth;
     const isMobile = screenWidth < 768;
     const fillRatio = isMobile ? 0.6 : 0.9;
-    const targetScale = (screenHeight * fillRatio) / h;
+    let targetScale = (screenHeight * fillRatio) / h;
+
+    // Desktop hero dock (design 2026-08-23): the dark card occupies the right
+    // ~480 px. The product must fit the stage LEFT of it — height alone let
+    // a 1.3:1 helmet grow to 900 px and run under the card.
+    const dockShift = this.heroDockShift();
+    if (!isMobile && dockShift > 0 && w > 0) {
+      const leftStage = screenWidth - dockShift * 2; // width free of the card
+      targetScale = Math.min(targetScale, (leftStage * 0.78) / w);
+    }
 
     const clampedScale = Math.min(targetScale, viewport.maxScale);
 
     // On mobile: position product in upper third (leave space for V2 dialog below)
     const focusY = isMobile ? centerY + h * 0.4 : centerY;
     this.viewportService.centerOn(centerX, focusY, clampedScale);
-    // Hero zoom applied
+    // Desktop dock: focal point is the centre of the left stage, not the screen.
+    if (!isMobile && dockShift > 0) {
+      const t = viewport.getTargetOffset();
+      viewport.setPosition(t.x - dockShift, t.y, clampedScale);
+    }
   }
 
   // Hit Testing

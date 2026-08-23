@@ -20,6 +20,14 @@
 }
 
 /* ITC Avant Garde Gothic Font Family */
+/* Condensed bold for the hero backdrop word (the huge faded model name) */
+@font-face {
+  font-family: 'ITC Avant Garde Gothic Condensed';
+  src: url('/fonts/ITC Avant Garde Gothic Bold Condensed/ITC Avant Garde Gothic Bold Condensed.otf') format('opentype');
+  font-weight: 700;
+  font-display: swap;
+}
+
 @font-face {
   font-family: 'ITC Avant Garde Gothic';
   src: url('/fonts/ITC Avant Garde Gothic CE Book/ITC Avant Garde Gothic CE Book.woff2') format('woff2'),
@@ -2207,4 +2215,25 @@ body {
   display: inline-grid;
   place-items: center;
   font-variant-numeric: tabular-nums;
+}
+
+/* Hero mode (desktop): "01 / 04" position, bottom centre, next to the dots */
+.pf-hero-counter {
+  position: absolute;
+  left: 50%;
+  bottom: max(22px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 3;
+  font-family: 'ITC Avant Garde Gothic', system-ui, sans-serif;
+  font-size: 14px;
+  letter-spacing: 0.12em;
+  color: rgba(17, 17, 17, 0.45);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.pf-hero-counter b { color: #e3261b; font-weight: 700; }
+@media (min-width: 768px) {
+  .pf-hero-arrow { width: 56px; height: 56px; min-width: 56px; font-size: 34px; bottom: 28px; }
+  .pf-hero-arrow-prev { left: 28px; }
+  .pf-hero-arrow-next { right: 28px; }
 }

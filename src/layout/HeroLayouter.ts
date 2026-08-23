@@ -4,6 +4,12 @@ import type { ILayouter } from './LayoutEngine';
 export type HeroLayoutConfig<T> = {
   spacing: number;
   targetHeightRatio: number;
+  /**
+   * Share of the view width a single product may occupy (desktop hero
+   * dock, design 2026-08-23): the product card sits in the right third,
+   * so the hero must not grow under it. Undefined = height-driven only.
+   */
+  maxWidthRatio?: number;
   minHeight?: number;
   horizontalPadding?: number;
   onLayout?: (nodes: LayoutNode<T>[]) => void;
@@ -18,10 +24,21 @@ export class HeroLayouter<T> implements ILayouter<T> {
     const padding = Math.max(0, this.config.horizontalPadding ?? 60);
     const availableHeight = Math.max(1, view.height);
     const ratio = this.config.targetHeightRatio ?? 0.8;
-    const targetHeight = Math.max(
+    let targetHeight = Math.max(
       this.config.minHeight ?? 80,
       Math.min(availableHeight * ratio, availableHeight)
     );
+    // Cap by width: a helmet is ~1.3x wider than tall, so 80 % of the height
+    // can mean 70 % of the width — straight under the docked card.
+    const maxWidth = this.config.maxWidthRatio ? view.width * this.config.maxWidthRatio : Infinity;
+    const widestAspect = nodes.reduce((m, node) => {
+      const img = (node.data as any)?.image;
+      const r = img && img.naturalWidth && img.naturalHeight ? img.naturalWidth / img.naturalHeight : 0.75;
+      return Math.max(m, Math.min(3, Math.max(0.3, r)));
+    }, 0.75);
+    if (targetHeight * widestAspect > maxWidth) {
+      targetHeight = Math.max(this.config.minHeight ?? 80, maxWidth / widestAspect);
+    }
 
     const fallbackAspect = 0.75;
     const widths: number[] = [];

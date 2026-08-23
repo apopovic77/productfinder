@@ -104,6 +104,8 @@ type State = {
   pivotGroups: PivotGroup[];
   pivotDefinitions: PivotDimensionDefinition[];
   isPivotHeroMode: boolean;
+  /** Hero mode: which product is centred (0-based) and how many there are. */
+  heroPosition: { index: number; count: number } | null;
   
   // Interaction State
   selectedProduct: Product | null;
@@ -197,6 +199,7 @@ const createInitialState = (): State => {
     pivotGroups: [],
     pivotDefinitions: [],
     isPivotHeroMode: false,
+    heroPosition: null,
 
     selectedProduct: null,
     selectedVariant: null,
@@ -972,7 +975,8 @@ export default class App extends React.Component<Props, State> {
       pivotOrientation: this.controller.getPivotOrientation(),
       pivotGroups: this.controller.getPivotGroups(),
       modalSequence: sequence,
-      isPivotHeroMode: this.controller.isPivotHeroMode()
+      isPivotHeroMode: this.controller.isPivotHeroMode(),
+      heroPosition: this.controller.getHeroPosition(),
     });
   };
 
@@ -990,10 +994,14 @@ export default class App extends React.Component<Props, State> {
         // 500ms setState re-rendered the whole app shell forever (issue #256).
         const zoomChanged = Math.abs(zoom - this.state.zoom) > 0.01;
         const fpsChanged = fps !== this.state.fps;
+        // Hero counter ("01 / 04") follows swipes, which bypass setState.
+        const hp = this.state.isPivotHeroMode ? this.controller.getHeroPosition() : null;
+        const heroChanged = (hp?.index ?? -1) !== (this.state.heroPosition?.index ?? -1)
+          || (hp?.count ?? 0) !== (this.state.heroPosition?.count ?? 0);
         if (zoomChanged) {
-          this.setState({ fps, zoom });
-        } else if (fpsChanged) {
-          this.setState({ fps });
+          this.setState({ fps, zoom, ...(heroChanged ? { heroPosition: hp } : {}) });
+        } else if (fpsChanged || heroChanged) {
+          this.setState({ fps, ...(heroChanged ? { heroPosition: hp } : {}) });
         }
 
         this.fpsFrameCount = 0;
@@ -2302,12 +2310,20 @@ export default class App extends React.Component<Props, State> {
           {/* Hero mode on phones: previous/next arrows. Swiping works too, but
               a flick between bildfüllend products is easy to overshoot; the
               arrows share the snap targets with the swipe (stepHeroProduct). */}
-          {this.state.isPivotHeroMode && window.innerWidth < 768 && (
+          {this.state.isPivotHeroMode && (
             <>
               <button type="button" className="pf-hero-arrow pf-hero-arrow-prev" aria-label="Vorheriges Produkt"
-                onClick={() => this.controller.stepHeroProduct(-1)}>‹</button>
+                onClick={() => { this.controller.stepHeroProduct(-1); this.setState({ heroPosition: this.controller.getHeroPosition() }); }}>‹</button>
               <button type="button" className="pf-hero-arrow pf-hero-arrow-next" aria-label="Nächstes Produkt"
-                onClick={() => this.controller.stepHeroProduct(1)}>›</button>
+                onClick={() => { this.controller.stepHeroProduct(1); this.setState({ heroPosition: this.controller.getHeroPosition() }); }}>›</button>
+              {/* "01 / 04" — position within the hero row, desktop only; the
+                  phone has no room below the product for it. */}
+              {!this.isMobileLayout() && this.state.heroPosition && (
+                <div className="pf-hero-counter" aria-live="polite">
+                  <b>{String(this.state.heroPosition.index + 1).padStart(2, '0')}</b>
+                  <span> / {String(this.state.heroPosition.count).padStart(2, '0')}</span>
+                </div>
+              )}
             </>
           )}
 
@@ -2709,6 +2725,7 @@ export default class App extends React.Component<Props, State> {
               // V2 Dialog: Default dialog for normal zoom levels
               <ProductOverlayModal
                 product={selectedProduct}
+                heroDock={this.state.isPivotHeroMode && !this.isMobileLayout()}
                 onClose={() => this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false })}
                 onPositionChange={this.handleDialogPositionChange}
                 onVariantChange={this.handleDialogVariantChange}

@@ -17,6 +17,12 @@ type Props = {
   onPositionChange?: (position: { x: number; y: number }) => void;
   onVariantChange?: (variant: any) => void;
   onImageSelect?: (storageId: number, thumbnailImage?: HTMLImageElement) => void;
+  /**
+   * Desktop hero presentation (design 2026-08-23): dark card docked to the
+   * right of the stage, not floating over the product. Layout reserves the
+   * space, so the card never covers the helmet.
+   */
+  heroDock?: boolean;
   onBuy?: (payload: {
     product: Product;
     variant?: any;
@@ -37,7 +43,7 @@ interface ParsedFeature {
  * Product Overlay Modal V2 - HALF WIDTH VERSION (240px)
  * Same design as V1, but with compact half-width layout
  */
-export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy }) => {
+export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false }) => {
   const isMobilePortrait = window.innerWidth <= 768 && window.innerHeight > window.innerWidth;
   const DIALOG_WIDTH = isMobilePortrait ? Math.min(window.innerWidth - 16, 380) : 240;
 
@@ -505,6 +511,18 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
 
   const { firstWord: productFirstWord, restWords: productRestWords } = parseProductName(product.name);
 
+  // Hero dock title (design 2026-08-23): series / MODEL / colour from the
+  // structured fields, not guessed from the name. "2SRS Helmet RUSH" ->
+  // series "2SRS", model "RUSH" (line prefix and generic nouns stripped).
+  const heroTitle = useMemo(() => {
+    const line: string = rawProduct.product_line || '';
+    const design: string = rawProduct.design_group || product.name || '';
+    let model = line ? design.replace(new RegExp('^' + line.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*', 'i'), '') : design;
+    model = model.replace(/\b(Helmet|Helm|Youth|Glove|Gloves|Jersey|Pants|Pant|Boot|Boots|Goggle|Jacket|Polyacrylite|Hyperlite|Fidlock®?)\b/gi, ' ').replace(/\s+/g, ' ').trim();
+    if (!model) model = line || design;
+    return { series: line, model, colour: (rawProduct.color_name || '') as string };
+  }, [rawProduct.product_line, rawProduct.design_group, rawProduct.color_name, product.name]);
+
   // Icon mapping
   const getFeatureIcon = (icon: ParsedFeature['icon']) => {
     const iconMap = {
@@ -547,16 +565,18 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
 
   return (
     <motion.div
-      className="pom-info-panel pom-panel-standalone"
+      className={`pom-info-panel pom-panel-standalone ${heroDock ? 'pom-hero-dock' : ''}`}
       style={{
         position: 'fixed',
-        left: isMobilePortrait ? `${(window.innerWidth - DIALOG_WIDTH) / 2}px` : `${dragPosition.x}px`,
-        top: isMobilePortrait ? 'auto' : `${dragPosition.y}px`,
-        bottom: isMobilePortrait ? '8px' : 'auto',
-        width: `${DIALOG_WIDTH}px`,
+        left: heroDock ? 'auto' : isMobilePortrait ? `${(window.innerWidth - DIALOG_WIDTH) / 2}px` : `${dragPosition.x}px`,
+        right: heroDock ? '96px' : 'auto',
+        top: heroDock ? '50%' : isMobilePortrait ? 'auto' : `${dragPosition.y}px`,
+        transform: heroDock ? 'translateY(-50%)' : undefined,
+        bottom: isMobilePortrait && !heroDock ? '8px' : 'auto',
+        width: `${heroDock ? 340 : DIALOG_WIDTH}px`,
         boxSizing: 'border-box',
         maxHeight: isMobilePortrait ? '48vh' : '80vh',
-        cursor: isDragging ? 'grabbing' : 'grab',
+        cursor: heroDock ? 'default' : isDragging ? 'grabbing' : 'grab',
         userSelect: isDragging ? 'none' : 'auto',
         fontSize: isMobilePortrait ? '12px' : '11px',
         overflowY: isMobilePortrait ? 'auto' : 'visible',
@@ -592,6 +612,21 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       </div>
 
       {/* Title - V4 Style: First word thin, rest bold */}
+      {heroDock ? (
+        <h2 className="pom-title pom-title-hero" style={{ margin: '0 0 4px', textTransform: 'uppercase', lineHeight: '1' }}>
+          {heroTitle.series && <div className="pom-hero-series">{heroTitle.series}</div>}
+          <div className="pom-hero-model">{heroTitle.model}</div>
+          {heroTitle.colour && (
+            <div className="pom-hero-colour">
+              {heroTitle.colour.split('/').map((c, i, arr) => (
+                <span key={i} className={i === arr.length - 1 && arr.length > 1 ? 'accent' : ''}>
+                  {c.trim()}{i < arr.length - 1 ? <span className="sep"> / </span> : null}
+                </span>
+              ))}
+            </div>
+          )}
+        </h2>
+      ) : (
       <h2 className="pom-title" style={{ fontSize: '14px', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '-0.01em', lineHeight: '1.1' }}>
         {productFirstWord && (
           <div style={{ fontWeight: '400' }}>
@@ -604,6 +639,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
           </div>
         )}
       </h2>
+      )}
 
       {/* Thumbnail Gallery - Compact */}
       {allImages.length > 0 && (

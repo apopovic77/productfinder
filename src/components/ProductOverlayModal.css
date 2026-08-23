@@ -497,3 +497,33 @@
     font-size: 20px;
   }
 }
+
+/* ---- Desktop hero dock (design 2026-08-23): dark card, right of the stage ---- */
+.pom-info-panel.pom-hero-dock {
+  background: rgba(20, 20, 22, 0.92);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  color: #f3f3f3;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 22px 22px 20px;
+  gap: 14px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+}
+.pom-hero-dock .pom-title { color: #fff; }
+.pom-hero-series { color: rgba(255, 255, 255, 0.6) !important; font-size: 13px; font-weight: 600; letter-spacing: 0.14em; margin-bottom: 4px; }
+.pom-hero-model { font-family: 'ITC Avant Garde Gothic Condensed', 'ITC Avant Garde Gothic', sans-serif; font-size: 56px; font-weight: 700; line-height: 0.92; letter-spacing: 0.005em; color: #fff !important; text-wrap: balance; }
+.pom-hero-colour { margin-top: 10px; font-size: 15px; font-weight: 700; letter-spacing: 0.04em; color: rgba(255, 255, 255, 0.85) !important; }
+.pom-hero-colour .sep { color: rgba(255, 255, 255, 0.35) !important; font-weight: 400; }
+.pom-hero-colour .accent { color: #ff7a45 !important; } /* brand accent; a per-colour hue (neon yellow for "neon yellow") would lie for black/pink */
+.pom-hero-dock .pom-price { color: #fff; font-size: 26px; }
+.pom-hero-dock .pom-close { background: rgba(255, 255, 255, 0.1); color: #fff; }
+.pom-hero-dock .pom-button-primary { background: #ff5a1f; color: #fff; border: none; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; font-size: 14px; padding: 14px; border-radius: 12px; }
+.pom-hero-dock .pom-button-primary:hover { background: #ff6f3c; }
+.pom-hero-dock .pom-button-secondary, .pom-hero-dock .pom-button:not(.pom-button-primary) { background: transparent; color: rgba(255, 255, 255, 0.7); border: 1px solid rgba(255, 255, 255, 0.18); }
+/* Sections inside the card are inline-styled with dark greys for the light
+   theme; on the dark dock those must read light. Colour-only overrides so
+   the accent colours (orange selection, green stock) keep their meaning. */
+.pom-hero-dock div, .pom-hero-dock span, .pom-hero-dock label { color: inherit; }
+.pom-hero-dock [style*="rgba(0, 0, 0"] { color: rgba(255, 255, 255, 0.65) !important; }
+.pom-hero-dock [style*="color: #1a1a1a"], .pom-hero-dock [style*="color:#1a1a1a"] { color: #fff !important; }

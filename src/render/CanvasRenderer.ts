@@ -1062,6 +1062,57 @@ export class CanvasRenderer<T> {
    * Product name: Centered, 50px above trim bounds
    * Variant color: Centered, 50px below trim bounds
    */
+  /**
+   * The model name (design without the series prefix, e.g. "RUSH" from
+   * "2SRS Helmet RUSH") as a huge, faint word behind the product nearest the
+   * viewport centre. Follows that product so swiping slides the word along.
+   */
+  private drawHeroBackdropWord(nodes: LayoutNode<T>[]): void {
+    if (!this.viewport) return;
+    const vp = this.viewport;
+    // Focal point = screen centre minus the docked card's half width (see
+    // ProductFinderController.heroDockShift — same constant).
+    const dockShift = this.ctx.canvas.clientWidth >= 768 ? (340 + 96 + 48) / 2 : 0;
+    const viewCenterX = (vp.viewportWidth / 2 - dockShift - vp.offset.x) / vp.scale;
+    let nearest: LayoutNode<T> | null = null;
+    let best = Infinity;
+    for (const n of nodes) {
+      if ((n.opacity.value ?? 1) <= 0.01) continue;
+      const cx = (n.posX.value ?? 0) + (n.width.value ?? 0) / 2;
+      const d = Math.abs(cx - viewCenterX);
+      if (d < best) { best = d; nearest = n; }
+    }
+    if (!nearest) return;
+    const raw = (nearest.data as any)?.raw ?? {};
+    const design: string = raw.design_group ?? (nearest.data as any)?.getAttributeValue?.('design_group') ?? '';
+    const line: string = raw.product_line ?? (nearest.data as any)?.getAttributeValue?.('product_line') ?? '';
+    // "2SRS Helmet RUSH" -> "RUSH": strip the line prefix and generic nouns.
+    let word = design.replace(new RegExp('^' + line.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*', 'i'), '');
+    word = word.replace(/\b(Helmet|Helm|Youth|Glove|Gloves|Jersey|Pants|Pant|Boot|Boots|Goggle|Jacket|Polyacrylite|Hyperlite|Fidlock®?)\b/gi, ' ').replace(/\s+/g, ' ').trim();
+    if (!word) word = line;
+    if (!word) return;
+    word = word.toUpperCase();
+
+    const cx = (nearest.posX.value ?? 0) + (nearest.width.value ?? 0) / 2;
+    const cy = (nearest.posY.value ?? 0) + (nearest.height.value ?? 0) / 2;
+    const h = nearest.height.value ?? 0;
+    // Size relative to the product; cap by viewport width so long names fit.
+    let fontPx = h * 0.95;
+    this.ctx.save();
+    this.ctx.font = `700 ${fontPx}px "ITC Avant Garde Gothic Condensed", "Arial Narrow", sans-serif`;
+    const maxW = (vp.viewportWidth / vp.scale) * 0.9;
+    const measured = this.ctx.measureText(word).width;
+    if (measured > maxW) {
+      fontPx *= maxW / measured;
+      this.ctx.font = `700 ${fontPx}px "ITC Avant Garde Gothic Condensed", "Arial Narrow", sans-serif`;
+    }
+    this.ctx.textAlign = 'center';
+    this.ctx.textBaseline = 'middle';
+    this.ctx.fillStyle = 'rgba(17, 17, 17, 0.06)';
+    this.ctx.fillText(word, cx, cy - h * 0.12);
+    this.ctx.restore();
+  }
+
   private renderHeroModeLabels(
     product: Product,
     x: number,
@@ -1229,6 +1280,14 @@ export class CanvasRenderer<T> {
     if (!this.selectedProduct || !this.alternativeImages || this.alternativeImages.length === 0
         || this.ctx.canvas.clientWidth < 768) {
       this.imageScaleFactor.targetValue = 1.0;
+    }
+
+    // Hero backdrop: the model name, huge and faint, behind the centred
+    // product (design direction 2026-08-23, storage 120472). Drawn before
+    // the products so they sit on top of it. Desktop only — on a phone the
+    // product fills the width and the word would just be noise behind it.
+    if (this.isHeroMode && this.ctx.canvas.clientWidth >= 768) {
+      this.drawHeroBackdropWord(nodes);
     }
 
     for (const n of nodes) {
@@ -1522,7 +1581,7 @@ export class CanvasRenderer<T> {
       this.ctx.restore();
 
       // Render product labels (hero mode, lanes mode, or custom config)
-      if (this.isHeroMode || this.productLabels.enabled) {
+      if (this.productLabels.enabled) {
         const vpScale = this.viewport?.scale ?? 1;
         const vpOffset = this.viewport ? { x: this.viewport.offset.x, y: this.viewport.offset.y } : undefined;
         const cvSize = { w: this.ctx.canvas.width, h: this.ctx.canvas.height };

@@ -219,9 +219,13 @@ export class LayoutService {
   }
 
   private createHeroLayouter(): HeroLayouter<Product> {
+    const desktop = typeof window !== 'undefined' && window.innerWidth >= 768;
     return new HeroLayouter<Product>({
       spacing: 100, // Gap between products in hero mode
       targetHeightRatio: 0.8,
+      // Desktop: the dark product card docks on the right (340 px + 96 px
+      // margin); the hero stays in the left ~58 % so it never sits under it.
+      maxWidthRatio: desktop ? 0.42 : undefined,
       minHeight: this.pivotConfig.minCellSize ?? 120,
       horizontalPadding: this.pivotConfig.framePadding ?? 40,
       onLayout: nodes => {
