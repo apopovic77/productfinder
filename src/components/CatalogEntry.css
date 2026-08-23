@@ -266,3 +266,36 @@
   .pf-catalog-category-name { max-width: 72%; }
 }
 
+
+/* Marketing mood shots on the gate tiles (curated via the media KG,
+   2026-08-23). Scrim keeps the labels readable on busy photos. */
+.pf-catalog-sport-card.has-banner {
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+.pf-catalog-sport-card.has-banner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.72) 0%, rgba(0, 0, 0, 0.25) 45%, rgba(0, 0, 0, 0.05) 100%);
+  pointer-events: none;
+}
+/* The flat banners put label left and count right — darken both edges. */
+.pf-catalog-category-banner[style*="background-image"]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.82) 0%, rgba(0, 0, 0, 0.35) 38%, rgba(0, 0, 0, 0.2) 62%, rgba(0, 0, 0, 0.72) 100%);
+  pointer-events: none;
+}
+.pf-catalog-sport-card.has-banner > *,
+.pf-catalog-category-banner > * {
+  position: relative;
+  z-index: 1;
+}
+.pf-catalog-sport-card.has-banner:not(:disabled):hover {
+  filter: saturate(1.08);
+}
+.pf-catalog-sport-card:disabled.has-banner {
+  filter: grayscale(0.85) brightness(0.6);
+}

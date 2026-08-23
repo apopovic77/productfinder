@@ -15,6 +15,7 @@ export type CatalogSportConfig = {
   sportValues: string[];
   enabled: boolean;
   comingSoon?: boolean;
+  banner?: CatalogLandingMedia;
 };
 
 export type CatalogCategoryConfig = {
@@ -67,6 +68,7 @@ export const CATALOG_ENTRY_CONFIG: CatalogEntryConfig = {
       labels: label('MOTO'),
       sportValues: ['MX'],
       enabled: true,
+      banner: { mode: 'image', storageId: 17577 },
     },
     {
       id: 'mtb',
@@ -74,27 +76,29 @@ export const CATALOG_ENTRY_CONFIG: CatalogEntryConfig = {
       sportValues: ['MTB'],
       enabled: false,
       comingSoon: true,
+      banner: { mode: 'image', storageId: 15344 },
     },
   ],
   categoriesBySport: {
     moto: [
-      { id: 'mx-helmets', labels: label('MX HELMETS'), categories: ['Helmets MX'], targetGroup: 'Erwachsene', grouping: HELMETS },
-      { id: 'goggles', labels: label('GOGGLES'), categories: ['Goggles'], targetGroup: 'Erwachsene', grouping: LINE_FIRST },
-      { id: 'mx-gear', labels: label('MX GEAR'), categories: ['Jerseys Offroad', 'Pants MX'], targetGroup: 'Erwachsene', grouping: GEAR },
-      { id: 'rainwear', labels: label('RAINWEAR'), categories: ['Rain Wear'], targetGroup: 'Erwachsene', grouping: RAIN },
-      { id: 'gloves', labels: label('GLOVES'), categories: ['Gloves'], targetGroup: 'Erwachsene', grouping: LINE_FIRST },
-      { id: 'boots', labels: label('BOOTS'), categories: ['Boots MX'], targetGroup: 'Erwachsene', grouping: LINE_FIRST },
-      { id: 'protection', labels: label('PROTECTION'), categories: ['Protection MX', 'Protection MTB'], targetGroup: 'Erwachsene', grouping: PROTECTION },
-      { id: 'street-adventure-helmets', labels: label('STREET/ADVENTURE HELMETS'), categories: ['Helmets Street'], targetGroup: 'Erwachsene', grouping: HELMETS },
-      { id: 'street-adventure-jackets-pants', labels: label('STREET/ADVENTURE JACKETS & PANTS'), categories: ['Jackets', 'ADV Pants'], targetGroup: 'Erwachsene', grouping: TYPE_COLOUR },
-      { id: 'youth-helmets', labels: label('YOUTH HELMETS'), categories: ['Helmets MX'], targetGroup: 'Jugendliche', grouping: HELMETS },
-      { id: 'youth-gear', labels: label('YOUTH GEAR'), categories: ['Jerseys Offroad', 'Pants MX'], targetGroup: 'Jugendliche', grouping: GEAR },
-      { id: 'youth-goggles', labels: label('YOUTH GOGGLES'), categories: ['Goggles'], targetGroup: 'Jugendliche', grouping: LINE_FIRST },
-      { id: 'youth-gloves', labels: label('YOUTH GLOVES'), categories: ['Gloves'], targetGroup: 'Jugendliche', grouping: LINE_FIRST },
-      { id: 'youth-boots', labels: label('YOUTH BOOTS'), categories: ['Boots MX'], targetGroup: 'Jugendliche', grouping: LINE_FIRST },
-      { id: 'youth-protection', labels: label('YOUTH PROTECTION'), categories: ['Protection MX', 'Protection MTB'], targetGroup: 'Jugendliche', grouping: PROTECTION },
+      { id: 'mx-helmets', banner: { mode: 'image', storageId: 10435 }, labels: label('MX HELMETS'), categories: ['Helmets MX'], targetGroup: 'Erwachsene', grouping: HELMETS },
+      { id: 'goggles', banner: { mode: 'image', storageId: 9970 }, labels: label('GOGGLES'), categories: ['Goggles'], targetGroup: 'Erwachsene', grouping: LINE_FIRST },
+      { id: 'mx-gear', banner: { mode: 'image', storageId: 17772 }, labels: label('MX GEAR'), categories: ['Jerseys Offroad', 'Pants MX'], targetGroup: 'Erwachsene', grouping: GEAR },
+      { id: 'rainwear', banner: { mode: 'image', storageId: 16355 }, labels: label('RAINWEAR'), categories: ['Rain Wear'], targetGroup: 'Erwachsene', grouping: RAIN },
+      { id: 'gloves', banner: { mode: 'image', storageId: 13798 }, labels: label('GLOVES'), categories: ['Gloves'], targetGroup: 'Erwachsene', grouping: LINE_FIRST },
+      { id: 'boots', banner: { mode: 'image', storageId: 11767 }, labels: label('BOOTS'), categories: ['Boots MX'], targetGroup: 'Erwachsene', grouping: LINE_FIRST },
+      { id: 'protection', banner: { mode: 'image', storageId: 10916 }, labels: label('PROTECTION'), categories: ['Protection MX', 'Protection MTB'], targetGroup: 'Erwachsene', grouping: PROTECTION },
+      { id: 'street-adventure-helmets', banner: { mode: 'image', storageId: 18556 }, labels: label('STREET/ADVENTURE HELMETS'), categories: ['Helmets Street'], targetGroup: 'Erwachsene', grouping: HELMETS },
+      { id: 'street-adventure-jackets-pants', banner: { mode: 'image', storageId: 18695 }, labels: label('STREET/ADVENTURE JACKETS & PANTS'), categories: ['Jackets', 'ADV Pants'], targetGroup: 'Erwachsene', grouping: TYPE_COLOUR },
+      { id: 'youth-helmets', banner: { mode: 'image', storageId: 17684 }, labels: label('YOUTH HELMETS'), categories: ['Helmets MX'], targetGroup: 'Jugendliche', grouping: HELMETS },
+      { id: 'youth-gear', banner: { mode: 'image', storageId: 17967 }, labels: label('YOUTH GEAR'), categories: ['Jerseys Offroad', 'Pants MX'], targetGroup: 'Jugendliche', grouping: GEAR },
+      { id: 'youth-goggles', banner: { mode: 'image', storageId: 17698 }, labels: label('YOUTH GOGGLES'), categories: ['Goggles'], targetGroup: 'Jugendliche', grouping: LINE_FIRST },
+      { id: 'youth-gloves', banner: { mode: 'image', storageId: 17969 }, labels: label('YOUTH GLOVES'), categories: ['Gloves'], targetGroup: 'Jugendliche', grouping: LINE_FIRST },
+      { id: 'youth-boots', banner: { mode: 'image', storageId: 17686 }, labels: label('YOUTH BOOTS'), categories: ['Boots MX'], targetGroup: 'Jugendliche', grouping: LINE_FIRST },
+      { id: 'youth-protection', banner: { mode: 'image', storageId: 18009 }, labels: label('YOUTH PROTECTION'), categories: ['Protection MX', 'Protection MTB'], targetGroup: 'Jugendliche', grouping: PROTECTION },
       {
         id: 'accessories-leisure',
+        banner: { mode: 'image', storageId: 15480 },
         labels: label('ACCESSORIES & LEISURE'),
         categories: ['Leisure Accessories', 'Casual Wear', 'Bags / Backpacks', 'Grips'],
         targetGroup: 'Erwachsene',

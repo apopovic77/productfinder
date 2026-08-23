@@ -134,8 +134,52 @@ export class ImageLoadQueue<T = any> {
   /**
    * Add image to load queue
    */
+  // Cache-hit fast path: decodes run locally and need no network fairness,
+  // so they bypass the queue entirely. Without this, several hundred CACHED
+  // thumbnails still waited behind maxConcurrent=6 slots on every reload and
+  // the grid showed its loading spinners for seconds (owner 2026-08-23). A
+  // small semaphore keeps parallel blob decodes from janking the main thread.
+  private static fastPathActive = 0;
+  private static readonly FAST_PATH_LIMIT = 16;
+  private static fastPathWaiters: Array<() => void> = [];
+
+  private async tryCacheFastPath(request: ImageLoadRequest<T>): Promise<ImageLoadResult<T> | null> {
+    try {
+      const cachedBlob = await imageCache.get(request.url);
+      if (!cachedBlob) return null;
+      while ((ImageLoadQueue as any).fastPathActive >= (ImageLoadQueue as any).FAST_PATH_LIMIT) {
+        await new Promise<void>(res => (ImageLoadQueue as any).fastPathWaiters.push(res));
+      }
+      (ImageLoadQueue as any).fastPathActive++;
+      try {
+        const image = await this.blobToImage(cachedBlob);
+        return { id: request.id, url: request.url, image, metadata: request.metadata } as ImageLoadResult<T>;
+      } finally {
+        (ImageLoadQueue as any).fastPathActive--;
+        const next = (ImageLoadQueue as any).fastPathWaiters.shift();
+        if (next) next();
+      }
+    } catch {
+      return null; // fall back to the normal queued load
+    }
+  }
+
   add(request: ImageLoadRequest<T>): Promise<ImageLoadResult<T>> {
     return new Promise((resolve, reject) => {
+      // Fast path first — only enqueue when the cache misses.
+      void this.tryCacheFastPath(request).then(fast => {
+        if (fast) { resolve(fast); return; }
+        this.enqueue(request, resolve, reject);
+      });
+    });
+  }
+
+  private enqueue(
+    request: ImageLoadRequest<T>,
+    resolve: (r: ImageLoadResult<T>) => void,
+    reject: (e: any) => void,
+  ): void {
+    {
       const queued: QueuedRequest<T> = {
         request: {
           ...request,
@@ -191,7 +235,7 @@ export class ImageLoadQueue<T = any> {
       // immediately and a later, more central visible node cannot overtake
       // them even though it has the better priority.
       this.scheduleProcessQueue();
-    });
+    }
   }
 
   /**

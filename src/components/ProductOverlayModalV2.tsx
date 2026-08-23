@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Product } from '../types/Product';
+import { soundService } from '../services/SoundService';
 import { useImageQueue } from '../hooks/useImageQueue';
 import { fetchProductById } from '../data/ProductRepository';
 import './ProductOverlayModal.css';
@@ -519,6 +520,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   };
 
   const handleAddToCart = () => {
+    soundService.tick();
     if (onBuy) {
       onBuy({
         product,

@@ -45,7 +45,7 @@ export function SlidePanel({
         bottom: 0,
         [side]: 0,
         width,
-        zIndex: 1000,
+        zIndex: 10500,
         transform,
         transition: `transform ${duration}ms cubic-bezier(0.32, 0.72, 0, 1)`,
         boxShadow: open
@@ -118,7 +118,7 @@ export function SlidePanelBackdrop({ open, onClick, duration = 400 }: SlidePanel
         position: 'fixed',
         inset: 0,
         background: 'rgba(0, 0, 0, 0.4)',
-        zIndex: 999,
+        zIndex: 10499,
         opacity: open ? 1 : 0,
         pointerEvents: open ? 'auto' : 'none',
         transition: `opacity ${duration}ms`,

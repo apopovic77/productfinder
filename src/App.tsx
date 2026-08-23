@@ -35,6 +35,7 @@ import {
 import { getImagesForVariant, getPrimaryVariant, getUniqueColorVariants } from './utils/variantImageHelpers';
 import { globalImageQueue } from './utils/GlobalImageQueue';
 import { buildMediaUrl } from './utils/MediaUrlBuilder';
+import { soundService } from './services/SoundService';
 import { resolveProductTapStage } from './utils/ProductTapFlow';
 import QuickSearchCommandPalette from './components/QuickSearchCommandPalette';
 import { AiProductQueryService } from './services/AiProductQueryService';
@@ -1086,7 +1087,12 @@ export default class App extends React.Component<Props, State> {
         // Desktop hero dock: the card belongs to the product in focus. When a
         // swipe, arrow or dot moves the focus, the open card follows — else
         // it kept showing "BLACK / PINK" next to the orange helmet.
-        if (heroChanged) this.syncHeroCardToFocus();
+        if (heroChanged) {
+          this.syncHeroCardToFocus();
+          // Quest-style slide feedback; direction from the index delta.
+          const prev = this.state.heroPosition?.index ?? -1;
+          if (prev >= 0 && hp) soundService.whoosh(hp.index >= prev ? 1 : -1);
+        }
 
         this.fpsFrameCount = 0;
         this.fpsLastSample = now;
@@ -1476,6 +1482,7 @@ export default class App extends React.Component<Props, State> {
     // Bring the product into view as well — a card that changes while the
     // stage stays put is exactly what made the old arrows feel broken.
     if (!this.state.isPivotHeroMode) this.controller.centerOnProduct(nextProduct);
+    soundService.whoosh(delta >= 0 ? 1 : -1);
   };
 
   /**
@@ -1514,6 +1521,8 @@ export default class App extends React.Component<Props, State> {
     const groupKey = this.controller.getGroupKeyForProduct(product);
     const sequence = this.controller.getDisplayOrderForGroup(groupKey).map(p => p.id);
     const seqIndex = sequence.indexOf(product.id);
+
+    if (!this.state.selectedProduct) soundService.pop();
 
     this.setState({
       selectedProduct: product,

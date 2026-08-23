@@ -79,6 +79,22 @@ export class GPANEEngine {
    * "Kopf") is not a choice, it is a no-op that costs the dealer a click.
    */
   splitsProducts(key: string, products: Product[]): boolean {
+    // Numeric dimensions (price) are grouped as RANGES by the bucketer, so
+    // the raw-value singleton test below would reject them although the
+    // actual grouping is fine (owner 2026-08-23: "warum fehlt Preis?").
+    const scored = this._scoredDimensions.find(d => d.key === key);
+    const strategy = scored?.recommendedStrategy ?? '';
+    if (scored?.dataType === 'numeric_continuous' || scored?.dataType === 'numeric_discrete' || strategy.startsWith('range_')) {
+      let withValue = 0;
+      const distinct = new Set<string>();
+      for (const prod of products) {
+        const v = getProductValue(prod, key);
+        if (v === null || v === undefined || v === '') continue;
+        withValue++;
+        distinct.add(String(v));
+      }
+      return withValue >= 4 && distinct.size >= 2;
+    }
     const groups = new Map<string, number>();
     for (const prod of products) {
       const v = getProductValue(prod, key);

@@ -146,18 +146,24 @@ export const CatalogNavigationGate: React.FC<Props> = ({
             <h1 className="pf-catalog-page-title">{text.chooseSport}</h1>
           </header>
           <div className="pf-catalog-sport-grid">
-            {CATALOG_ENTRY_CONFIG.sports.map(item => (
-              <button
-                type="button"
-                className="pf-catalog-sport-card"
-                key={item.id}
-                disabled={!item.enabled}
-                onClick={() => writeCatalogUrl({ sport: item.id, category: null })}
-              >
-                {item.comingSoon && <span className="pf-catalog-coming-soon">{text.comingSoon}</span>}
-                <span className="pf-catalog-sport-name">{getLocalizedLabel(item.labels, locale)}</span>
-              </button>
-            ))}
+            {CATALOG_ENTRY_CONFIG.sports.map(item => {
+              const bannerUrl = item.banner?.url ?? (item.banner?.storageId
+                ? `${STORAGE_API_BASE}/storage/media/${item.banner.storageId}?format=webp&width=1600`
+                : undefined);
+              return (
+                <button
+                  type="button"
+                  className={`pf-catalog-sport-card ${bannerUrl ? 'has-banner' : ''}`}
+                  key={item.id}
+                  disabled={!item.enabled}
+                  onClick={() => writeCatalogUrl({ sport: item.id, category: null })}
+                  style={bannerUrl ? { backgroundImage: `url(${bannerUrl})`, backgroundPosition: item.banner?.position ?? 'center' } : undefined}
+                >
+                  {item.comingSoon && <span className="pf-catalog-coming-soon">{text.comingSoon}</span>}
+                  <span className="pf-catalog-sport-name">{getLocalizedLabel(item.labels, locale)}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
       </main>
@@ -191,7 +197,7 @@ export const CatalogNavigationGate: React.FC<Props> = ({
             {(CATALOG_ENTRY_CONFIG.categoriesBySport[sport.id] ?? []).map(item => {
               const count = categoryCounts.get(item.id) ?? 0;
               const bannerUrl = item.banner?.url ?? (item.banner?.storageId
-                ? `${STORAGE_API_BASE}/storage/media/${item.banner.storageId}?format=webp&width=2400`
+                ? `${STORAGE_API_BASE}/storage/media/${item.banner.storageId}?format=webp&width=1600`
                 : undefined);
               return (
                 <button
