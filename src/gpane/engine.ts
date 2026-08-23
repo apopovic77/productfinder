@@ -377,13 +377,24 @@ export class GPANEEngine {
     this._taxonomyPath = [];
     this._navigationStack = [];
 
-    if (this._config.taxonomy?.length) {
+    this._enterRoot(() => this._rescore());
+  }
+
+  /**
+   * Root of the navigation: the taxonomy tree unless the session skips it
+   * (catalog entry already answered "which sport"). Shared by load, reset
+   * and the constraint paths — reset() used to re-enter the tree on its
+   * own and "Alle" in an entry session showed MTB | MX | Frauen again
+   * (2026-08-23).
+   */
+  private _enterRoot(gpaneInit: () => void): void {
+    if (this._config.taxonomy?.length && !this._skipTaxonomy) {
       this._mode = 'taxonomy';
       this._currentTaxonomyNodes = this._config.taxonomy;
       this._buildTaxonomyBuckets();
     } else {
       this._mode = 'gpane';
-      this._rescore();
+      gpaneInit();
     }
   }
 
@@ -396,13 +407,7 @@ export class GPANEEngine {
     this._focusStack = [];
     this._taxonomyPath = [];
     this._analyze();
-    if (this._config.taxonomy?.length) {
-      this._mode = 'taxonomy';
-      this._currentTaxonomyNodes = this._config.taxonomy;
-      this._buildTaxonomyBuckets();
-    } else {
-      this._selectInitialDimension();
-    }
+    this._enterRoot(() => this._selectInitialDimension());
   }
 
   removeConstraint(index: number): void {
@@ -410,13 +415,7 @@ export class GPANEEngine {
     this._focusStack = [];
     this._taxonomyPath = [];
     this._analyze();
-    if (this._config.taxonomy?.length) {
-      this._mode = 'taxonomy';
-      this._currentTaxonomyNodes = this._config.taxonomy;
-      this._buildTaxonomyBuckets();
-    } else {
-      this._selectInitialDimension();
-    }
+    this._enterRoot(() => this._selectInitialDimension());
   }
 
   clearConstraints(): void {

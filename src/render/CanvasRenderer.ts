@@ -850,9 +850,14 @@ export class CanvasRenderer<T> {
     let t = label;
     const parent = this.headerParentLabel;
     if (parent && t.toLowerCase().startsWith(parent.toLowerCase() + ' ')) t = t.slice(parent.length).trim();
-    t = t.replace(/\b(Helmet|Helm|Youth|Glove|Gloves|Jersey|Pants|Pant|Boot|Boots|Goggle|Jacket|Polyacrylite|Hyperlite|Fidlock®?)\b/gi, ' ').replace(/\s+/g, ' ').trim();
+    if (this.headerStripNoise) {
+      t = t.replace(/\b(Helmet|Helm|Youth|Glove|Gloves|Jersey|Pants|Pant|Boot|Boots|Goggle|Jacket|Polyacrylite|Hyperlite|Fidlock®?)\b/gi, ' ').replace(/\s+/g, ' ').trim();
+    }
     return t || label;
   }
+
+  /** Strip product-name noise words from column headers — only for design/series dimensions. */
+  public headerStripNoise = true;
 
   /** Label of the group currently drilled into (set by the controller), or null at the top. */
   public headerParentLabel: string | null = null;

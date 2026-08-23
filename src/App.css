@@ -2308,3 +2308,9 @@ body {
 .pf-header-actions { gap: 4px; }
 .pf-header-select-group + .pf-header-select-group { margin-left: 2px; }
 .pf-header-ai-btn { margin-left: 8px; }
+
+.pf-hero-arrow:disabled {
+  opacity: 0.25;
+  cursor: default;
+  pointer-events: none;
+}

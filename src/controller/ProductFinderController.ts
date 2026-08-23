@@ -198,8 +198,7 @@ export class ProductFinderController {
         // Column headers drop the prefix of the group we drilled into
         // ("3SRS Helmet STREAM" under "3SRS" -> "STREAM"); raw label, not
         // the already-shortened breadcrumb.
-        const stack = (this.layoutService as any).drillDownService?.engine?.navigationStack as { label: string }[] | undefined;
-        this.renderer.headerParentLabel = stack && stack.length ? stack[stack.length - 1].label : null;
+        this.syncRendererHeaderLabels();
       }
     }
     this.notifyListeners();
@@ -833,7 +832,20 @@ export class ProductFinderController {
   
   setPivotDimension(dimension: GroupDimension): void {
     this.layoutService.setPivotDimension(dimension);
+    this.syncRendererHeaderLabels();
     this.onDataChanged();
+  }
+
+  /** Column-header labelling context for the renderer (parent prefix + noise-word rule). */
+  private syncRendererHeaderLabels(): void {
+    if (!this.renderer) return;
+    const stack = (this.layoutService as any).drillDownService?.engine?.navigationStack as { label: string }[] | undefined;
+    this.renderer.headerParentLabel = stack && stack.length ? stack[stack.length - 1].label : null;
+    // Noise words ("Pants", "Helmet") are only noise inside product
+    // names. In a category bucket they ARE the label: "Pants MX"
+    // stripped to "MX" read like a sport (2026-08-23).
+    const dim = this.layoutService.getPivotDimension() as string;
+    this.renderer.headerStripNoise = dim === 'design_group' || dim === 'product_line' || dim === 'model' || dim === 'series';
   }
   
   getPivotDimension(): GroupDimension {

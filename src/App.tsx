@@ -1079,6 +1079,17 @@ export default class App extends React.Component<Props, State> {
     this.syncPivotUI();
   };
 
+  /**
+   * Header trail: the entry category IS the pivot root, so the former
+   * "Alle" crumb is gone (it sat mid-trail and read like a level of its
+   * own). Drilled in → the category crumb returns to the category's
+   * overview; at the root → it opens the category selection.
+   */
+  private handleCategoryCrumbClick = () => {
+    if (this.state.pivotBreadcrumbs.length > 1) this.handleBreadcrumbClick(0);
+    else this.props.onRequestCategorySelection();
+  };
+
   private resetToInitialView = () => {
     const initialState = createInitialState();
     this.controller.clearAiFilterProductIds();
@@ -1397,6 +1408,9 @@ export default class App extends React.Component<Props, State> {
     const nextProduct = filteredProducts.find(p => p.id === nextId) || this.controller.getDisplayOrder().find(p => p.id === nextId);
     if (!nextProduct) return;
     this.setState({ selectedProduct: nextProduct, selectedIndex: nextIndex, modalDirection: Math.sign(delta) });
+    // Bring the product into view as well — a card that changes while the
+    // stage stays put is exactly what made the old arrows feel broken.
+    if (!this.state.isPivotHeroMode) this.controller.centerOnProduct(nextProduct);
   };
 
   /**
@@ -1429,10 +1443,20 @@ export default class App extends React.Component<Props, State> {
     }
     this.controller.centerOnProduct(product);
 
+    // Sibling sequence for the card's prev/next: the column the product
+    // sits in, in display order. Was never set on the mouse path, which
+    // left the old arrows dead (selectedIndex -1).
+    const groupKey = this.controller.getGroupKeyForProduct(product);
+    const sequence = this.controller.getDisplayOrderForGroup(groupKey).map(p => p.id);
+    const seqIndex = sequence.indexOf(product.id);
+
     this.setState({
       selectedProduct: product,
       selectedVariant: primaryVariant,
       shouldShowV4Dialog: tapStage === 'detail',
+      modalSequence: sequence,
+      selectedIndex: seqIndex,
+      modalDirection: 0,
     });
 
     const storageId = this.getProductStorageId(product);
@@ -1967,20 +1991,19 @@ export default class App extends React.Component<Props, State> {
                 role="button"
                 tabIndex={0}
                 className="pf-header-breadcrumb pf-catalog-breadcrumb"
-                onClick={this.props.onRequestCategorySelection}
+                onClick={this.handleCategoryCrumbClick}
                 onKeyDown={evt => {
                   if (evt.key === 'Enter' || evt.key === ' ') {
                     evt.preventDefault();
-                    this.props.onRequestCategorySelection();
+                    this.handleCategoryCrumbClick();
                   }
                 }}
               >
                 {this.props.categoryLabel}
               </span>
-              <span className="pf-header-breadcrumb-sep">›</span>
-              {pivotBreadcrumbs.map((crumb, i) => (
+              {pivotBreadcrumbs.slice(1).map((crumb, j) => { const i = j + 1; return (
                 <React.Fragment key={`header-${crumb}-${i}`}>
-                  {i > 0 && <span className="pf-header-breadcrumb-sep">›</span>}
+                  <span className="pf-header-breadcrumb-sep">›</span>
                   <span
                     role="button"
                     tabIndex={i === 0 || i < pivotBreadcrumbs.length - 1 ? 0 : -1}
@@ -1996,7 +2019,7 @@ export default class App extends React.Component<Props, State> {
                     {crumb}
                   </span>
                 </React.Fragment>
-              ))}
+              ); })}
               {searchFilterTerm && (
                 <span className="pf-search-filter-chip" title="Click ✕ to remove search filter">
                   <span className="pf-search-filter-chip-icon">🔍</span>
@@ -2223,20 +2246,19 @@ export default class App extends React.Component<Props, State> {
               role="button"
               tabIndex={0}
               className="pf-header-breadcrumb pf-catalog-breadcrumb"
-              onClick={this.props.onRequestCategorySelection}
+              onClick={this.handleCategoryCrumbClick}
               onKeyDown={evt => {
                 if (evt.key === 'Enter' || evt.key === ' ') {
                   evt.preventDefault();
-                  this.props.onRequestCategorySelection();
+                  this.handleCategoryCrumbClick();
                 }
               }}
             >
               {this.props.categoryLabel}
             </span>
-            <span className="pf-header-breadcrumb-sep">›</span>
-            {pivotBreadcrumbs.map((crumb, i) => (
+            {pivotBreadcrumbs.slice(1).map((crumb, j) => { const i = j + 1; return (
               <React.Fragment key={`mobile-header-${crumb}-${i}`}>
-                {i > 0 && <span className="pf-header-breadcrumb-sep">›</span>}
+                <span className="pf-header-breadcrumb-sep">›</span>
                 <span
                   role="button"
                   tabIndex={i === 0 || i < pivotBreadcrumbs.length - 1 ? 0 : -1}
@@ -2252,7 +2274,7 @@ export default class App extends React.Component<Props, State> {
                   {crumb}
                 </span>
               </React.Fragment>
-            ))}
+            ); })}
             {searchFilterTerm && (
               <span className="pf-search-filter-chip" title="Click ✕ to remove search filter">
                 <span className="pf-search-filter-chip-icon">🔍</span>
@@ -2390,32 +2412,23 @@ export default class App extends React.Component<Props, State> {
             </>
           )}
 
-          {/* Navigation arrows - visible when a product is selected */}
-          {selectedProduct && this.state.modalSequence.length > 1 && (
+          {/* Sibling navigation while a card is docked outside hero mode
+              (pivot grid). Same footer arrows as the hero presentation; the
+              old centre-right squares only swapped the card content without
+              moving the viewport, which read as broken. In hero mode the
+              hero arrows above already cover this. */}
+          {selectedProduct && !this.state.isPivotHeroMode && this.state.modalSequence.length > 1 && (
             <>
-              {this.state.selectedIndex > 0 && (
-                <button
-                  type="button"
-                  className="pf-nav-arrow pf-nav-prev"
-                  onClick={() => this.showRelativeProduct(-1)}
-                  aria-label="Previous product"
-                >
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="15 18 9 12 15 6"></polyline>
-                  </svg>
-                </button>
-              )}
-              {this.state.selectedIndex < this.state.modalSequence.length - 1 && (
-                <button
-                  type="button"
-                  className="pf-nav-arrow pf-nav-next"
-                  onClick={() => this.showRelativeProduct(1)}
-                  aria-label="Next product"
-                >
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="9 6 15 12 9 18"></polyline>
-                  </svg>
-                </button>
+              <button type="button" className="pf-hero-arrow pf-hero-arrow-prev" aria-label="Vorheriges Produkt"
+                disabled={this.state.selectedIndex <= 0}
+                onClick={() => this.showRelativeProduct(-1)}>‹</button>
+              <button type="button" className="pf-hero-arrow pf-hero-arrow-next" aria-label="Nächstes Produkt"
+                disabled={this.state.selectedIndex >= this.state.modalSequence.length - 1}
+                onClick={() => this.showRelativeProduct(1)}>›</button>
+              {!this.isMobileLayout() && (
+                <div className="pf-hero-counter">
+                  {String(this.state.selectedIndex + 1).padStart(2, '0')} / {String(this.state.modalSequence.length).padStart(2, '0')}
+                </div>
               )}
             </>
           )}
