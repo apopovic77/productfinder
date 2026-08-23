@@ -998,10 +998,14 @@ export default class App extends React.Component<Props, State> {
         const hp = this.state.isPivotHeroMode ? this.controller.getHeroPosition() : null;
         const heroChanged = (hp?.index ?? -1) !== (this.state.heroPosition?.index ?? -1)
           || (hp?.count ?? 0) !== (this.state.heroPosition?.count ?? 0);
-        if (zoomChanged) {
-          this.setState({ fps, zoom, ...(heroChanged ? { heroPosition: hp } : {}) });
-        } else if (fpsChanged || heroChanged) {
-          this.setState({ fps, ...(heroChanged ? { heroPosition: hp } : {}) });
+        if (zoomChanged && heroChanged) {
+          this.setState({ fps, zoom, heroPosition: hp });
+        } else if (zoomChanged) {
+          this.setState({ fps, zoom });
+        } else if (heroChanged) {
+          this.setState({ fps, heroPosition: hp });
+        } else if (fpsChanged) {
+          this.setState({ fps });
         }
 
         this.fpsFrameCount = 0;
