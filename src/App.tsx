@@ -597,7 +597,10 @@ export default class App extends React.Component<Props, State> {
                   storageId: heroStorageId,
                   width: 1300,
                   quality: 85,
-                  trim: false, // Keep full image as product images are not perfectly isolated
+                  // Same crop as the grid tile it grows out of. Grid = trim,
+                  // hero = untrimmed meant every zoom-in ended with the product
+                  // visibly shrinking once the large image landed.
+                  trim: true,
                 });
 
                 if (this.selectedHeroRequestKey !== heroRequestKey) {
@@ -711,7 +714,7 @@ export default class App extends React.Component<Props, State> {
                   storageId,
                   width: 1300,
                   quality: 85,
-                  trim: false, // Keep full image as product images are not perfectly isolated
+                  trim: true, // same crop as grid tiles and dialog thumbnails
                 });
                 const imgObj: any = { storageId, src, variantName };
 
@@ -855,15 +858,27 @@ export default class App extends React.Component<Props, State> {
     const renderer = this.controller.getRenderer();
     if (!renderer) return;
 
-    // Immediately show thumbnail (already loaded, instant)
+    // The alternative images are preloaded at 1300 px the moment a product
+    // is selected (see the spread-animation loader above). Use that copy:
+    // no intermediate state at all for the common case. Before, this handler
+    // ignored the cache, showed the 130 px dialog thumbnail stretched to
+    // ~900 px and re-fetched the large file (owner report 2026-08-23,
+    // storage 120467).
+    const preloaded = renderer.alternativeImages?.find(a => a.storageId === storageId)?.loadedImage;
+    if (preloaded) {
+      renderer.selectedVariantHeroImage = preloaded;
+      return;
+    }
+
+    // Fallback while the large file is still on its way: the thumbnail.
     if (thumbnailImage) {
       renderer.selectedVariantHeroImage = thumbnailImage;
     }
 
-    // Then load high-res version in background
-    const STORAGE_API_BASE = CENTRAL_STORAGE_BASE;
-    const src = `${STORAGE_API_BASE}/storage/media/${storageId}?width=1300&format=webp&quality=85`;
-
+    // Same crop as the thumbnail (trim) — a trimmed 130 px placeholder
+    // replaced by an untrimmed 1300 px image made the product visibly
+    // shrink when the large one arrived. That jump was the "lame" part.
+    const src = buildMediaUrl({ storageId, width: 1300, quality: 85, trim: true });
     const img = new Image();
     img.onload = () => {
       if (renderer) {
