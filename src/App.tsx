@@ -279,7 +279,7 @@ export default class App extends React.Component<Props, State> {
     });
 
     // Configure controller BEFORE initialize (avoids multiple layout re-triggers)
-    this.controller.skipCanvasRenderer = this.useArcturianRenderer();
+    this.controller.productsOnGpu = this.useArcturianRenderer();
     this.controller.preConfig = {
       gridConfig: this.state.devSettings.gridConfig,
       animationDuration: this.state.devSettings.animationDuration,
@@ -2247,11 +2247,12 @@ export default class App extends React.Component<Props, State> {
               />
             </Suspense>
           ) : null}
-          {/* GPU mode: the canvas stays full-size and ON TOP — it is the input
-              surface (pinch, drag, click, hit-testing) and the layout measures
-              itself by its clientWidth/Height. Only its pixels are hidden;
-              the WebGL layer beneath paints what this canvas' transform says. */}
-          <canvas ref={this.canvasRef} className="pf-canvas" style={this.useArcturianRenderer() ? { opacity: 0, zIndex: 2 } : undefined} />
+          {/* GPU mode: this canvas stays full-size and ON TOP. It is the input
+              surface (pinch, drag, click, hit-testing), the layout measures
+              itself by its clientWidth/Height, and it still draws the pivot
+              headers, hover and selection. Only the product images move to
+              the WebGL layer beneath, which mirrors this canvas' transform. */}
+          <canvas ref={this.canvasRef} className="pf-canvas" style={this.useArcturianRenderer() ? { zIndex: 2, background: 'transparent' } : undefined} />
 
           {/* Navigation arrows - visible when a product is selected */}
           {selectedProduct && this.state.modalSequence.length > 1 && (

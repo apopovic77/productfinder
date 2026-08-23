@@ -173,7 +173,9 @@ function GridScene({ getNodes, getViewport, getSize }: ArcturianRendererProps) {
       const w = (node.width.value ?? 0) * (node.scale.value ?? 1);
       const h = (node.height.value ?? 0) * (node.scale.value ?? 1);
       if (w <= 0 || h <= 0) continue;
-      const x = node.posX.value ?? 0;
+      // heroOffsetX is the card-fan spread when a product is selected;
+      // Canvas2D adds it the same way (CanvasRenderer product loop).
+      const x = (node.posX.value ?? 0) + ((node as any).heroOffsetX?.value ?? 0);
       const y = node.posY.value ?? 0;
 
       // Request the image; visible tiles first, nearer to centre first.

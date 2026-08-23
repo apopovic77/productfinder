@@ -59,7 +59,8 @@ export class ProductFinderController {
   private historyPopStateHandler: ((e: PopStateEvent) => void) | null = null;
   private ignoreNextHistoryPush = false;
 
-  skipCanvasRenderer = false;
+  /** GPU mode: product images come from the WebGL layer (#260). */
+  productsOnGpu = false;
 
   /** The 2D transform every input handler writes to; the GPU renderer mirrors it. */
   getViewportTransform() {
@@ -93,10 +94,10 @@ export class ProductFinderController {
 
     // Skip skeleton — preloader already cached all images before App renders
 
-    // Initialize main renderer (skip if using Arcturian)
-    if (this.skipCanvasRenderer) {
-      this.renderer = null;
-    } else {
+    // The Canvas2D renderer always runs: in GPU mode it draws the pivot
+    // headers, hover, selection and labels while the WebGL layer beneath
+    // draws the product images (#260). One header implementation, not two.
+    {
     this.renderer = new CanvasRenderer<Product>(
       this.ctx,
       () => this.layoutService.getEngine().all(),
@@ -105,6 +106,7 @@ export class ProductFinderController {
       () => this.layoutService.getGroupHeaders(),
       () => this.layoutService.getPivotDimension()
     );
+    this.renderer.productsOnGpu = this.productsOnGpu;
     }
 
     // Setup favorites listener

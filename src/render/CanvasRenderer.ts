@@ -48,6 +48,14 @@ export class CanvasRenderer<T> {
   public selectedProductBounds: { x: number; y: number; width: number; height: number } | null = null; // Cell dimensions
   public heroDisplayMode: 'overlay' | 'force-labels' = 'overlay';
   public overlayScaleMode: 'scale-invariant' | 'scale-with-content' = 'scale-invariant';
+
+  /**
+   * GPU mode (issue #260): the product images are drawn by the WebGL layer
+   * underneath; this renderer keeps everything that surrounds them — pivot
+   * headers, hover, selection glow, labels, annotations — so there is one
+   * implementation of those, not two.
+   */
+  public productsOnGpu = false;
   public imageSpreadDirection: 'auto' | 'horizontal' | 'vertical' = 'auto';
 
   // Hero product trim bounds (normalized 0-1 coordinates for text positioning)
@@ -633,7 +641,9 @@ export class CanvasRenderer<T> {
     // physical clear, then re-establish the CSS-pixel base transform
     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
     this.ctx.clearRect(0, 0, c.width, c.height);
-    if (this.backgroundColor) {
+    // GPU mode: never paint a background here — it would cover the WebGL
+    // layer beneath. The background moves to the GL host (see renderer).
+    if (this.backgroundColor && !this.productsOnGpu) {
       this.ctx.fillStyle = this.backgroundColor;
       this.ctx.fillRect(0, 0, c.width, c.height);
     }
@@ -1222,6 +1232,7 @@ export class CanvasRenderer<T> {
     }
 
     for (const n of nodes) {
+      if (this.productsOnGpu) break; // images come from the GPU layer
       const baseX = n.posX.value ?? 0;
       const heroOffset = n.heroOffsetX.value ?? 0;
       const x = baseX + heroOffset;
