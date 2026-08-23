@@ -304,7 +304,13 @@ export class ProductFinderController {
     if (isHeroMode) {
       // Hero mode: Horizontal-only scrolling, scale 1.0 (no zoom)
       this.viewportService.setLockVerticalPan(true);
-      const centerX = bounds.minX + bounds.width / 2;
+      // Start on the FIRST product, not the middle of the row. Centring the
+      // row's midpoint put the viewport between products two and three of
+      // four (owner report 2026-08-23, storage 120464/120465): the dealer
+      // had just clicked a group whose first item is the one they saw on
+      // top, and the hero view opened on a different helmet.
+      const centers = this.heroProductCenters();
+      const centerX = centers.length ? centers[0] : bounds.minX + bounds.width / 2;
       const centerY = bounds.minY + bounds.height / 2;
       this.viewportService.centerOn(centerX, centerY, 1);
       // Paged swiping: on release, settle on a product centre. A flick
