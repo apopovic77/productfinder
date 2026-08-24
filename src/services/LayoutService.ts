@@ -904,12 +904,17 @@ export class LayoutService {
       // Horizontal extension: To center first product: its center must be at viewportWidth/2
       // This requires: minX = firstProductCenter - viewportWidth/2
       const firstProductCenter = firstProduct.x + firstProduct.w / 2;
-      const requiredMinX = firstProductCenter - (viewportWidth / 2);
+      // Dock margin: the desktop card sits right of the stage, so the hero
+      // focal point is viewport-centre MINUS the dock shift (~276 px). With
+      // a single product the clamp range collapsed to exact centring and
+      // the card overlapped the helmet (issue #1304, 120561).
+      const dockMargin = 320;
+      const requiredMinX = firstProductCenter - (viewportWidth / 2) - dockMargin;
 
       // To center last product: its center must be at viewportWidth/2
       // This requires: maxX = lastProductCenter + viewportWidth/2
       const lastProductCenter = lastProduct.x + lastProduct.w / 2;
-      const requiredMaxX = lastProductCenter + (viewportWidth / 2);
+      const requiredMaxX = lastProductCenter + (viewportWidth / 2) + dockMargin;
 
       // Set horizontal bounds to these exact values
       minX = requiredMinX;
