@@ -43,6 +43,11 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
   // is pending nothing renders (background stays dark); on a miss or error
   // the sport video takes over as before.
   const [bgImageUrl, setBgImageUrl] = useState<string | null>(null);
+  // Focal-aware crop: storage-api's face detector (GET /media/{id}/focal,
+  // AI-cost-free, cached server-side). Helmeted riders usually yield no
+  // face -> keep the 78% heuristic; a real focal steers the crop so the
+  // subject stays visible in the strip left of the detail dialog.
+  const [bgPosition, setBgPosition] = useState<string | null>(null);
   const [bgResolved, setBgResolved] = useState(!imageQuery);
 
   useEffect(() => {
@@ -60,6 +65,20 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
         const hit = hits[0];
         if (hit && hit.similarity >= LIFESTYLE_MIN_SIMILARITY) {
           setBgImageUrl(`${STORAGE_API_URL}/storage/media/${hit.storage_id}?width=1920&format=webp&quality=82`);
+          fetch(`${STORAGE_API_URL}/storage/media/${hit.storage_id}/focal`)
+            .then(r => (r.ok ? r.json() : null))
+            .then(focal => {
+              if (cancelled || !focal?.focal_point) return;
+              const fx = focal.focal_point.x_pct;
+              const fy = focal.focal_point.y_pct;
+              // Shift the crop so the subject lands in the left strip:
+              // position p aligns image-p% with container-p%; +28 pushes
+              // the focal left of centre (50 -> 78 = the old heuristic).
+              const px = Math.max(0, Math.min(100, fx + 28));
+              const py = Math.max(0, Math.min(100, fy));
+              setBgPosition(`${px.toFixed(0)}% ${py.toFixed(0)}%`);
+            })
+            .catch(() => {});
         }
         setBgResolved(true);
       })
@@ -146,6 +165,7 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
           className={`hero-bg-image ${isLoaded && !isClosing ? 'loaded' : ''}`}
           style={{
             backgroundImage: `url(${bgImageUrl})`,
+            ...(bgPosition ? { backgroundPosition: bgPosition } : {}),
             opacity: isLoaded && !isClosing ? backdropOpacity : 0,
           }}
         />

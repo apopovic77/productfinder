@@ -504,7 +504,8 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     // V2 API: price is object { gross, net, currency }
     if (typeof variant.price === 'object' && variant.price.gross !== undefined) {
       const currency = variant.price.currency === 'EUR' ? '€' : variant.price.currency || '€';
-      return `${currency} ${variant.price.gross.toFixed(2)}`;
+      // gross can be null in LIUS (price not maintained) — crashed the card
+      return typeof variant.price.gross === 'number' ? `${currency} ${variant.price.gross.toFixed(2)}` : '';
     }
     // V1 API: price is number
     if (typeof variant.price === 'number') {
