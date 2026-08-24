@@ -22,6 +22,7 @@
   height: auto;
   transform: translate(-50%, -50%);
   object-fit: cover;
+  object-position: 78% center;
   opacity: 0;
   transition: opacity 1s ease-in-out; /* 1 second fade-in */
 }
@@ -124,7 +125,10 @@
   position: absolute;
   inset: 0;
   background-size: cover;
-  background-position: center;
+  /* Subject sits in the media centre; the expanded dialog covers the
+     screen centre-right. Pull the crop so the rider shows in the free
+     left strip (owner 2026-08-24). */
+  background-position: 78% center;
   opacity: 0;
   transition: opacity 1s ease-in-out;
   animation: hero-kenburns 24s ease-in-out infinite alternate;

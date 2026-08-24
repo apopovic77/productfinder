@@ -1076,7 +1076,7 @@ export default class App extends React.Component<Props, State> {
     // STAYING on the leaf keeps it shut.
     if (this.autoOpenedLeafKey && this.autoOpenedLeafKey !== crumbKey) this.autoOpenedLeafKey = null;
     const eligible = this.controller.isPivotHeroMode()
-      && !this.controller.isHeroRootOverview()
+      && this.controller.getPivotBreadcrumbs().length > 1 // not the category root
       && order.length === 1;
     if (!eligible) return;
     if (this.autoOpenedLeafKey === crumbKey || this.state.selectedProduct) return;

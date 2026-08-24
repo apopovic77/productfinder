@@ -404,10 +404,14 @@ export class LayoutService {
     return this.engine;
   }
 
-  /** Category root reached hero mode without a single drill — overview case. */
+  /**
+   * Hero mode presents as an OVERVIEW grid first — root or drilled leaf
+   * (owner 2026-08-24: 8SRS with 17 products went bildfüllend although the
+   * group overview exists). The hero presentation itself is what a click
+   * on a product opens.
+   */
   isHeroRootOverview(): boolean {
-    return this.isPivotHeroMode()
-      && ((this.drillDownService as any).engine?.navigationStack?.length ?? 0) === 0;
+    return this.isPivotHeroMode();
   }
 
   layout(width: number, height: number): void {
