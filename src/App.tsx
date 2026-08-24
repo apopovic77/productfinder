@@ -321,6 +321,7 @@ export default class App extends React.Component<Props, State> {
 
     // Listen to controller state changes
     this.controller.addListener(state => {
+      this.maybeAutoOpenSingleHero();
       const currentProduct = this.state.selectedProduct;
       const groupKey = currentProduct ? this.controller.getGroupKeyForProduct(currentProduct) : undefined;
       const sequence = groupKey
@@ -1057,6 +1058,36 @@ export default class App extends React.Component<Props, State> {
       isPivotHeroMode: this.controller.isPivotHeroMode(),
       heroPosition: this.controller.getHeroPosition(),
     });
+    this.maybeAutoOpenSingleHero();
+  };
+
+  /**
+   * A hero leaf with exactly one product behaves as if that product were
+   * already clicked: the card opens by itself (issue #1309). Guarded per
+   * breadcrumb path so closing the card does not reopen it; leaving the
+   * leaf clears the guard.
+   */
+  private autoOpenedLeafKey: string | null = null;
+
+  private maybeAutoOpenSingleHero = () => {
+    const crumbKey = this.controller.getPivotBreadcrumbs().join('>');
+    const order = this.controller.getDisplayOrder();
+    // Any path change re-arms the auto-open; only closing the card while
+    // STAYING on the leaf keeps it shut.
+    if (this.autoOpenedLeafKey && this.autoOpenedLeafKey !== crumbKey) this.autoOpenedLeafKey = null;
+    const eligible = this.controller.isPivotHeroMode()
+      && !this.controller.isHeroRootOverview()
+      && order.length === 1;
+    if (!eligible) return;
+    if (this.autoOpenedLeafKey === crumbKey || this.state.selectedProduct) return;
+    this.autoOpenedLeafKey = crumbKey;
+    // Let the hero layout settle before centring + docking the card.
+    setTimeout(() => {
+      if (this.state.selectedProduct) return;
+      if (this.controller.getPivotBreadcrumbs().join('>') !== crumbKey) return;
+      const only = this.controller.getDisplayOrder()[0];
+      if (only) this.openProductDetails(only, { pushHistory: false });
+    }, 450);
   };
 
   private startFPSCounter = () => {
