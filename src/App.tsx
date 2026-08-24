@@ -1204,9 +1204,14 @@ export default class App extends React.Component<Props, State> {
     }
   };
 
+  /**
+   * Breadcrumb semantics (issue #1311): a crumb goes to ITS page — the one
+   * you saw after choosing it. O'Neal -> sport selection, MOTO -> category
+   * selection, MX HELMETS -> this category's pivot root. Clicking the
+   * category crumb never opens the selection list (that is MOTO's page).
+   */
   private handleCategoryCrumbClick = () => {
     if (this.state.pivotBreadcrumbs.length > 1) this.handleBreadcrumbClick(0);
-    else this.props.onRequestCategorySelection();
   };
 
   private resetToInitialView = () => {
@@ -2103,11 +2108,11 @@ export default class App extends React.Component<Props, State> {
                 role={this.props.canChangeBrand ? 'button' : undefined}
                 tabIndex={this.props.canChangeBrand ? 0 : -1}
                 className={`pf-header-breadcrumb pf-brand-breadcrumb ${this.props.canChangeBrand ? 'changeable' : ''}`}
-                onClick={this.props.canChangeBrand ? this.props.onRequestBrandSelection : undefined}
+                onClick={this.props.onRequestSportSelection}
                 onKeyDown={evt => {
                   if (this.props.canChangeBrand && (evt.key === 'Enter' || evt.key === ' ')) {
                     evt.preventDefault();
-                    this.props.onRequestBrandSelection();
+                    this.props.onRequestSportSelection();
                   }
                 }}
                 title={this.props.canChangeBrand ? 'Change brand' : `Brand: ${this.props.brand}`}
@@ -2119,11 +2124,11 @@ export default class App extends React.Component<Props, State> {
                 role="button"
                 tabIndex={0}
                 className="pf-header-breadcrumb pf-catalog-breadcrumb"
-                onClick={this.props.onRequestSportSelection}
+                onClick={this.props.onRequestCategorySelection}
                 onKeyDown={evt => {
                   if (evt.key === 'Enter' || evt.key === ' ') {
                     evt.preventDefault();
-                    this.props.onRequestSportSelection();
+                    this.props.onRequestCategorySelection();
                   }
                 }}
               >
@@ -2359,11 +2364,11 @@ export default class App extends React.Component<Props, State> {
               role={this.props.canChangeBrand ? 'button' : undefined}
               tabIndex={this.props.canChangeBrand ? 0 : -1}
               className={`pf-header-breadcrumb pf-brand-breadcrumb ${this.props.canChangeBrand ? 'changeable' : ''}`}
-              onClick={this.props.canChangeBrand ? this.props.onRequestBrandSelection : undefined}
+              onClick={this.props.onRequestSportSelection}
               onKeyDown={evt => {
                 if (this.props.canChangeBrand && (evt.key === 'Enter' || evt.key === ' ')) {
                   evt.preventDefault();
-                  this.props.onRequestBrandSelection();
+                  this.props.onRequestSportSelection();
                 }
               }}
             >
@@ -2374,11 +2379,11 @@ export default class App extends React.Component<Props, State> {
               role="button"
               tabIndex={0}
               className="pf-header-breadcrumb pf-catalog-breadcrumb"
-              onClick={this.props.onRequestSportSelection}
+              onClick={this.props.onRequestCategorySelection}
               onKeyDown={evt => {
                 if (evt.key === 'Enter' || evt.key === ' ') {
                   evt.preventDefault();
-                  this.props.onRequestSportSelection();
+                  this.props.onRequestCategorySelection();
                 }
               }}
             >
