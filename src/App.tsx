@@ -409,6 +409,9 @@ export default class App extends React.Component<Props, State> {
         || prevState.selectedVariant !== this.state.selectedVariant) && this.state.selectedProduct) {
       this.preloadDialogGallery();
     }
+    if (prevState.selectedProduct && !this.state.selectedProduct) {
+      this.controller.exitHeroPresentation();
+    }
     if (prevState.selectedProduct !== this.state.selectedProduct && this.isMobileLayout()) {
       this.sheetObserver?.disconnect();
       this.sheetObserver = null;
@@ -1604,7 +1607,7 @@ export default class App extends React.Component<Props, State> {
     // Category-root overview: the siblings are ALL products of the
     // category, not just the colour group — else the arrows counted 01/02
     // inside a 22-product overview.
-    const sequence = (this.controller.isHeroRootOverview()
+    const sequence = (this.controller.isHeroRootOverview() || this.controller.isPivotHeroMode()
       ? this.controller.getDisplayOrder()
       : this.controller.getDisplayOrderForGroup(groupKey)).map(p => p.id);
     const seqIndex = sequence.indexOf(product.id);

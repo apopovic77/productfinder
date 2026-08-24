@@ -662,6 +662,16 @@ export class ProductFinderController {
     const viewport = this.viewportService.getTransform();
     if (!viewport) return;
 
+    // Overview grid -> hero presentation: switch the layouter so all nodes
+    // animate sideways into the hero row, THEN centre the clicked one.
+    if ((this.canvas?.clientWidth ?? 0) >= 768
+        && this.layoutService.isPivotHeroMode()
+        && this.layoutService.isHeroRootOverview()) {
+      this.layoutService.setHeroPresentation(true);
+      this._heroEntryKey = null;
+      this.handleResize();
+    }
+
     // Find the node for this product
     const nodes = this.layoutService.getEngine().all();
     const node = nodes.find(n => n.data.id === product.id);
@@ -671,11 +681,12 @@ export class ProductFinderController {
       return;
     }
 
-    // Get product center and dimensions in world coordinates
-    const x = node.posX.value ?? 0;
-    const y = node.posY.value ?? 0;
-    const w = node.width.value ?? 0;
-    const h = node.height.value ?? 0;
+    // DESTINATION, not the mid-animation position: the row layout was just
+    // applied as targets.
+    const x = node.posX.targetValue ?? node.posX.value ?? 0;
+    const y = node.posY.targetValue ?? node.posY.value ?? 0;
+    const w = node.width.targetValue ?? node.width.value ?? 0;
+    const h = node.height.targetValue ?? node.height.value ?? 0;
 
     const centerX = x + w / 2;
     const centerY = y + h / 2;
@@ -962,6 +973,14 @@ export class ProductFinderController {
   
   isHeroRootOverview(): boolean {
     return this.layoutService.isHeroRootOverview() && (this.canvas?.clientWidth ?? 0) >= 768;
+  }
+
+  /** Card closed: the hero row flows back into the overview grid. */
+  exitHeroPresentation(): void {
+    if (!this.layoutService.isHeroPresentation()) return;
+    this.layoutService.setHeroPresentation(false);
+    this._heroEntryKey = null;
+    this.handleResize();
   }
 
   getPivotDimensions(): GroupDimension[] {

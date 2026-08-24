@@ -405,13 +405,24 @@ export class LayoutService {
   }
 
   /**
-   * Hero mode presents as an OVERVIEW grid first — root or drilled leaf
-   * (owner 2026-08-24: 8SRS with 17 products went bildfüllend although the
-   * group overview exists). The hero presentation itself is what a click
-   * on a product opens.
+   * Hero mode presents as an OVERVIEW grid first — root or drilled leaf.
+   * Selecting a product enters the hero PRESENTATION: the very same nodes
+   * animate from their grid slots into the side-by-side hero row (fluid
+   * flow via the interpolated node targets, owner 2026-08-24). Closing the
+   * card animates them back into the grid.
    */
+  private _heroPresentation = false;
+
+  setHeroPresentation(active: boolean): void {
+    this._heroPresentation = active;
+  }
+
+  isHeroPresentation(): boolean {
+    return this._heroPresentation;
+  }
+
   isHeroRootOverview(): boolean {
-    return this.isPivotHeroMode();
+    return this.isPivotHeroMode() && !this._heroPresentation;
   }
 
   layout(width: number, height: number): void {
