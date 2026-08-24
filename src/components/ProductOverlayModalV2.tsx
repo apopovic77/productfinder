@@ -576,7 +576,10 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       model = cut.slice(0, Math.max(20, cut.lastIndexOf(' '))) + '…';
     }
     if (!model) model = line || design;
-    return { series: line, model, colour: (rawProduct.color_name || '') as string };
+    // "7SRS" series + "7SRS" model rendered as "7SRS 7SRS" — drop the
+    // series line when it adds nothing.
+    const series = line && line.trim().toLowerCase() !== model.trim().toLowerCase() ? line : '';
+    return { series, model, colour: (rawProduct.color_name || '') as string };
   }, [rawProduct.product_line, rawProduct.design_group, rawProduct.color_name, product.name]);
 
   // Hero dock badges (design 2026-08-23): only what the data really carries.

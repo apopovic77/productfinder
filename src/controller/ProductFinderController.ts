@@ -662,7 +662,9 @@ export class ProductFinderController {
     const screenHeight = viewport.viewportHeight;
     const screenWidth = viewport.viewportWidth;
     const isMobile = screenWidth < 768;
-    const fillRatio = isMobile ? 0.6 : 0.9;
+    // Desktop: leave room BELOW the product for its caption (name + price)
+    // — at 0.9 the caption fell off the bottom edge (120532).
+    const fillRatio = isMobile ? 0.6 : 0.78;
     let targetScale = (screenHeight * fillRatio) / h;
 
     // Desktop hero dock (design 2026-08-23): the dark card occupies the right
@@ -679,6 +681,11 @@ export class ProductFinderController {
     // shoved upward put the helmet half under the sheet and half under the
     // header (120518). Fit into the free band, centre it there.
     let focusY = centerY;
+    if (!isMobile && h > 0) {
+      // Nudge the product up a little so the caption band clears the
+      // arrows/counter at the bottom.
+      focusY = centerY + h * 0.06;
+    }
     if (isMobile && h > 0 && w > 0) {
       const sheetH = (typeof window !== 'undefined' ? window.innerHeight : screenHeight) * 0.52 + 8;
       const freeH = Math.max(120, screenHeight - sheetH);

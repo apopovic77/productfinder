@@ -299,3 +299,11 @@
 .pf-catalog-sport-card:disabled.has-banner {
   filter: grayscale(0.85) brightness(0.6);
 }
+
+/* Phone: "PRODUKTKATEGORIE" at min 46 px overran the right edge. */
+@media (max-width: 767px) {
+  .pf-catalog-page-title {
+    font-size: clamp(30px, 10.5vw, 46px);
+    overflow-wrap: anywhere;
+  }
+}

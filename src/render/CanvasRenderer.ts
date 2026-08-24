@@ -1403,7 +1403,14 @@ export class CanvasRenderer<T> {
       const y = n.posY.value ?? 0;
       const w = n.width.value ?? 0, h = n.height.value ?? 0;
       const scale = n.scale.value ?? 1;
-      const opacity = n.opacity.value ?? 1;
+      let opacity = n.opacity.value ?? 1;
+      // Phone, card open: the selected product IS the hero — fade the
+      // neighbours far back instead of standing beside it at full strength
+      // ("ich sehe beide nebeneinander, das ist verwirrend", 2026-08-24).
+      if (this.selectedProduct && this.ctx.canvas.clientWidth < 768
+          && (n.data as any).id !== (this.selectedProduct as any).id) {
+        opacity *= 0.10;
+      }
 
       if (opacity <= 0.01) {
         const hiddenProduct = n.data as any as Product;

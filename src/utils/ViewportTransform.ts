@@ -441,6 +441,21 @@ export class ViewportTransform {
       if (target !== null) {
         this.targetOffset.x = this.viewportWidth / 2 - target * this.targetScale;
       }
+    } else {
+      // Free-scrolling views: carry the release velocity into a glide.
+      // Killing it dead made long lists feel like dragging a brick — every
+      // screenful needed its own swipe (owner 2026-08-24, phone leaf grid).
+      // The interpolation eases toward the projected point; the rubber
+      // band still owns the edges.
+      const GLIDE = 16;      // ≈ Σ 0.95^n of the per-frame velocity
+      const MAX_GLIDE = 2400;
+      const clampGlide = (v: number) => Math.max(-MAX_GLIDE, Math.min(MAX_GLIDE, v * GLIDE));
+      if (!this.lockHorizontalPan && Math.abs(this.velocityX) > 2) {
+        this.targetOffset.x += clampGlide(this.velocityX);
+      }
+      if (!this.lockVerticalPan && Math.abs(this.velocityY) > 2) {
+        this.targetOffset.y += clampGlide(this.velocityY);
+      }
     }
     this.velocityX = 0;
     this.velocityY = 0;
