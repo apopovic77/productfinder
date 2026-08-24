@@ -28,6 +28,8 @@ type Props = {
    * space, so the card never covers the helmet.
    */
   heroDock?: boolean;
+  /** Colour sibling chosen in the card — App re-selects it on the canvas. */
+  onSiblingSelect?: (productId: string | number) => boolean;
   /** Expanded state: the SAME card grows into the detail view (true morph). */
   expanded?: boolean;
   onCollapse?: () => void;
@@ -56,7 +58,7 @@ interface ParsedFeature {
  * Product Overlay Modal V2 - HALF WIDTH VERSION (240px)
  * Same design as V1, but with compact half-width layout
  */
-export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady, onShowDetails, expanded = false, onCollapse, locale }) => {
+export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady, onShowDetails, expanded = false, onCollapse, locale, onSiblingSelect }) => {
   const isMobilePortrait = window.innerWidth <= 768 && window.innerHeight > window.innerWidth;
   // Phone: the dark hero card as a full-width bottom sheet (owner 2026-08-23,
   // "die Karte auch im Desktop-Style"). Same markup as the desktop dock,
@@ -199,11 +201,14 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   const [thumbnailImages, setThumbnailImages] = useState<Array<{ storageId: number | null; src: string; label: string }>>([]);
   const [thumbnailsLoading, setThumbnailsLoading] = useState(true);
 
-  // Clear thumbnails immediately when product changes
+  // Clear thumbnails immediately when the shown product changes — ALSO on
+  // a colour-sibling swap (fullProduct changes while product.id stays):
+  // the old gallery kept showing for siblings without images and a yellow
+  // jersey displayed a black/white shirt (owner 2026-08-24, 120598).
   useEffect(() => {
     setThumbnailsLoading(true);
     setThumbnailImages([]);
-  }, [product.id]);
+  }, [product.id, (activeProduct as any)?.id]);
 
   // Load new thumbnails - filtered by selected color (supports both V1 and V2 API)
   useEffect(() => {
@@ -746,6 +751,11 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       {/* Expanded: hero stage — the big dialog exists to PRESENT the
           product (owner 2026-08-24). Large active image on a white stage,
           thumbs below it; the outer mini strip hides via CSS. */}
+      {expanded && allImages.length === 0 && !thumbnailsLoading && (
+        <div className="pom-expanded-hero pom-expanded-hero-empty">
+          <span>Kein Produktbild verfügbar</span>
+        </div>
+      )}
       {expanded && allImages.length > 0 && (() => {
         const active = allImages[Math.max(0, Math.min(selectedImageIndex, allImages.length - 1))];
         const heroSrc = active?.storageId
@@ -970,6 +980,10 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                     disabled={isActive}
                     onClick={async () => {
                       if (isActive || opt.id === 'current') return;
+                      // Prefer a real re-selection: canvas, stage and card
+                      // then all show the SAME product. In-card sibling view
+                      // only when the sibling is not on the current level.
+                      if (onSiblingSelect && onSiblingSelect(opt.id)) return;
                       setIsSiblingView(true);
                       const sibProduct = await fetchProductById(opt.id as number);
                       if (sibProduct) {

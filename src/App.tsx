@@ -2977,6 +2977,12 @@ export default class App extends React.Component<Props, State> {
                 onImageSelect={this.handleDialogImageSelect}
                 isHiResReady={this.isHiResReady}
                 onShowDetails={() => this.setState({ shouldShowV4Dialog: true })}
+                onSiblingSelect={(pid) => {
+                  const target = this.controller.getDisplayOrder().find(pr => String(pr.id) === String(pid));
+                  if (!target) return false;
+                  this.openProductDetails(target, { pushHistory: false });
+                  return true;
+                }}
                 onBuy={this.handleProductBuy}
               />
             </>
