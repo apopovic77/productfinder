@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { createPortal } from 'react-dom';
 import type { Product } from '../types/Product';
 import { soundService } from '../services/SoundService';
 import { sanitizeInlineHtml, extractYouTubeIds } from '../utils/richText';
@@ -167,6 +168,21 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       }
     }
   }, [selectedColor, availableSizes, selectedSize]);
+
+  // Expanded detail text (LIUS long_text, locale-aware) + video ids — used
+  // by BOTH the right info column and the hero stage (video plays IN the
+  // stage where the photo sits, owner 2026-08-24, 120594).
+  const expandedDescText = useMemo(() => {
+    const raw: any = (activeProduct as any)?.raw || {};
+    const descriptions: any[] = raw?.descriptions || [];
+    const LOCALE_IDS: Record<string, number> = { de: 6, fr: 20, it: 22, es: 23, en: 26, pl: 31, cs: 45 };
+    const pick = (id: number) => descriptions.find((d: any) => d.language_id === id);
+    const longOf = (d: any) => (d?.long_text || '').trim();
+    return longOf(pick(LOCALE_IDS[locale || 'de'] ?? 6)) || longOf(pick(26)) || longOf(pick(6)) || '';
+  }, [activeProduct, locale]);
+  const stageVideoIds = useMemo(() => extractYouTubeIds(expandedDescText), [expandedDescText]);
+  const [stageVideoId, setStageVideoId] = useState<string | null>(null);
+  useEffect(() => { setStageVideoId(null); }, [product.id, expanded]);
 
   // Find active variant
   const activeVariant = variants.find((v: any) =>
@@ -734,10 +750,43 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         const heroSrc = active?.storageId
           ? `${STORAGE_API_URL}/storage/media/${active.storageId}?width=1000&format=webp&quality=85&trim=true`
           : active?.src;
-        return (
-          <div className="pom-expanded-hero">
-            <img className="pom-expanded-hero-img" src={heroSrc} alt={product.name} />
+        // Fixed to the viewport: the stage must NOT scroll with the info
+        // column (owner 2026-08-24 — two separate blocks). The dialog
+        // geometry is deterministic (anchored bottom-right).
+        const expW = Math.min(1040, window.innerWidth - 248);
+        const stageStyle: React.CSSProperties = isMobilePortrait ? {} : {
+          position: 'fixed',
+          left: `${window.innerWidth - 208 - expW + 20}px`,
+          top: 'calc(14vh + 20px)',
+          bottom: '20px',
+          width: '492px',
+        };
+        const stage = (
+          <div className="pom-expanded-hero" style={{ ...stageStyle, zIndex: 10002 }}>
+            {stageVideoId ? (
+              <iframe
+                className="pom-expanded-hero-video"
+                src={`https://www.youtube-nocookie.com/embed/${stageVideoId}?autoplay=1`}
+                title="Produktvideo"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            ) : (
+              <img className="pom-expanded-hero-img" src={heroSrc} alt={product.name} />
+            )}
             <div className="pom-expanded-hero-thumbs">
+              {stageVideoIds.map(id => (
+                <button
+                  key={`video-${id}`}
+                  type="button"
+                  className={`pom-expanded-thumb pom-expanded-thumb-video ${stageVideoId === id ? 'active' : ''}`}
+                  onClick={() => setStageVideoId(stageVideoId === id ? null : id)}
+                  title="Produktvideo abspielen"
+                >
+                  <img src={`https://i.ytimg.com/vi/${id}/mqdefault.jpg`} alt="" />
+                  <span className="pom-expanded-thumb-play">▶</span>
+                </button>
+              ))}
               {allImages.map((img, idx) => {
                 const thumbnailUrl = img.storageId ? buildThumbUrl(img.storageId) : img.src;
                 const isActive = idx === selectedImageIndex;
@@ -747,6 +796,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                     type="button"
                     className={`pom-expanded-thumb ${isActive ? 'active' : ''}`}
                     onClick={() => {
+                      setStageVideoId(null);
                       manualHoldUntilRef.current = Date.now() + 12000;
                       cyclePosRef.current = idx;
                       autoSelectedRef.current = -1;
@@ -764,6 +814,9 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
             </div>
           </div>
         );
+        // Portal: position:fixed inside the dialog is captured by its
+        // transform (framer) — outside it is truly viewport-fixed.
+        return isMobilePortrait ? stage : createPortal(stage, document.body);
       })()}
 
       {/* Title - V4 Style: First word thin, rest bold */}
@@ -1027,13 +1080,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       {/* Expanded-only detail sections: the SAME dialog grows and reveals
           these (owner 2026-08-24 — true morph, no second dialog). */}
       {expanded && (() => {
-        // Descriptions hang on the PRODUCT raw (fetched detail), not the variant.
-        const activeRaw: any = (activeProduct as any)?.raw || {};
-        const descriptions: any[] = activeRaw?.descriptions || [];
-        const LOCALE_IDS: Record<string, number> = { de: 6, fr: 20, it: 22, es: 23, en: 26, pl: 31, cs: 45 };
-        const pick = (id: number) => descriptions.find((d: any) => d.language_id === id);
-        const longOf = (d: any) => (d?.long_text || '').trim();
-        const descText = longOf(pick(LOCALE_IDS[locale || 'de'] ?? 6)) || longOf(pick(26)) || longOf(pick(6)) || (activeVariant as any)?.description_long || '';
+        const descText = expandedDescText || (activeVariant as any)?.description_long || '';
         const props: Array<[string, string]> = [];
         const raw: any = (product as any).raw || {};
         const attrs: any = (product as any).attributes || {};
@@ -1053,18 +1100,6 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                 ))}
               </div>
             )}
-            {extractYouTubeIds(descText).map(id => (
-              <div key={id} style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', margin: '10px 0', borderRadius: '12px', overflow: 'hidden', background: '#000' }}>
-                <iframe
-                  src={`https://www.youtube-nocookie.com/embed/${id}`}
-                  title="Produktvideo"
-                  loading="lazy"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                  allowFullScreen
-                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }}
-                />
-              </div>
-            ))}
             {props.length > 0 && (
               <div className="pom-expanded-props">
                 {props.map(([k, v]) => (
