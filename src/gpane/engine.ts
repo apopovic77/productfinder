@@ -85,15 +85,14 @@ export class GPANEEngine {
     const scored = this._scoredDimensions.find(d => d.key === key);
     const strategy = scored?.recommendedStrategy ?? '';
     if (scored?.dataType === 'numeric_continuous' || scored?.dataType === 'numeric_discrete' || strategy.startsWith('range_')) {
-      let withValue = 0;
-      const distinct = new Set<string>();
-      for (const prod of products) {
-        const v = getProductValue(prod, key);
-        if (v === null || v === undefined || v === '') continue;
-        withValue++;
-        distinct.add(String(v));
-      }
-      return withValue >= 4 && distinct.size >= 2;
+      // Ask the actual bucketer: 17 helmets at (almost) one price passed a
+      // distinct-values test, but the range boundaries collapse to a single
+      // bucket — the pick then fell through to the hero row instead of a
+      // price pivot (owner 2026-08-24, 120559).
+      if (!scored) return false;
+      const trial = buildBuckets(products, scored, this._config);
+      const real = trial.filter(b => !b.isUnknown && b.count >= 1);
+      return real.length >= 2;
     }
     const groups = new Map<string, number>();
     for (const prod of products) {
