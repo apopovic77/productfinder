@@ -43,6 +43,17 @@ function sanitizeInlineHtml(html: string): string {
   return Array.from(doc.body.childNodes).map(walk).join('');
 }
 
+/** YouTube ids referenced anywhere in a description (watch/short/embed URLs). */
+function extractYouTubeIds(text: string): string[] {
+  const ids: string[] = [];
+  const re = /(?:youtube(?:-nocookie)?\.com\/(?:watch\?[^"'\s]*?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{6,20})/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (!ids.includes(m[1])) ids.push(m[1]);
+  }
+  return ids;
+}
+
 // Storage API base URL from environment
 const STORAGE_API_URL = STORAGE_API_BASE;
 
@@ -510,6 +521,7 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, local
       {/* Dialog */}
       <motion.div
         ref={dialogRef}
+        layoutId="pf-product-dialog"
         className="pom-info-panel pom-panel-standalone pom-v4-glassmorphism"
         style={{
           position: 'fixed',
@@ -535,12 +547,13 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, local
           transition: isMobile ? 'none' : 'top 0.05s linear',
           zIndex: 1000,
         }}
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.95 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
         transition={{
           duration: 0.4,
           ease: [0.4, 0, 0.2, 1],
+          layout: { duration: 0.45, ease: [0.4, 0, 0.2, 1] },
         }}
         onClick={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
@@ -754,6 +767,21 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, local
                   {materialText}
                 </div>
               )}
+              {/* Video links in the copy become real embeds (owner
+                  2026-08-24). The iframe URL is built from the extracted
+                  id, never taken from the source HTML. */}
+              {extractYouTubeIds(descText).map(id => (
+                <div key={id} style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', margin: '12px 0 4px', borderRadius: '12px', overflow: 'hidden', background: '#000' }}>
+                  <iframe
+                    src={`https://www.youtube-nocookie.com/embed/${id}`}
+                    title="Produktvideo"
+                    loading="lazy"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }}
+                  />
+                </div>
+              ))}
             </div>
           );
         })()}

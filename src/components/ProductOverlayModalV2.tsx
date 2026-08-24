@@ -26,6 +26,8 @@ type Props = {
    * space, so the card never covers the helmet.
    */
   heroDock?: boolean;
+  /** Opens the big detail dialog (V4) — the card morphs into it. */
+  onShowDetails?: () => void;
   onBuy?: (payload: {
     product: Product;
     variant?: any;
@@ -48,7 +50,7 @@ interface ParsedFeature {
  * Product Overlay Modal V2 - HALF WIDTH VERSION (240px)
  * Same design as V1, but with compact half-width layout
  */
-export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady }) => {
+export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady, onShowDetails }) => {
   const isMobilePortrait = window.innerWidth <= 768 && window.innerHeight > window.innerWidth;
   // Phone: the dark hero card as a full-width bottom sheet (owner 2026-08-23,
   // "die Karte auch im Desktop-Style"). Same markup as the desktop dock,
@@ -654,6 +656,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
 
   return (
     <motion.div
+      layoutId="pf-product-dialog"
       className={`pom-info-panel pom-panel-standalone ${heroDock ? 'pom-hero-dock' : ''} ${heroSheet ? 'pom-hero-sheet' : ''}`}
       style={{
         position: 'fixed',
@@ -674,12 +677,13 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         fontSize: isMobilePortrait ? '12px' : '11px',
         overflowY: heroSheet ? 'hidden' : isMobilePortrait ? 'auto' : 'visible',
       }}
-      initial={{ opacity: 0, x: 50 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 50 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
       transition={{
         duration: 0.3,
-        ease: 'easeOut'
+        ease: 'easeOut',
+        layout: { duration: 0.45, ease: [0.4, 0, 0.2, 1] },
       }}
       onClick={(e) => e.stopPropagation()}
       onMouseDown={handleMouseDown}
@@ -968,6 +972,11 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
           <button className="pom-button pom-button-primary" onClick={handleAddToCart} style={{ fontSize: '11px', padding: '8px 12px' }}>
             Add to Cart
           </button>
+          {onShowDetails && (
+            <button className="pom-button" onClick={onShowDetails} style={{ fontSize: '11px', padding: '8px 12px' }}>
+              Mehr Details
+            </button>
+          )}
           {productUrl && (
             <button className="pom-button pom-button-secondary" onClick={handleShowInHP} style={{ fontSize: '11px', padding: '8px 12px' }}>
               Show in HP

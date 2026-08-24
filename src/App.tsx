@@ -2951,7 +2951,7 @@ export default class App extends React.Component<Props, State> {
 
             return (
               // V4 Dialog: shown only after tapping the already previewed product again.
-              this.state.shouldShowV4Dialog && !this.state.isPivotHeroMode ? (
+              this.state.shouldShowV4Dialog ? (
                 <HeroVideoBackground
                   storageId={videoStorageId}
                   imageQuery={heroImageQuery}
@@ -2977,6 +2977,7 @@ export default class App extends React.Component<Props, State> {
                 onVariantChange={this.handleDialogVariantChange}
                 onImageSelect={this.handleDialogImageSelect}
                 isHiResReady={this.isHiResReady}
+                onShowDetails={() => this.setState({ shouldShowV4Dialog: true })}
                 onBuy={this.handleProductBuy}
               />
             )
