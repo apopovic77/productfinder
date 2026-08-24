@@ -1498,7 +1498,7 @@ export default class App extends React.Component<Props, State> {
     this.setState({ selectedProduct: nextProduct, selectedIndex: nextIndex, modalDirection: Math.sign(delta) });
     // Bring the product into view as well — a card that changes while the
     // stage stays put is exactly what made the old arrows feel broken.
-    if (!this.state.isPivotHeroMode) this.controller.centerOnProduct(nextProduct);
+    if (!this.state.isPivotHeroMode || this.controller.isHeroRootOverview()) this.controller.centerOnProduct(nextProduct);
     soundService.whoosh(delta >= 0 ? 1 : -1);
   };
 
@@ -1509,6 +1509,7 @@ export default class App extends React.Component<Props, State> {
    */
   private syncHeroCardToFocus = () => {
     if (!this.state.isPivotHeroMode || !this.state.selectedProduct) return;
+    if (this.controller.isHeroRootOverview()) return;
     const hp = this.controller.getHeroPosition();
     if (!hp) return;
     const focused = this.controller.getHeroProductAt(hp.index);
@@ -1536,7 +1537,12 @@ export default class App extends React.Component<Props, State> {
     // sits in, in display order. Was never set on the mouse path, which
     // left the old arrows dead (selectedIndex -1).
     const groupKey = this.controller.getGroupKeyForProduct(product);
-    const sequence = this.controller.getDisplayOrderForGroup(groupKey).map(p => p.id);
+    // Category-root overview: the siblings are ALL products of the
+    // category, not just the colour group — else the arrows counted 01/02
+    // inside a 22-product overview.
+    const sequence = (this.controller.isHeroRootOverview()
+      ? this.controller.getDisplayOrder()
+      : this.controller.getDisplayOrderForGroup(groupKey)).map(p => p.id);
     const seqIndex = sequence.indexOf(product.id);
 
     if (!this.state.selectedProduct) soundService.pop();
@@ -2465,7 +2471,8 @@ export default class App extends React.Component<Props, State> {
           {/* Hero mode on phones: previous/next arrows. Swiping works too, but
               a flick between bildfüllend products is easy to overshoot; the
               arrows share the snap targets with the swipe (stepHeroProduct). */}
-          {this.state.isPivotHeroMode && (!this.isMobileLayout() || this.state.selectedProduct) && (
+          {this.state.isPivotHeroMode && (!this.isMobileLayout() || this.state.selectedProduct)
+            && !this.controller.isHeroRootOverview() && (
             <>
               <button type="button" className="pf-hero-arrow pf-hero-arrow-prev" aria-label="Vorheriges Produkt"
                 onClick={() => { this.controller.stepHeroProduct(-1); this.setState({ heroPosition: this.controller.getHeroPosition() }, this.syncHeroCardToFocus); }}>‹</button>
@@ -2508,7 +2515,7 @@ export default class App extends React.Component<Props, State> {
               old centre-right squares only swapped the card content without
               moving the viewport, which read as broken. In hero mode the
               hero arrows above already cover this. */}
-          {selectedProduct && !this.state.isPivotHeroMode && this.state.modalSequence.length > 1 && (
+          {selectedProduct && (!this.state.isPivotHeroMode || this.controller.isHeroRootOverview()) && this.state.modalSequence.length > 1 && (
             <>
               <button type="button" className="pf-hero-arrow pf-hero-arrow-prev" aria-label="Vorheriges Produkt"
                 disabled={this.state.selectedIndex <= 0}

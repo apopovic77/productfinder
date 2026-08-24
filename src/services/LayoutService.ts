@@ -403,6 +403,12 @@ export class LayoutService {
     return this.engine;
   }
 
+  /** Category root reached hero mode without a single drill — overview case. */
+  isHeroRootOverview(): boolean {
+    return this.isPivotHeroMode()
+      && ((this.drillDownService as any).engine?.navigationStack?.length ?? 0) === 0;
+  }
+
   layout(width: number, height: number): void {
     if (this.mode === 'pivot') {
       const heroActive = this.drillDownService.isHeroModeActive();
@@ -413,6 +419,7 @@ export class LayoutService {
           this.engine.setLayouter(this.layouter);
           this.applyAnimationDuration();
         }
+        if (this.heroLayouter) this.heroLayouter.overviewMode = this.isHeroRootOverview();
       } else {
         if (!(this.layouter instanceof PivotLayouter)) {
           // Update pivot config with hero mode state for 'auto' scale resolution
@@ -891,7 +898,8 @@ export class LayoutService {
     // (desktop hero row only — the phone leaf shows a fitted grid and the
     // extension would zoom the fit far out)
     const phoneGrid = typeof window !== 'undefined' && window.innerWidth < 768;
-    if (viewportWidth && firstProduct && lastProduct && !phoneGrid) {
+    const gridOverview = phoneGrid || this.isHeroRootOverview();
+    if (viewportWidth && firstProduct && lastProduct && !gridOverview) {
       // Horizontal extension: To center first product: its center must be at viewportWidth/2
       // This requires: minX = firstProductCenter - viewportWidth/2
       const firstProductCenter = firstProduct.x + firstProduct.w / 2;
@@ -911,7 +919,7 @@ export class LayoutService {
     // (desktop hero row only — for the phone leaf grid this REPLACED the
     // 4700 px pannable range with the middle screenful: the view started
     // mid-grid and the rest was unreachable, 120530)
-    if (viewportHeight && minY !== Infinity && maxY !== -Infinity && !phoneGrid) {
+    if (viewportHeight && minY !== Infinity && maxY !== -Infinity && !gridOverview) {
       // Calculate current content vertical center
       const contentHeight = maxY - minY;
       const contentCenterY = minY + contentHeight / 2;

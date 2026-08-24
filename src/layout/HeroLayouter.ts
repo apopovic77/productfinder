@@ -16,6 +16,14 @@ export type HeroLayoutConfig<T> = {
 };
 
 export class HeroLayouter<T> implements ILayouter<T> {
+  /**
+   * Category ROOT on desktop: show every product as a page-filling grid
+   * first — the bildfüllend hero row hid what the category contains
+   * (owner 2026-08-24, 120552 RAINWEAR). Set by LayoutService per layout
+   * pass; drilling deeper returns to the hero row.
+   */
+  public overviewMode = false;
+
   constructor(private config: HeroLayoutConfig<T>) {}
 
   compute(nodes: LayoutNode<T>[], view: { width: number; height: number }): void {
@@ -26,6 +34,10 @@ export class HeroLayouter<T> implements ILayouter<T> {
     // (owner report 2026-08-23, storage 120526).
     if (view.width < 768) {
       this.computePhoneGrid(nodes, view);
+      return;
+    }
+    if (this.overviewMode) {
+      this.computeOverviewGrid(nodes, view);
       return;
     }
     const spacing = this.config.spacing ?? 24;
@@ -128,6 +140,52 @@ export class HeroLayouter<T> implements ILayouter<T> {
       const col = i % cols;
       const row = Math.floor(i / cols);
       // Last row centred when not full
+      const inLastRow = row === rows - 1;
+      const lastRowCount = n - (rows - 1) * cols;
+      const rowOffset = inLastRow && lastRowCount < cols
+        ? ((cols - lastRowCount) * (cellW + gap)) / 2 : 0;
+      node.posX.targetValue = startX + rowOffset + col * (cellW + gap);
+      node.posY.targetValue = startY + row * rowStep;
+      node.width.targetValue = cellW;
+      node.height.targetValue = cellH;
+      node.scale.targetValue = 1;
+      node.opacity.targetValue = 1;
+    }
+    this.config.onLayout?.(nodes);
+  }
+
+  /** Desktop category-root overview: all products in a page-filling grid. */
+  private computeOverviewGrid(nodes: LayoutNode<T>[], view: { width: number; height: number }): void {
+    const gap = 24;
+    const pad = 48;
+    const captionH = 56;
+    const n = nodes.length;
+    const cellAspect = 0.85;
+    // Column count from width, then shrink cells until the rows fit the
+    // page — the overview should not scroll for typical category sizes.
+    let cols = Math.max(3, Math.min(n, Math.floor((view.width - pad * 2) / 240)));
+    let cellW = (view.width - pad * 2 - (cols - 1) * gap) / cols;
+    let rows = Math.ceil(n / cols);
+    const fitsH = (w: number, r: number) => r * (w / cellAspect + captionH) + (r - 1) * gap <= view.height - pad;
+    while (!fitsH(cellW, rows) && cols < Math.min(n, 8)) {
+      cols++;
+      cellW = (view.width - pad * 2 - (cols - 1) * gap) / cols;
+      rows = Math.ceil(n / cols);
+    }
+    if (!fitsH(cellW, rows)) {
+      cellW = ((view.height - pad - (rows - 1) * gap) / rows - captionH) * cellAspect;
+    }
+    cellW = Math.max(90, cellW);
+    const cellH = cellW / cellAspect;
+    const rowStep = cellH + captionH + gap;
+    const gridW = cols * cellW + (cols - 1) * gap;
+    const gridH = rows * rowStep - gap;
+    const startX = Math.max(pad, (view.width - gridW) / 2);
+    const startY = Math.max(24, (view.height - gridH) / 2);
+    for (let i = 0; i < n; i++) {
+      const node = nodes[i];
+      const col = i % cols;
+      const row = Math.floor(i / cols);
       const inLastRow = row === rows - 1;
       const lastRowCount = n - (rows - 1) * cols;
       const rowOffset = inLastRow && lastRowCount < cols

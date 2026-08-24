@@ -917,6 +917,9 @@ export class CanvasRenderer<T> {
   /** Strip product-name noise words from column headers — only for design/series dimensions. */
   public headerStripNoise = true;
 
+  /** Category-root overview grid: hero flag set, but no focused product — no backdrop word. */
+  public isRootOverview = false;
+
   /** Label of the group currently drilled into (set by the controller), or null at the top. */
   public headerParentLabel: string | null = null;
 
@@ -1394,7 +1397,7 @@ export class CanvasRenderer<T> {
     // product (design direction 2026-08-23, storage 120472). Drawn before
     // the products so they sit on top of it. Desktop only — on a phone the
     // product fills the width and the word would just be noise behind it.
-    if ((this.isHeroMode || this.selectedProduct) && this.ctx.canvas.clientWidth >= 768) {
+    if (((this.isHeroMode && !this.isRootOverview) || this.selectedProduct) && this.ctx.canvas.clientWidth >= 768) {
       this.drawHeroBackdropWord(nodes);
     }
 

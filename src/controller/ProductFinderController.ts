@@ -196,6 +196,7 @@ export class ProductFinderController {
       if (this.renderer) {
         const isHero = this.layoutService.isPivotHeroMode();
         this.renderer.isHeroMode = isHero;
+        this.renderer.isRootOverview = this.layoutService.isHeroRootOverview();
         this.syncProductLabels(isHero);
         // Column headers drop the prefix of the group we drilled into
         // ("3SRS Helmet STREAM" under "3SRS" -> "STREAM"); raw label, not
@@ -234,6 +235,7 @@ export class ProductFinderController {
       if (this.renderer) {
         const isHero = this.layoutService.isPivotHeroMode();
         this.renderer.isHeroMode = isHero;
+        this.renderer.isRootOverview = this.layoutService.isHeroRootOverview();
         this.syncProductLabels(isHero);
       }
 
@@ -317,7 +319,27 @@ export class ProductFinderController {
     const isLanesMode = this.layoutService.getMode() === 'lanes';
 
     const isPhone = (this.canvas?.clientWidth ?? 0) < 768;
-    if (isHeroMode && isPhone) {
+    const isRootOverview = isHeroMode && !isPhone && this.layoutService.isHeroRootOverview();
+    if (isRootOverview) {
+      // Desktop category-root overview: fitted static grid — no paged
+      // snapping, no dock shift, no first-product centring.
+      this.viewportService.setLockVerticalPan(false);
+      this.viewportService.setLockHorizontalPan(true);
+      const vto = this.viewportService.getTransform();
+      if (vto) {
+        vto.snapResolver = null;
+        const entryKey = 'desk-overview:' + this.layoutService.getPivotBreadcrumbs().join('>');
+        if (this._heroEntryKey !== entryKey) {
+          this._heroEntryKey = entryKey;
+          vto.setPosition(0, 0, 1);
+          setTimeout(() => {
+            if (this._heroEntryKey !== entryKey) return;
+            this.updateContentBounds();
+            vto.setPosition(0, 0, 1);
+          }, 350);
+        }
+      }
+    } else if (isHeroMode && isPhone) {
       // Phone leaf grid (HeroLayouter.computePhoneGrid): vertical-only
       // scrolling — a two-column list must not wander sideways.
       this.viewportService.setLockVerticalPan(false);
@@ -938,6 +960,10 @@ export class ProductFinderController {
     return this.layoutService.getPivotDimension();
   }
   
+  isHeroRootOverview(): boolean {
+    return this.layoutService.isHeroRootOverview() && (this.canvas?.clientWidth ?? 0) >= 768;
+  }
+
   getPivotDimensions(): GroupDimension[] {
     return this.layoutService.getPivotDimensions();
   }
