@@ -206,7 +206,7 @@ export const CatalogNavigationGate: React.FC<Props> = ({
                   key={item.id}
                   disabled={count === 0}
                   onClick={() => writeCatalogUrl({ category: item.id })}
-                  style={bannerUrl ? { backgroundImage: `url(${bannerUrl})`, backgroundPosition: item.banner?.position ?? 'center' } : undefined}
+                  style={bannerUrl ? { backgroundImage: `url(${bannerUrl})`, backgroundPosition: item.banner?.position ?? 'center 35%' } : undefined}
                 >
                   <span className="pf-catalog-category-name">{getLocalizedLabel(item.labels, locale)}</span>
                   <span className="pf-catalog-category-count">{count > 0 ? `${count} ${text.products}` : text.unavailable}</span>
