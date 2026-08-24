@@ -465,12 +465,15 @@ function mapProduct(p: ApiProduct): Product | null {
     : undefined);
 
   // Model year (Jahrgang) - as enum/string so it becomes discrete buckets, not numeric ranges
+  // Number, not String: as an enum every year was its own bucket (22
+  // columns -> rejected by the split rule); numeric it buckets as ranges
+  // like price (owner 2026-08-24, 120557).
   addAttribute(attributes, typeof apiAny.model_year === 'number' && apiAny.model_year > 0
     ? {
         key: 'model_year',
         label: 'Jahrgang',
-        type: 'enum',
-        value: String(apiAny.model_year),
+        type: 'number',
+        value: apiAny.model_year,
         sourcePath: 'model_year',
       }
     : undefined);

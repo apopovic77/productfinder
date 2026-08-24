@@ -146,9 +146,17 @@ function rangeBuckets(
   const min = values[0].num;
   const max = values[values.length - 1].num;
 
+  // Year-like dimensions: smartRound snapped every boundary to the nearest
+  // 500 (2007..2028 all became one ">= 2011" bucket) and toLocaleString
+  // rendered "2.011". Whole years, no thousands separator.
+  const isYearLike = key.toLowerCase().includes('year')
+    || (Number.isInteger(min) && Number.isInteger(max) && min >= 1900 && max <= 2100);
+  const roundFn = isYearLike ? Math.round : smartRound;
+  const fmtFn = isYearLike ? (v: number) => String(Math.round(v)) : formatNumber;
+
   if (min === max) {
     const ids = values.map(v => v.id);
-    const buckets = [makeBucket(formatNumber(min), ids, false, false, { min, max })];
+    const buckets = [makeBucket(fmtFn(min), ids, false, false, { min, max })];
     if (unknown.length > 0) buckets.push(makeBucket('N/A', unknown, true));
     return buckets;
   }
@@ -160,7 +168,7 @@ function rangeBuckets(
       boundaries = [];
       for (let i = 1; i < bucketCount; i++) {
         const idx = Math.floor(values.length * i / bucketCount);
-        boundaries.push(smartRound(values[idx].num));
+        boundaries.push(roundFn(values[idx].num));
       }
       break;
     }
@@ -170,7 +178,7 @@ function rangeBuckets(
       const logStep = (logMax - logMin) / bucketCount;
       boundaries = [];
       for (let i = 1; i < bucketCount; i++) {
-        boundaries.push(smartRound(Math.exp(logMin + logStep * i)));
+        boundaries.push(roundFn(Math.exp(logMin + logStep * i)));
       }
       break;
     }
@@ -178,7 +186,7 @@ function rangeBuckets(
       const step = (max - min) / bucketCount;
       boundaries = [];
       for (let i = 1; i < bucketCount; i++) {
-        boundaries.push(smartRound(min + step * i));
+        boundaries.push(roundFn(min + step * i));
       }
       break;
     }
@@ -208,9 +216,9 @@ function rangeBuckets(
 
     const u = unit ? `${unit} ` : '';
     let label: string;
-    if (isFirst && !isLast) label = `< ${u}${formatNumber(hi)}`;
-    else if (isLast) label = `≥ ${u}${formatNumber(lo)}`;
-    else label = `${u}${formatNumber(lo)} – ${u}${formatNumber(hi)}`;
+    if (isFirst && !isLast) label = `< ${u}${fmtFn(hi)}`;
+    else if (isLast) label = `≥ ${u}${fmtFn(lo)}`;
+    else label = `${u}${fmtFn(lo)} – ${u}${fmtFn(hi)}`;
 
     buckets.push(makeBucket(label, ids, false, false, {
       min: lo,
