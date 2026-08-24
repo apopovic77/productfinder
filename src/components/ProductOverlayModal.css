@@ -541,7 +541,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  width: 96px;
+  width: 116px; /* "Youth M–Youth L" was clipped at 96px (issue #1307) */
 }
 .pom-hero-badge {
   background: rgba(20, 20, 22, 0.92);

@@ -2874,6 +2874,13 @@ export default class App extends React.Component<Props, State> {
           )}
         </div>}
 
+        {/* White fade under the docked card: whatever product lies behind
+            the card/badges is washed out instead of clashing with them
+            (owner idea, issue #1307). */}
+        {this.usesHeroDock() && selectedProduct && !this.state.shouldShowV4Dialog && (
+          <div className="pf-hero-dock-scrim" aria-hidden="true" />
+        )}
+
         {/* React Product Info Panel (fixed right side OR zoom-based V4 Dialog with Video) */}
         <AnimatePresence>
           {this.state.overlayMode === 'react' && selectedProduct && (() => {

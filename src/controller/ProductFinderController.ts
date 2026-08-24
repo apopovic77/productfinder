@@ -603,7 +603,7 @@ export class ProductFinderController {
     // Card column = 340 px card + 172 px right (margin + badge column) + 40 px inner gap.
     // The focal point moves left by half of that, so the product sits in
     // the centre of what remains.
-    return w >= 768 ? (340 + 172 + 40) / 2 : 0;
+    return w >= 768 ? (340 + 208 + 40) / 2 : 0;
   }
 
   /** World x of every hero product centre, sorted left to right. */

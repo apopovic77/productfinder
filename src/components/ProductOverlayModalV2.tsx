@@ -658,7 +658,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       style={{
         position: 'fixed',
         left: heroSheet ? '8px' : heroDock ? 'auto' : isMobilePortrait ? `${(window.innerWidth - DIALOG_WIDTH) / 2}px` : `${dragPosition.x}px`,
-        right: heroSheet ? '8px' : heroDock ? '172px' : 'auto', // 64 margin + 96 badge column + 12 gap
+        right: heroSheet ? '8px' : heroDock ? '208px' : 'auto', // 80 margin + 116 badge column + 12 gap (issue #1307)
         // Dock: pinned to the bottom edge with a margin, growing upward. A
         // percentage anchor looked right at 900 px and put ADD TO CART below
         // the fold at 800 px (measured: button bottom 814 of 800).

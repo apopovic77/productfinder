@@ -2321,3 +2321,19 @@ body {
   .pf-stage-card-open .pf-hero-arrow { bottom: calc(var(--pf-sheet-h, 48vh) + 16px); }
   .pf-stage-card-open .pf-hero-counter { bottom: calc(var(--pf-sheet-h, 48vh) + 24px); }
 }
+
+/* Soft white veil under the hero dock card (issue #1307) */
+.pf-hero-dock-scrim {
+  position: fixed;
+  top: 48px;
+  right: 0;
+  bottom: 0;
+  width: 640px;
+  pointer-events: none;
+  z-index: 9990;
+  background: linear-gradient(to left,
+    rgba(255, 255, 255, 0.92) 0%,
+    rgba(255, 255, 255, 0.88) 55%,
+    rgba(255, 255, 255, 0.55) 78%,
+    rgba(255, 255, 255, 0) 100%);
+}
