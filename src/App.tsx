@@ -2487,7 +2487,8 @@ export default class App extends React.Component<Props, State> {
               a flick between bildfüllend products is easy to overshoot; the
               arrows share the snap targets with the swipe (stepHeroProduct). */}
           {this.state.isPivotHeroMode && (!this.isMobileLayout() || this.state.selectedProduct)
-            && !this.controller.isHeroRootOverview() && (
+            && !this.controller.isHeroRootOverview()
+            && (this.state.heroPosition?.count ?? this.controller.getDisplayOrder().length) > 1 && (
             <>
               <button type="button" className="pf-hero-arrow pf-hero-arrow-prev" aria-label="Vorheriges Produkt"
                 onClick={() => { this.controller.stepHeroProduct(-1); this.setState({ heroPosition: this.controller.getHeroPosition() }, this.syncHeroCardToFocus); }}>‹</button>

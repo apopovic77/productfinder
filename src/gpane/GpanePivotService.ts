@@ -186,6 +186,9 @@ export class GpanePivotService {
   // ==========================================================================
 
   drillDown(value: string): boolean {
+    // Below the drilled level the engine picks again — the user's explicit
+    // dimension choice applied to THIS level only.
+    this._userSelectedDimension = false;
     if (this.engine.mode === 'taxonomy') {
       // Find taxonomy node by label
       const node = this.engine.currentTaxonomyNodes.find(n => n.label === value);
@@ -303,12 +306,14 @@ export class GpanePivotService {
   groupProducts(products: Product[]): Map<string, Product[]> {
     // Use cached group map (rebuilt on every navigation action)
     const filtered = this.engine.focusedProducts;
-    // Hero/overview only when nothing actually buckets: with an active
-    // dimension that splits (Jacke|Hose, or a user pick from the menu) the
-    // pivot must win — the old count-only fallback kept RAINWEAR in the
-    // flat view even after choosing a dimension (owner 2026-08-24, 120554).
+    // Hero/overview when the count is small — EXCEPT when the user picked
+    // a dimension that actually splits: then the pivot must win (RAINWEAR
+    // stayed flat after choosing a dimension, 120554). Auto-picked residual
+    // dimensions do NOT beat hero: drilled leaves like 5SRS>black are a
+    // hero row although the engine still holds colour buckets.
     const hasSplit = this._currentBuckets.length > 1;
-    this._heroModeActive = !hasSplit && filtered.length > 0 && filtered.length <= this._heroThreshold;
+    this._heroModeActive = filtered.length > 0 && filtered.length <= this._heroThreshold
+      && !(this._userSelectedDimension && hasSplit);
     return this._groupMap;
   }
 
