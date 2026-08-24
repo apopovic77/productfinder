@@ -10,6 +10,39 @@ import { LifestyleMediaSection } from './LifestyleMediaSection';
 import { ProductDocumentsSection } from './ProductDocumentsSection';
 import { getDesignFamilyLabel, selectExactDesignFamily } from '../utils/productDesignFamily';
 
+
+/**
+ * LIUS description lines carry inline HTML (links to product videos,
+ * entities like &trade;). Keep a small whitelist, drop everything else to
+ * plain text, and force links to open in a new tab.
+ */
+function sanitizeInlineHtml(html: string): string {
+  const ALLOWED = new Set(['A', 'B', 'STRONG', 'I', 'EM', 'U', 'SPAN', 'SUP', 'SUB']);
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const walk = (node: Node): string => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const div = document.createElement('div');
+      div.textContent = node.textContent || '';
+      return div.innerHTML; // re-escaped text
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return '';
+    const el = node as HTMLElement;
+    // Executable/embedded containers vanish INCLUDING their content.
+    if (['SCRIPT', 'STYLE', 'IFRAME', 'OBJECT', 'EMBED', 'NOSCRIPT'].includes(el.tagName)) return '';
+    const inner = Array.from(el.childNodes).map(walk).join('');
+    if (!ALLOWED.has(el.tagName)) return inner;
+    if (el.tagName === 'A') {
+      const href = el.getAttribute('href') || '';
+      if (!/^https?:\/\//i.test(href)) return inner;
+      const div = document.createElement('div');
+      div.textContent = href;
+      return `<a href="${div.innerHTML}" target="_blank" rel="noopener noreferrer" style="color:#ff5a1f;text-decoration:underline;">${inner}</a>`;
+    }
+    return `<${el.tagName.toLowerCase()}>${inner}</${el.tagName.toLowerCase()}>`;
+  };
+  return Array.from(doc.body.childNodes).map(walk).join('');
+}
+
 // Storage API base URL from environment
 const STORAGE_API_URL = STORAGE_API_BASE;
 
@@ -707,9 +740,12 @@ export const ProductOverlayModalV4: React.FC<Props> = ({ product, onClose, local
             <div style={{ fontSize: '13px', lineHeight: '1.5', color: 'rgba(0, 0, 0, 0.6)' }}>
               {descText && (
                 <div style={{ marginBottom: '4px' }}>
-                  {/* LIUS delivers "- item<br>- item"; render one line per bullet */}
+                  {/* LIUS delivers "- item<br>- item" WITH inline HTML
+                      (YouTube links, &trade; …) — raw tags showed as text
+                      (owner 2026-08-24). Render sanitized: only inline
+                      formatting and safe links survive. */}
                   {descText.split(/<br\s*\/?>/i).map((line: string) => line.replace(/^\s*-\s*/, '').trim()).filter(Boolean).map((line: string, i: number) => (
-                    <div key={i}>{line}</div>
+                    <div key={i} dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(line) }} />
                   ))}
                 </div>
               )}
