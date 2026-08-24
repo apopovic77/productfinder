@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { Product } from '../types/Product';
 import { soundService } from '../services/SoundService';
+import { sanitizeInlineHtml, extractYouTubeIds } from '../utils/richText';
 import { useImageQueue } from '../hooks/useImageQueue';
 import { fetchProductById } from '../data/ProductRepository';
 import './ProductOverlayModal.css';
@@ -26,7 +27,11 @@ type Props = {
    * space, so the card never covers the helmet.
    */
   heroDock?: boolean;
-  /** Opens the big detail dialog (V4) — the card morphs into it. */
+  /** Expanded state: the SAME card grows into the detail view (true morph). */
+  expanded?: boolean;
+  onCollapse?: () => void;
+  /** Catalog language for the description text (LIUS language ids). */
+  locale?: string;
   onShowDetails?: () => void;
   onBuy?: (payload: {
     product: Product;
@@ -50,7 +55,7 @@ interface ParsedFeature {
  * Product Overlay Modal V2 - HALF WIDTH VERSION (240px)
  * Same design as V1, but with compact half-width layout
  */
-export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady, onShowDetails }) => {
+export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady, onShowDetails, expanded = false, onCollapse, locale }) => {
   const isMobilePortrait = window.innerWidth <= 768 && window.innerHeight > window.innerWidth;
   // Phone: the dark hero card as a full-width bottom sheet (owner 2026-08-23,
   // "die Karte auch im Desktop-Style"). Same markup as the desktop dock,
@@ -656,26 +661,26 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
 
   return (
     <motion.div
-      layoutId="pf-product-dialog"
-      className={`pom-info-panel pom-panel-standalone ${heroDock ? 'pom-hero-dock' : ''} ${heroSheet ? 'pom-hero-sheet' : ''}`}
+      layout
+      className={`pom-info-panel pom-panel-standalone ${heroDock ? 'pom-hero-dock' : ''} ${heroSheet && !expanded ? 'pom-hero-sheet' : ''} ${expanded ? 'pom-expanded' : ''}`}
       style={{
         position: 'fixed',
-        left: heroSheet ? '8px' : heroDock ? 'auto' : isMobilePortrait ? `${(window.innerWidth - DIALOG_WIDTH) / 2}px` : `${dragPosition.x}px`,
-        right: heroSheet ? '8px' : heroDock ? '208px' : 'auto', // 80 margin + 116 badge column + 12 gap (issue #1307)
+        left: expanded ? (isMobilePortrait ? '10px' : `${Math.max(24, (window.innerWidth - 1040) / 2)}px`) : heroSheet ? '8px' : heroDock ? 'auto' : isMobilePortrait ? `${(window.innerWidth - DIALOG_WIDTH) / 2}px` : `${dragPosition.x}px`,
+        right: expanded ? (isMobilePortrait ? '10px' : 'auto') : heroSheet ? '8px' : heroDock ? '208px' : 'auto', // 80 margin + 116 badge column + 12 gap (issue #1307)
         // Dock: pinned to the bottom edge with a margin, growing upward. A
         // percentage anchor looked right at 900 px and put ADD TO CART below
         // the fold at 800 px (measured: button bottom 814 of 800).
-        top: heroDock ? 'auto' : isMobilePortrait ? 'auto' : `${dragPosition.y}px`,
+        top: expanded ? (isMobilePortrait ? '10px' : '7vh') : heroDock ? 'auto' : isMobilePortrait ? 'auto' : `${dragPosition.y}px`,
         transform: undefined,
-        bottom: heroSheet ? '8px' : heroDock ? '88px' : isMobilePortrait ? '8px' : 'auto',
-        width: heroSheet ? 'auto' : `${heroDock ? 340 : DIALOG_WIDTH}px`,
+        bottom: expanded ? (isMobilePortrait ? '10px' : 'auto') : heroSheet ? '8px' : heroDock ? '88px' : isMobilePortrait ? '8px' : 'auto',
+        width: expanded ? (isMobilePortrait ? 'auto' : `${Math.min(1040, window.innerWidth - 48)}px`) : heroSheet ? 'auto' : `${heroDock ? 340 : DIALOG_WIDTH}px`,
         boxSizing: 'border-box',
-        height: heroSheet ? '50vh' : undefined,
-        maxHeight: heroSheet ? '50vh' : isMobilePortrait ? '48vh' : heroDock ? 'calc(100vh - 150px)' : '80vh',
+        height: !expanded && heroSheet ? '50vh' : undefined,
+        maxHeight: expanded ? '86vh' : heroSheet ? '50vh' : isMobilePortrait ? '48vh' : heroDock ? 'calc(100vh - 150px)' : '80vh',
         cursor: heroDock ? 'default' : isDragging ? 'grabbing' : 'grab',
         userSelect: isDragging ? 'none' : 'auto',
         fontSize: isMobilePortrait ? '12px' : '11px',
-        overflowY: heroSheet ? 'hidden' : isMobilePortrait ? 'auto' : 'visible',
+        overflowY: expanded ? 'auto' : heroSheet ? 'hidden' : isMobilePortrait ? 'auto' : 'visible',
       }}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -703,7 +708,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
             Cart
           </button>
         )}
-        <button className="pom-close" onClick={onClose} aria-label="Close" style={{ position: 'static', flex: '0 0 auto', fontSize: '18px', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <button className="pom-close" onClick={expanded && onCollapse ? onCollapse : onClose} aria-label="Close" style={{ position: 'static', flex: '0 0 auto', fontSize: '18px', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           ×
         </button>
       </div>
@@ -966,15 +971,70 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         </aside>
       )}
 
+      {/* Expanded-only detail sections: the SAME dialog grows and reveals
+          these (owner 2026-08-24 — true morph, no second dialog). */}
+      {expanded && (() => {
+        // Descriptions hang on the PRODUCT raw (fetched detail), not the variant.
+        const activeRaw: any = (activeProduct as any)?.raw || {};
+        const descriptions: any[] = activeRaw?.descriptions || [];
+        const LOCALE_IDS: Record<string, number> = { de: 6, fr: 20, it: 22, es: 23, en: 26, pl: 31, cs: 45 };
+        const pick = (id: number) => descriptions.find((d: any) => d.language_id === id);
+        const longOf = (d: any) => (d?.long_text || '').trim();
+        const descText = longOf(pick(LOCALE_IDS[locale || 'de'] ?? 6)) || longOf(pick(26)) || longOf(pick(6)) || (activeVariant as any)?.description_long || '';
+        const props: Array<[string, string]> = [];
+        const raw: any = (product as any).raw || {};
+        const attrs: any = (product as any).attributes || {};
+        const attr = (k: string) => attrs[k]?.value ?? raw?.properties?.[k];
+        if (attr('sport')) props.push(['Sport', String(Array.isArray(attr('sport')) ? attr('sport').join(', ') : attr('sport'))]);
+        if (attr('target_group')) props.push(['Zielgruppe', String(attr('target_group'))]);
+        if (attr('product_line')) props.push(['Produktlinie', String(attr('product_line'))]);
+        if (raw?.model_year) props.push(['Jahrgang', String(raw.model_year)]);
+        if ((activeVariant as any)?.material) props.push(['Material', String((activeVariant as any).material)]);
+        for (const b of heroBadges) props.push([b.label, b.value]);
+        return (
+          <div className="pom-expanded-extra">
+            {descText && (
+              <div className="pom-expanded-desc">
+                {descText.split(/<br\s*\/?>/i).map((line: string) => line.replace(/^\s*-\s*/, '').trim()).filter(Boolean).map((line: string, i: number) => (
+                  <div key={i} dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(line) }} />
+                ))}
+              </div>
+            )}
+            {extractYouTubeIds(descText).map(id => (
+              <div key={id} style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', margin: '10px 0', borderRadius: '12px', overflow: 'hidden', background: '#000' }}>
+                <iframe
+                  src={`https://www.youtube-nocookie.com/embed/${id}`}
+                  title="Produktvideo"
+                  loading="lazy"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }}
+                />
+              </div>
+            ))}
+            {props.length > 0 && (
+              <div className="pom-expanded-props">
+                {props.map(([k, v]) => (
+                  <div key={k} className="pom-expanded-prop">
+                    <span className="pom-expanded-prop-label">{k}</span>
+                    <span className="pom-expanded-prop-value">{v}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Buttons - hidden on mobile portrait (moved to top right) */}
       {(!isMobilePortrait || heroSheet) && (
         <div className="pom-actions" style={{ gap: '6px' }}>
           <button className="pom-button pom-button-primary" onClick={handleAddToCart} style={{ fontSize: '11px', padding: '8px 12px' }}>
             Add to Cart
           </button>
-          {onShowDetails && (
-            <button className="pom-button" onClick={onShowDetails} style={{ fontSize: '11px', padding: '8px 12px' }}>
-              Mehr Details
+          {(onShowDetails || onCollapse) && (
+            <button className="pom-button" onClick={expanded ? onCollapse : onShowDetails} style={{ fontSize: '11px', padding: '8px 12px' }}>
+              {expanded ? 'Weniger' : 'Mehr Details'}
             </button>
           )}
           {productUrl && (

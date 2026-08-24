@@ -613,3 +613,32 @@
 
 /* Sheet: keep the thumb strip clear of the floating close button. */
 .pom-hero-sheet .pom-thumb-strip { padding-right: 44px; margin-top: 0 !important; }
+
+/* ---- Expanded state: the same dark card, grown to detail size ---- */
+.pom-info-panel.pom-hero-dock.pom-expanded {
+  transform: none !important; /* the 3D tilt straightens out as it grows */
+  cursor: default;
+}
+.pom-expanded .pom-hero-model { font-size: 44px; }
+.pom-expanded-extra { margin: 6px 0 10px; }
+.pom-expanded-desc { font-size: 13.5px; line-height: 1.65; color: rgba(255, 255, 255, 0.82); }
+.pom-expanded-desc a { color: #ff5a1f; }
+.pom-expanded-props {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+.pom-expanded-prop {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pom-expanded-prop-label { font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255, 255, 255, 0.5) !important; font-weight: 700; }
+.pom-expanded-prop-value { font-size: 14px; font-weight: 600; color: #fff !important; }
+/* Badges live inside the card when expanded — hide the side column */
+.pom-expanded .pom-hero-badges { display: none; }

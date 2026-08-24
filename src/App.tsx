@@ -2951,27 +2951,23 @@ export default class App extends React.Component<Props, State> {
 
             return (
               // V4 Dialog: shown only after tapping the already previewed product again.
-              this.state.shouldShowV4Dialog ? (
-                <HeroVideoBackground
-                  storageId={videoStorageId}
-                  imageQuery={heroImageQuery}
-                  backdropOpacity={1}
-                  onClose={this.handleProductDialogClose}
-                >
-                  <ProductOverlayModalV4
-                    locale={this.props.locale}
-                    product={selectedProduct}
-                    onClose={this.handleProductDialogClose}
-                    onPositionChange={this.handleDialogPositionChange}
-                    onVariantChange={this.handleDialogVariantChange}
-                    onBuy={this.handleProductBuy}
-                  />
-                </HeroVideoBackground>
-              ) : (
-              // V2 Dialog: Default dialog for normal zoom levels
+              <>
+                {this.state.shouldShowV4Dialog && (
+                  <HeroVideoBackground
+                    storageId={videoStorageId}
+                    imageQuery={heroImageQuery}
+                    backdropOpacity={1}
+                    onClose={() => this.setState({ shouldShowV4Dialog: false })}
+                  >
+                    {null}
+                  </HeroVideoBackground>
+                )}
               <ProductOverlayModal
                 product={selectedProduct}
                 heroDock={this.usesHeroDock() || this.isMobileLayout()}
+                expanded={this.state.shouldShowV4Dialog}
+                locale={this.props.locale}
+                onCollapse={() => this.setState({ shouldShowV4Dialog: false })}
                 onClose={this.handleProductDialogClose}
                 onPositionChange={this.handleDialogPositionChange}
                 onVariantChange={this.handleDialogVariantChange}
@@ -2980,7 +2976,7 @@ export default class App extends React.Component<Props, State> {
                 onShowDetails={() => this.setState({ shouldShowV4Dialog: true })}
                 onBuy={this.handleProductBuy}
               />
-            )
+            </>
             );
           })()}
         </AnimatePresence>
