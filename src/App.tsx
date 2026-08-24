@@ -1215,9 +1215,8 @@ export default class App extends React.Component<Props, State> {
 
     this.controller.drillDownGroup(groupKey);
     this.syncPivotUI();
-
-    // Push history state for back button navigation
-    this.pushHistoryState({ type: 'drillDown', groupKey, breadcrumbs: this.state.pivotBreadcrumbs });
+    // History entry comes from controller.drillDownGroup - pushing here too
+    // meant TWO entries per drill and back only undid half a step.
   };
 
   /**
@@ -3031,27 +3030,24 @@ export default class App extends React.Component<Props, State> {
   }
 
   /**
-   * Handle browser back button
+   * Browser back = one step back in the trail. Exactly ONE owner per
+   * concern: the controller reconciles the pivot depth via its own
+   * popstate handler, the catalog gates re-read the URL query, and this
+   * handler only closes an open product dialog. It used to drill up on
+   * its own ON TOP of the controller handler - every back jumped two
+   * levels (owner 2026-08-24).
    */
   private handlePopState = (event: PopStateEvent) => {
     const state = event.state;
 
-    if (!state || state.type === 'initial') {
-      // First back - do nothing (stay in app)
-      // Re-push initial state so user can't navigate away
+    if (!state) {
+      // Leaving the app entirely - keep the user in the catalog.
       this.pushHistoryState({ type: 'initial', breadcrumbs: this.state.pivotBreadcrumbs });
       return;
     }
 
-    if (state.type === 'productSelect') {
-      // User navigated back from product selection - close product
-      this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false });
-    } else if (state.type === 'drillDown') {
-      // User navigated back from drill down - go back one breadcrumb level
-      const { pivotBreadcrumbs } = this.state;
-      if (pivotBreadcrumbs.length > 1) {
-        this.handleBreadcrumbClick(pivotBreadcrumbs.length - 2);
-      }
+    if (this.state.selectedProduct && state.type !== 'productSelect') {
+      this.handleProductDialogClose();
     }
   };
 }

@@ -219,7 +219,13 @@ function mapProduct(p: ApiProduct): Product | null {
   const bodyPart = props.body_part ?? null;
   const productFunction = props.product_function ?? null;
   const productType = props.product_type ?? null;
-  const productLine = props.product_line ?? null;
+  // LIUS carries case variants of the same line ("HARDWEAR"/"Hardwear",
+  // "APOCALYPSE"/"Apocalypse") — they rendered as separate pivot columns
+  // (owner 2026-08-24, 120555). Normalise to uppercase; the shop shows
+  // lines uppercase anyway.
+  const productLine = typeof props.product_line === 'string' && props.product_line.trim()
+    ? props.product_line.trim().toUpperCase()
+    : null;
 
   // Derive presentation category from product_type or category
   const presentationCategory = productType

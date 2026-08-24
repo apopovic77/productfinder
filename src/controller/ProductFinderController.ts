@@ -1177,9 +1177,15 @@ export class ProductFinderController {
     for (const header of headers) {
       if (worldX >= header.x - hitPadding && worldX <= header.x + header.width + hitPadding &&
           worldY >= header.y - hitPadding && worldY <= header.y + header.height + hitPadding) {
-        // Click on group header - drill down!
+        // Click on group header - drill down! Push a history entry like
+        // every other drill path — canvas drills previously left none, so
+        // browser-back jumped past them to the last pushed depth.
         this.layoutService.drillDownPivot(header.key);
         this.onPivotChanged();
+        if (!this.ignoreNextHistoryPush) {
+          const trail = this.layoutService.getPivotBreadcrumbs();
+          window.history.pushState({ ...(window.history.state ?? {}), pivotDepth: trail.length - 1, breadcrumbs: trail }, '');
+        }
         return true;
       }
     }
