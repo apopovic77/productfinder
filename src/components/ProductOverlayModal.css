@@ -500,10 +500,8 @@
 
 /* ---- Desktop hero dock (design 2026-08-23): dark card, right of the stage ---- */
 .pom-info-panel.pom-hero-dock {
-  /* Slight 3D: the card turns a few degrees toward the product, like a
-     panel standing on the stage (design 2026-08-23). transform-origin on
-     the left edge keeps the right edge (badges) where it is. */
-  transform: perspective(1400px) rotateY(-7deg) !important;
+  /* Slight 3D tilt is animated by framer-motion (rotateY -7deg -> 0 when
+     the card expands); only the origin lives here. */
   transform-origin: 0% 50%;
   background: rgba(20, 20, 22, 0.92);
   backdrop-filter: blur(24px);
@@ -558,7 +556,6 @@
 
 /* ---- Phone: hero card as bottom sheet (same dark style, flat, badges inline) ---- */
 .pom-info-panel.pom-hero-dock.pom-hero-sheet {
-  transform: none !important;
   border-radius: 18px;
   padding: 14px 16px 12px;
   /* Two-column grid — the sheet must never scroll (owner 2026-08-23,
@@ -616,7 +613,6 @@
 
 /* ---- Expanded state: the same dark card, grown to detail size ---- */
 .pom-info-panel.pom-hero-dock.pom-expanded {
-  transform: none !important; /* the 3D tilt straightens out as it grows */
   cursor: default;
 }
 .pom-expanded .pom-hero-model { font-size: 44px; }
@@ -642,3 +638,53 @@
 .pom-expanded-prop-value { font-size: 14px; font-weight: 600; color: #fff !important; }
 /* Badges live inside the card when expanded — hide the side column */
 .pom-expanded .pom-hero-badges { display: none; }
+
+/* ---- Expanded hero stage: left presentation column ---- */
+.pom-info-panel.pom-expanded { padding-left: 536px; position: relative; min-height: 460px; }
+.pom-expanded-hero {
+  position: absolute;
+  left: 20px;
+  top: 20px;
+  bottom: 20px;
+  width: 492px;
+  background: linear-gradient(160deg, #ffffff, #eef1f4);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.pom-expanded-hero-img {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  object-fit: contain;
+  padding: 18px;
+  box-sizing: border-box;
+}
+.pom-expanded-hero-thumbs {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px 14px;
+  overflow-x: auto;
+}
+.pom-expanded-thumb {
+  width: 56px;
+  height: 56px;
+  min-width: 56px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #fff;
+  cursor: pointer;
+  overflow: hidden;
+}
+.pom-expanded-thumb.active { border: 2px solid #ff5a1f; }
+.pom-expanded-thumb img { width: 100%; height: 100%; object-fit: contain; }
+/* The mini strip belongs to the compact card only */
+.pom-expanded .pom-thumb-strip { display: none !important; }
+/* Phone: stage stacks on top instead of a side column */
+@media (max-width: 767px) {
+  .pom-info-panel.pom-expanded { padding-left: 16px; }
+  .pom-expanded-hero { position: static; width: auto; height: 34vh; margin-bottom: 10px; }
+}

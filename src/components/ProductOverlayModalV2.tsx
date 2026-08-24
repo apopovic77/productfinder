@@ -661,34 +661,41 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
 
   return (
     <motion.div
-      layout
       className={`pom-info-panel pom-panel-standalone ${heroDock ? 'pom-hero-dock' : ''} ${heroSheet && !expanded ? 'pom-hero-sheet' : ''} ${expanded ? 'pom-expanded' : ''}`}
       style={{
         position: 'fixed',
-        left: expanded ? (isMobilePortrait ? '10px' : `${Math.max(24, (window.innerWidth - 1040) / 2)}px`) : heroSheet ? '8px' : heroDock ? 'auto' : isMobilePortrait ? `${(window.innerWidth - DIALOG_WIDTH) / 2}px` : `${dragPosition.x}px`,
-        right: expanded ? (isMobilePortrait ? '10px' : 'auto') : heroSheet ? '8px' : heroDock ? '208px' : 'auto', // 80 margin + 116 badge column + 12 gap (issue #1307)
-        // Dock: pinned to the bottom edge with a margin, growing upward. A
-        // percentage anchor looked right at 900 px and put ADD TO CART below
-        // the fold at 800 px (measured: button bottom 814 of 800).
-        top: expanded ? (isMobilePortrait ? '10px' : '7vh') : heroDock ? 'auto' : isMobilePortrait ? 'auto' : `${dragPosition.y}px`,
+        // ANCHOR NEVER MOVES (fluid morph, owner 2026-08-24): the dock card
+        // is pinned bottom-right; expanding interpolates width/height from
+        // that same corner — up and to the left. The sheet keeps its
+        // bottom strip anchors and grows upward.
+        left: heroSheet || isMobilePortrait ? '8px' : 'auto',
+        right: heroSheet || isMobilePortrait ? '8px' : '208px',
+        top: 'auto',
         transform: undefined,
-        bottom: expanded ? (isMobilePortrait ? '10px' : 'auto') : heroSheet ? '8px' : heroDock ? '88px' : isMobilePortrait ? '8px' : 'auto',
-        width: expanded ? (isMobilePortrait ? 'auto' : `${Math.min(1040, window.innerWidth - 48)}px`) : heroSheet ? 'auto' : `${heroDock ? 340 : DIALOG_WIDTH}px`,
+        bottom: heroSheet || isMobilePortrait ? '8px' : '88px',
         boxSizing: 'border-box',
-        height: !expanded && heroSheet ? '50vh' : undefined,
-        maxHeight: expanded ? '86vh' : heroSheet ? '50vh' : isMobilePortrait ? '48vh' : heroDock ? 'calc(100vh - 150px)' : '80vh',
         cursor: heroDock ? 'default' : isDragging ? 'grabbing' : 'grab',
         userSelect: isDragging ? 'none' : 'auto',
         fontSize: isMobilePortrait ? '12px' : '11px',
         overflowY: expanded ? 'auto' : heroSheet ? 'hidden' : isMobilePortrait ? 'auto' : 'visible',
       }}
+      animate={{
+        opacity: 1,
+        width: heroSheet || isMobilePortrait
+          ? undefined
+          : (expanded ? Math.min(1040, window.innerWidth - 248) : 340),
+        maxHeight: heroSheet || isMobilePortrait
+          ? (expanded ? Math.round(window.innerHeight * 0.9) - 16 : Math.round(window.innerHeight * 0.5))
+          : (expanded ? Math.round(window.innerHeight * 0.86) : window.innerHeight - 150),
+        rotateY: !isMobilePortrait && !expanded ? -7 : 0,
+        transformPerspective: 1400,
+      }}
       initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{
-        duration: 0.3,
-        ease: 'easeOut',
-        layout: { duration: 0.45, ease: [0.4, 0, 0.2, 1] },
+        duration: 0.45,
+        ease: [0.4, 0, 0.2, 1],
+        opacity: { duration: 0.3 },
       }}
       onClick={(e) => e.stopPropagation()}
       onMouseDown={handleMouseDown}
@@ -712,6 +719,46 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
           ×
         </button>
       </div>
+
+      {/* Expanded: hero stage — the big dialog exists to PRESENT the
+          product (owner 2026-08-24). Large active image on a white stage,
+          thumbs below it; the outer mini strip hides via CSS. */}
+      {expanded && allImages.length > 0 && (() => {
+        const active = allImages[Math.max(0, Math.min(selectedImageIndex, allImages.length - 1))];
+        const heroSrc = active?.storageId
+          ? `${STORAGE_API_URL}/storage/media/${active.storageId}?width=1000&format=webp&quality=85&trim=true`
+          : active?.src;
+        return (
+          <div className="pom-expanded-hero">
+            <img className="pom-expanded-hero-img" src={heroSrc} alt={product.name} />
+            <div className="pom-expanded-hero-thumbs">
+              {allImages.map((img, idx) => {
+                const thumbnailUrl = img.storageId ? buildThumbUrl(img.storageId) : img.src;
+                const isActive = idx === selectedImageIndex;
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    className={`pom-expanded-thumb ${isActive ? 'active' : ''}`}
+                    onClick={() => {
+                      manualHoldUntilRef.current = Date.now() + 12000;
+                      cyclePosRef.current = idx;
+                      autoSelectedRef.current = -1;
+                      setSelectedImageIndex(idx);
+                      if (onImageSelect && img.storageId) {
+                        const cachedThumb = loadedThumbnails.get(buildThumbUrl(img.storageId));
+                        onImageSelect(img.storageId, cachedThumb || undefined);
+                      }
+                    }}
+                  >
+                    <img src={thumbnailUrl} alt="" />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Title - V4 Style: First word thin, rest bold */}
       {heroDock ? (
