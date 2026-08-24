@@ -583,6 +583,16 @@
 /* One primary action is enough — the X closes. */
 .pom-hero-sheet .pom-actions .pom-button:not(.pom-button-primary) { display: none; }
 .pom-hero-sheet .pom-title-hero { padding-right: 34px; }
+/* Headline never taller than three lines. */
+.pom-hero-sheet .pom-hero-model {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+/* Size chips run across the full sheet width — wrapped chips in a half
+   column looked broken (120531). */
+.pom-hero-sheet .pom-size-block { grid-column: 1 / -1; margin-bottom: 4px !important; }
 /* Sheet: the colour line and the badges duplicate the chip blocks below —
    drop them, the sheet has to fit 50vh without scrolling. */
 .pom-hero-sheet .pom-hero-colour { display: none; }
@@ -600,3 +610,6 @@
 }
 .pom-hero-sheet .pom-hero-badge { flex: 1 1 0; padding: 8px 6px; }
 .pom-hero-sheet .pom-button-primary { font-size: 13px; padding: 12px; }
+
+/* Sheet: keep the thumb strip clear of the floating close button. */
+.pom-hero-sheet .pom-thumb-strip { padding-right: 44px; margin-top: 0 !important; }

@@ -318,9 +318,10 @@ export class ProductFinderController {
 
     const isPhone = (this.canvas?.clientWidth ?? 0) < 768;
     if (isHeroMode && isPhone) {
-      // Phone leaf grid (HeroLayouter.computePhoneGrid): plain fitted view,
-      // free vertical pan, no paged snapping.
+      // Phone leaf grid (HeroLayouter.computePhoneGrid): vertical-only
+      // scrolling — a two-column list must not wander sideways.
       this.viewportService.setLockVerticalPan(false);
+      this.viewportService.setLockHorizontalPan(true);
       const vtp = this.viewportService.getTransform();
       if (vtp) {
         vtp.snapResolver = null;
@@ -345,6 +346,7 @@ export class ProductFinderController {
       this._heroEntryKey = null;
       // Hero mode: Horizontal-only scrolling, scale 1.0 (no zoom)
       this.viewportService.setLockVerticalPan(true);
+      this.viewportService.setLockHorizontalPan(false);
       // Start on the FIRST product, not the middle of the row. Centring the
       // row's midpoint put the viewport between products two and three of
       // four (owner report 2026-08-23, storage 120464/120465): the dealer
@@ -387,6 +389,7 @@ export class ProductFinderController {
       this._heroEntryKey = null;
       // Lanes mode: Fixed scale 1.0, free vertical scrolling, start at top, no zoom-out
       this.viewportService.setLockVerticalPan(false);
+      this.viewportService.setLockHorizontalPan(false);
       const vtl = this.viewportService.getTransform(); if (vtl) vtl.snapResolver = null;
       const vt = this.viewportService.getTransform();
       if (vt) {
@@ -406,6 +409,7 @@ export class ProductFinderController {
       this._heroEntryKey = null;
       // Pivot mode: free panning
       this.viewportService.setLockVerticalPan(false);
+      this.viewportService.setLockHorizontalPan(false);
       const vt = this.viewportService.getTransform();
       if (vt) vt.snapResolver = null;
       // CSS pixels — the viewport's unit. canvas.width/height is the backing

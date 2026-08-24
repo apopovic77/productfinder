@@ -567,6 +567,14 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     const design: string = rawProduct.design_group || product.name || '';
     let model = line ? design.replace(new RegExp('^' + line.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*', 'i'), '') : design;
     model = model.replace(/\b(Helmet|Helm|Youth|Glove|Gloves|Jersey|Pants|Pant|Boot|Boots|Goggle|Jacket|Polyacrylite|Hyperlite|Fidlock®?)\b/gi, ' ').replace(/\s+/g, ' ').trim();
+    // Marketing copy as design_group ("SUPERLEICHTER MX MIT NUR 1.150
+    // GRAMM - 8SRS", 120531): drop a trailing "- <series>" echo and cap
+    // the headline at a card-sized length.
+    if (line) model = model.replace(new RegExp('\\s*[-–]\\s*' + line.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*$', 'i'), '').trim();
+    if (model.length > 42) {
+      const cut = model.slice(0, 42);
+      model = cut.slice(0, Math.max(20, cut.lastIndexOf(' '))) + '…';
+    }
     if (!model) model = line || design;
     return { series: line, model, colour: (rawProduct.color_name || '') as string };
   }, [rawProduct.product_line, rawProduct.design_group, rawProduct.color_name, product.name]);
@@ -719,7 +727,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
 
       {/* Thumbnail Gallery - Compact */}
       {allImages.length > 0 && (
-        <div style={{
+        <div className="pom-thumb-strip" style={{
           display: 'flex',
           gap: '4px',
           marginTop: '8px',
@@ -867,7 +875,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       {/* Sizes — selectable chips; the chosen size goes into the cart via
           activeVariant (owner 2026-08-23: plain text left no way to pick). */}
       {availableSizes.length > 0 && (
-        <div style={{ marginBottom: '12px' }}>
+        <div className="pom-size-block" style={{ marginBottom: '12px' }}>
           <div style={{ fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.8, marginBottom: '6px' }}>
             Size: <span style={{ opacity: 1 }}>{selectedSize || availableSizes[0]}</span>
           </div>

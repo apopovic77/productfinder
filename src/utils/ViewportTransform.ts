@@ -35,6 +35,7 @@ export class ViewportTransform {
   private rubberBandResistance = 0.5; // 0-1, how much resistance (higher = more resistance)
   private rubberBandSpringBack = 0.08; // Speed of spring back (higher = faster)
   private lockVerticalPan = false; // If true, disable vertical panning and rubber banding
+  private lockHorizontalPan = false; // If true, disable horizontal panning (phone leaf grid: up/down only)
 
   // Momentum / inertia
   private velocityX = 0;
@@ -81,6 +82,10 @@ export class ViewportTransform {
   /**
    * Lock vertical panning (horizontal-only scrolling)
    */
+  setLockHorizontalPan(lock: boolean): void {
+    this.lockHorizontalPan = lock;
+  }
+
   setLockVerticalPan(lock: boolean): void {
     this.lockVerticalPan = lock;
   }
@@ -226,6 +231,14 @@ export class ViewportTransform {
         this.targetOffset.x += overflow * this.rubberBandSpringBack;
       }
     }
+    if (this.lockHorizontalPan) {
+      // No sideways drift at all: pin X to its clamped position.
+      const target = bounds.shouldCenterX
+        ? bounds.centerX
+        : Math.min(bounds.maxOffsetX, Math.max(bounds.minOffsetX, this.targetOffset.x));
+      this.targetOffset.x = target;
+      this.velocityX = 0;
+    }
 
     // Skip Y-axis rubber banding if vertical pan is locked
     if (!this.lockVerticalPan) {
@@ -261,8 +274,10 @@ export class ViewportTransform {
     const newOffsetX = this.offsetStart.x + dx;
     const newOffsetY = this.offsetStart.y + dy;
 
-    // X-axis resistance
-    if (!bounds.shouldCenterX) {
+    // X-axis resistance (skip if horizontal pan is locked)
+    if (this.lockHorizontalPan) {
+      resistedDx = 0;
+    } else if (!bounds.shouldCenterX) {
       if (newOffsetX > bounds.maxOffsetX) {
         const overflow = newOffsetX - bounds.maxOffsetX;
         resistedDx = dx - overflow * this.rubberBandResistance;
