@@ -1372,9 +1372,13 @@ export default class App extends React.Component<Props, State> {
       const existingIndex = prev.cartItems.findIndex(item => item.id === itemId);
       let cartItems = [...prev.cartItems];
 
-      const chosenSize = payload.size
+      // Helmet sizes carry head circumference ("XS (53/54)") — as matrix
+      // column keys that made six extra-wide, alphabetically sorted columns
+      // (issue #1312). The bracket part is display detail, not a size key.
+      const cleanSize = (x: string) => x.replace(/\s*\(.*\)\s*$/, '').trim();
+      const chosenSize = cleanSize(payload.size
         || payload.variant?.size || payload.variant?.option2
-        || payload.availableSizes?.[0] || 'One Size';
+        || payload.availableSizes?.[0] || 'One Size');
 
       if (existingIndex >= 0) {
         const existing = cartItems[existingIndex];
@@ -1411,9 +1415,9 @@ export default class App extends React.Component<Props, State> {
           articleNumber: payload.product.sku || (payload.product.raw as any)?.product_code || '',
           color: currentColor,
           availableColors: colors.length > 0 ? colors : [currentColor],
-          availableSizes: payload.availableSizes?.length
+          availableSizes: Array.from(new Set((payload.availableSizes?.length
             ? payload.availableSizes
-            : (sizes.length > 0 ? sizes : [chosenSize]),
+            : (sizes.length > 0 ? sizes : [chosenSize])).map(cleanSize))),
           // Quantity lives in the size matrix — an empty map rendered as
           // "1 Position · 0 Stk." with a dead 0 cell (issue #1303).
           sizes: { [chosenSize]: delta },
@@ -1506,6 +1510,15 @@ export default class App extends React.Component<Props, State> {
   };
 
   private toCartViewItems = (): CartViewItem[] => {
+    const cleanSize = (x: string) => x.replace(/\s*\(.*\)\s*$/, '').trim();
+    const cleanSizes = (m: Record<string, number> | undefined) => {
+      const out: Record<string, number> = {};
+      for (const [k, v] of Object.entries(m || {})) {
+        const key = cleanSize(k);
+        out[key] = (out[key] || 0) + (v || 0);
+      }
+      return out;
+    };
     return this.state.cartItems.map(item => ({
       id: item.id,
       productId: item.productId,
@@ -1514,10 +1527,10 @@ export default class App extends React.Component<Props, State> {
       articleNumber: item.articleNumber || '',
       color: item.color || item.variantLabel || '',
       availableColors: item.availableColors || [item.color || ''],
-      availableSizes: item.availableSizes || ['One Size'],
+      availableSizes: Array.from(new Set((item.availableSizes || ['One Size']).map(cleanSize))),
       sizes: Object.keys(item.sizes || {}).length
-        ? (item.sizes as Record<string, number>)
-        : (item.quantity > 0 ? { [item.availableSizes?.[0] || 'One Size']: item.quantity } : {}),
+        ? cleanSizes(item.sizes)
+        : (item.quantity > 0 ? { [cleanSize(item.availableSizes?.[0] || 'One Size')]: item.quantity } : {}),
     }));
   };
 

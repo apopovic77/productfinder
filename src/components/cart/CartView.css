@@ -414,3 +414,17 @@
 }
 .cart-qty-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.18); }
 .cart-qty-btn:disabled { opacity: 0.3; cursor: default; }
+
+/* Compact size columns (issue #1312: the row grew endless) */
+.cart-table th { padding: 10px 4px; }
+.cart-cell-qty { padding: 6px 3px !important; }
+.cart-qty-input { width: 32px; padding: 4px 1px; font-size: 12px; }
+.cart-qty-stepper { gap: 2px; }
+.cart-qty-btn { width: 20px; height: 20px; font-size: 12px; border-radius: 5px; padding: 0; box-sizing: border-box; }
+.cart-qty-input { box-sizing: border-box; }
+.cart-col-product { min-width: 180px !important; }
+.cart-col-color { min-width: 84px !important; }
+.cart-col-art { min-width: 60px !important; }
+.cart-table th, .cart-table td { box-sizing: border-box; }
+.cart-col-size { min-width: 0 !important; width: 84px; }
+.cart-cell-qty { width: 84px; }
