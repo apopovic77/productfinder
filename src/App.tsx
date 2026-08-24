@@ -1324,6 +1324,8 @@ export default class App extends React.Component<Props, State> {
     imageUrl?: string;
     variantLabel?: string;
     quantity?: number;
+    size?: string;
+    availableSizes?: string[];
   }) => {
     const delta = payload.quantity ?? 1;
     if (delta === 0) return;
@@ -1334,13 +1336,21 @@ export default class App extends React.Component<Props, State> {
       const existingIndex = prev.cartItems.findIndex(item => item.id === itemId);
       let cartItems = [...prev.cartItems];
 
+      const chosenSize = payload.size
+        || payload.variant?.size || payload.variant?.option2
+        || payload.availableSizes?.[0] || 'One Size';
+
       if (existingIndex >= 0) {
         const existing = cartItems[existingIndex];
-        const newQuantity = existing.quantity + delta;
+        const sizes = { ...(existing.sizes || {}) };
+        const nextSizeQty = (sizes[chosenSize] || 0) + delta;
+        if (nextSizeQty <= 0) delete sizes[chosenSize];
+        else sizes[chosenSize] = nextSizeQty;
+        const newQuantity = Object.values(sizes).reduce((sum, q) => sum + (q || 0), 0);
         if (newQuantity <= 0) {
           cartItems.splice(existingIndex, 1);
         } else {
-          cartItems[existingIndex] = { ...existing, quantity: newQuantity };
+          cartItems[existingIndex] = { ...existing, sizes, quantity: newQuantity };
         }
       } else if (delta > 0) {
         // Extract available colors and sizes from product variants
@@ -1365,8 +1375,12 @@ export default class App extends React.Component<Props, State> {
           articleNumber: payload.product.sku || (payload.product.raw as any)?.product_code || '',
           color: currentColor,
           availableColors: colors.length > 0 ? colors : [currentColor],
-          availableSizes: sizes.length > 0 ? sizes : ['One Size'],
-          sizes: {},
+          availableSizes: payload.availableSizes?.length
+            ? payload.availableSizes
+            : (sizes.length > 0 ? sizes : [chosenSize]),
+          // Quantity lives in the size matrix — an empty map rendered as
+          // "1 Position · 0 Stk." with a dead 0 cell (issue #1303).
+          sizes: { [chosenSize]: delta },
         };
         cartItems = [newItem, ...cartItems];
       }
@@ -1465,7 +1479,9 @@ export default class App extends React.Component<Props, State> {
       color: item.color || item.variantLabel || '',
       availableColors: item.availableColors || [item.color || ''],
       availableSizes: item.availableSizes || ['One Size'],
-      sizes: item.sizes || (item.quantity > 0 ? { [item.availableSizes?.[0] || 'One Size']: item.quantity } : {}),
+      sizes: Object.keys(item.sizes || {}).length
+        ? (item.sizes as Record<string, number>)
+        : (item.quantity > 0 ? { [item.availableSizes?.[0] || 'One Size']: item.quantity } : {}),
     }));
   };
 

@@ -166,15 +166,30 @@ export function CartView({
                     return (
                       <td key={size} className={`cart-cell-qty ${!available ? 'cart-cell-na' : ''}`}>
                         {available ? (
-                          <input
-                            type="number"
-                            min={0}
-                            max={9999}
-                            value={qty || ''}
-                            placeholder="0"
-                            onChange={e => onSetQuantity(item.id, size, parseInt(e.target.value) || 0)}
-                            className="cart-qty-input"
-                          />
+                          <div className="cart-qty-stepper">
+                            <button
+                              type="button"
+                              className="cart-qty-btn"
+                              aria-label="Menge verringern"
+                              disabled={qty <= 0}
+                              onClick={() => onSetQuantity(item.id, size, Math.max(0, qty - 1))}
+                            >−</button>
+                            <input
+                              type="number"
+                              min={0}
+                              max={9999}
+                              value={qty || ''}
+                              placeholder="0"
+                              onChange={e => onSetQuantity(item.id, size, parseInt(e.target.value) || 0)}
+                              className="cart-qty-input"
+                            />
+                            <button
+                              type="button"
+                              className="cart-qty-btn"
+                              aria-label="Menge erhöhen"
+                              onClick={() => onSetQuantity(item.id, size, qty + 1)}
+                            >+</button>
+                          </div>
                         ) : (
                           <span className="cart-na">—</span>
                         )}

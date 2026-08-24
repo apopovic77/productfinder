@@ -403,3 +403,14 @@
 }
 .cart-order-success { background: #e8f7ee; color: #116632; border: 1px solid #b7e4c7; }
 .cart-order-error { background: #fdecec; color: #8f1d1d; border: 1px solid #f3b8b8; }
+
+/* Quantity stepper (issue #1303: bare number field read as dead) */
+.cart-qty-stepper { display: inline-flex; align-items: center; gap: 4px; }
+.cart-qty-btn {
+  width: 24px; height: 24px; border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff; font-size: 14px; line-height: 1; cursor: pointer;
+}
+.cart-qty-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.18); }
+.cart-qty-btn:disabled { opacity: 0.3; cursor: default; }

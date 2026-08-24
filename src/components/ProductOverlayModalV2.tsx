@@ -33,6 +33,8 @@ type Props = {
     imageUrl?: string;
     variantLabel?: string;
     quantity?: number;
+    size?: string;
+    availableSizes?: string[];
   }) => void;
 };
 
@@ -528,6 +530,10 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         priceText,
         imageUrl: getCartImageUrl(),
         variantLabel: variantLabel || undefined,
+        // The cart is a size matrix — hand it the chosen size and the clean
+        // size list (issue #1303: quantity landed nowhere visible).
+        size: selectedSize || availableSizes[0] || undefined,
+        availableSizes: availableSizes.length ? availableSizes : undefined,
       });
     }
   };
