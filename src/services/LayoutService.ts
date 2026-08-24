@@ -107,6 +107,7 @@ export class LayoutService {
         design_group: { label: 'Design', dataType: 'categorical' },
         product_line: { label: 'Produktlinie', dataType: 'categorical' },
         color_base: { label: 'Farbe', dataType: 'categorical' },
+        garment_type: { label: 'Typ', dataType: 'categorical' },
         color_name: { label: 'Farbton', dataType: 'categorical' },
         is_spare: { label: 'Ersatzteil' },
         model_year: { label: 'Jahrgang', dataType: 'numeric_discrete' },

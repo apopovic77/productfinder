@@ -278,6 +278,15 @@ export class GpanePivotService {
   filterProducts(products: Product[]): Product[] {
     const focused = this.engine.focusedProducts;
 
+    // MEMBERSHIP comes from the engine (focus stack), but the ORDER comes
+    // from the caller: `products` is the filter-and-SORTED list from the
+    // controller. Returning focusedProducts as-is froze everything in load
+    // order and the Sort dropdown visibly did nothing (owner 2026-08-24).
+    const orderIndex = new Map(products.map((p, i) => [p.id, i] as const));
+    const ordered = focused.slice().sort(
+      (a, b) => (orderIndex.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (orderIndex.get(b.id) ?? Number.MAX_SAFE_INTEGER)
+    );
+
     // In taxonomy mode: only show products that match current taxonomy nodes
     if (this.engine.mode === 'taxonomy' && this._currentBuckets.length > 0) {
       const matchedIds = new Set<string>();
@@ -285,16 +294,21 @@ export class GpanePivotService {
         for (const id of bucket.objectIds) matchedIds.add(id);
       }
       // Use focused products (respects focus stack), filtered to current nodes
-      return focused.filter(p => matchedIds.has(p.id));
+      return ordered.filter(p => matchedIds.has(p.id));
     }
 
-    return focused;
+    return ordered;
   }
 
   groupProducts(products: Product[]): Map<string, Product[]> {
     // Use cached group map (rebuilt on every navigation action)
     const filtered = this.engine.focusedProducts;
-    this._heroModeActive = filtered.length > 0 && filtered.length <= this._heroThreshold;
+    // Hero/overview only when nothing actually buckets: with an active
+    // dimension that splits (Jacke|Hose, or a user pick from the menu) the
+    // pivot must win — the old count-only fallback kept RAINWEAR in the
+    // flat view even after choosing a dimension (owner 2026-08-24, 120554).
+    const hasSplit = this._currentBuckets.length > 1;
+    this._heroModeActive = !hasSplit && filtered.length > 0 && filtered.length <= this._heroThreshold;
     return this._groupMap;
   }
 

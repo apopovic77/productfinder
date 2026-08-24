@@ -40,7 +40,7 @@ const GEAR = ['product_type', 'product_line', 'design_group', 'color_base', 'col
 const LINE_FIRST = ['product_line', 'design_group', 'color_base', 'color_name']; // gloves, boots, goggles
 const PROTECTION = ['body_part', 'product_line', 'color_base', 'color_name']; // chest/knee > line > base colour > colour
 const TYPE_COLOUR = ['product_type', 'color_base', 'color_name'];            // jackets, accessories
-const RAIN = ['design_group', 'color_base', 'color_name'];                                // product_type is one value here; jacket/pants live in the model name
+const RAIN = ['garment_type', 'design_group', 'color_base', 'color_name'];               // jacket/pants derived from the model name (garment_type)
 
 export type CatalogEntrySelection = {
   sportId: string;

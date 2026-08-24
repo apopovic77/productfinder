@@ -518,6 +518,23 @@ function mapProduct(p: ApiProduct): Product | null {
       }
     : undefined);
 
+  // Garment type from the model name — for categories whose product_type is
+  // one value ("Regenbekleidung") while jacket/pants live only in the name.
+  // Gives RAINWEAR its Jacke|Hose split (owner 2026-08-24, 120553).
+  const nameForType = String(apiAny.name ?? apiAny.design_group ?? '');
+  const garmentType = /jacket|jacke/i.test(nameForType) ? 'Jacke'
+    : /pants|pant\b|hose|short/i.test(nameForType) ? 'Hose'
+    : '';
+  addAttribute(attributes, garmentType
+    ? {
+        key: 'garment_type',
+        label: 'Typ',
+        type: 'string',
+        value: garmentType,
+        sourcePath: 'name',
+      }
+    : undefined);
+
   const aiTags = Array.isArray(apiAny.ai_tags)
     ? apiAny.ai_tags.filter((tag: unknown) => typeof tag === 'string' && tag.trim().length)
     : [];
