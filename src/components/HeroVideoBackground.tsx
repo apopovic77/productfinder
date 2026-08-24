@@ -135,7 +135,11 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
   }, [onClose]);
 
   return (
-    <div className="hero-video-background">
+    <div
+      className="hero-video-background"
+      style={{ cursor: 'pointer' }}
+      onClick={onClose}
+    >
       {/* Product-related backdrop image (Ken-Burns), sport video as fallback */}
       {bgImageUrl ? (
         <div

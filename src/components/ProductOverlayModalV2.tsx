@@ -672,7 +672,6 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         right: heroSheet || isMobilePortrait ? '8px' : '208px',
         top: 'auto',
         transform: undefined,
-        bottom: heroSheet || isMobilePortrait ? '8px' : '88px',
         boxSizing: 'border-box',
         cursor: heroDock ? 'default' : isDragging ? 'grabbing' : 'grab',
         userSelect: isDragging ? 'none' : 'auto',
@@ -681,6 +680,13 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       }}
       animate={{
         opacity: 1,
+        // Expanded: flush with the bottom edge, only the top corners stay
+        // rounded (owner 2026-08-24).
+        bottom: expanded ? 0 : (heroSheet || isMobilePortrait ? 8 : 88),
+        borderBottomLeftRadius: expanded ? 0 : 18,
+        borderBottomRightRadius: expanded ? 0 : 18,
+        borderTopLeftRadius: 18,
+        borderTopRightRadius: 18,
         width: heroSheet || isMobilePortrait
           ? undefined
           : (expanded ? Math.min(1040, window.innerWidth - 248) : 340),
