@@ -2176,7 +2176,9 @@ body {
   box-sizing: border-box;
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.35);
-  background: rgba(17, 17, 17, 0.82);
+  /* OPAQUE: at 0.82 the white veil behind the docked card shone through
+     and the next arrow read as disabled grey (owner 2026-08-24). */
+  background: #161618;
   color: #fff;
   font-size: 30px;
   line-height: 1;
