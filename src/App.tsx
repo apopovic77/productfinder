@@ -821,8 +821,10 @@ export default class App extends React.Component<Props, State> {
           } else {
             console.warn('[App] Node not found for selected product:', this.state.selectedProduct.id);
           }
-        } else if (this.state.overlayMode !== 'react') {
-          // Only clear if not in React mode (React mode sets selectedProduct for stacked images)
+        } else if (!this.state.selectedProduct) {
+          // No selection in ANY mode: clear. The old "keep in react mode"
+          // guard left renderer.selectedProduct set after closing/back —
+          // the hero backdrop word kept drawing behind the grid (120551).
           renderer.selectedProduct = null;
           renderer.selectedProductAnchor = null;
           renderer.selectedProductBounds = null;

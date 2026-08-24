@@ -936,24 +936,27 @@ export class CanvasRenderer<T> {
       return { fontSize: maxSize, lines: [text] };
     }
 
-    // Single line doesn't fit - try line breaks at max size
-    const breakableLines = this.breakTextIntoLines(text, maxWidth, maxSize, fontWeight);
-    const lineHeight = maxSize * 1.2;
-
-    if (breakableLines.length * lineHeight <= maxHeight) {
-      // Multi-line fits at max size!
-      return { fontSize: maxSize, lines: breakableLines };
+    // Prefer ONE line in a smaller font over any break: "10SRS" split as
+    // "10SR/S" and "SONSTIGE" as "SONS/TIGE" read as syllable soup (owner
+    // 2026-08-24, 120550). Shrink down to ~55 % of the max first.
+    const singleLineFloor = Math.max(minSize, maxSize * 0.55);
+    for (let fs = maxSize - 0.5; fs >= singleLineFloor; fs -= 0.5) {
+      this.ctx.font = `${fontWeight} ${fs}px ${BUCKET_BUTTON_CONFIG.font.family}`;
+      if (this.ctx.measureText(text).width <= maxWidth) {
+        return { fontSize: fs, lines: [text] };
+      }
     }
 
-    // Multi-line doesn't fit either - reduce font size
-    let fontSize = maxSize - 0.5;
+    // Multi-line — but ONLY at real word boundaries, never inside a word.
+    let fontSize = maxSize;
 
     while (fontSize >= minSize) {
       this.ctx.font = `${fontWeight} ${fontSize}px ${BUCKET_BUTTON_CONFIG.font.family}`;
-      const lines = this.breakTextIntoLines(text, maxWidth, fontSize, fontWeight);
+      const lines = this.breakTextIntoLines(text, maxWidth, fontSize, fontWeight, true);
       const currentLineHeight = fontSize * 1.2;
 
-      if (lines.length * currentLineHeight <= maxHeight) {
+      const fitsWidth = lines.every(line => this.ctx.measureText(line).width <= maxWidth);
+      if (fitsWidth && lines.length * currentLineHeight <= maxHeight) {
         return { fontSize, lines };
       }
 
