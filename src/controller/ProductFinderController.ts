@@ -49,6 +49,7 @@ export class ProductFinderController {
 
   // Family grouping
   private _familyGrouped = false;
+  private _heroEntryKey: string | null = null;
   private _familyMap: Map<string, Product[]> = new Map();
 
   // Canvas
@@ -323,13 +324,25 @@ export class ProductFinderController {
       const vtp = this.viewportService.getTransform();
       if (vtp) {
         vtp.snapResolver = null;
-        // The grid is laid out in CSS pixels for this viewport — scale 1,
-        // start at the top. reset() would apply the fit-to-content scale
-        // and shrink a long grid back into one screen.
-        vtp.setPosition(0, 0, 1);
-        setTimeout(() => { this.updateContentBounds(); vtp.setPosition(0, 0, 1); }, 350);
+        // Snap to the top ONLY when this leaf was just entered.
+        // updateContentBounds runs on every resize — iOS collapses the
+        // toolbar while scrolling, which fired a resize, which snapped the
+        // grid back to the top mid-scroll ("rauf runter", 2026-08-24).
+        const entryKey = 'phone-grid:' + this.layoutService.getPivotBreadcrumbs().join('>');
+        if (this._heroEntryKey !== entryKey) {
+          this._heroEntryKey = entryKey;
+          // Scale 1, start at top. reset() would apply the fit-to-content
+          // scale and shrink a long grid back into one screen.
+          vtp.setPosition(0, 0, 1);
+          setTimeout(() => {
+            if (this._heroEntryKey !== entryKey) return;
+            this.updateContentBounds();
+            vtp.setPosition(0, 0, 1);
+          }, 350);
+        }
       }
     } else if (isHeroMode) {
+      this._heroEntryKey = null;
       // Hero mode: Horizontal-only scrolling, scale 1.0 (no zoom)
       this.viewportService.setLockVerticalPan(true);
       // Start on the FIRST product, not the middle of the row. Centring the
@@ -371,6 +384,7 @@ export class ProductFinderController {
         };
       }
     } else if (isLanesMode) {
+      this._heroEntryKey = null;
       // Lanes mode: Fixed scale 1.0, free vertical scrolling, start at top, no zoom-out
       this.viewportService.setLockVerticalPan(false);
       const vtl = this.viewportService.getTransform(); if (vtl) vtl.snapResolver = null;
@@ -389,6 +403,7 @@ export class ProductFinderController {
         1,
       );
     } else {
+      this._heroEntryKey = null;
       // Pivot mode: free panning
       this.viewportService.setLockVerticalPan(false);
       const vt = this.viewportService.getTransform();
