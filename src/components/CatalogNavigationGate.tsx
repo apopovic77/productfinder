@@ -48,6 +48,35 @@ const messages: Record<string, Record<string, string>> = {
     loading: 'Loading categories…',
     retry: 'Try again',
   },
+  // fr/it/es fell back to English although the catalog offers these
+  // languages (issue #1308).
+  fr: {
+    chooseSport: 'Choisis ton sport',
+    chooseCategory: 'Choisis ta catégorie de produits',
+    comingSoon: 'Bientôt disponible',
+    products: 'produits',
+    unavailable: 'Indisponible',
+    loading: 'Chargement des catégories…',
+    retry: 'Réessayer',
+  },
+  it: {
+    chooseSport: 'Scegli il tuo sport',
+    chooseCategory: 'Scegli la tua categoria di prodotti',
+    comingSoon: 'Prossimamente',
+    products: 'prodotti',
+    unavailable: 'Non disponibile',
+    loading: 'Caricamento delle categorie…',
+    retry: 'Riprova',
+  },
+  es: {
+    chooseSport: 'Elige tu deporte',
+    chooseCategory: 'Elige tu categoría de productos',
+    comingSoon: 'Próximamente',
+    products: 'productos',
+    unavailable: 'No disponible',
+    loading: 'Cargando categorías…',
+    retry: 'Reintentar',
+  },
 };
 
 export const CatalogNavigationGate: React.FC<Props> = ({
