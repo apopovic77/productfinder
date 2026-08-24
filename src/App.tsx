@@ -1267,7 +1267,7 @@ export default class App extends React.Component<Props, State> {
   private searchAllProducts(term: string, limit = 8): Product[] {
     const tokens = term.trim().toLowerCase().split(/\s+/).filter(Boolean);
     if (tokens.length === 0) return [];
-    const all = this.controller.getAllProducts();
+    const all = this.controller.getCatalogAllProducts();
     const results: Product[] = [];
     for (const product of all) {
       const name = (product.name || '').toLowerCase();
@@ -1317,16 +1317,16 @@ export default class App extends React.Component<Props, State> {
       return;
     }
     const matches = this.searchAllProducts(trimmed, 0);
-    const total = this.controller.getAllProducts().length;
+    const total = this.controller.getCatalogAllProducts().length;
     console.log('[searchFilter] term=', trimmed, 'matches=', matches.length, '/', total);
     if (matches.length === 0 || matches.length === total) {
       console.warn('[searchFilter] no-op — matches everything or nothing');
       return;
     }
-    const ids = matches.map(p => p.id);
-    this.controller.setAiFilterProductIds(ids);
-    const after = this.controller.getFilteredProducts();
-    console.log('[searchFilter] controller filtered after=', after.length);
+    // GLOBAL: the working set becomes the matches across the whole catalog
+    // — the category gate no longer caps the search (owner 2026-08-24).
+    this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false });
+    this.controller.setGlobalSearchProducts(matches);
     this.setState({
       searchFilterTerm: trimmed,
       footerSearchTerm: '',
@@ -1334,20 +1334,34 @@ export default class App extends React.Component<Props, State> {
   };
 
   private clearSearchFilter = () => {
-    this.controller.clearAiFilterProductIds();
+    this.controller.setGlobalSearchProducts(null);
     this.setState({ searchFilterTerm: null }, () => this.syncPivotUI());
   };
 
   private handleFooterSearchSelect = (productId: string) => {
-    const product =
+    const inCategory =
       this.controller.getAllProducts().find((p) => p.id === productId) ||
       this.state.filteredProducts.find((p) => p.id === productId) ||
       this.controller.getDisplayOrder().find((p) => p.id === productId);
-    if (!product) {
+    if (inCategory) {
+      this.openProductDetails(inCategory);
+      this.setState({ footerSearchTerm: '' });
       return;
     }
-    this.openProductDetails(product);
-    this.setState({ footerSearchTerm: '' });
+    // Outside the current category: switch to global search mode with the
+    // current term, then select the product in the new view.
+    const global = this.controller.getCatalogAllProducts().find((p) => p.id === productId);
+    if (!global) return;
+    const term = this.state.footerSearchTerm.trim() || global.name;
+    const matches = this.searchAllProducts(term, 0);
+    this.controller.setGlobalSearchProducts(matches.length ? matches : [global]);
+    this.setState({ searchFilterTerm: term, footerSearchTerm: '' }, () => {
+      this.syncPivotUI();
+      setTimeout(() => {
+        const target = this.controller.getDisplayOrder().find((p) => p.id === productId);
+        if (target) this.openProductDetails(target, { pushHistory: false });
+      }, 600);
+    });
   };
 
   private getVariantKeyFromPayload(payload: { product: Product; variant?: any; variantLabel?: string }): string {

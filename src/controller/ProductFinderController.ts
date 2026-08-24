@@ -43,6 +43,8 @@ export class ProductFinderController {
 
   // State
   private products: Product[] = [];
+  private catalogAll: Product[] = [];
+  private globalSearchActive = false;
   private loading = true;
   private error: string | null = null;
   private listeners: StateChangeListener[] = [];
@@ -138,6 +140,10 @@ export class ProductFinderController {
     // Load products
     try {
       const results = await fetchProducts({ limit: 10000, brand: this.preConfig.brand });
+      // Full brand universe (all sports/categories) — powers the global
+      // search that must NOT be limited by the category gate (owner
+      // 2026-08-24: "Search auf die gesamte Produktdatenbank").
+      this.catalogAll = results || [];
       this.products = this.preConfig.entrySelection
         ? filterCatalogProducts(results || [], this.preConfig.entrySelection)
         : results || [];
@@ -860,6 +866,44 @@ export class ProductFinderController {
   // Utility
   getAllProducts(): Product[] {
     return this.products;
+  }
+
+  /** Every product of the brand, ignoring the category gate. */
+  getCatalogAllProducts(): Product[] {
+    return this.catalogAll.length ? this.catalogAll : this.products;
+  }
+
+  isGlobalSearchActive(): boolean {
+    return this.globalSearchActive;
+  }
+
+  /**
+   * Global search mode: the working set becomes the matches across the
+   * WHOLE catalog (all categories/sports); the pivot engine re-scores
+   * generic dimensions over it. null restores the category set.
+   */
+  setGlobalSearchProducts(matches: Product[] | null): void {
+    const entryCategory = this.preConfig.entrySelection
+      ? getCatalogCategory(this.preConfig.entrySelection.sportId, this.preConfig.entrySelection.categoryId)
+      : undefined;
+    if (matches && matches.length) {
+      this.globalSearchActive = true;
+      this.products = matches;
+      // Generic scoring instead of the category's prescribed order —
+      // search results span categories.
+      this.layoutService.setGroupingPath([]);
+    } else {
+      this.globalSearchActive = false;
+      this.products = this.preConfig.entrySelection
+        ? filterCatalogProducts(this.catalogAll, this.preConfig.entrySelection)
+        : this.catalogAll;
+      this.layoutService.setGroupingPath(entryCategory?.grouping ?? []);
+    }
+    // New universe: the engine must reload, not just re-filter.
+    (this.layoutService as any).drillDownService.forceReload(this.products);
+    this.layoutService.resetPivot();
+    this._heroEntryKey = null;
+    this.onDataChanged();
   }
 
   getUniqueCategories(): string[] {
