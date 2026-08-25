@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   CATALOG_ENTRY_CONFIG,
+  SMART_GATE_HERO_THRESHOLD,
   getLocalizedLabel,
   type CatalogEntrySelection,
   type CatalogLocale,
@@ -8,7 +9,7 @@ import {
 import { STORAGE_API_BASE } from '../config/apiConfig';
 import { fetchProducts } from '../data/ProductRepository';
 import type { Product } from '../types/Product';
-import { countCatalogCategoryProducts, getCatalogCategory, getCatalogSport } from '../utils/catalogEntry';
+import { countCatalogCategoryProducts, filterCatalogProducts, getCatalogCategory, getCatalogSport } from '../utils/catalogEntry';
 import { readCatalogQuery, writeCatalogUrl } from '../utils/catalogEntryUrl';
 import './CatalogEntry.css';
 
@@ -28,6 +29,8 @@ type Props = {
   /** Flow-Schalter je Taxonomie-Stufe (resolveCatalogFlow) */
   sportGate?: boolean;
   categoryGate?: boolean;
+  /** Smarte Gates: Stufen ohne echte Wahl überspringen, kleine Mengen direkt in den Finder */
+  smartGates?: boolean;
   onRequestBrandSelection: () => void;
   onRequestLanding: () => void;
   children: (context: CatalogNavigationContext) => React.ReactNode;
@@ -89,6 +92,7 @@ export const CatalogNavigationGate: React.FC<Props> = ({
   canChangeBrand,
   sportGate = true,
   categoryGate = true,
+  smartGates = true,
   onRequestBrandSelection,
   onRequestLanding,
   children,
@@ -126,7 +130,7 @@ export const CatalogNavigationGate: React.FC<Props> = ({
   }, [category, query.category, query.sport, sport]);
 
   useEffect(() => {
-    if (!sport?.enabled) return;
+    if (!sportGate) return;
     let cancelled = false;
     setIsLoading(true);
     setHasLoadedProducts(false);
@@ -145,7 +149,7 @@ export const CatalogNavigationGate: React.FC<Props> = ({
         if (!cancelled) setIsLoading(false);
       });
     return () => { cancelled = true; };
-  }, [brand, sport?.id, sport?.enabled, reloadKey]);
+  }, [brand, sportGate, reloadKey]);
 
   const categoryCounts = useMemo(() => {
     if (!sport) return new Map<string, number>();
@@ -154,6 +158,43 @@ export const CatalogNavigationGate: React.FC<Props> = ({
       countCatalogCategoryProducts(products, sport.id, item.id),
     ]));
   }, [products, sport]);
+
+  // Smarte Gates (owner 2026-08-25): dieselbe Entscheidung wie eine
+  // Pivot-Aktion im Canvas — Anzahl Produkte + verfügbare Optionen
+  // bestimmen die nächste Sicht.
+  const sportCounts = useMemo(() => {
+    return new Map(CATALOG_ENTRY_CONFIG.sports.map(item => [
+      item.id,
+      filterCatalogProducts(products, { sportId: item.id, categoryId: null }).length,
+    ]));
+  }, [products]);
+  const sportTotal = sport ? (sportCounts.get(sport.id) ?? 0) : 0;
+  // Unter der Hero-Schwelle lohnt kein Kategorie-Gate mehr: der Finder
+  // zeigt die Produkte direkt (Overview/Hero), wie nach einem Preis-Klick.
+  const skipCategoryGate = smartGates && hasLoadedProducts && sportTotal > 0
+    && sportTotal <= SMART_GATE_HERO_THRESHOLD;
+
+  // Stufe ohne echte Wahl überspringen: genau EIN Sport mit Produkten →
+  // auto-select (analog zur Grouping-Regel 'a level that does not split
+  // the products is skipped').
+  useEffect(() => {
+    if (!smartGates || !hasLoadedProducts || query.sport) return;
+    const withProducts = CATALOG_ENTRY_CONFIG.sports
+      .filter(item => item.enabled && (sportCounts.get(item.id) ?? 0) > 0);
+    if (withProducts.length === 1) {
+      writeCatalogUrl({ sport: withProducts[0].id, category: null }, 'replace');
+    }
+  }, [smartGates, hasLoadedProducts, query.sport, sportCounts]);
+
+  // Genau EINE belegte Kategorie → auto-select statt Kachelwand.
+  useEffect(() => {
+    if (!smartGates || !hasLoadedProducts || !sport?.enabled || category || skipCategoryGate) return;
+    const nonEmpty = (CATALOG_ENTRY_CONFIG.categoriesBySport[sport.id] ?? [])
+      .filter(item => (categoryCounts.get(item.id) ?? 0) > 0);
+    if (nonEmpty.length === 1) {
+      writeCatalogUrl({ category: nonEmpty[0].id }, 'replace');
+    }
+  }, [smartGates, hasLoadedProducts, sport, category, categoryCounts, skipCategoryGate]);
 
   useEffect(() => {
     if (!category || !hasLoadedProducts) return;
@@ -199,7 +240,7 @@ export const CatalogNavigationGate: React.FC<Props> = ({
                   type="button"
                   className={`pf-catalog-sport-card ${bannerUrl ? 'has-banner' : ''}`}
                   key={item.id}
-                  disabled={!item.enabled}
+                  disabled={!item.enabled || (smartGates && hasLoadedProducts && (sportCounts.get(item.id) ?? 0) === 0)}
                   onClick={() => writeCatalogUrl({ sport: item.id, category: null })}
                   style={bannerUrl ? { backgroundImage: `url(${bannerUrl})`, backgroundPosition: item.banner?.position ?? 'center' } : undefined}
                 >
@@ -226,7 +267,7 @@ export const CatalogNavigationGate: React.FC<Props> = ({
     );
   }
 
-  if (!categoryGate) {
+  if (!categoryGate || (skipCategoryGate && !category)) {
     return <>{children({
       selection: { sportId: sport.id, categoryId: null },
       sportLabel: getLocalizedLabel(sport.labels, locale),

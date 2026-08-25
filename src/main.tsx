@@ -57,6 +57,7 @@ createRoot(document.getElementById('root')!).render(
                     canChangeBrand={canChangeBrand}
                     sportGate={catalogFlow.gates.includes('sport')}
                     categoryGate={catalogFlow.gates.includes('category')}
+                    smartGates={catalogFlow.smartGates !== false}
                     onRequestBrandSelection={requestBrandSelection}
                     onRequestLanding={requestLanding}
                   >

@@ -61,7 +61,23 @@ export type CatalogFlowVariant = {
   id: string;
   gates: CatalogGateId[];
   description: string;
+  /**
+   * Smarte Gates (Default an): Jede Gate-Stufe zieht dieselbe Entscheidung
+   * wie eine Pivot-Aktion im Canvas — eine Stufe ohne echte Wahl (nur eine
+   * belegte Option) wird automatisch übersprungen, und faellt die
+   * Produktmenge unter die Hero-Schwelle, geht es direkt in den Finder,
+   * wo die Engine grouped/hero waehlt, statt eine Kachelwand mit
+   * 'Nicht verfuegbar' zu zeigen (owner 2026-08-25).
+   */
+  smartGates?: boolean;
 };
+
+/**
+ * Ab wie vielen Produkten lohnt das Kategorie-Gate noch? Gleiche Schwelle
+ * wie GpanePivotService.HERO_THRESHOLD: darunter zeigt der Finder die
+ * Produkte direkt (Overview/Hero) statt einer weiteren Auswahl-Ebene.
+ */
+export const SMART_GATE_HERO_THRESHOLD = 40;
 
 export const CATALOG_FLOW_VARIANTS: CatalogFlowVariant[] = [
   { id: 'guided', gates: ['brand', 'sport', 'category'], description: 'Geführte Grafik-Gates: Marke, Sport, Kategorie (Default)' },
