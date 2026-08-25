@@ -1411,13 +1411,11 @@ export class CanvasRenderer<T> {
       const w = n.width.value ?? 0, h = n.height.value ?? 0;
       const scale = n.scale.value ?? 1;
       let opacity = n.opacity.value ?? 1;
-      // Phone, card open: the selected product IS the hero — fade the
-      // neighbours far back instead of standing beside it at full strength
-      // ("ich sehe beide nebeneinander, das ist verwirrend", 2026-08-24).
-      if (this.selectedProduct && this.ctx.canvas.clientWidth < 768
-          && (n.data as any).id !== (this.selectedProduct as any).id) {
-        opacity *= 0.10;
-      }
+      // Phone: Nachbarn NICHT mehr abblenden (owner 2026-08-25, media
+      // 120663) — der horizontale Hero zeigt ohnehin nur einen Helm, und
+      // der naechste faedelt beim Swipen voll sichtbar ein. Die fruehere
+      // 0.10-Abblendung (2026-08-24, damals vertikales Layout) las sich
+      // als weisser Fade an den Raendern.
 
       if (opacity <= 0.01) {
         const hiddenProduct = n.data as any as Product;
