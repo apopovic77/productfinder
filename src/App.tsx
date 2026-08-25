@@ -434,7 +434,19 @@ export default class App extends React.Component<Props, State> {
         const stage = document.querySelector<HTMLElement>('.pf-stage');
         if (!stage) return;
         if (!sheet || !this.state.selectedProduct) { stage.style.removeProperty('--pf-sheet-h'); return; }
-        const publish = () => stage.style.setProperty('--pf-sheet-h', `${Math.round(sheet.getBoundingClientRect().height + 8)}px`);
+        const publish = () => {
+          const sheetRect = sheet.getBoundingClientRect();
+          const stageRect = stage.getBoundingClientRect();
+          stage.style.setProperty('--pf-sheet-h', `${Math.round(sheetRect.height + 8)}px`);
+          // Abstand Stage-UNTERKANTE -> Sheet-OBERKANTE: die Stage endet auf
+          // iOS hinter der Browser-Toolbar, das Sheet ist viewport-fixed —
+          // 'bottom: sheetH+16' relativ zur Stage lag darum unterm Sheet
+          // (media 120703). Pfeile/Counter haengen jetzt an dieser Messung.
+          stage.style.setProperty('--pf-sheet-gap', `${Math.round(Math.max(0, stageRect.bottom - sheetRect.top))}px`);
+          // Produkt ins gemessene Band zentrieren (Sheet-Hoehe ist erst
+          // jetzt bekannt bzw. gewachsen).
+          this.controller.refitPhoneBand();
+        };
         publish();
         // The sheet animates in and grows as its content loads — follow it.
         if (typeof ResizeObserver !== 'undefined') {

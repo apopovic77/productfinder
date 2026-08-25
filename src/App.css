@@ -2322,8 +2322,8 @@ body {
 @media (max-width: 767px) {
   /* Fallback 52vh statt 48vh: greift der --pf-sheet-h-Publisher nicht,
      lagen die Pfeile bei einem ~50vh-Sheet halb UNTER dem Dialog (120674). */
-  .pf-stage-card-open .pf-hero-arrow { bottom: calc(var(--pf-sheet-h, 52vh) + 16px); }
-  .pf-stage-card-open .pf-hero-counter { bottom: calc(var(--pf-sheet-h, 52vh) + 24px); }
+  .pf-stage-card-open .pf-hero-arrow { bottom: calc(var(--pf-sheet-gap, 52vh) + 16px); }
+  .pf-stage-card-open .pf-hero-counter { bottom: calc(var(--pf-sheet-gap, 52vh) + 24px); }
   /* Phone presentation swipes horizontally like desktop — plain ‹ › at
      the band edges. */
 }

@@ -631,6 +631,44 @@ export class ProductFinderController {
    * 96 px right margin + 48 px gap) — the hero's focal point moves left by
    * this much. 0 on phones (no dock).
    */
+  /**
+   * Hoehe des freien Bands ueber dem Phone-Sheet in CSS-px, aus der DOM-
+   * Geometrie: Sheet-Oberkante minus Canvas-Oberkante. Ist das Sheet noch
+   * nicht montiert, Schaetzwert (Sheet ~52vh + 8px Rand).
+   */
+  private phoneFreeBandHeight(screenHeight: number): number {
+    if (typeof document !== 'undefined' && this.canvas) {
+      const sheet = document.querySelector<HTMLElement>('.pom-info-panel');
+      if (sheet) {
+        const top = sheet.getBoundingClientRect().top;
+        const canvasTop = this.canvas.getBoundingClientRect().top;
+        if (top > canvasTop + 60) return top - canvasTop;
+      }
+    }
+    const inner = typeof window !== 'undefined' ? window.innerHeight : screenHeight;
+    return screenHeight - (inner * 0.52 + 8);
+  }
+
+  /**
+   * Phone: das Sheet ist montiert/gewachsen (ResizeObserver in App) —
+   * Produkt neu ins jetzt bekannte Band zentrieren.
+   */
+  private _lastPhoneBandH = -1;
+
+  refitPhoneBand(): void {
+    if (!this.canvas || this.canvas.clientWidth >= 768) return;
+    if (!this.layoutService.isHeroPresentation()) return;
+    const product = this.renderer?.selectedProduct as Product | null | undefined;
+    if (!product) return;
+    // Nur bei ECHTER Aenderung des Bands nachzentrieren — der Aufruf kommt
+    // aus einem ResizeObserver; ohne Guard schaukelt sich Refit -> Re-Render
+    // -> Resize -> Refit zur Endlosschleife auf.
+    const bandH = Math.round(this.phoneFreeBandHeight(this.canvas.clientHeight));
+    if (Math.abs(bandH - this._lastPhoneBandH) < 2) return;
+    this._lastPhoneBandH = bandH;
+    this.centerOnProduct(product);
+  }
+
   private heroDockShift(): number {
     const w = this.canvas?.clientWidth ?? 0;
     // Card column = 340 px card + 172 px right (margin + badge column) + 40 px inner gap.
@@ -794,8 +832,10 @@ export class ProductFinderController {
       focusY = centerY + h * 0.06;
     }
     if (isMobile && h > 0 && w > 0) {
-      const sheetH = (typeof window !== 'undefined' ? window.innerHeight : screenHeight) * 0.52 + 8;
-      const freeH = Math.max(120, screenHeight - sheetH);
+      // Freies Band = Canvas-Oberkante bis Sheet-Oberkante, GEMESSEN — der
+      // 52vh-Schaetzwert traf das echte Sheet (~40 % bei kurzen Karten)
+      // nicht: Produkt klebte oben, Luecke darunter (media 120703).
+      const freeH = Math.max(120, this.phoneFreeBandHeight(screenHeight));
       // Presentation goes one product per page — the camera can go close
       // (owner 2026-08-24, 120602): fill the band almost completely.
       targetScale = Math.min((freeH * 0.95) / h, (screenWidth * 0.94) / w);
