@@ -774,20 +774,9 @@ export function buildProductsRequestUrl(query: Query): string {
 
 async function fetchProductsFromApi(query: Query): Promise<Product[]> {
   const collectionYear = query.collection_year === undefined ? CATALOG_ENTRY_CONFIG.year : query.collection_year;
-  if (query.brand || collectionYear != null) {
-    // Raw fetch: die SDK kennt collection_year noch nicht (Regen via Agent
-    // GitHub angestossen, bis dahin dieser Pfad).
-    const response = await fetch(buildProductsRequestUrl(query), {
-      headers: { 'X-API-Key': API_KEY },
-    });
-    if (!response.ok) throw new Error(`Product API failed (${response.status})`);
-    const payload = await response.json();
-    return (payload.results || [])
-      .map(mapProduct)
-      .filter((product: Product | null): product is Product => Boolean(product));
-  }
 
   const response = await productsApi.listProductsV1ProductsGet({
+    brand: query.brand,
     search: query.search,
     category: query.category,
     priceMin: query.price_min,
@@ -799,6 +788,9 @@ async function fetchProductsFromApi(query: Query): Promise<Product[]> {
     // Server-side filter (SDK 1.1.0 / issue #254) — replaces the old client
     // filter, so count/paging from the API are accurate.
     hasImage: true,
+    // Kollektionsfilter "Jahr J + Weiterlaeufer" (SDK 1.2.1) — Default aus
+    // CATALOG_ENTRY_CONFIG.year, null schaltet ab.
+    collectionYear: collectionYear,
   });
 
   const results = (response.data as any).results || [];
