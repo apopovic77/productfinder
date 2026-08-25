@@ -719,6 +719,31 @@ export class ProductFinderController {
       this._heroEntryKey = null;
       this.handleResize();
       this.syncProductLabels(true);
+
+      // ANKER-RELATIVES LAYOUT (owner 2026-08-25): Das geklickte Produkt
+      // soll von seiner AKTUELLEN Position auf kuerzestem Weg ins Zentrum —
+      // nicht quer zum absoluten Row-Anfang. Also wird die frische Hero-Row
+      // so verschoben, dass der Anker in der Welt stehen bleibt; die
+      // Nachbarn ordnen sich UM ihn an und die Kamera macht nur noch den
+      // Zoom-Glide auf den Anker statt einer Querfahrt.
+      const rowNodes = this.layoutService.getEngine().all();
+      const anchor = rowNodes.find(n => n.data.id === product.id);
+      if (anchor) {
+        const curCX = (anchor.posX.value ?? anchor.posX.targetValue ?? 0)
+          + (anchor.width.value ?? anchor.width.targetValue ?? 0) / 2;
+        const curCY = (anchor.posY.value ?? anchor.posY.targetValue ?? 0)
+          + (anchor.height.value ?? anchor.height.targetValue ?? 0) / 2;
+        const tgtCX = (anchor.posX.targetValue ?? 0) + (anchor.width.targetValue ?? 0) / 2;
+        const tgtCY = (anchor.posY.targetValue ?? 0) + (anchor.height.targetValue ?? 0) / 2;
+        const dx = curCX - tgtCX;
+        const dy = curCY - tgtCY;
+        if (dx !== 0 || dy !== 0) {
+          for (const n of rowNodes) {
+            n.posX.targetValue = (n.posX.targetValue ?? 0) + dx;
+            n.posY.targetValue = (n.posY.targetValue ?? 0) + dy;
+          }
+        }
+      }
     }
 
     // Find the node for this product
