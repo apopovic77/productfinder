@@ -738,7 +738,9 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         cursor: heroDock ? 'default' : isDragging ? 'grabbing' : 'grab',
         userSelect: isDragging ? 'none' : 'auto',
         fontSize: isMobilePortrait ? '12px' : '11px',
-        overflowY: expanded ? 'auto' : heroSheet ? 'hidden' : isMobilePortrait ? 'auto' : 'visible',
+        // heroSheet scrollt: mit 'hidden' war 'Mehr Details' unterhalb der
+        // Sheet-Kante unerreichbar (Befund 2026-08-25 bei media 120674).
+        overflowY: expanded ? 'auto' : heroSheet ? 'auto' : isMobilePortrait ? 'auto' : 'visible',
       }}
       animate={{
         opacity: 1,

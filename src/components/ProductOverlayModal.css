@@ -686,7 +686,10 @@
 /* Phone: stage stacks on top instead of a side column */
 @media (max-width: 767px) {
   .pom-info-panel.pom-expanded { padding-left: 16px; }
-  .pom-expanded-hero { position: static; width: auto; height: 34vh; margin-bottom: 10px; }
+  /* flex: 0 0 auto — das Panel ist eine Flex-Spalte; ohne shrink-Schutz
+     quetschte sie die 34vh-Stage auf 0px und der Detail-Dialog zeigte
+     kein Produktbild (media 120677/120678). */
+  .pom-expanded-hero { position: static; width: auto; height: 34vh; flex: 0 0 34vh; margin-bottom: 10px; }
 }
 
 /* Stage video + play chip (video plays where the photo sits) */

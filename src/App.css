@@ -2320,8 +2320,10 @@ body {
 /* Phone: while the bottom sheet (48vh) is open, the hero arrows and counter
    sit just above it instead of underneath it. */
 @media (max-width: 767px) {
-  .pf-stage-card-open .pf-hero-arrow { bottom: calc(var(--pf-sheet-h, 48vh) + 16px); }
-  .pf-stage-card-open .pf-hero-counter { bottom: calc(var(--pf-sheet-h, 48vh) + 24px); }
+  /* Fallback 52vh statt 48vh: greift der --pf-sheet-h-Publisher nicht,
+     lagen die Pfeile bei einem ~50vh-Sheet halb UNTER dem Dialog (120674). */
+  .pf-stage-card-open .pf-hero-arrow { bottom: calc(var(--pf-sheet-h, 52vh) + 16px); }
+  .pf-stage-card-open .pf-hero-counter { bottom: calc(var(--pf-sheet-h, 52vh) + 24px); }
   /* Phone presentation swipes horizontally like desktop — plain ‹ › at
      the band edges. */
 }
