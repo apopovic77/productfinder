@@ -1081,8 +1081,11 @@ export default class App extends React.Component<Props, State> {
     // Any path change re-arms the auto-open; only closing the card while
     // STAYING on the leaf keeps it shut.
     if (this.autoOpenedLeafKey && this.autoOpenedLeafKey !== crumbKey) this.autoOpenedLeafKey = null;
+    // Auch am Kategorie-Root: EIN Produkt braucht keine Gruppen-Overview —
+    // direkt in den Hero mit Karte (owner 2026-08-25, media 120660/120661;
+    // der fruehere Root-Guard stammte aus #1309, wo es nur um Drill-Ebenen
+    // ging).
     const eligible = this.controller.isPivotHeroMode()
-      && this.controller.getPivotBreadcrumbs().length > 1 // not the category root
       && order.length === 1;
     if (!eligible) return;
     if (this.autoOpenedLeafKey === crumbKey || this.state.selectedProduct) return;
