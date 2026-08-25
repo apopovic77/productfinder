@@ -304,8 +304,20 @@ export class HeroLayouter<T> implements ILayouter<T> {
         rows[rows.length - 1].push({ key: shelf.key, nodes: shelf.nodes, shelfW, showHeader: shelf.showHeader });
         cursorX += shelfW + shelfGapX;
       }
-      const totalH = rows.length * (headerH + h + shelfGapY) - shelfGapY;
-      return { rows, totalH, w };
+      // Fortsetzungszeilen (reine Teilstapel ohne Header) ruecken enger an
+      // ihre Gruppe: kein Header-Raum und kleinerer Zeilenabstand als
+      // zwischen Gruppen (owner 2026-08-25, media 120662).
+      const intraGapY = 14;
+      let totalH = 0;
+      rows.forEach((row, idx) => {
+        const hasHeader = row.some(shelf => shelf.showHeader);
+        totalH += (hasHeader ? headerH : intraGapY) + h;
+        if (idx < rows.length - 1) {
+          const nextHasHeader = rows[idx + 1].some(shelf => shelf.showHeader);
+          totalH += nextHasHeader ? shelfGapY : 0;
+        }
+      });
+      return { rows, totalH, w, intraGapY };
     };
     let plan = layoutOnce(cellH);
     while (plan.totalH > view.height - pad * 2 && cellH > 140) {
@@ -316,7 +328,9 @@ export class HeroLayouter<T> implements ILayouter<T> {
     this.posterHeaders = [];
     const startY = Math.max(24, (view.height - plan.totalH) / 2);
     let y = startY;
-    for (const row of plan.rows) {
+    plan.rows.forEach((row, idx) => {
+      const hasHeader = row.some(shelf => shelf.showHeader);
+      const topSpace = hasHeader ? headerH : plan.intraGapY;
       const rowW = row.reduce((sum, shelf) => sum + shelf.shelfW, 0) + (row.length - 1) * shelfGapX;
       let x = Math.max(pad, (view.width - rowW) / 2);
       for (const shelf of row) {
@@ -326,7 +340,7 @@ export class HeroLayouter<T> implements ILayouter<T> {
         for (let i = 0; i < shelf.nodes.length; i++) {
           const node = shelf.nodes[i];
           node.posX.targetValue = x + i * plan.w * advance;
-          node.posY.targetValue = y + headerH;
+          node.posY.targetValue = y + topSpace;
           node.width.targetValue = plan.w;
           node.height.targetValue = cellH;
           node.scale.targetValue = 1;
@@ -334,8 +348,12 @@ export class HeroLayouter<T> implements ILayouter<T> {
         }
         x += shelf.shelfW + shelfGapX;
       }
-      y += headerH + cellH + shelfGapY;
-    }
+      y += topSpace + cellH;
+      if (idx < plan.rows.length - 1) {
+        const nextHasHeader = plan.rows[idx + 1].some(shelf => shelf.showHeader);
+        y += nextHasHeader ? shelfGapY : 0;
+      }
+    });
     this.config.onLayout?.(nodes);
   }
 
