@@ -672,6 +672,11 @@ export class LayoutService {
     && new URLSearchParams(window.location.search).get('poster') === '1';
 
   getPosterHeaders(): Array<{ x: number; y: number; text: string; maxWidth?: number }> {
+    // Nur wenn der HeroLayouter AKTIV ist: nach einem Wechsel in die
+    // Pivot-Sicht (z.B. Breadcrumb-Dropdown) laeuft sein compute() nicht
+    // mehr — ohne diesen Guard malte der Renderer die stehengebliebenen
+    // Poster-Header ueber das Histogramm (owner 2026-08-25, media 120644).
+    if (this.layouter !== this.heroLayouter) return [];
     return this.heroLayouter?.posterMode ? (this.heroLayouter.posterHeaders ?? []) : [];
   }
 
