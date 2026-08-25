@@ -282,7 +282,12 @@ export class ProductFinderController {
     // centred in the band ABOVE it. Content smaller than the viewport gets
     // hard-centred by the clamp, which shoved the product back under the
     // sheet — extend the vertical bounds so the focal point is reachable.
-    if ((this.canvas?.clientWidth ?? 0) < 768 && this.renderer?.selectedProduct) {
+    // NUR im Hero-Modus: im Pivot machte die Erweiterung mit stale
+    // renderer.selectedProduct minY um -viewportHeight falsch und der
+    // rows-Offset (-minY) schob die Kamera exakt eine Viewporthoehe nach
+    // unten — weisser Screen nach Crumb-Navigation (media 120670/120671).
+    if ((this.canvas?.clientWidth ?? 0) < 768 && this.renderer?.selectedProduct
+        && this.layoutService.isPivotHeroMode()) {
       const vt = this.viewportService.getTransform();
       const sc = Math.max(0.05, vt?.getTargetScale() ?? 1);
       const ext = (this.canvas?.clientHeight ?? 600) / sc;
@@ -1192,6 +1197,7 @@ export class ProductFinderController {
   }
 
   drillDownPivot(value: string): void {
+    if (this.renderer) { this.renderer.selectedProduct = null; }
     this.layoutService.drillDownPivot(value);
     this.onPivotChanged();
     this.pushPivotHistory();
@@ -1274,12 +1280,14 @@ export class ProductFinderController {
   }
 
   drillUpPivot(): void {
+    if (this.renderer) { this.renderer.selectedProduct = null; }
     this.layoutService.drillUpPivot();
     this.onPivotChanged();
     this.pushPivotHistory();
   }
 
   resetPivot(): void {
+    if (this.renderer) { this.renderer.selectedProduct = null; }
     this.layoutService.resetPivot();
     this.onPivotChanged();
     this.pushPivotHistory('replace');

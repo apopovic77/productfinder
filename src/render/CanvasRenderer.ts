@@ -1313,6 +1313,7 @@ export class CanvasRenderer<T> {
 
     this.clear();
 
+
     if (this.viewport) {
       this.viewport.update();
     }
