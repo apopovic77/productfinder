@@ -1758,9 +1758,22 @@ export default class App extends React.Component<Props, State> {
       return;
     }
 
+    // Grouped-View: Klick auf einen Poster-Header drillt in die Gruppe
+    if (this.controller.handlePosterHeaderClick(x, y)) {
+      this.syncPivotUI();
+      return;
+    }
+
     // Otherwise check for product click
     const product = this.controller.hitTest(x, y);
     if (product) {
+      // Grouped-View: Produkt-Klick = Filter auf seine Gruppe (Pivot-Action,
+      // media 120646) — erst wenn die Ebene nicht weiter splittet, oeffnet
+      // der Klick das Produkt selbst.
+      if (this.controller.isHeroRootOverview() && this.controller.drillIntoProductGroup(product)) {
+        this.syncPivotUI();
+        return;
+      }
       this.openProductDetails(product);
     } else {
       // Clicked on empty space - deselect product
@@ -1845,6 +1858,12 @@ export default class App extends React.Component<Props, State> {
     // Check for group header click (in pivot mode)
     const groupHeaderClicked = this.controller.handleGroupHeaderClick(x, y);
     if (groupHeaderClicked) {
+      this.syncPivotUI();
+      return;
+    }
+
+    // Grouped-View: Klick auf einen Poster-Header drillt in die Gruppe
+    if (this.controller.handlePosterHeaderClick(x, y)) {
       this.syncPivotUI();
       return;
     }
@@ -2384,38 +2403,46 @@ export default class App extends React.Component<Props, State> {
                 </div>
               </>
             )}
-            <button
-              type="button"
-              className={`pf-header-btn ${this.controller.isFamilyGrouped() ? 'active' : ''}`}
-              onClick={() => {
-                this.controller.setFamilyGrouped(!this.controller.isFamilyGrouped());
-                this.syncPivotUI();
-              }}
-              title={this.controller.isFamilyGrouped() ? 'Grouped by product family' : 'Showing all color variants'}
-            >
-              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                {this.controller.isFamilyGrouped()
-                  ? <><rect x="3" y="3" width="18" height="18" rx="3"/></>
-                  : <><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></>}
-              </svg>
-            </button>
-            <button
-              type="button"
-              className={`pf-header-btn ${this.controller.getLayoutMode() === 'lanes' ? 'active' : ''}`}
-              onClick={() => {
-                const current = this.controller.getLayoutMode();
-                this.controller.setLayoutMode(current === 'lanes' ? 'pivot' : 'lanes');
-                this.syncPivotUI();
-                setTimeout(() => this.controller.handleResize(), 50);
-              }}
-              title={this.controller.getLayoutMode() === 'lanes' ? 'Lane view (shop style)' : 'Pivot view'}
-            >
-              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                {this.controller.getLayoutMode() === 'lanes'
-                  ? <><path d="M4 7h16M4 12h16M4 17h16"/></>
-                  : <><path d="M5 20V9M12 20V4M19 20v-7"/><path d="M3 20h18"/></>}
-              </svg>
-            </button>
+            {(() => { const grouped = this.controller.isHeroRootOverview();
+            return (
+            <div className="pf-view-switch" role="group" aria-label="Ansicht">
+              <button
+                type="button"
+                className={`pf-header-btn ${!grouped ? 'active' : ''}`}
+                disabled={grouped && !this.controller.canShowPivotColumns()}
+                onClick={() => {
+                  if (grouped) {
+                    this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false });
+                    this.controller.exitHeroPresentation();
+                    this.controller.setViewOverride('pivot');
+                    this.syncPivotUI();
+                  }
+                }}
+                title="Pivot-Spalten"
+              >
+                <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M5 20V9M12 20V4M19 20v-7"/><path d="M3 20h18"/>
+                </svg>
+              </button>
+              <button
+                type="button"
+                className={`pf-header-btn ${grouped ? 'active' : ''}`}
+                onClick={() => {
+                  if (!grouped) {
+                    this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false });
+                    this.controller.exitHeroPresentation();
+                    this.controller.setViewOverride('grouped');
+                    this.syncPivotUI();
+                  }
+                }}
+                title="Grouped View"
+              >
+                <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/>
+                </svg>
+              </button>
+            </div>
+            ); })()}
             {/* Desktop: the right pane is gone (owner, 2026-08-23 — it only took
                 space; back is the breadcrumb, dimension/sort already live here).
                 Its two functions move up: AI search and the cart. */}

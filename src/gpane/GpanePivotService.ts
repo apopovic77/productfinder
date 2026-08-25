@@ -364,6 +364,11 @@ export class GpanePivotService {
     return String(val);
   }
 
+  /** Aktuelle Engine-Buckets der Ebene (auch im Hero-Modus vorhanden). */
+  getCurrentBuckets() {
+    return this.engine.buckets;
+  }
+
   getGroupComparator(): (a: string, b: string) => number {
     // In taxonomy mode: preserve taxonomy node order (array index = sort order)
     if (this.engine.mode === 'taxonomy') {

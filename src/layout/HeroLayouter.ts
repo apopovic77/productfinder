@@ -31,7 +31,14 @@ export class HeroLayouter<T> implements ILayouter<T> {
    */
   public posterMode = false;
   /** Typo-Header pro Modell-Block, gezeichnet vom CanvasRenderer (world coords). */
-  public posterHeaders: Array<{ x: number; y: number; text: string; maxWidth?: number }> = [];
+  public posterHeaders: Array<{ x: number; y: number; text: string; raw: string; maxWidth?: number }> = [];
+
+  /**
+   * Gruppen der Poster-View = Engine-Buckets der Ebene (LayoutService).
+   * Damit ist der Gruppen-Klick eine echte Pivot-Action (drillDown auf
+   * das Bucket-Label). Leer -> Fallback auf Attribut-Kandidaten.
+   */
+  public posterBuckets: Array<{ label: string; ids: Set<string> }> = [];
 
   constructor(private config: HeroLayoutConfig<T>) {}
 
@@ -240,20 +247,31 @@ export class HeroLayouter<T> implements ILayouter<T> {
       const v = data?.attributes?.[key]?.value ?? data?.raw?.properties?.[key];
       return typeof v === 'string' && v.trim() ? v.trim() : '';
     };
-    // Gruppierschluessel nach Trennschaerfe (wie die Pivot-Engine): die
-    // erste Dimension, die tatsaechlich splittet — eine Ebene tiefer ist
-    // product_line uniform, dann traegt design_group die Poster-Bloecke.
-    const candidates = ['product_line', 'design_group', 'color_base', 'color_name'];
-    let groupKey = '';
-    for (const candidate of candidates) {
-      const distinct = new Set(nodes.map(node => attr(node, candidate)).filter(Boolean));
-      if (distinct.size >= 2) { groupKey = candidate; break; }
-    }
     const groups = new Map<string, LayoutNode<T>[]>();
-    for (const node of nodes) {
-      const key = (groupKey && attr(node, groupKey)) || 'WEITERE';
-      const list = groups.get(key);
-      if (list) list.push(node); else groups.set(key, [node]);
+    if (this.posterBuckets.length >= 2) {
+      // Gruppen = Engine-Buckets (Bucket-Reihenfolge, Rest -> WEITERE)
+      for (const bucket of this.posterBuckets) groups.set(bucket.label, []);
+      for (const node of nodes) {
+        const id = String((node.data as any)?.id ?? '');
+        const bucket = this.posterBuckets.find(item => item.ids.has(id));
+        const key = bucket ? bucket.label : 'WEITERE';
+        const list = groups.get(key);
+        if (list) list.push(node); else groups.set(key, [node]);
+      }
+      for (const [key, list] of [...groups]) { if (!list.length) groups.delete(key); }
+    } else {
+      // Fallback: erste Dimension, die tatsaechlich splittet
+      const candidates = ['product_line', 'design_group', 'color_base', 'color_name'];
+      let groupKey = '';
+      for (const candidate of candidates) {
+        const distinct = new Set(nodes.map(node => attr(node, candidate)).filter(Boolean));
+        if (distinct.size >= 2) { groupKey = candidate; break; }
+      }
+      for (const node of nodes) {
+        const key = (groupKey && attr(node, groupKey)) || 'WEITERE';
+        const list = groups.get(key);
+        if (list) list.push(node); else groups.set(key, [node]);
+      }
     }
 
     // Zellgroesse iterativ verkleinern bis die Blöcke die Seite fuellen,
@@ -303,7 +321,7 @@ export class HeroLayouter<T> implements ILayouter<T> {
       let x = Math.max(pad, (view.width - rowW) / 2);
       for (const shelf of row) {
         if (shelf.showHeader) {
-          this.posterHeaders.push({ x, y: y + headerH - 14, text: shelf.key.toUpperCase(), maxWidth: shelf.shelfW + shelfGapX * 0.5 });
+          this.posterHeaders.push({ x, y: y + headerH - 14, text: shelf.key.toUpperCase(), raw: shelf.key, maxWidth: shelf.shelfW + shelfGapX * 0.5 });
         }
         for (let i = 0; i < shelf.nodes.length; i++) {
           const node = shelf.nodes[i];

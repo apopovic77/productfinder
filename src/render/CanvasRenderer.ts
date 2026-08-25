@@ -1715,16 +1715,25 @@ export class CanvasRenderer<T> {
     // Poster-Overview (Prototyp 2026-08-25): Typo-Header pro Modell-Block,
     // world-space wie die Produkte — Stil des A1-B2B-Plakats (fette
     // Versalien, kein Chip, kein Rahmen).
-    for (const header of this.posterHeaderProvider()) {
-      const size = Math.max(13, Math.min(24, 18));
-      this.ctx.font = `800 ${size}px 'ITC Avant Garde Gothic', system-ui, sans-serif`;
-      this.ctx.fillStyle = 'rgba(17, 17, 17, 0.88)';
-      this.ctx.textAlign = 'left';
-      this.ctx.textBaseline = 'alphabetic';
-      // maxWidth staucht statt zu ueberlappen; harte Kappung via Ellipsis
-      // waere teurer und der Poster-Stil vertraegt condensed Versalien.
-      if ((header as any).maxWidth) this.ctx.fillText(header.text, header.x, header.y, (header as any).maxWidth);
-      else this.ctx.fillText(header.text, header.x, header.y);
+    {
+      // Header liegen in WORLD-Koordinaten — durch die Viewport-Transform
+      // rechnen, sonst kleben sie bei gezoomtem/gescrolltem Canvas an der
+      // falschen Stelle (Bug 2026-08-25: bei scale~1 unsichtbar verrutscht).
+      const vpScale = this.viewport?.scale ?? 1;
+      const vpOffset = this.viewport ? this.viewport.offset : { x: 0, y: 0 };
+      for (const header of this.posterHeaderProvider()) {
+        const size = Math.max(11, Math.min(26, 18 * vpScale));
+        this.ctx.font = `800 ${size}px 'ITC Avant Garde Gothic', system-ui, sans-serif`;
+        this.ctx.fillStyle = 'rgba(17, 17, 17, 0.88)';
+        this.ctx.textAlign = 'left';
+        this.ctx.textBaseline = 'alphabetic';
+        const sx = header.x * vpScale + vpOffset.x;
+        const sy = header.y * vpScale + vpOffset.y;
+        // maxWidth staucht statt zu ueberlappen; harte Kappung via Ellipsis
+        // waere teurer und der Poster-Stil vertraegt condensed Versalien.
+        if ((header as any).maxWidth) this.ctx.fillText(header.text, sx, sy, (header as any).maxWidth * vpScale);
+        else this.ctx.fillText(header.text, sx, sy);
+      }
     }
 
     // Draw group headers (after products, so they're on top) - matching .pf-pivot-chip style

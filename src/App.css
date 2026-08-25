@@ -2397,3 +2397,8 @@ body {
 .pf-crumb-menu-item:hover { background: rgba(255, 90, 31, 0.18); color: #fff; }
 .pf-crumb-menu-item.active { color: #ff5a1f; cursor: default; }
 @media (hover: none) { .pf-crumb-menu { display: none !important; } }
+
+/* Sicht-Switch Pivot-Spalten <-> Grouped View (owner 2026-08-25, 120646) */
+.pf-view-switch { display: inline-flex; gap: 2px; padding: 2px; border-radius: 999px; background: rgba(255, 255, 255, 0.07); }
+.pf-view-switch .pf-header-btn.active { background: rgba(255, 90, 31, 0.25); color: #fff; }
+.pf-view-switch .pf-header-btn:disabled { opacity: 0.35; cursor: default; }

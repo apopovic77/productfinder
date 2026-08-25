@@ -1134,6 +1134,59 @@ export class ProductFinderController {
     this.ignoreNextHistoryPush = false;
   }
 
+  /** Header-Switch Pivot-Spalten <-> Grouped-View (media 120646). */
+  setViewOverride(override: 'auto' | 'pivot' | 'grouped'): void {
+    this.layoutService.setViewOverride(override);
+    this.onPivotChanged();
+    this.handleResize();
+  }
+
+  getViewOverride(): 'auto' | 'pivot' | 'grouped' {
+    return this.layoutService.getViewOverride();
+  }
+
+  /** Gibt es an dieser Ebene ueberhaupt >1 Bucket fuer eine Pivot-Sicht? */
+  canShowPivotColumns(): boolean {
+    return this.layoutService.getCurrentBuckets().filter((b: any) => !b.isUnknown).length >= 2;
+  }
+
+  /**
+   * Grouped-View: Klick auf ein Produkt filtert auf dessen Gruppe —
+   * eine echte Pivot-Action (drillDown auf das Engine-Bucket), statt alle
+   * Produkte der Ebene in den Hero-Mode zu fahren (media 120646).
+   */
+  drillIntoProductGroup(product: Product): boolean {
+    const buckets = this.layoutService.getCurrentBuckets().filter((b: any) => !b.isUnknown);
+    if (buckets.length < 2) return false;
+    const id = String(product.id);
+    const bucket = buckets.find((b: any) => b.objectIds.includes(id));
+    if (!bucket) return false;
+    this.drillDownPivot(bucket.label);
+    return true;
+  }
+
+  /**
+   * Poster-Header-Klick (world-space Hit-Test) -> Pivot-Drill in die Gruppe.
+   */
+  handlePosterHeaderClick(canvasX: number, canvasY: number): boolean {
+    const headers = this.layoutService.getPosterHeaders();
+    if (!headers.length) return false;
+    const vt = this.viewportService.getTransform();
+    if (!vt) return false;
+    const worldX = (canvasX - vt.offset.x) / vt.scale;
+    const worldY = (canvasY - vt.offset.y) / vt.scale;
+    for (const header of headers) {
+      const w = header.maxWidth ?? 220;
+      if (worldX >= header.x && worldX <= header.x + w && worldY >= header.y - 24 && worldY <= header.y + 8) {
+        const raw = (header as any).raw ?? header.text;
+        if (raw === 'WEITERE') return false;
+        this.drillDownPivot(raw);
+        return true;
+      }
+    }
+    return false;
+  }
+
   getPivotBreadcrumbSiblings(): string[][] {
     return this.layoutService.getPivotBreadcrumbSiblings();
   }

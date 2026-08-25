@@ -428,9 +428,35 @@ export class LayoutService {
     return this.isPivotHeroMode() && !this._heroPresentation;
   }
 
+  /**
+   * Sicht-Override (owner 2026-08-25, media 120646): der Header-Switch
+   * erzwingt Pivot-Spalten ODER Grouped-View fuer die aktuelle Ebene.
+   * Jede Drill-Aktion setzt auf 'auto' zurueck — dort entscheidet wieder
+   * die smarte Logik (Produktanzahl/Hero-Schwelle).
+   */
+  private viewOverride: 'auto' | 'pivot' | 'grouped' = 'auto';
+
+  setViewOverride(override: 'auto' | 'pivot' | 'grouped'): void {
+    this.viewOverride = override;
+  }
+
+  getViewOverride(): 'auto' | 'pivot' | 'grouped' {
+    return this.viewOverride;
+  }
+
+  private effectiveHeroActive(): boolean {
+    if (this.viewOverride === 'grouped') return true;
+    if (this.viewOverride === 'pivot') return false;
+    return this.drillDownService.isHeroModeActive();
+  }
+
+  getCurrentBuckets() {
+    return this.drillDownService.getCurrentBuckets();
+  }
+
   layout(width: number, height: number): void {
     if (this.mode === 'pivot') {
-      const heroActive = this.drillDownService.isHeroModeActive();
+      const heroActive = this.effectiveHeroActive();
       if (heroActive) {
         if (!(this.layouter instanceof HeroLayouter)) {
           this.heroLayouter = this.createHeroLayouter();
@@ -441,6 +467,11 @@ export class LayoutService {
         if (this.heroLayouter) {
           this.heroLayouter.overviewMode = this.isHeroRootOverview();
           this.heroLayouter.posterMode = this.posterOverview;
+          // Gruppen der Poster-View = Engine-Buckets der Ebene, damit der
+          // Gruppen-Klick eine echte Pivot-Action ist (media 120646).
+          this.heroLayouter.posterBuckets = this.drillDownService.getCurrentBuckets()
+            .filter(bucket => !bucket.isUnknown)
+            .map(bucket => ({ label: bucket.label, ids: new Set(bucket.objectIds) }));
         }
       } else {
         if (!(this.layouter instanceof PivotLayouter)) {
@@ -461,7 +492,7 @@ export class LayoutService {
       this.displayOrderIds = [];
       this.nodeToGroup.clear();
     } else if (this.mode === 'lanes') {
-      const heroActive = this.drillDownService.isHeroModeActive();
+      const heroActive = this.effectiveHeroActive();
       if (heroActive) {
         if (!(this.layouter instanceof HeroLayouter)) {
           this.heroLayouter = this.createHeroLayouter();
@@ -584,6 +615,7 @@ export class LayoutService {
    * Drill down into a pivot group
    */
   drillDownPivot(value: string): void {
+    this.viewOverride = 'auto';
     if (this.mode !== 'pivot' && this.mode !== 'lanes') return;
 
     // Cache positions BEFORE removing nodes — so they can return to same spot
@@ -608,6 +640,7 @@ export class LayoutService {
    * Drill up (remove last filter)
    */
   drillUpPivot(): void {
+    this.viewOverride = 'auto';
     if (this.mode !== 'pivot' && this.mode !== 'lanes') return;
     this.cacheCurrentNodePositions();
     if (this.drillDownService.drillUp()) {
@@ -622,6 +655,7 @@ export class LayoutService {
    * Reset pivot to top level
    */
   resetPivot(): void {
+    this.viewOverride = 'auto';
     if (this.mode !== 'pivot' && this.mode !== 'lanes') return;
     this.cacheCurrentNodePositions();
     this.drillDownService.reset();
@@ -651,6 +685,7 @@ export class LayoutService {
   }
 
   isPivotHeroMode(): boolean {
+    if (this.mode === 'pivot' || this.mode === 'lanes') return this.effectiveHeroActive();
     return this.drillDownService.isHeroModeActive();
   }
   
@@ -668,8 +703,8 @@ export class LayoutService {
    * PROTOTYP (owner 2026-08-25): Poster-Overview nach dem A1-B2B-Plakat —
    * aktiviert per URL ?poster=1, nur Desktop-Overview.
    */
-  private posterOverview = typeof window !== 'undefined'
-    && new URLSearchParams(window.location.search).get('poster') === '1';
+  private posterOverview = typeof window === 'undefined'
+    || new URLSearchParams(window.location.search).get('poster') !== '0';
 
   getPosterHeaders(): Array<{ x: number; y: number; text: string; maxWidth?: number }> {
     // Nur wenn der HeroLayouter AKTIV ist: nach einem Wechsel in die
@@ -945,6 +980,15 @@ export class LayoutService {
     // extension would zoom the fit far out)
     const phoneGrid = typeof window !== 'undefined' && window.innerWidth < 768;
     const gridOverview = phoneGrid || this.isHeroRootOverview();
+    // Poster-Overview: die Typo-Header liegen OBERHALB der ersten Produkt-
+    // Reihe — ohne Erweiterung clampt der Top-Snap die Produkt-Bounds an
+    // die Canvas-Oberkante und die Header stehen unsichtbar darueber
+    // (offset.y=-70, Debug 2026-08-25).
+    if (gridOverview && this.layouter === this.heroLayouter && this.heroLayouter?.posterMode) {
+      for (const header of this.heroLayouter.posterHeaders) {
+        minY = Math.min(minY, header.y - 32);
+      }
+    }
     if (viewportWidth && firstProduct && lastProduct && !gridOverview) {
       // Horizontal extension: To center first product: its center must be at viewportWidth/2
       // This requires: minX = firstProductCenter - viewportWidth/2
