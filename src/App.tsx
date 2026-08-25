@@ -45,6 +45,7 @@ import { STORAGE_API_BASE as CENTRAL_STORAGE_BASE, STORAGE_API_KEY as CENTRAL_ST
 import { CATALOG_ENTRY_CONFIG, getLocalizedLabel, type CatalogEntrySelection } from './config/CatalogEntryConfig';
 import { writeCatalogUrl } from './utils/catalogEntryUrl';
 import { buildBrandUrl, type BrandFacet } from './utils/brandSelection';
+import { createPortal } from 'react-dom';
 import { fetchFacets } from './data/ProductRepository';
 
 function clamp(n: number, min: number, max: number) {
@@ -1389,7 +1390,8 @@ export default class App extends React.Component<Props, State> {
   }
 
   private filterFooterSearchResults(term: string): Product[] {
-    return this.searchAllProducts(term, 8);
+    // Matrix-Pane (owner 2026-08-26): bis zu 60 Kacheln statt 8 Zeilen.
+    return this.searchAllProducts(term, 60);
   }
 
   private handleFooterSearchChange = (value: string) => {
@@ -2410,38 +2412,52 @@ export default class App extends React.Component<Props, State> {
                 onChange={(e) => this.handleFooterSearchChange(e.target.value)}
                 onKeyDown={this.handleFooterSearchKeyDown}
               />
-              {footerSearchTerm.trim().length > 0 && (
-                <div className="pf-header-search-results">
-                  {footerSearchResults.length === 0 ? (
-                    <div className="pf-header-search-empty">No matches</div>
-                  ) : (
-                    <>
-                      {footerSearchResults.map((product) => (
-                        <button
-                          type="button"
-                          key={`header-result-${product.id}`}
-                          className="pf-header-search-result"
-                          onClick={() => this.handleFooterSearchSelect(product.id)}
-                        >
-                          <span className="pf-header-search-name">{product.name}</span>
-                          {product.price?.formatted && (
-                            <span className="pf-header-search-price">{product.price.formatted}</span>
-                          )}
-                        </button>
-                      ))}
-                      <button
-                        type="button"
-                        className="pf-header-search-filter-action"
-                        onClick={() => this.applySearchFilter(footerSearchTerm)}
-                        title="Filter view to all matching products (Shift+Enter)"
-                      >
-                        <span>🔍 Als Filter anwenden</span>
-                        <span className="pf-header-search-filter-hint">Shift+Enter</span>
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
+              {footerSearchTerm.trim().length > 0 && createPortal((() => {
+                // Suchergebnis als MATRIX ueber die volle Seitenbreite (owner
+                // 2026-08-26): Bild + Name + Preis pro Kachel, unter dem
+                // Header, statt einer schmalen 8-Zeilen-Liste. Portal, weil
+                // backdrop-filter im Header ein fixed-Element einfangen wuerde.
+                const header = typeof document !== 'undefined' ? document.querySelector('.pf-header') : null;
+                const top = header ? Math.round(header.getBoundingClientRect().bottom) + 8 : 64;
+                const total = this.searchAllProducts(footerSearchTerm, 0).length;
+                return (
+                  <div className="pf-search-panel" style={{ top }} role="dialog" aria-label="Suchergebnis">
+                    <div className="pf-search-panel-head">
+                      <span className="pf-search-panel-title">
+                        {total === 0 ? 'Keine Treffer' : `${total} Treffer`}
+                        {total > footerSearchResults.length && <span className="pf-search-panel-sub"> · erste {footerSearchResults.length}</span>}
+                        <span className="pf-search-panel-term"> für „{footerSearchTerm.trim()}"</span>
+                      </span>
+                      <div className="pf-search-panel-actions">
+                        {total > 0 && (
+                          <button type="button" className="pf-search-panel-apply" onClick={() => this.applySearchFilter(footerSearchTerm)} title="Alle Treffer im Finder anzeigen (Shift+Enter)">
+                            Alle {total} im Finder zeigen
+                          </button>
+                        )}
+                        <button type="button" className="pf-search-panel-close" onClick={() => this.setState({ footerSearchTerm: '' })} aria-label="Schließen">×</button>
+                      </div>
+                    </div>
+                    {total > 0 && (
+                      <div className="pf-search-panel-grid">
+                        {footerSearchResults.map((product) => (
+                          <button
+                            type="button"
+                            key={`search-tile-${product.id}`}
+                            className="pf-search-tile"
+                            onClick={() => this.handleFooterSearchSelect(product.id)}
+                            title={product.name}
+                          >
+                            <span className="pf-search-tile-img"><img src={product.imageUrl} alt="" loading="lazy" /></span>
+                            <span className="pf-search-tile-cat">{(product as any).raw?.properties?.product_type || (product as any).raw?.category || ''}</span>
+                            <span className="pf-search-tile-name">{product.name}</span>
+                            {product.price?.formatted && <span className="pf-search-tile-price">{product.price.formatted}</span>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })(), document.body)}
             </div>
           </div>
           <div className="pf-header-actions">
