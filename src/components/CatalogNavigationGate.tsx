@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   CATALOG_ENTRY_CONFIG,
   SMART_GATE_HERO_THRESHOLD,
+  getCatalogSportBanner,
   getLocalizedLabel,
   type CatalogEntrySelection,
   type CatalogLocale,
@@ -232,8 +233,9 @@ export const CatalogNavigationGate: React.FC<Props> = ({
           </header>
           <div className="pf-catalog-sport-grid">
             {CATALOG_ENTRY_CONFIG.sports.map(item => {
-              const bannerUrl = item.banner?.url ?? (item.banner?.storageId
-                ? `${STORAGE_API_BASE}/storage/media/${item.banner.storageId}?format=webp&width=1600`
+              const banner = getCatalogSportBanner(item, brand);
+              const bannerUrl = banner?.url ?? (banner?.storageId
+                ? `${STORAGE_API_BASE}/storage/media/${banner.storageId}?format=webp&width=1600`
                 : undefined);
               return (
                 <button
@@ -242,7 +244,7 @@ export const CatalogNavigationGate: React.FC<Props> = ({
                   key={item.id}
                   disabled={!item.enabled || (smartGates && hasLoadedProducts && (sportCounts.get(item.id) ?? 0) === 0)}
                   onClick={() => writeCatalogUrl({ sport: item.id, category: null })}
-                  style={bannerUrl ? { backgroundImage: `url(${bannerUrl})`, backgroundPosition: item.banner?.position ?? 'center' } : undefined}
+                  style={bannerUrl ? { backgroundImage: `url(${bannerUrl})`, backgroundPosition: banner?.position ?? 'center' } : undefined}
                 >
                   {item.comingSoon && <span className="pf-catalog-coming-soon">{text.comingSoon}</span>}
                   <span className="pf-catalog-sport-name">{getLocalizedLabel(item.labels, locale)}</span>

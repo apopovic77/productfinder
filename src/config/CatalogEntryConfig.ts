@@ -17,6 +17,8 @@ export type CatalogSportConfig = {
   sportValues: string[];
   enabled: boolean;
   comingSoon?: boolean;
+  /** Markenbezogene Mood-Shots; `banner` bleibt der Fallback für offene/unbekannte Marken. */
+  bannersByBrand?: Record<string, CatalogLandingMedia>;
   banner?: CatalogLandingMedia;
 };
 
@@ -133,6 +135,11 @@ export const CATALOG_ENTRY_CONFIG: CatalogEntryConfig = {
       sportValues: ['MX'],
       enabled: true,
       banner: { mode: 'image', storageId: 17577 },
+      bannersByBrand: {
+        "O'Neal": { mode: 'image', storageId: 17577 },
+        'Kini Red Bull': { mode: 'image', storageId: 30976, position: 'center 45%' },
+        'ONE Industries': { mode: 'image', storageId: 31795, position: 'center 42%' },
+      },
     },
     {
       id: 'mtb',
@@ -140,6 +147,13 @@ export const CATALOG_ENTRY_CONFIG: CatalogEntryConfig = {
       sportValues: ['MTB'],
       enabled: true,
       banner: { mode: 'image', storageId: 15344 },
+      bannersByBrand: {
+        "O'Neal": { mode: 'image', storageId: 15344 },
+        'Kini Red Bull': { mode: 'image', storageId: 31537, position: 'center 42%' },
+        // Das ONE-Portal liefert keine Area-Zuordnung; dieser zweite echte
+        // ONE-Mood-Shot hält die Markenidentität auch am MTB-Einstieg stabil.
+        'ONE Industries': { mode: 'image', storageId: 31802, position: 'center 44%' },
+      },
     },
   ],
   categoriesBySport: {
@@ -193,3 +207,10 @@ export function getLocalizedLabel(labels: LocalizedLabel, locale: CatalogLocale)
   return labels[locale] ?? labels.en ?? Object.values(labels)[0] ?? '';
 }
 
+/** Resolve the sport artwork from the selected brand without losing the generic fallback. */
+export function getCatalogSportBanner(
+  sport: CatalogSportConfig,
+  brand?: string | null,
+): CatalogLandingMedia | undefined {
+  return (brand ? sport.bannersByBrand?.[brand] : undefined) ?? sport.banner;
+}

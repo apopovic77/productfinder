@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CATALOG_ENTRY_CONFIG } from '../config/CatalogEntryConfig';
+import { CATALOG_ENTRY_CONFIG, getCatalogSportBanner } from '../config/CatalogEntryConfig';
 import { Product } from '../types/Product';
 import { countCatalogCategoryProducts, matchesCatalogEntrySelection } from './catalogEntry';
 
@@ -51,5 +51,18 @@ describe('catalog entry mapping', () => {
     expect(countCatalogCategoryProducts(products, 'moto', 'mx-gear')).toBe(2);
     expect(countCatalogCategoryProducts(products, 'moto', 'youth-gear')).toBe(1);
   });
-});
 
+  it('resolves sport artwork from the selected brand with a generic fallback', () => {
+    const moto = CATALOG_ENTRY_CONFIG.sports.find(sport => sport.id === 'moto');
+    const mtb = CATALOG_ENTRY_CONFIG.sports.find(sport => sport.id === 'mtb');
+    expect(moto).toBeDefined();
+    expect(mtb).toBeDefined();
+
+    expect(getCatalogSportBanner(moto!, 'Kini Red Bull')?.storageId).toBe(30976);
+    expect(getCatalogSportBanner(mtb!, 'Kini Red Bull')?.storageId).toBe(31537);
+    expect(getCatalogSportBanner(moto!, 'ONE Industries')?.storageId).toBe(31795);
+    expect(getCatalogSportBanner(mtb!, 'ONE Industries')?.storageId).toBe(31802);
+    expect(getCatalogSportBanner(moto!, 'Unknown brand')).toBe(moto!.banner);
+    expect(getCatalogSportBanner(mtb!, null)).toBe(mtb!.banner);
+  });
+});
