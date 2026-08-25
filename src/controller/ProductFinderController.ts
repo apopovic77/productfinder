@@ -334,6 +334,8 @@ export class ProductFinderController {
       const vto = this.viewportService.getTransform();
       if (vto) {
         vto.snapResolver = null;
+        vto.snapResolverY = null;
+        vto.snapAnchorY = null;
         const entryKey = 'desk-overview:' + this.layoutService.getPivotBreadcrumbs().join('>');
         if (this._heroEntryKey !== entryKey) {
           this._heroEntryKey = entryKey;
@@ -346,6 +348,28 @@ export class ProductFinderController {
           }, 350);
         }
       }
+    } else if (isHeroMode && isPhone && this.layoutService.isHeroPresentation()) {
+      // Phone hero presentation: vertical column, paged up/down snapping
+      // anchored on the band above the sheet.
+      this.viewportService.setLockVerticalPan(false);
+      this.viewportService.setLockHorizontalPan(true);
+      const vtv = this.viewportService.getTransform();
+      if (vtv) {
+        vtv.snapResolver = null;
+        vtv.snapAnchorY = this.phoneBandHeight() / 2;
+        vtv.snapResolverY = (centerWorldY, velocityY) => {
+          const centers = this.heroProductCenters();
+          if (centers.length === 0) return null;
+          let nearest = 0;
+          for (let i = 1; i < centers.length; i++) {
+            if (Math.abs(centers[i] - centerWorldY) < Math.abs(centers[nearest] - centerWorldY)) nearest = i;
+          }
+          const FLICK = 6;
+          if (velocityY < -FLICK) nearest = Math.min(centers.length - 1, nearest + 1);
+          else if (velocityY > FLICK) nearest = Math.max(0, nearest - 1);
+          return centers[nearest];
+        };
+      }
     } else if (isHeroMode && isPhone) {
       // Phone leaf grid (HeroLayouter.computePhoneGrid): vertical-only
       // scrolling — a two-column list must not wander sideways.
@@ -354,6 +378,8 @@ export class ProductFinderController {
       const vtp = this.viewportService.getTransform();
       if (vtp) {
         vtp.snapResolver = null;
+        vtp.snapResolverY = null;
+        vtp.snapAnchorY = null;
         // Snap to the top ONLY when this leaf was just entered.
         // updateContentBounds runs on every resize — iOS collapses the
         // toolbar while scrolling, which fired a resize, which snapped the
@@ -401,6 +427,8 @@ export class ProductFinderController {
       // a slow drag snaps to whichever product is nearest the centre.
       const vt = this.viewportService.getTransform();
       if (vt) {
+        vt.snapResolverY = null;
+        vt.snapAnchorY = null;
         vt.snapResolver = (centerWorldX, velocityX) => {
           // centerWorldX is the screen centre; the focal point sits left of it.
           centerWorldX -= this.heroDockShift() / vt.getTargetScale();
@@ -422,7 +450,7 @@ export class ProductFinderController {
       // Lanes mode: Fixed scale 1.0, free vertical scrolling, start at top, no zoom-out
       this.viewportService.setLockVerticalPan(false);
       this.viewportService.setLockHorizontalPan(false);
-      const vtl = this.viewportService.getTransform(); if (vtl) vtl.snapResolver = null;
+      const vtl = this.viewportService.getTransform(); if (vtl) { vtl.snapResolver = null; vtl.snapResolverY = null; vtl.snapAnchorY = null; }
       const vt = this.viewportService.getTransform();
       if (vt) {
         vt.minScaleOverride = 0.8;
@@ -617,10 +645,28 @@ export class ProductFinderController {
   }
 
   /** World x of every hero product centre, sorted left to right. */
+  /** Phone + hero presentation = the vertical column layout. */
+  private isPhonePresentation(): boolean {
+    return (this.canvas?.clientWidth ?? 0) < 768
+      && this.layoutService.isPivotHeroMode()
+      && this.layoutService.isHeroPresentation();
+  }
+
+  /** Free band height above the phone bottom sheet, in CSS px. */
+  private phoneBandHeight(): number {
+    const vt = this.viewportService.getTransform();
+    const screenH = vt?.viewportHeight ?? (this.canvas?.clientHeight ?? 600);
+    const sheetH = (typeof window !== 'undefined' ? window.innerHeight : screenH) * 0.52 + 8;
+    return Math.max(120, screenH - sheetH);
+  }
+
   private heroProductCenters(): number[] {
+    const vertical = this.isPhonePresentation();
     return this.layoutService.getEngine().all()
       .filter(n => (n.opacity.targetValue ?? 1) > 0.01 && (n.width.targetValue ?? 0) > 0)
-      .map(n => (n.posX.targetValue ?? 0) + (n.width.targetValue ?? 0) / 2)
+      .map(n => vertical
+        ? (n.posY.targetValue ?? 0) + (n.height.targetValue ?? 0) / 2
+        : (n.posX.targetValue ?? 0) + (n.width.targetValue ?? 0) / 2)
       .sort((a, b) => a - b);
   }
 
@@ -631,9 +677,13 @@ export class ProductFinderController {
    */
   /** Hero mode: the product at position i (left to right), or null. */
   getHeroProductAt(index: number): Product | null {
+    const vertical = this.isPhonePresentation();
+    const centre = (n: any) => vertical
+      ? (n.posY.targetValue ?? 0) + (n.height.targetValue ?? 0) / 2
+      : (n.posX.targetValue ?? 0) + (n.width.targetValue ?? 0) / 2;
     const nodes = this.layoutService.getEngine().all()
       .filter(n => (n.opacity.targetValue ?? 1) > 0.01 && (n.width.targetValue ?? 0) > 0)
-      .sort((a, b) => ((a.posX.targetValue ?? 0) + (a.width.targetValue ?? 0) / 2) - ((b.posX.targetValue ?? 0) + (b.width.targetValue ?? 0) / 2));
+      .sort((a, b) => centre(a) - centre(b));
     return nodes[index]?.data ?? null;
   }
 
@@ -643,7 +693,9 @@ export class ProductFinderController {
     if (!vt || !this.layoutService.isPivotHeroMode()) return null;
     const centers = this.heroProductCenters();
     if (centers.length === 0) return null;
-    const cx = (vt.viewportWidth / 2 - this.heroDockShift() - vt.getTargetOffset().x) / vt.getTargetScale();
+    const cx = this.isPhonePresentation()
+      ? (this.phoneBandHeight() / 2 - vt.getTargetOffset().y) / vt.getTargetScale()
+      : (vt.viewportWidth / 2 - this.heroDockShift() - vt.getTargetOffset().x) / vt.getTargetScale();
     let nearest = 0;
     for (let i = 1; i < centers.length; i++) {
       if (Math.abs(centers[i] - cx) < Math.abs(centers[nearest] - cx)) nearest = i;
@@ -654,6 +706,16 @@ export class ProductFinderController {
   stepHeroProduct(direction: -1 | 1): boolean {
     const vt = this.viewportService.getTransform();
     if (!vt || !this.layoutService.isPivotHeroMode()) return false;
+    if (this.isPhonePresentation()) {
+      const pos = this.getHeroPosition();
+      if (!pos) return false;
+      const next = Math.max(0, Math.min(pos.count - 1, pos.index + direction));
+      if (next === pos.index) return false;
+      const prod = this.getHeroProductAt(next);
+      if (!prod) return false;
+      this.centerOnProduct(prod);
+      return true;
+    }
     const centers = this.heroProductCenters();
     if (centers.length === 0) return false;
     const shift = this.heroDockShift() / vt.getTargetScale();
@@ -674,12 +736,12 @@ export class ProductFinderController {
 
     // Overview grid -> hero presentation: switch the layouter so all nodes
     // animate sideways into the hero row, THEN centre the clicked one.
-    if ((this.canvas?.clientWidth ?? 0) >= 768
-        && this.layoutService.isPivotHeroMode()
+    if (this.layoutService.isPivotHeroMode()
         && this.layoutService.isHeroRootOverview()) {
       this.layoutService.setHeroPresentation(true);
       this._heroEntryKey = null;
       this.handleResize();
+      this.syncProductLabels(true);
     }
 
     // Find the node for this product
@@ -990,6 +1052,12 @@ export class ProductFinderController {
     if (isHero) {
       // Phone: the category line is noise on a leaf that is all one type.
       const phone = (this.canvas?.clientWidth ?? 0) < 768;
+      // Phone presentation: the sheet below carries name/price — the canvas
+      // caption would duplicate it in the small band (owner 2026-08-24).
+      if (phone && this.layoutService.isHeroPresentation()) {
+        this.renderer.productLabels.enabled = false;
+        return;
+      }
       this.renderer.productLabels.update({
         enabled: true,
         fields: phone ? ['name', 'price'] : ['category', 'name', 'price'],
@@ -1029,6 +1097,7 @@ export class ProductFinderController {
     this.layoutService.setHeroPresentation(false);
     this._heroEntryKey = null;
     this.handleResize();
+    this.syncProductLabels(this.layoutService.isPivotHeroMode());
   }
 
   getPivotDimensions(): GroupDimension[] {

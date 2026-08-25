@@ -429,12 +429,27 @@ export class ViewportTransform {
    */
   public snapResolver: ((centerWorldX: number, velocityX: number) => number | null) | null = null;
 
+  /** Vertical pendant (phone hero presentation): world y anchored at snapAnchorY. */
+  public snapResolverY: ((centerWorldY: number, velocityY: number) => number | null) | null = null;
+  public snapAnchorY: number | null = null;
+
   private applyMomentum(): void {
     // No artificial momentum — the interpolation decelerates on its own.
     // But a paged view must not stop BETWEEN pages: without a snap the
     // viewport came to rest wherever the finger lifted, half-way between
     // two products, and every swipe needed a correction (owner report
     // 2026-08-23, storage 120441).
+    if (this.snapResolverY) {
+      const anchor = this.snapAnchorY ?? this.viewportHeight / 2;
+      const centerWorldY = (anchor - this.targetOffset.y) / this.targetScale;
+      const target = this.snapResolverY(centerWorldY, this.velocityY);
+      if (target !== null) {
+        this.targetOffset.y = anchor - target * this.targetScale;
+      }
+      this.velocityX = 0;
+      this.velocityY = 0;
+      return;
+    }
     if (this.snapResolver) {
       const centerWorldX = (this.viewportWidth / 2 - this.targetOffset.x) / this.targetScale;
       const target = this.snapResolver(centerWorldX, this.velocityX);

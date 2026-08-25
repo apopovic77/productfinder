@@ -33,7 +33,8 @@ export class HeroLayouter<T> implements ILayouter<T> {
     // selected" although the user was still on the 10-product overview
     // (owner report 2026-08-23, storage 120526).
     if (view.width < 768) {
-      this.computePhoneGrid(nodes, view);
+      if (this.overviewMode) this.computePhoneGrid(nodes, view);
+      else this.computePhoneColumn(nodes, view);
       return;
     }
     if (this.overviewMode) {
@@ -194,6 +195,28 @@ export class HeroLayouter<T> implements ILayouter<T> {
       node.posY.targetValue = startY + row * rowStep;
       node.width.targetValue = cellW;
       node.height.targetValue = cellH;
+      node.scale.targetValue = 1;
+      node.opacity.targetValue = 1;
+    }
+    this.config.onLayout?.(nodes);
+  }
+
+  /**
+   * Phone hero presentation: one product per "page", stacked VERTICALLY —
+   * the phone pendant of the desktop hero row (owner 2026-08-24). The
+   * selected product is centred in the band above the bottom sheet; swipes
+   * and the arrows move up/down.
+   */
+  private computePhoneColumn(nodes: LayoutNode<T>[], view: { width: number; height: number }): void {
+    const cell = Math.min(view.width * 0.82, view.height * 0.4);
+    const step = view.height * 0.52;
+    const x = (view.width - cell) / 2;
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i];
+      node.posX.targetValue = x;
+      node.posY.targetValue = 40 + i * step;
+      node.width.targetValue = cell;
+      node.height.targetValue = cell;
       node.scale.targetValue = 1;
       node.opacity.targetValue = 1;
     }
