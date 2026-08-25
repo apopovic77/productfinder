@@ -798,12 +798,51 @@ export class ProductFinderController {
   }
 
   // Hit Testing
+  /** 1x1-Canvas fuer das Alpha-Sampling im Poster-Hit-Test. */
+  private alphaProbe: { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } | null = null;
+
+  /**
+   * Deckt der Klickpunkt ein OPAKES Pixel des Produktbilds? Die Rects der
+   * Poster-Stapel ueberlappen stark und die Bilder haben grosse
+   * transparente Raender — der reine Rechteck-Test traf den durchsichtigen
+   * Rand des Nachbarn statt der sichtbaren Hose (media 120657/120658).
+   * Fit-Mathematik identisch zu CanvasRenderer.drawImageFit (contain+center).
+   */
+  private hitsOpaquePixel(node: any, worldX: number, worldY: number,
+    nx: number, ny: number, nw: number, nh: number): boolean | null {
+    const img = (node.data as any)?.image as HTMLImageElement | undefined;
+    if (!img || !img.complete || !img.naturalWidth || !img.naturalHeight) return null;
+    const fit = Math.min(nw / img.naturalWidth, nh / img.naturalHeight);
+    const dw = img.naturalWidth * fit;
+    const dh = img.naturalHeight * fit;
+    const dx = nx + (nw - dw) / 2;
+    const dy = ny + (nh - dh) / 2;
+    if (worldX < dx || worldX > dx + dw || worldY < dy || worldY > dy + dh) return false;
+    try {
+      if (!this.alphaProbe) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 1; canvas.height = 1;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) return null;
+        this.alphaProbe = { canvas, ctx };
+      }
+      const px = Math.min(img.naturalWidth - 1, Math.max(0, Math.floor((worldX - dx) / fit)));
+      const py = Math.min(img.naturalHeight - 1, Math.max(0, Math.floor((worldY - dy) / fit)));
+      this.alphaProbe.ctx.clearRect(0, 0, 1, 1);
+      this.alphaProbe.ctx.drawImage(img, px, py, 1, 1, 0, 0, 1, 1);
+      return this.alphaProbe.ctx.getImageData(0, 0, 1, 1).data[3] > 16;
+    } catch {
+      // Tainted canvas (CORS): kein Sampling moeglich -> Rechteck zaehlt
+      return null;
+    }
+  }
+
   hitTest(screenX: number, screenY: number): Product | null {
     const worldPos = this.viewportService.screenToWorld(screenX, screenY);
     const nodes = this.layoutService.getEngine().all();
 
     // REVERSE iteration: last rendered = on top = should be found first
-    // This ensures we hit the visually topmost product
+    const candidates: Array<{ node: any; nx: number; ny: number; nw: number; nh: number }> = [];
     for (let i = nodes.length - 1; i >= 0; i--) {
       const node = nodes[i];
       const nx = node.posX.targetValue ?? node.posX.value ?? 0;
@@ -812,11 +851,22 @@ export class ProductFinderController {
       const nh = node.height.targetValue ?? node.height.value ?? 0;
 
       if (worldPos.x >= nx && worldPos.x <= nx + nw && worldPos.y >= ny && worldPos.y <= ny + nh) {
-        return node.data;
+        candidates.push({ node, nx, ny, nw, nh });
       }
     }
+    if (!candidates.length) return null;
+    if (candidates.length === 1) return candidates[0].node.data;
 
-    return null;
+    // Ueberlappende Rects (Poster-Stapel): oberster Kandidat mit OPAKEM
+    // Pixel am Klickpunkt gewinnt; ohne verwertbares Sampling gilt die
+    // alte Topmost-Regel.
+    for (const candidate of candidates) {
+      const opaque = this.hitsOpaquePixel(candidate.node, worldPos.x, worldPos.y,
+        candidate.nx, candidate.ny, candidate.nw, candidate.nh);
+      if (opaque === null) return candidate.node.data;
+      if (opaque) return candidate.node.data;
+    }
+    return candidates[0].node.data;
   }
 
   // Renderer Access

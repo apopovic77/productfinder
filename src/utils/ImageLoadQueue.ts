@@ -696,6 +696,9 @@ export class ImageLoadQueue<T = any> {
   ): Promise<HTMLImageElement> {
     return new Promise((resolve, reject) => {
       const img = new Image();
+      // Alpha-Hit-Test der Poster-Stapel liest Pixel via getImageData —
+      // ohne CORS-Flag waere der Canvas tainted (2026-08-25).
+      img.crossOrigin = 'anonymous';
       let timer: ReturnType<typeof setTimeout> | null = null;
 
       const cleanup = () => {
@@ -776,6 +779,9 @@ export class ImageLoadQueue<T = any> {
   private blobToImage(blob: Blob): Promise<HTMLImageElement> {
     return new Promise((resolve, reject) => {
       const img = new Image();
+      // Alpha-Hit-Test der Poster-Stapel liest Pixel via getImageData —
+      // ohne CORS-Flag waere der Canvas tainted (2026-08-25).
+      img.crossOrigin = 'anonymous';
       const objectUrl = URL.createObjectURL(blob);
 
       img.onload = () => {
