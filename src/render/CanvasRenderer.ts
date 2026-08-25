@@ -264,6 +264,7 @@ export class CanvasRenderer<T> {
     private renderAccessors: { label(item: T): string; priceText(item: T): string },
     private viewport: ViewportTransform | null = null,
     private getGroupHeaders: () => GroupHeaderInfo[] = () => [],
+    public posterHeaderProvider: () => Array<{ x: number; y: number; text: string; maxWidth?: number }> = () => [],
     private getPivotDimension: () => string = () => ''
   ) {
     this.productOverlay = new ProductOverlayCanvas(ctx, DEFAULT_OVERLAY_STYLE);
@@ -1711,6 +1712,21 @@ export class CanvasRenderer<T> {
       }
     }
     
+    // Poster-Overview (Prototyp 2026-08-25): Typo-Header pro Modell-Block,
+    // world-space wie die Produkte — Stil des A1-B2B-Plakats (fette
+    // Versalien, kein Chip, kein Rahmen).
+    for (const header of this.posterHeaderProvider()) {
+      const size = Math.max(13, Math.min(24, 18));
+      this.ctx.font = `800 ${size}px 'ITC Avant Garde Gothic', system-ui, sans-serif`;
+      this.ctx.fillStyle = 'rgba(17, 17, 17, 0.88)';
+      this.ctx.textAlign = 'left';
+      this.ctx.textBaseline = 'alphabetic';
+      // maxWidth staucht statt zu ueberlappen; harte Kappung via Ellipsis
+      // waere teurer und der Poster-Stil vertraegt condensed Versalien.
+      if ((header as any).maxWidth) this.ctx.fillText(header.text, header.x, header.y, (header as any).maxWidth);
+      else this.ctx.fillText(header.text, header.x, header.y);
+    }
+
     // Draw group headers (after products, so they're on top) - matching .pf-pivot-chip style
     const groupHeaders = this.getGroupHeaders();
     const currentDimension = this.getPivotDimension();

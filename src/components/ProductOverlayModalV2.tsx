@@ -230,38 +230,44 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       const images: Array<{ storageId: number | null; src: string; label: string }> = [];
       const seenStorageIds = new Set<number>();
 
-      // Find the active variant for selected color (use first size)
+      // All variants of the selected colour (sizes + glass/lens SKUs)
       const colorVariants = variants.filter((v: any) => getColor(v) === selectedColor);
-      const activeColorVariant = colorVariants[0];
 
-      // V2 API: Get images from variant.images[] array (all perspectives)
-      if (activeColorVariant?.images && Array.isArray(activeColorVariant.images)) {
-        activeColorVariant.images.forEach((img: any, idx: number) => {
-          const storageId = img.storage?.id || null;
+      // V2 API: Bilder ALLER Varianten der gewählten Farbe mergen — eine
+      // Farbe kann mehrere SKUs mit eigenem Bild tragen (B-20 FLAT
+      // teal/white: klares Glas + Radium-Verspiegelung, owner 2026-08-25).
+      // Vorher las nur colorVariants[0], das zweite Glas fehlte im Dialog.
+      colorVariants.forEach((variant: any) => {
+        if (variant?.images && Array.isArray(variant.images)) {
+          variant.images.forEach((img: any, idx: number) => {
+            const storageId = img.storage?.id || null;
+            if (storageId && !seenStorageIds.has(storageId)) {
+              seenStorageIds.add(storageId);
+              const imageUrl = `${STORAGE_API_URL}/storage/media/${storageId}?width=130&format=webp&quality=80&trim=true`;
+              images.push({
+                storageId,
+                src: imageUrl,
+                label: img.image_path || img.role || `View ${idx + 1}`
+              });
+            }
+          });
+        }
+      });
+
+      // Fallback: V2 API variant.storage.id (single hero image je Variante)
+      if (images.length === 0) {
+        colorVariants.forEach((variant: any) => {
+          const storageId = variant?.storage?.id;
           if (storageId && !seenStorageIds.has(storageId)) {
             seenStorageIds.add(storageId);
             const imageUrl = `${STORAGE_API_URL}/storage/media/${storageId}?width=130&format=webp&quality=80&trim=true`;
             images.push({
               storageId,
               src: imageUrl,
-              label: img.image_path || img.role || `View ${idx + 1}`
+              label: 'Hero'
             });
           }
         });
-      }
-
-      // Fallback: V2 API variant.storage.id (single hero image)
-      if (images.length === 0 && activeColorVariant?.storage?.id) {
-        const storageId = activeColorVariant.storage.id;
-        if (!seenStorageIds.has(storageId)) {
-          seenStorageIds.add(storageId);
-          const imageUrl = `${STORAGE_API_URL}/storage/media/${storageId}?width=130&format=webp&quality=80&trim=true`;
-          images.push({
-            storageId,
-            src: imageUrl,
-            label: 'Hero'
-          });
-        }
       }
 
       // Fallback: V1 API image_storage_id

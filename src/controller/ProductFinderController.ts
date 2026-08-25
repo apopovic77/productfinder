@@ -102,6 +102,7 @@ export class ProductFinderController {
       this.renderAccess,
       this.viewportService.getTransform(),
       () => this.layoutService.getGroupHeaders(),
+      () => this.layoutService.getPosterHeaders(),
       () => this.layoutService.getPivotDimension()
     );
     this.renderer.productsOnGpu = this.productsOnGpu;
@@ -1039,6 +1040,13 @@ export class ProductFinderController {
       // Phone presentation: the sheet below carries name/price — the canvas
       // caption would duplicate it in the small band (owner 2026-08-24).
       if (phone && this.layoutService.isHeroPresentation()) {
+        this.renderer.productLabels.enabled = false;
+        return;
+      }
+      // Poster-Overview (Prototyp): Captions kollidieren mit den
+      // ueberlappenden Stapeln — der Modell-Header traegt die Information,
+      // Details kommen per Hover/Karte.
+      if (this.layoutService.isPosterOverview()) {
         this.renderer.productLabels.enabled = false;
         return;
       }

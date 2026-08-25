@@ -438,7 +438,10 @@ export class LayoutService {
           this.engine.setLayouter(this.layouter);
           this.applyAnimationDuration();
         }
-        if (this.heroLayouter) this.heroLayouter.overviewMode = this.isHeroRootOverview();
+        if (this.heroLayouter) {
+          this.heroLayouter.overviewMode = this.isHeroRootOverview();
+          this.heroLayouter.posterMode = this.posterOverview;
+        }
       } else {
         if (!(this.layouter instanceof PivotLayouter)) {
           // Update pivot config with hero mode state for 'auto' scale resolution
@@ -657,6 +660,21 @@ export class LayoutService {
   /**
    * Get group headers from pivot layouter (for rendering)
    */
+  /**
+   * PROTOTYP (owner 2026-08-25): Poster-Overview nach dem A1-B2B-Plakat —
+   * aktiviert per URL ?poster=1, nur Desktop-Overview.
+   */
+  private posterOverview = typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).get('poster') === '1';
+
+  getPosterHeaders(): Array<{ x: number; y: number; text: string; maxWidth?: number }> {
+    return this.heroLayouter?.posterMode ? (this.heroLayouter.posterHeaders ?? []) : [];
+  }
+
+  isPosterOverview(): boolean {
+    return this.posterOverview && this.isHeroRootOverview();
+  }
+
   getGroupHeaders() {
     if (((this.mode === 'pivot' && this.layouter instanceof PivotLayouter) || (this.mode === 'lanes' && this.layouter instanceof LaneLayouter))) {
       const headers = this.layouter.getGroupHeaders();

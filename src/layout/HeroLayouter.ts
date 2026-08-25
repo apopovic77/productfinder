@@ -24,6 +24,15 @@ export class HeroLayouter<T> implements ILayouter<T> {
    */
   public overviewMode = false;
 
+  /**
+   * PROTOTYP Poster-Grid (owner 2026-08-25, A1-B2B-Plakat 120618-120622):
+   * Overview als Modell-Bloecke mit ueberlappenden Colorway-Stapeln statt
+   * uniformem Raster. Aktivierung via ?poster=1 (LayoutService).
+   */
+  public posterMode = false;
+  /** Typo-Header pro Modell-Block, gezeichnet vom CanvasRenderer (world coords). */
+  public posterHeaders: Array<{ x: number; y: number; text: string; maxWidth?: number }> = [];
+
   constructor(private config: HeroLayoutConfig<T>) {}
 
   compute(nodes: LayoutNode<T>[], view: { width: number; height: number }): void {
@@ -42,9 +51,15 @@ export class HeroLayouter<T> implements ILayouter<T> {
       }
     }
     if (this.overviewMode) {
+      if (this.posterMode) {
+        this.computePosterGrid(nodes, view);
+        return;
+      }
+      this.posterHeaders = [];
       this.computeOverviewGrid(nodes, view);
       return;
     }
+    this.posterHeaders = [];
     const spacing = this.config.spacing ?? 24;
     const padding = Math.max(0, this.config.horizontalPadding ?? 60);
     const availableHeight = Math.max(1, view.height);
@@ -201,6 +216,107 @@ export class HeroLayouter<T> implements ILayouter<T> {
       node.height.targetValue = cellH;
       node.scale.targetValue = 1;
       node.opacity.targetValue = 1;
+    }
+    this.config.onLayout?.(nodes);
+  }
+
+  /**
+   * Poster-Grid (Prototyp): Gruppierung nach Produktlinie (Fallback Design),
+   * pro Gruppe ein Typo-Header und ein horizontal ueberlappender Stapel —
+   * die Colorways teilen die Silhouette, Ueberlappung verdeckt nur
+   * redundante Form (A1-Plakat-Prinzip). Draw-Order = Array-Order, also
+   * liegt innerhalb eines Stapels das rechte Produkt oben.
+   */
+  private computePosterGrid(nodes: LayoutNode<T>[], view: { width: number; height: number }): void {
+    const pad = 48;
+    const headerH = 46;
+    const shelfGapX = 56;
+    const shelfGapY = 44;
+    const advance = 0.36; // sichtbarer Anteil je ueberlapptem Produkt
+    const cellAspect = 0.9;
+
+    const attr = (node: LayoutNode<T>, key: string): string => {
+      const data: any = node.data;
+      const v = data?.attributes?.[key]?.value ?? data?.raw?.properties?.[key];
+      return typeof v === 'string' && v.trim() ? v.trim() : '';
+    };
+    // Gruppierschluessel nach Trennschaerfe (wie die Pivot-Engine): die
+    // erste Dimension, die tatsaechlich splittet — eine Ebene tiefer ist
+    // product_line uniform, dann traegt design_group die Poster-Bloecke.
+    const candidates = ['product_line', 'design_group', 'color_base', 'color_name'];
+    let groupKey = '';
+    for (const candidate of candidates) {
+      const distinct = new Set(nodes.map(node => attr(node, candidate)).filter(Boolean));
+      if (distinct.size >= 2) { groupKey = candidate; break; }
+    }
+    const groups = new Map<string, LayoutNode<T>[]>();
+    for (const node of nodes) {
+      const key = (groupKey && attr(node, groupKey)) || 'WEITERE';
+      const list = groups.get(key);
+      if (list) list.push(node); else groups.set(key, [node]);
+    }
+
+    // Zellgroesse iterativ verkleinern bis die Blöcke die Seite fuellen,
+    // ohne sie zu sprengen; darunter scrollt die Overview vertikal weiter.
+    let cellH = Math.min(280, Math.max(150, view.height * 0.32));
+    const layoutOnce = (h: number) => {
+      const w = h * cellAspect;
+      // Ueberbreite Gruppen in zeilen-fuellende Teilstapel brechen —
+      // Header nur am ersten Teil.
+      const maxPerShelf = Math.max(1, Math.floor(((view.width - pad * 2) / w - 1) / advance) + 1);
+      const shelves: Array<{ key: string; nodes: LayoutNode<T>[]; showHeader: boolean }> = [];
+      for (const [key, list] of groups) {
+        for (let i = 0; i < list.length; i += maxPerShelf) {
+          shelves.push({ key, nodes: list.slice(i, i + maxPerShelf), showHeader: i === 0 });
+        }
+      }
+      const rows: Array<Array<{ key: string; nodes: LayoutNode<T>[]; shelfW: number; showHeader: boolean }>> = [[]];
+      let cursorX = pad;
+      for (const shelf of shelves) {
+        // Shelfbreite = Stapel ODER Headertext (18px-Versalien ~ 11px/Zeichen)
+        // — sonst laufen die Header benachbarter Ein-Produkt-Gruppen ineinander.
+        const stackW = w * (1 + (shelf.nodes.length - 1) * advance);
+        const shelfW = shelf.showHeader
+          ? Math.max(stackW, Math.min(shelf.key.length * 11, stackW + 160))
+          : stackW;
+        if (cursorX > pad && cursorX + shelfW > view.width - pad) {
+          rows.push([]);
+          cursorX = pad;
+        }
+        rows[rows.length - 1].push({ key: shelf.key, nodes: shelf.nodes, shelfW, showHeader: shelf.showHeader });
+        cursorX += shelfW + shelfGapX;
+      }
+      const totalH = rows.length * (headerH + h + shelfGapY) - shelfGapY;
+      return { rows, totalH, w };
+    };
+    let plan = layoutOnce(cellH);
+    while (plan.totalH > view.height - pad * 2 && cellH > 140) {
+      cellH -= 16;
+      plan = layoutOnce(cellH);
+    }
+
+    this.posterHeaders = [];
+    const startY = Math.max(24, (view.height - plan.totalH) / 2);
+    let y = startY;
+    for (const row of plan.rows) {
+      const rowW = row.reduce((sum, shelf) => sum + shelf.shelfW, 0) + (row.length - 1) * shelfGapX;
+      let x = Math.max(pad, (view.width - rowW) / 2);
+      for (const shelf of row) {
+        if (shelf.showHeader) {
+          this.posterHeaders.push({ x, y: y + headerH - 14, text: shelf.key.toUpperCase(), maxWidth: shelf.shelfW + shelfGapX * 0.5 });
+        }
+        for (let i = 0; i < shelf.nodes.length; i++) {
+          const node = shelf.nodes[i];
+          node.posX.targetValue = x + i * plan.w * advance;
+          node.posY.targetValue = y + headerH;
+          node.width.targetValue = plan.w;
+          node.height.targetValue = cellH;
+          node.scale.targetValue = 1;
+          node.opacity.targetValue = 1;
+        }
+        x += shelf.shelfW + shelfGapX;
+      }
+      y += headerH + cellH + shelfGapY;
     }
     this.config.onLayout?.(nodes);
   }
