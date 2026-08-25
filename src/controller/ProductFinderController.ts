@@ -794,7 +794,9 @@ export class ProductFinderController {
     if (isMobile && h > 0 && w > 0) {
       const sheetH = (typeof window !== 'undefined' ? window.innerHeight : screenHeight) * 0.52 + 8;
       const freeH = Math.max(120, screenHeight - sheetH);
-      targetScale = Math.min((freeH * 0.82) / h, (screenWidth * 0.84) / w);
+      // Presentation goes one product per page — the camera can go close
+      // (owner 2026-08-24, 120602): fill the band almost completely.
+      targetScale = Math.min((freeH * 0.95) / h, (screenWidth * 0.94) / w);
       // World point that must land on the screen centre so that the product
       // centre lands at freeH / 2.
       focusY = centerY + (screenHeight / 2 - freeH / 2) / targetScale;

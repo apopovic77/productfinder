@@ -2322,10 +2322,19 @@ body {
 @media (max-width: 767px) {
   .pf-stage-card-open .pf-hero-arrow { bottom: calc(var(--pf-sheet-h, 48vh) + 16px); }
   .pf-stage-card-open .pf-hero-counter { bottom: calc(var(--pf-sheet-h, 48vh) + 24px); }
-  /* Phone presentation moves vertically — rotate the chevrons: left
-     button = up (previous), right = down (next). */
-  .pf-stage-card-open .pf-hero-arrow-prev { transform: rotate(90deg); }
-  .pf-stage-card-open .pf-hero-arrow-next { transform: rotate(90deg); }
+  /* Phone presentation moves vertically — both chevrons stack on the
+     RIGHT edge (up above down), rotated to match the axis. */
+  .pf-stage-card-open .pf-hero-arrow-prev {
+    transform: rotate(90deg);
+    left: auto;
+    right: 16px;
+    bottom: calc(var(--pf-sheet-h, 48vh) + 76px);
+  }
+  .pf-stage-card-open .pf-hero-arrow-next {
+    transform: rotate(90deg);
+    right: 16px;
+    bottom: calc(var(--pf-sheet-h, 48vh) + 16px);
+  }
 }
 
 /* Soft white veil under the hero dock card (issue #1307) */
