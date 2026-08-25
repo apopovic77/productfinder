@@ -672,6 +672,10 @@ export class LayoutService {
     return this.drillDownService.getBreadcrumbs();
   }
 
+  getPivotRawTrail(): string[] {
+    return this.drillDownService.getRawTrail();
+  }
+
   getPivotBreadcrumbSiblings(): string[][] {
     return this.drillDownService.getBreadcrumbSiblings();
   }

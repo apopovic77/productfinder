@@ -210,6 +210,11 @@ export class GpanePivotService {
    * im Crumb-Trail ('Alle' = 0) -> Roh-Bucket-Labels der Ebene, aus der
    * Crumb i gewaehlt wurde. Fuer 'Alle' leer.
    */
+  /** Roh-Bucket-Labels des Pfads ('Alle' + Stack) — fuer History-Restore per drillDown. */
+  getRawTrail(): string[] {
+    return ['Alle', ...this.engine.navigationStack.map(entry => entry.label)];
+  }
+
   getBreadcrumbSiblings(): string[][] {
     return [[], ...this.engine.navigationStack.map(entry => entry.siblings ?? [])];
   }

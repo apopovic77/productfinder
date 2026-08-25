@@ -1122,16 +1122,29 @@ export class ProductFinderController {
     this.onDataChanged();
   }
   
+  /**
+   * Ein History-Eintrag pro Aktion (owner 2026-08-25: Browser-Back soll
+   * JEDE Aktion rueckgaengig machen): traegt neben der Tiefe den ROHEN
+   * Bucket-Pfad (fuer laterale/vorwaerts Restores per drillDown) und den
+   * Sicht-Override des Pivot/Grouped-Switch.
+   */
+  private pushPivotHistory(mode: 'push' | 'replace' = 'push'): void {
+    if (mode === 'push' && this.ignoreNextHistoryPush) { this.ignoreNextHistoryPush = false; return; }
+    const crumbs = this.layoutService.getPivotBreadcrumbs();
+    const state = {
+      ...(window.history.state ?? {}),
+      pivotDepth: crumbs.length - 1,
+      breadcrumbs: crumbs,
+      rawTrail: this.layoutService.getPivotRawTrail(),
+      viewOverride: this.layoutService.getViewOverride(),
+    };
+    window.history[mode === 'push' ? 'pushState' : 'replaceState'](state, '');
+  }
+
   drillDownPivot(value: string): void {
     this.layoutService.drillDownPivot(value);
     this.onPivotChanged();
-
-    // Push history state for browser back button
-    if (!this.ignoreNextHistoryPush) {
-      const state = this.layoutService.getPivotBreadcrumbs();
-      window.history.pushState({ ...(window.history.state ?? {}), pivotDepth: state.length - 1, breadcrumbs: state }, '');
-    }
-    this.ignoreNextHistoryPush = false;
+    this.pushPivotHistory();
   }
 
   /** Header-Switch Pivot-Spalten <-> Grouped-View (media 120646). */
@@ -1139,6 +1152,8 @@ export class ProductFinderController {
     this.layoutService.setViewOverride(override);
     this.onPivotChanged();
     this.handleResize();
+    // Auch der Sicht-Wechsel ist eine Back-Button-faehige Aktion.
+    this.pushPivotHistory();
   }
 
   getViewOverride(): 'auto' | 'pivot' | 'grouped' {
@@ -1205,31 +1220,19 @@ export class ProductFinderController {
     }
     this.layoutService.drillDownPivot(siblingLabel);
     this.onPivotChanged();
-    if (!this.ignoreNextHistoryPush) {
-      const state = this.layoutService.getPivotBreadcrumbs();
-      window.history.pushState({ ...(window.history.state ?? {}), pivotDepth: state.length - 1, breadcrumbs: state }, '');
-    }
+    this.pushPivotHistory();
   }
 
   drillUpPivot(): void {
     this.layoutService.drillUpPivot();
     this.onPivotChanged();
-
-    // Push history state for browser back button
-    if (!this.ignoreNextHistoryPush) {
-      const state = this.layoutService.getPivotBreadcrumbs();
-      window.history.pushState({ ...(window.history.state ?? {}), pivotDepth: state.length - 1, breadcrumbs: state }, '');
-    }
-    this.ignoreNextHistoryPush = false;
+    this.pushPivotHistory();
   }
 
   resetPivot(): void {
     this.layoutService.resetPivot();
     this.onPivotChanged();
-
-    // Replace history state (don't push)
-    const state = this.layoutService.getPivotBreadcrumbs();
-    window.history.replaceState({ ...(window.history.state ?? {}), pivotDepth: state.length - 1, breadcrumbs: state }, '');
+    this.pushPivotHistory('replace');
   }
   
   getPivotBreadcrumbs(): string[] {
@@ -1324,7 +1327,7 @@ export class ProductFinderController {
   private setupHistoryIntegration(): void {
     // Initialize history with current state
     const initialState = this.layoutService.getPivotBreadcrumbs();
-    window.history.replaceState({ ...(window.history.state ?? {}), pivotDepth: initialState.length - 1, breadcrumbs: initialState }, '');
+    this.pushPivotHistory('replace');
 
     // Handle browser back/forward
     this.historyPopStateHandler = (e: PopStateEvent) => {
@@ -1333,27 +1336,46 @@ export class ProductFinderController {
         return;
       }
 
-      const targetDepth = e.state.pivotDepth;
-      const currentDepth = this.layoutService.getPivotBreadcrumbs().length - 1;
-
       // Prevent pushing new history during restoration
       this.ignoreNextHistoryPush = true;
 
-      if (targetDepth < currentDepth) {
-        // Going back - drill up
-        const steps = currentDepth - targetDepth;
-        for (let i = 0; i < steps; i++) {
-          if (this.layoutService.canDrillUpPivot()) {
-            this.layoutService.drillUpPivot();
+      const targetTrail: string[] | undefined = e.state.rawTrail;
+      if (targetTrail && targetTrail.length) {
+        // Voller Pfad-Restore (2026-08-25): hoch bis zum gemeinsamen
+        // Praefix, dann den Ziel-Pfad runterdrillen — damit macht Back
+        // auch laterale Wechsel (Breadcrumb-Dropdown) und Vorwaerts-
+        // Navigation rueckgaengig, nicht nur Tiefe.
+        const currentTrail = this.layoutService.getPivotRawTrail();
+        let common = 0;
+        while (common < Math.min(currentTrail.length, targetTrail.length)
+          && currentTrail[common] === targetTrail[common]) common++;
+        for (let i = currentTrail.length; i > common; i--) {
+          if (this.layoutService.canDrillUpPivot()) this.layoutService.drillUpPivot();
+          else break;
+        }
+        for (let i = common; i < targetTrail.length; i++) {
+          this.layoutService.drillDownPivot(targetTrail[i]);
+        }
+      } else {
+        const targetDepth = e.state.pivotDepth;
+        const currentDepth = this.layoutService.getPivotBreadcrumbs().length - 1;
+        if (targetDepth < currentDepth) {
+          const steps = currentDepth - targetDepth;
+          for (let i = 0; i < steps; i++) {
+            if (this.layoutService.canDrillUpPivot()) {
+              this.layoutService.drillUpPivot();
+            }
           }
         }
-        this.onDataChanged();
-      } else if (targetDepth > currentDepth) {
-        // Going forward - would need to store drill path, for now just ignore
-        // This is a limitation - we can't restore forward navigation
-        console.warn('[ProductFinderController] Forward navigation not fully supported');
       }
 
+      // Sicht-Override des Eintrags wiederherstellen (drillDown reset
+      // ihn auf 'auto', deshalb NACH den Drills).
+      this.layoutService.setViewOverride(e.state.viewOverride ?? 'auto');
+
+      this.onPivotChanged();
+      this.onDataChanged();
+      this.handleResize();
       this.ignoreNextHistoryPush = false;
     };
 
@@ -1387,10 +1409,7 @@ export class ProductFinderController {
         // browser-back jumped past them to the last pushed depth.
         this.layoutService.drillDownPivot(header.key);
         this.onPivotChanged();
-        if (!this.ignoreNextHistoryPush) {
-          const trail = this.layoutService.getPivotBreadcrumbs();
-          window.history.pushState({ ...(window.history.state ?? {}), pivotDepth: trail.length - 1, breadcrumbs: trail }, '');
-        }
+        this.pushPivotHistory();
         return true;
       }
     }
