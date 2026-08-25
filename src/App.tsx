@@ -1132,8 +1132,14 @@ export default class App extends React.Component<Props, State> {
         if (heroChanged) {
           this.syncHeroCardToFocus();
           // Quest-style slide feedback; direction from the index delta.
+          // NUR beim echten Durchsteppen (count stabil): ein Ebenenwechsel
+          // aendert count und feuerte den Whoosh faelschlich mitten in der
+          // Drill-Transition (owner 2026-08-25, 'Audio-Geraeusch').
           const prev = this.state.heroPosition?.index ?? -1;
-          if (prev >= 0 && hp) soundService.whoosh(hp.index >= prev ? 1 : -1);
+          const prevCount = this.state.heroPosition?.count ?? -1;
+          if (prev >= 0 && hp && hp.count === prevCount && hp.index !== prev) {
+            soundService.whoosh(hp.index >= prev ? 1 : -1);
+          }
         }
 
         this.fpsFrameCount = 0;

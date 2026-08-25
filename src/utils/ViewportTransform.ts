@@ -655,6 +655,11 @@ export class ViewportTransform {
     this.targetScale = scale;
     this.targetOffset.x = offsetX;
     this.targetOffset.y = offsetY;
+    // Ein programmatischer Snap ist ein NEUES Kamera-Kommando: Restimpulse
+    // aus Drag/Glide liessen die Kamera sonst gegen das frische Ziel federn
+    // (rauf-runter-rauf beim Ebenenwechsel, owner 2026-08-25).
+    this.velocityX = 0;
+    this.velocityY = 0;
   }
 
   /**

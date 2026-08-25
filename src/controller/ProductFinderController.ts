@@ -345,13 +345,10 @@ export class ProductFinderController {
         const entryKey = 'desk-overview:' + this.layoutService.getPivotBreadcrumbs().join('>');
         if (this._heroEntryKey !== entryKey) {
           this._heroEntryKey = entryKey;
+          // EIN Kamera-Kommando pro Uebergang (owner 2026-08-25: 'einfache
+          // Transitions'): die Bounds stammen bereits aus den Ziel-Targets,
+          // der fruehere 350ms-Nachschlag erzeugte nur den zweiten Hub.
           vto.setPosition(0, 0, 1);
-          setTimeout(() => {
-            if (this._heroEntryKey !== entryKey) return;
-            if (this.renderer?.selectedProduct) return;
-            this.updateContentBounds();
-            vto.setPosition(0, 0, 1);
-          }, 350);
         }
       }
     } else if (isHeroMode && isPhone && this.layoutService.isHeroPresentation()) {
@@ -393,17 +390,9 @@ export class ProductFinderController {
         const entryKey = 'phone-grid:' + this.layoutService.getPivotBreadcrumbs().join('>');
         if (this._heroEntryKey !== entryKey) {
           this._heroEntryKey = entryKey;
-          // Scale 1, start at top. reset() would apply the fit-to-content
-          // scale and shrink a long grid back into one screen.
+          // Scale 1, start at top — EIN Kommando, kein 350ms-Nachschlag
+          // (Doppelhub, owner 2026-08-25). Bounds kommen aus den Targets.
           vtp.setPosition(0, 0, 1);
-          setTimeout(() => {
-            if (this._heroEntryKey !== entryKey) return;
-            // A fast tap can beat this timer — never yank the view away
-            // from a freshly selected product (owner 2026-08-24, 120600).
-            if (this.renderer?.selectedProduct) return;
-            this.updateContentBounds();
-            vtp.setPosition(0, 0, 1);
-          }, 350);
         }
       }
     } else if (isHeroMode) {
