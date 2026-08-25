@@ -2,6 +2,7 @@ import { ProductsApi, CategoriesFacetsApi, Configuration, type ProductDetail as 
 import { Product, type ProductData, ProductAttribute, type PrimitiveAttributeValue, type AttributeType } from '../types/Product';
 import { ACTIVE_PIVOT_PROFILE } from '../config/pivot';
 import { ONEAL_API_BASE, ONEAL_API_KEY } from '../config/apiConfig';
+import { CATALOG_ENTRY_CONFIG } from '../config/CatalogEntryConfig';
 
 const API_BASE = ONEAL_API_BASE;
 const API_KEY = ONEAL_API_KEY;
@@ -34,6 +35,12 @@ function isRealMedia(item: any): boolean {
 
 export type Query = {
   brand?: string;
+  /**
+   * Kollektionsfilter "Jahr J + Weiterlaeufer" (Sonja Goldmann, Variante B):
+   * eingefuehrt bis inkl. J und nicht vor J ausgelaufen. Default ist das
+   * Katalogjahr aus CATALOG_ENTRY_CONFIG; `null` schaltet den Filter ab.
+   */
+  collection_year?: number | null;
   search?: string;
   category?: string;
   season?: number;
@@ -744,7 +751,7 @@ const fullCatalogPromises = new Map<string, Promise<Product[]>>();
 function isFullCatalogQuery(query: Query): boolean {
   if (query.limit !== 10000) return false;
   return Object.entries(query).every(([key, value]) =>
-    key === 'limit' || key === 'brand' || value === undefined || value === null || value === ''
+    key === 'limit' || key === 'brand' || key === 'collection_year' || value === undefined || value === null || value === ''
   );
 }
 
@@ -760,11 +767,16 @@ export function buildProductsRequestUrl(query: Query): string {
   if (query.limit !== undefined) params.set('limit', String(query.limit));
   if (query.offset !== undefined) params.set('offset', String(query.offset));
   params.set('has_image', 'true');
+  const collectionYear = query.collection_year === undefined ? CATALOG_ENTRY_CONFIG.year : query.collection_year;
+  if (collectionYear != null) params.set('collection_year', String(collectionYear));
   return `${API_BASE}/products?${params.toString()}`;
 }
 
 async function fetchProductsFromApi(query: Query): Promise<Product[]> {
-  if (query.brand) {
+  const collectionYear = query.collection_year === undefined ? CATALOG_ENTRY_CONFIG.year : query.collection_year;
+  if (query.brand || collectionYear != null) {
+    // Raw fetch: die SDK kennt collection_year noch nicht (Regen via Agent
+    // GitHub angestossen, bis dahin dieser Pfad).
     const response = await fetch(buildProductsRequestUrl(query), {
       headers: { 'X-API-Key': API_KEY },
     });
@@ -804,7 +816,7 @@ export function fetchProducts(query: Query = {}): Promise<Product[]> {
   // here: only CanvasRenderer knows which products are visible (issue #1066).
   if (!isFullCatalogQuery(query)) return fetchProductsFromApi(query);
 
-  const cacheKey = query.brand ?? '__all__';
+  const cacheKey = `${query.brand ?? '__all__'}|${query.collection_year === undefined ? CATALOG_ENTRY_CONFIG.year : query.collection_year}`;
   if (!fullCatalogPromises.has(cacheKey)) {
     fullCatalogPromises.set(cacheKey, fetchProductsFromApi(query).catch(error => {
       fullCatalogPromises.delete(cacheKey);
