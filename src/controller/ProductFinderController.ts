@@ -1134,6 +1134,30 @@ export class ProductFinderController {
     this.ignoreNextHistoryPush = false;
   }
 
+  getPivotBreadcrumbSiblings(): string[][] {
+    return this.layoutService.getPivotBreadcrumbSiblings();
+  }
+
+  /**
+   * Explorer-Dropdown im Breadcrumb (owner 2026-08-25): auf Ebene `index`
+   * direkt zum Geschwister-Bucket wechseln, ohne manuell zurueckzugehen —
+   * hoch bis vor die Ebene, dann in die Alternative drillen.
+   */
+  switchPivotBreadcrumb(index: number, siblingLabel: string): void {
+    const crumbs = this.layoutService.getPivotBreadcrumbs();
+    if (index < 1 || index >= crumbs.length) return;
+    const levelsToRemove = crumbs.length - index;
+    for (let i = 0; i < levelsToRemove; i++) {
+      this.layoutService.drillUpPivot();
+    }
+    this.layoutService.drillDownPivot(siblingLabel);
+    this.onPivotChanged();
+    if (!this.ignoreNextHistoryPush) {
+      const state = this.layoutService.getPivotBreadcrumbs();
+      window.history.pushState({ ...(window.history.state ?? {}), pivotDepth: state.length - 1, breadcrumbs: state }, '');
+    }
+  }
+
   drillUpPivot(): void {
     this.layoutService.drillUpPivot();
     this.onPivotChanged();

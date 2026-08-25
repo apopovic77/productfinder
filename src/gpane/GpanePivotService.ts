@@ -205,6 +205,15 @@ export class GpanePivotService {
     return true;
   }
 
+  /**
+   * Geschwister-Alternativen je Breadcrumb (Explorer-Dropdown): Index i
+   * im Crumb-Trail ('Alle' = 0) -> Roh-Bucket-Labels der Ebene, aus der
+   * Crumb i gewaehlt wurde. Fuer 'Alle' leer.
+   */
+  getBreadcrumbSiblings(): string[][] {
+    return [[], ...this.engine.navigationStack.map(entry => entry.siblings ?? [])];
+  }
+
   drillUp(): boolean {
     if (!this.canDrillUp()) return false;
     this.engine.unfocus();

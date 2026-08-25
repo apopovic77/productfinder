@@ -637,6 +637,10 @@ export class LayoutService {
   getPivotBreadcrumbs(): string[] {
     return this.drillDownService.getBreadcrumbs();
   }
+
+  getPivotBreadcrumbSiblings(): string[][] {
+    return this.drillDownService.getBreadcrumbSiblings();
+  }
   
   canDrillUpPivot(): boolean {
     return this.drillDownService.canDrillUp();

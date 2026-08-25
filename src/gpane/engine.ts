@@ -213,6 +213,9 @@ export class GPANEEngine {
     const node = this._currentTaxonomyNodes.find(n => n.slug === slug);
     if (!node) return;
 
+    // Geschwister der verlassenen Ebene fuer den Breadcrumb-Dropdown
+    const siblings = this._buckets.filter(b => !b.isUnknown).map(b => b.label);
+
     this._taxonomyPath.push(node);
 
     const products = this._getVisibleProducts();
@@ -234,6 +237,7 @@ export class GPANEEngine {
         dimensionKey: null,
         dimensionLabel: 'Taxonomie',
         objectIds: matchingIds,
+        siblings,
       });
     } else {
       // Leaf → GPANE takes over
@@ -245,6 +249,7 @@ export class GPANEEngine {
         dimensionKey: this._activeDimension?.key || null,
         dimensionLabel: this._activeDimension?.label || null,
         objectIds: matchingIds,
+        siblings,
       });
     }
   }
@@ -309,6 +314,10 @@ export class GPANEEngine {
     const bucket = this._buckets.find(b => b.label === bucketLabel);
     if (!bucket || bucket.isUnknown) return;
 
+    // Geschwister JETZT sichern — _rescore() unten ersetzt _buckets durch
+    // die Buckets der neuen Ebene (Breadcrumb-Dropdown, 2026-08-25).
+    const siblings = this._buckets.filter(b => !b.isUnknown).map(b => b.label);
+
     const dimKey = this._activeDimension?.key || '__taxonomy__';
 
     this._focusStack.push({
@@ -327,6 +336,7 @@ export class GPANEEngine {
         dimensionKey: this._activeDimension?.key || dimKey,
         dimensionLabel: this._activeDimension?.label || dimKey,
         objectIds: bucket.objectIds,
+        siblings,
       });
     }
   }

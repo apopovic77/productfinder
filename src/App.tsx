@@ -42,7 +42,8 @@ import { AiProductQueryService } from './services/AiProductQueryService';
 import { categoryMediaService } from './services/CategoryMediaService';
 import { FOOTER_CONFIG, type FooterPosition } from './config/FooterConfig';
 import { STORAGE_API_BASE as CENTRAL_STORAGE_BASE, STORAGE_API_KEY as CENTRAL_STORAGE_KEY } from './config/apiConfig';
-import type { CatalogEntrySelection } from './config/CatalogEntryConfig';
+import { CATALOG_ENTRY_CONFIG, getLocalizedLabel, type CatalogEntrySelection } from './config/CatalogEntryConfig';
+import { writeCatalogUrl } from './utils/catalogEntryUrl';
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -1189,6 +1190,36 @@ export default class App extends React.Component<Props, State> {
   };
 
   /**
+   * Explorer-Dropdown (owner 2026-08-25): im Breadcrumb direkt auf die
+   * Geschwister-Alternative der Ebene wechseln, ohne zurueckzugehen.
+   */
+  private handleBreadcrumbSwitch = (index: number, siblingLabel: string) => {
+    this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false });
+    this.controller.switchPivotBreadcrumb(index, siblingLabel);
+    this.syncPivotUI();
+  };
+
+  /** Hover-Menue eines Breadcrumbs (Desktop; Touch hat kein Hover). */
+  private renderCrumbMenu(items: Array<{ label: string; active: boolean; onSelect: () => void }>): React.ReactNode {
+    if (items.length < 2) return null;
+    return (
+      <div className="pf-crumb-menu" role="menu">
+        {items.map(item => (
+          <button
+            type="button"
+            role="menuitem"
+            key={item.label}
+            className={`pf-crumb-menu-item ${item.active ? 'active' : ''}`}
+            onClick={item.active ? undefined : item.onSelect}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  /**
    * Header trail: the entry category IS the pivot root, so the former
    * "Alle" crumb is gone (it sat mid-trail and read like a level of its
    * own). Drilled in → the category crumb returns to the category's
@@ -2156,6 +2187,7 @@ export default class App extends React.Component<Props, State> {
               </>}
               {this.props.sportLabel && <>
               <span className="pf-header-breadcrumb-sep">›</span>
+              <span className="pf-crumb-wrap">
               <span
                 role="button"
                 tabIndex={0}
@@ -2170,9 +2202,16 @@ export default class App extends React.Component<Props, State> {
               >
                 {this.props.sportLabel}
               </span>
+              {this.renderCrumbMenu(CATALOG_ENTRY_CONFIG.sports.filter(item => item.enabled).map(item => ({
+                label: getLocalizedLabel(item.labels, this.props.locale),
+                active: item.id === this.props.entrySelection?.sportId,
+                onSelect: () => writeCatalogUrl({ sport: item.id, category: null }),
+              })))}
+              </span>
               </>}
               {this.props.categoryLabel && <>
               <span className="pf-header-breadcrumb-sep">›</span>
+              <span className="pf-crumb-wrap">
               <span
                 role="button"
                 tabIndex={0}
@@ -2187,10 +2226,20 @@ export default class App extends React.Component<Props, State> {
               >
                 {this.props.categoryLabel}
               </span>
+              {this.renderCrumbMenu((CATALOG_ENTRY_CONFIG.categoriesBySport[this.props.entrySelection?.sportId ?? ''] ?? []).map(item => ({
+                label: getLocalizedLabel(item.labels, this.props.locale),
+                active: item.id === this.props.entrySelection?.categoryId,
+                onSelect: () => writeCatalogUrl({ category: item.id }),
+              })))}
+              </span>
               </>}
-              {pivotBreadcrumbs.slice(1).map((crumb, j) => { const i = j + 1; return (
+              {(() => { const crumbSiblings = this.controller.getPivotBreadcrumbSiblings();
+              return pivotBreadcrumbs.slice(1).map((crumb, j) => { const i = j + 1;
+                const rawSiblings = crumbSiblings[i] ?? [];
+                return (
                 <React.Fragment key={`header-${crumb}-${i}`}>
                   <span className="pf-header-breadcrumb-sep">›</span>
+                  <span className="pf-crumb-wrap">
                   <span
                     role="button"
                     tabIndex={i === 0 || i < pivotBreadcrumbs.length - 1 ? 0 : -1}
@@ -2205,8 +2254,14 @@ export default class App extends React.Component<Props, State> {
                   >
                     {crumb}
                   </span>
+                  {this.renderCrumbMenu(rawSiblings.map(label => ({
+                    label,
+                    active: label === (this.controller.getPivotBreadcrumbs()[i] ?? crumb),
+                    onSelect: () => this.handleBreadcrumbSwitch(i, label),
+                  })))}
+                  </span>
                 </React.Fragment>
-              ); })}
+              ); }); })()}
               {searchFilterTerm && (
                 <span className="pf-search-filter-chip" title="Click ✕ to remove search filter">
                   <span className="pf-search-filter-chip-icon">🔍</span>

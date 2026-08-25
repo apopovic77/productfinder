@@ -135,6 +135,14 @@ export interface NavigationEntry {
 
   /** Product IDs at this level */
   objectIds: string[];
+
+  /**
+   * Bucket-Labels der Ebene, aus der dieser Schritt gewaehlt wurde —
+   * die Geschwister-Alternativen fuer den Breadcrumb-Dropdown
+   * (Explorer-Pattern, owner 2026-08-25). Roh-Labels, wie drillDown
+   * sie erwartet.
+   */
+  siblings?: string[];
 }
 
 // ============================================================================
