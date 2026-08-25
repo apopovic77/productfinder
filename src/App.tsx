@@ -1232,6 +1232,24 @@ export default class App extends React.Component<Props, State> {
     this.syncPivotUI();
   };
 
+  /**
+   * Pointer-Steuerung der Crumb-Menues: CSS-:hover greift nur, wenn der
+   * Browser sich als hover-faehig meldet — der Quest-Browser (Hand-Ray)
+   * meldet das je nach Version nicht (owner 2026-08-25). Deshalb oeffnen
+   * pointerenter-Events jedes NICHT-Touch-Pointers (mouse/pen/Ray) das
+   * Menue zusaetzlich per Klasse; Touch-Taps navigieren weiter direkt.
+   */
+  private crumbWrapProps() {
+    return {
+      onPointerEnter: (e: React.PointerEvent<HTMLSpanElement>) => {
+        if (e.pointerType !== 'touch') e.currentTarget.classList.add('pf-crumb-open');
+      },
+      onPointerLeave: (e: React.PointerEvent<HTMLSpanElement>) => {
+        e.currentTarget.classList.remove('pf-crumb-open');
+      },
+    };
+  }
+
   /** Hover-Menue eines Breadcrumbs (Desktop; Touch hat kein Hover). */
   private renderCrumbMenu(items: Array<{ label: string; active: boolean; onSelect: () => void }>): React.ReactNode {
     if (items.length < 2) return null;
@@ -2231,7 +2249,7 @@ export default class App extends React.Component<Props, State> {
               {/* Flow-Varianten: übersprungene Gate-Stufen erscheinen nicht als Crumb */}
               {this.props.brand && <>
               <span className="pf-header-breadcrumb-sep">›</span>
-              <span className="pf-crumb-wrap">
+              <span className="pf-crumb-wrap" {...this.crumbWrapProps()}>
               <span
                 role={this.props.canChangeBrand ? 'button' : undefined}
                 tabIndex={this.props.canChangeBrand ? 0 : -1}
@@ -2261,7 +2279,7 @@ export default class App extends React.Component<Props, State> {
               </>}
               {this.props.sportLabel && <>
               <span className="pf-header-breadcrumb-sep">›</span>
-              <span className="pf-crumb-wrap">
+              <span className="pf-crumb-wrap" {...this.crumbWrapProps()}>
               <span
                 role="button"
                 tabIndex={0}
@@ -2288,7 +2306,7 @@ export default class App extends React.Component<Props, State> {
               </>}
               {this.props.categoryLabel && <>
               <span className="pf-header-breadcrumb-sep">›</span>
-              <span className="pf-crumb-wrap">
+              <span className="pf-crumb-wrap" {...this.crumbWrapProps()}>
               <span
                 role="button"
                 tabIndex={0}
@@ -2319,7 +2337,7 @@ export default class App extends React.Component<Props, State> {
                 return (
                 <React.Fragment key={`header-${crumb}-${i}`}>
                   <span className="pf-header-breadcrumb-sep">›</span>
-                  <span className="pf-crumb-wrap">
+                  <span className="pf-crumb-wrap" {...this.crumbWrapProps()}>
                   <span
                     role="button"
                     tabIndex={i === 0 || i < pivotBreadcrumbs.length - 1 ? 0 : -1}
