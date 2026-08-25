@@ -113,7 +113,7 @@ const label = (value: string): LocalizedLabel => ({ de: value, en: value });
  * Produktbilder, freigestellt auf der dunklen Kachel (fit: contain).
  */
 export const BRAND_BANNERS: Record<string, CatalogLandingMedia> = {
-  "O'Neal": { mode: 'image', storageId: 9923, fit: 'cover', position: 'center 30%' },
+  "O'Neal": { mode: 'image', storageId: 19018, fit: 'cover', position: 'center 25%' },
   'ONE Industries': { mode: 'image', storageId: 29424, fit: 'contain' },
   'Kini Red Bull': { mode: 'image', storageId: 29471, fit: 'contain' },
 };

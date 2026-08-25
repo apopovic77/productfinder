@@ -207,6 +207,9 @@ export const BrandSelectionGate: React.FC<Props> = ({ children, locale = 'en', e
                     ? `url(${bannerUrl})`
                     : `linear-gradient(to top, rgba(5,5,5,0.86) 0%, rgba(5,5,5,0.25) 45%, rgba(5,5,5,0.1) 100%), url(${bannerUrl})`,
                   backgroundPosition: banner?.position ?? (banner?.fit === 'contain' ? 'right 24px center' : 'center'),
+                  // Inline, weil das background-Shorthand der Basisklasse die
+                  // size-Angabe aus .has-banner in der Kaskade schlug.
+                  backgroundSize: banner?.fit === 'contain' ? undefined : 'cover',
                 } : undefined}
               >
                 <span className="pf-brand-card-name">{brand.name}</span>
