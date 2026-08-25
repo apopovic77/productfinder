@@ -1716,23 +1716,20 @@ export class CanvasRenderer<T> {
     // world-space wie die Produkte — Stil des A1-B2B-Plakats (fette
     // Versalien, kein Chip, kein Rahmen).
     {
-      // Header liegen in WORLD-Koordinaten — durch die Viewport-Transform
-      // rechnen, sonst kleben sie bei gezoomtem/gescrolltem Canvas an der
-      // falschen Stelle (Bug 2026-08-25: bei scale~1 unsichtbar verrutscht).
-      const vpScale = this.viewport?.scale ?? 1;
-      const vpOffset = this.viewport ? this.viewport.offset : { x: 0, y: 0 };
+      // WORLD-Koordinaten, KEINE manuelle Viewport-Mathematik: der ctx
+      // traegt an dieser Stelle noch die applyTransform() des Render-Passes
+      // (Zeile ~1322) — manuelles Einrechnen transformierte doppelt, die
+      // Header liefen beim Zoomen schneller als die Produkte (media
+      // 120651/120652). So zoomen und schieben sie exakt mit dem Canvas.
       for (const header of this.posterHeaderProvider()) {
-        const size = Math.max(11, Math.min(26, 18 * vpScale));
-        this.ctx.font = `800 ${size}px 'ITC Avant Garde Gothic', system-ui, sans-serif`;
+        this.ctx.font = `800 18px 'ITC Avant Garde Gothic', system-ui, sans-serif`;
         this.ctx.fillStyle = 'rgba(17, 17, 17, 0.88)';
         this.ctx.textAlign = 'left';
         this.ctx.textBaseline = 'alphabetic';
-        const sx = header.x * vpScale + vpOffset.x;
-        const sy = header.y * vpScale + vpOffset.y;
         // maxWidth staucht statt zu ueberlappen; harte Kappung via Ellipsis
         // waere teurer und der Poster-Stil vertraegt condensed Versalien.
-        if ((header as any).maxWidth) this.ctx.fillText(header.text, sx, sy, (header as any).maxWidth * vpScale);
-        else this.ctx.fillText(header.text, sx, sy);
+        if ((header as any).maxWidth) this.ctx.fillText(header.text, header.x, header.y, (header as any).maxWidth);
+        else this.ctx.fillText(header.text, header.x, header.y);
       }
     }
 
