@@ -706,3 +706,12 @@
   font-weight: 600;
   letter-spacing: 0.04em;
 }
+
+/* True Morph Phase 2: Detail-Content blendet nach dem Box-Morph weich ein
+   (owner 2026-08-25, media 120605/120606). Gilt auch fuer die Portal-Stage. */
+@keyframes pomContentFade {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+.pom-info-panel.pom-expanded > * { animation: pomContentFade 0.3s ease both; }
+.pom-expanded-hero { animation: pomContentFade 0.35s ease both; }

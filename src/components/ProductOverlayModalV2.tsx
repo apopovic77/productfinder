@@ -140,6 +140,18 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
 
   // State for selected image
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
+  // True Morph, Phase 2 (owner 2026-08-25, media 120605/120606): waehrend
+  // die Box waechst, bleibt der Dock-Content stehen — der Detail-Content
+  // (padding-left 536, Stage-Portal) blendet erst NACH dem Morph ein. Sonst
+  // reflowt der Titel in eine Ein-Zeichen-Spalte und die Stage steht schon
+  // im Viewport, waehrend die Box noch schmal ist.
+  const [morphSettled, setMorphSettled] = useState(false);
+  useEffect(() => {
+    if (!expanded) { setMorphSettled(false); return; }
+    const t = window.setTimeout(() => setMorphSettled(true), 470);
+    return () => window.clearTimeout(t);
+  }, [expanded]);
+  const showExpandedContent = expanded && morphSettled;
 
   // Reset all state when product changes
   useEffect(() => {
@@ -684,9 +696,28 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     return iconMap[icon];
   };
 
+  // Geometrie-Ziel des Morphs — von animate UND initial geteilt.
+  // Expanded: buendig mit der Unterkante, nur die oberen Ecken rund
+  // (owner 2026-08-24).
+  const morphTarget = {
+    bottom: expanded ? 0 : (heroSheet || isMobilePortrait ? 8 : 88),
+    borderBottomLeftRadius: expanded ? 0 : 18,
+    borderBottomRightRadius: expanded ? 0 : 18,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    width: heroSheet || isMobilePortrait
+      ? undefined
+      : (expanded ? Math.min(1040, window.innerWidth - 248) : 340),
+    maxHeight: heroSheet || isMobilePortrait
+      ? (expanded ? Math.round(window.innerHeight * 0.9) - 16 : Math.round(window.innerHeight * 0.5))
+      : (expanded ? Math.round(window.innerHeight * 0.86) : window.innerHeight - 150),
+    rotateY: !isMobilePortrait && !expanded ? -7 : 0,
+    transformPerspective: 1400,
+  };
+
   return (
     <motion.div
-      className={`pom-info-panel pom-panel-standalone ${heroDock ? 'pom-hero-dock' : ''} ${heroSheet && !expanded ? 'pom-hero-sheet' : ''} ${expanded ? 'pom-expanded' : ''}`}
+      className={`pom-info-panel pom-panel-standalone ${heroDock ? 'pom-hero-dock' : ''} ${heroSheet && !expanded ? 'pom-hero-sheet' : ''} ${showExpandedContent ? 'pom-expanded' : ''}`}
       style={{
         position: 'fixed',
         // ANCHOR NEVER MOVES (fluid morph, owner 2026-08-24): the dock card
@@ -705,23 +736,12 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       }}
       animate={{
         opacity: 1,
-        // Expanded: flush with the bottom edge, only the top corners stay
-        // rounded (owner 2026-08-24).
-        bottom: expanded ? 0 : (heroSheet || isMobilePortrait ? 8 : 88),
-        borderBottomLeftRadius: expanded ? 0 : 18,
-        borderBottomRightRadius: expanded ? 0 : 18,
-        borderTopLeftRadius: 18,
-        borderTopRightRadius: 18,
-        width: heroSheet || isMobilePortrait
-          ? undefined
-          : (expanded ? Math.min(1040, window.innerWidth - 248) : 340),
-        maxHeight: heroSheet || isMobilePortrait
-          ? (expanded ? Math.round(window.innerHeight * 0.9) - 16 : Math.round(window.innerHeight * 0.5))
-          : (expanded ? Math.round(window.innerHeight * 0.86) : window.innerHeight - 150),
-        rotateY: !isMobilePortrait && !expanded ? -7 : 0,
-        transformPerspective: 1400,
+        ...morphTarget,
       }}
-      initial={{ opacity: 0 }}
+      // Mount = fertige Geometrie, nur Opacity faded ein. Ohne das startet
+      // Framer beim Layout-Wert (width:auto = breit) und morpht sichtbar
+      // auf 340px zusammen (owner 2026-08-25, media 120605).
+      initial={{ ...morphTarget, opacity: 0 }}
       exit={{ opacity: 0 }}
       transition={{
         duration: 0.45,
@@ -770,12 +790,12 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       {/* Expanded: hero stage — the big dialog exists to PRESENT the
           product (owner 2026-08-24). Large active image on a white stage,
           thumbs below it; the outer mini strip hides via CSS. */}
-      {expanded && allImages.length === 0 && !thumbnailsLoading && (
+      {showExpandedContent && allImages.length === 0 && !thumbnailsLoading && (
         <div className="pom-expanded-hero pom-expanded-hero-empty">
           <span>Kein Produktbild verfügbar</span>
         </div>
       )}
-      {expanded && allImages.length > 0 && (() => {
+      {showExpandedContent && allImages.length > 0 && (() => {
         const active = allImages[Math.max(0, Math.min(selectedImageIndex, allImages.length - 1))];
         const heroSrc = active?.storageId
           ? `${STORAGE_API_URL}/storage/media/${active.storageId}?width=1000&format=webp&quality=85&trim=true`
@@ -1113,7 +1133,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
 
       {/* Expanded-only detail sections: the SAME dialog grows and reveals
           these (owner 2026-08-24 — true morph, no second dialog). */}
-      {expanded && (() => {
+      {showExpandedContent && (() => {
         const descText = expandedDescText || (activeVariant as any)?.description_long || '';
         const props: Array<[string, string]> = [];
         const raw: any = (product as any).raw || {};
