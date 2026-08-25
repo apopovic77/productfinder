@@ -44,6 +44,8 @@ import { FOOTER_CONFIG, type FooterPosition } from './config/FooterConfig';
 import { STORAGE_API_BASE as CENTRAL_STORAGE_BASE, STORAGE_API_KEY as CENTRAL_STORAGE_KEY } from './config/apiConfig';
 import { CATALOG_ENTRY_CONFIG, getLocalizedLabel, type CatalogEntrySelection } from './config/CatalogEntryConfig';
 import { writeCatalogUrl } from './utils/catalogEntryUrl';
+import { buildBrandUrl, type BrandFacet } from './utils/brandSelection';
+import { fetchFacets } from './data/ProductRepository';
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -103,6 +105,7 @@ type State = {
   // Pivot State
   pivotDimension: GroupDimension;
   pivotBreadcrumbs: string[];
+  availableBrands: BrandFacet[];
   pivotDimensions: GroupDimension[];
   pivotOrientation: Orientation;
   pivotGroups: PivotGroup[];
@@ -198,6 +201,7 @@ const createInitialState = (): State => {
 
     pivotDimension: pivot.dimension,
     pivotBreadcrumbs: [pivot.rootBreadcrumb],
+    availableBrands: [],
     pivotDimensions: [],
     pivotOrientation: 'columns',
     pivotGroups: [],
@@ -293,6 +297,13 @@ export default class App extends React.Component<Props, State> {
   state: State = createInitialState();
 
   async componentDidMount() {
+    // Marken fuer das Breadcrumb-Dropdown (Markenwechsel im Kontext)
+    fetchFacets().then((data: any) => {
+      const brands = Array.isArray(data?.brands)
+        ? data.brands.filter((b: any) => typeof b?.name === 'string' && (b.count_with_image ?? 0) > 0)
+        : [];
+      this.setState({ availableBrands: brands });
+    }).catch(() => { /* Dropdown bleibt leer, Crumb-Klick geht weiter zur Markenwahl */ });
     const canvas = this.canvasRef.current;
     if (!canvas) return;
 
@@ -1202,6 +1213,19 @@ export default class App extends React.Component<Props, State> {
    * Explorer-Dropdown (owner 2026-08-25): im Breadcrumb direkt auf die
    * Geschwister-Alternative der Ebene wechseln, ohne zurueckzugehen.
    */
+  /**
+   * Markenwechsel aus dem Breadcrumb-Dropdown (owner 2026-08-25): Sport +
+   * Kategorie BLEIBEN in der URL — hat die Ziel-Marke die Kategorie nicht,
+   * verwirft das Kategorie-Gate sie automatisch (count==0 -> category=null)
+   * und zeigt die passende Auswahl.
+   */
+  private handleBrandSwitch = (brandName: string) => {
+    if (brandName === this.props.brand) return;
+    const next = buildBrandUrl(window.location.href, brandName, { clearDependents: false });
+    window.history.pushState({ brand: brandName }, '', next);
+    window.dispatchEvent(new Event('cataloglocationchange'));
+  };
+
   private handleBreadcrumbSwitch = (index: number, siblingLabel: string) => {
     this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false });
     this.controller.switchPivotBreadcrumb(index, siblingLabel);
@@ -2207,6 +2231,7 @@ export default class App extends React.Component<Props, State> {
               {/* Flow-Varianten: übersprungene Gate-Stufen erscheinen nicht als Crumb */}
               {this.props.brand && <>
               <span className="pf-header-breadcrumb-sep">›</span>
+              <span className="pf-crumb-wrap">
               <span
                 role={this.props.canChangeBrand ? 'button' : undefined}
                 tabIndex={this.props.canChangeBrand ? 0 : -1}
@@ -2221,6 +2246,17 @@ export default class App extends React.Component<Props, State> {
                 title={this.props.canChangeBrand ? 'Change brand' : `Brand: ${this.props.brand}`}
               >
                 {this.props.brand}
+              </span>
+              {this.renderCrumbMenu(this.state.availableBrands.map(item => ({
+                label: item.name,
+                active: item.name === this.props.brand,
+                // Aktive Marke: wie ueberall Kamera-Reset; andere: Marke im
+                // KONTEXT wechseln (Sport+Kategorie bleiben, Gate faellt bei
+                // leerer Kategorie automatisch zurueck).
+                onSelect: item.name === this.props.brand
+                  ? this.handleCategoryCrumbClick
+                  : () => this.handleBrandSwitch(item.name),
+              })))}
               </span>
               </>}
               {this.props.sportLabel && <>

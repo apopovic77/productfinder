@@ -144,7 +144,13 @@ export const BrandSelectionGate: React.FC<Props> = ({ children, locale = 'en', e
   useEffect(() => {
     const handlePopState = () => applyLocation(brands);
     window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    // Programmatiche Wechsel (Marken-Dropdown im Header) pushen die URL und
+    // feuern dieses Event — ohne Listener blieb die alte Marke montiert.
+    window.addEventListener('cataloglocationchange', handlePopState);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('cataloglocationchange', handlePopState);
+    };
   }, [applyLocation, brands]);
 
   const chooseBrand = (brand: string) => {
