@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { fetchFacets } from '../data/ProductRepository';
+import { BRAND_BANNERS } from '../config/CatalogEntryConfig';
+import { STORAGE_API_BASE } from '../config/apiConfig';
 import { buildBrandUrl, resolveBrandEntry, type BrandFacet } from '../utils/brandSelection';
 import './BrandSelectionGate.css';
 
@@ -189,20 +191,32 @@ export const BrandSelectionGate: React.FC<Props> = ({ children, locale = 'en', e
           <p>{text.subtitle}</p>
         </div>
         <div className="pf-brand-grid" aria-label="Available brands">
-          {brands.map(brand => (
-            <button
-              type="button"
-              className="pf-brand-card"
-              key={brand.name}
-              onClick={() => chooseBrand(brand.name)}
-            >
-              <span className="pf-brand-card-name">{brand.name}</span>
-              <span className="pf-brand-card-count">
-                {new Intl.NumberFormat(locale).format(brand.count_with_image)} {text.products}
-              </span>
-              <span className="pf-brand-card-action">{text.action} <span aria-hidden="true">→</span></span>
-            </button>
-          ))}
+          {brands.map(brand => {
+            const banner = BRAND_BANNERS[brand.name];
+            const bannerUrl = banner?.url ?? (banner?.storageId
+              ? `${STORAGE_API_BASE}/storage/media/${banner.storageId}?format=webp&width=1200&trim=true`
+              : undefined);
+            return (
+              <button
+                type="button"
+                className={`pf-brand-card ${bannerUrl ? `has-banner fit-${banner?.fit ?? 'cover'}` : ''}`}
+                key={brand.name}
+                onClick={() => chooseBrand(brand.name)}
+                style={bannerUrl ? {
+                  backgroundImage: banner?.fit === 'contain'
+                    ? `url(${bannerUrl})`
+                    : `linear-gradient(to top, rgba(5,5,5,0.86) 0%, rgba(5,5,5,0.25) 45%, rgba(5,5,5,0.1) 100%), url(${bannerUrl})`,
+                  backgroundPosition: banner?.position ?? (banner?.fit === 'contain' ? 'right 24px center' : 'center'),
+                } : undefined}
+              >
+                <span className="pf-brand-card-name">{brand.name}</span>
+                <span className="pf-brand-card-count">
+                  {new Intl.NumberFormat(locale).format(brand.count_with_image)} {text.products}
+                </span>
+                <span className="pf-brand-card-action">{text.action} <span aria-hidden="true">→</span></span>
+              </button>
+            );
+          })}
         </div>
       </main>
     );

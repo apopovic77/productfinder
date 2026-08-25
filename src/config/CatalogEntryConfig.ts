@@ -7,6 +7,8 @@ export type CatalogLandingMedia = {
   url?: string;
   storageId?: number;
   position?: string;
+  /** 'contain' fuer freigestellte Produktbilder auf dunkler Kachel, 'cover' fuer Fotos */
+  fit?: 'cover' | 'contain';
 };
 
 export type CatalogSportConfig = {
@@ -103,6 +105,18 @@ export type CatalogEntryConfig = {
 };
 
 const label = (value: string): LocalizedLabel => ({ de: value, en: value });
+
+/**
+ * Media je Marken-Kachel im Brand-Gate (owner 2026-08-25, media 120623).
+ * Schluessel = Facet-Name aus der API. Unbekannte Marken rendern ohne Bild.
+ * O'Neal: Marketing-Actionshot (Media-KG); ONE/Kini: markante Helm-
+ * Produktbilder, freigestellt auf der dunklen Kachel (fit: contain).
+ */
+export const BRAND_BANNERS: Record<string, CatalogLandingMedia> = {
+  "O'Neal": { mode: 'image', storageId: 9923, fit: 'cover', position: 'center 30%' },
+  'ONE Industries': { mode: 'image', storageId: 29424, fit: 'contain' },
+  'Kini Red Bull': { mode: 'image', storageId: 29471, fit: 'contain' },
+};
 
 export const CATALOG_ENTRY_CONFIG: CatalogEntryConfig = {
   year: 2027,

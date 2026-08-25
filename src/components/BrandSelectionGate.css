@@ -36,7 +36,7 @@
   gap: 16px;
 }
 .pf-brand-card {
-  min-height: 210px;
+  min-height: clamp(300px, 38vh, 420px);
   padding: 26px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 4px;
@@ -49,6 +49,25 @@
   backdrop-filter: blur(16px);
   cursor: pointer;
   transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+}
+.pf-brand-card.has-banner {
+  background-size: cover;
+  background-repeat: no-repeat;
+  position: relative;
+  overflow: hidden;
+}
+/* Freigestellte Produktbilder (Helme) schweben rechts auf der dunklen
+   Kachel statt weiss beschnitten zu werden (owner 2026-08-25, 120623). */
+.pf-brand-card.fit-contain {
+  background-color: rgba(255, 255, 255, 0.055);
+  background-size: auto min(78%, 300px);
+}
+.pf-brand-card.has-banner .pf-brand-card-name,
+.pf-brand-card.has-banner .pf-brand-card-count,
+.pf-brand-card.has-banner .pf-brand-card-action {
+  position: relative;
+  z-index: 1;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.55);
 }
 .pf-brand-card:hover,
 .pf-brand-card:focus-visible {
@@ -68,5 +87,6 @@
 @media (max-width: 768px) {
   .pf-brand-entry { justify-content: flex-start; padding: 56px 18px 32px; gap: 32px; }
   .pf-brand-entry h1 { font-size: clamp(40px, 15vw, 64px); }
-  .pf-brand-card { min-height: 160px; padding: 20px; }
+  .pf-brand-card { min-height: 220px; padding: 20px; }
+  .pf-brand-card.fit-contain { background-size: auto 70%; background-position: right 12px center; }
 }
