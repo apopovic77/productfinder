@@ -33,9 +33,13 @@ export class HeroLayouter<T> implements ILayouter<T> {
     // selected" although the user was still on the 10-product overview
     // (owner report 2026-08-23, storage 120526).
     if (view.width < 768) {
-      if (this.overviewMode) this.computePhoneGrid(nodes, view);
-      else this.computePhoneColumn(nodes, view);
-      return;
+      // Overview = the 2-column grid; the presentation falls through to
+      // the SAME horizontal row as desktop — the phone hero swipes
+      // left/right too (owner 2026-08-24).
+      if (this.overviewMode) {
+        this.computePhoneGrid(nodes, view);
+        return;
+      }
     }
     if (this.overviewMode) {
       this.computeOverviewGrid(nodes, view);

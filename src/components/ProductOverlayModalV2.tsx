@@ -28,6 +28,8 @@ type Props = {
    * space, so the card never covers the helmet.
    */
   heroDock?: boolean;
+  /** Swipe left/right ON the sheet steps to the neighbouring product. */
+  onStepProduct?: (direction: -1 | 1) => void;
   /** Colour sibling chosen in the card — App re-selects it on the canvas. */
   onSiblingSelect?: (productId: string | number) => boolean;
   /** Expanded state: the SAME card grows into the detail view (true morph). */
@@ -58,7 +60,7 @@ interface ParsedFeature {
  * Product Overlay Modal V2 - HALF WIDTH VERSION (240px)
  * Same design as V1, but with compact half-width layout
  */
-export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady, onShowDetails, expanded = false, onCollapse, locale, onSiblingSelect }) => {
+export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady, onShowDetails, expanded = false, onCollapse, locale, onSiblingSelect, onStepProduct }) => {
   const isMobilePortrait = window.innerWidth <= 768 && window.innerHeight > window.innerWidth;
   // Phone: the dark hero card as a full-width bottom sheet (owner 2026-08-23,
   // "die Karte auch im Desktop-Style"). Same markup as the desktop dock,
@@ -306,6 +308,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   const selectedImageIndexRef = useRef(selectedImageIndex);
   selectedImageIndexRef.current = selectedImageIndex;
   const manualHoldUntilRef = useRef(0);
+  const sheetSwipeRef = useRef<{ x: number; y: number } | null>(null);
   // The cycle keeps its own position: the variant-sync effect below may
   // snap the highlight back, and cycling from the snapped-back index would
   // pick the same image forever.
@@ -727,7 +730,23 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       }}
       onClick={(e) => e.stopPropagation()}
       onMouseDown={handleMouseDown}
-      onTouchStart={handleTouchStart}
+      onTouchStart={(e) => {
+        if (heroSheet && onStepProduct && e.touches.length === 1) {
+          sheetSwipeRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        }
+        handleTouchStart(e);
+      }}
+      onTouchEnd={(e) => {
+        const start = sheetSwipeRef.current;
+        sheetSwipeRef.current = null;
+        if (!start || !heroSheet || !onStepProduct || expanded) return;
+        const t = e.changedTouches[0];
+        const dx = t.clientX - start.x;
+        const dy = t.clientY - start.y;
+        // Horizontal swipe on the sheet = next/previous product (owner
+        // 2026-08-24: "am Dialog links und rechts wischen").
+        if (Math.abs(dx) > 60 && Math.abs(dy) < 40) onStepProduct(dx < 0 ? 1 : -1);
+      }}
     >
       {/* Action buttons - top right on mobile, close only on desktop */}
       <div style={{

@@ -2991,6 +2991,7 @@ export default class App extends React.Component<Props, State> {
                 onImageSelect={this.handleDialogImageSelect}
                 isHiResReady={this.isHiResReady}
                 onShowDetails={() => this.setState({ shouldShowV4Dialog: true })}
+                onStepProduct={(dir) => { this.controller.stepHeroProduct(dir); this.setState({ heroPosition: this.controller.getHeroPosition() }, this.syncHeroCardToFocus); }}
                 onSiblingSelect={(pid) => {
                   const target = this.controller.getDisplayOrder().find(pr => String(pr.id) === String(pid));
                   if (!target) return false;

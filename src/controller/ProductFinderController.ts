@@ -349,24 +349,24 @@ export class ProductFinderController {
         }
       }
     } else if (isHeroMode && isPhone && this.layoutService.isHeroPresentation()) {
-      // Phone hero presentation: vertical column, paged up/down snapping
-      // anchored on the band above the sheet.
-      this.viewportService.setLockVerticalPan(false);
-      this.viewportService.setLockHorizontalPan(true);
+      // Phone hero presentation: same horizontal paging as desktop, one
+      // product per swipe; vertical stays pinned to the band position.
+      this.viewportService.setLockVerticalPan(true);
+      this.viewportService.setLockHorizontalPan(false);
       const vtv = this.viewportService.getTransform();
       if (vtv) {
-        vtv.snapResolver = null;
-        vtv.snapAnchorY = this.phoneBandHeight() / 2;
-        vtv.snapResolverY = (centerWorldY, velocityY) => {
+        vtv.snapResolverY = null;
+        vtv.snapAnchorY = null;
+        vtv.snapResolver = (centerWorldX, velocityX) => {
           const centers = this.heroProductCenters();
           if (centers.length === 0) return null;
           let nearest = 0;
           for (let i = 1; i < centers.length; i++) {
-            if (Math.abs(centers[i] - centerWorldY) < Math.abs(centers[nearest] - centerWorldY)) nearest = i;
+            if (Math.abs(centers[i] - centerWorldX) < Math.abs(centers[nearest] - centerWorldX)) nearest = i;
           }
           const FLICK = 6;
-          if (velocityY < -FLICK) nearest = Math.min(centers.length - 1, nearest + 1);
-          else if (velocityY > FLICK) nearest = Math.max(0, nearest - 1);
+          if (velocityX < -FLICK) nearest = Math.min(centers.length - 1, nearest + 1);
+          else if (velocityX > FLICK) nearest = Math.max(0, nearest - 1);
           return centers[nearest];
         };
       }
@@ -661,12 +661,9 @@ export class ProductFinderController {
   }
 
   private heroProductCenters(): number[] {
-    const vertical = this.isPhonePresentation();
     return this.layoutService.getEngine().all()
       .filter(n => (n.opacity.targetValue ?? 1) > 0.01 && (n.width.targetValue ?? 0) > 0)
-      .map(n => vertical
-        ? (n.posY.targetValue ?? 0) + (n.height.targetValue ?? 0) / 2
-        : (n.posX.targetValue ?? 0) + (n.width.targetValue ?? 0) / 2)
+      .map(n => (n.posX.targetValue ?? 0) + (n.width.targetValue ?? 0) / 2)
       .sort((a, b) => a - b);
   }
 
@@ -677,10 +674,7 @@ export class ProductFinderController {
    */
   /** Hero mode: the product at position i (left to right), or null. */
   getHeroProductAt(index: number): Product | null {
-    const vertical = this.isPhonePresentation();
-    const centre = (n: any) => vertical
-      ? (n.posY.targetValue ?? 0) + (n.height.targetValue ?? 0) / 2
-      : (n.posX.targetValue ?? 0) + (n.width.targetValue ?? 0) / 2;
+    const centre = (n: any) => (n.posX.targetValue ?? 0) + (n.width.targetValue ?? 0) / 2;
     const nodes = this.layoutService.getEngine().all()
       .filter(n => (n.opacity.targetValue ?? 1) > 0.01 && (n.width.targetValue ?? 0) > 0)
       .sort((a, b) => centre(a) - centre(b));
@@ -693,9 +687,7 @@ export class ProductFinderController {
     if (!vt || !this.layoutService.isPivotHeroMode()) return null;
     const centers = this.heroProductCenters();
     if (centers.length === 0) return null;
-    const cx = this.isPhonePresentation()
-      ? (this.phoneBandHeight() / 2 - vt.getTargetOffset().y) / vt.getTargetScale()
-      : (vt.viewportWidth / 2 - this.heroDockShift() - vt.getTargetOffset().x) / vt.getTargetScale();
+    const cx = (vt.viewportWidth / 2 - this.heroDockShift() - vt.getTargetOffset().x) / vt.getTargetScale();
     let nearest = 0;
     for (let i = 1; i < centers.length; i++) {
       if (Math.abs(centers[i] - cx) < Math.abs(centers[nearest] - cx)) nearest = i;
@@ -706,16 +698,6 @@ export class ProductFinderController {
   stepHeroProduct(direction: -1 | 1): boolean {
     const vt = this.viewportService.getTransform();
     if (!vt || !this.layoutService.isPivotHeroMode()) return false;
-    if (this.isPhonePresentation()) {
-      const pos = this.getHeroPosition();
-      if (!pos) return false;
-      const next = Math.max(0, Math.min(pos.count - 1, pos.index + direction));
-      if (next === pos.index) return false;
-      const prod = this.getHeroProductAt(next);
-      if (!prod) return false;
-      this.centerOnProduct(prod);
-      return true;
-    }
     const centers = this.heroProductCenters();
     if (centers.length === 0) return false;
     const shift = this.heroDockShift() / vt.getTargetScale();
