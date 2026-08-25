@@ -979,10 +979,14 @@ export class LayoutService {
       maxY = Math.max(maxY, header.y + header.height);
     }
 
-    // Hero Mode: Extend bounds to allow first/last product center to reach viewport center
-    // (desktop hero row only — the phone leaf shows a fitted grid and the
-    // extension would zoom the fit far out)
-    const phoneGrid = typeof window !== 'undefined' && window.innerWidth < 768;
+    // Hero Mode: Extend bounds to allow first/last product center to reach viewport center.
+    // Border-Checker-Regel (owner 2026-08-25): die Klammer MUSS Whitespace
+    // vor dem ersten und nach dem letzten Produkt erlauben, sonst kann das
+    // Randprodukt nie zentriert werden. Am Handy galt frueher pauschal
+    // 'Grid' (kein Extend) — seit der horizontalen Praesentation braucht
+    // sie dieselbe Erweiterung wie der Desktop-Hero (ohne Dock-Margin).
+    const phone = typeof window !== 'undefined' && window.innerWidth < 768;
+    const phoneGrid = phone && !this._heroPresentation;
     const gridOverview = phoneGrid || this.isHeroRootOverview();
     // Poster-Overview: die Typo-Header liegen OBERHALB der ersten Produkt-
     // Reihe — ohne Erweiterung clampt der Top-Snap die Produkt-Bounds an
@@ -1001,7 +1005,7 @@ export class LayoutService {
       // focal point is viewport-centre MINUS the dock shift (~276 px). With
       // a single product the clamp range collapsed to exact centring and
       // the card overlapped the helmet (issue #1304, 120561).
-      const dockMargin = 320;
+      const dockMargin = phone ? 0 : 320;
       const requiredMinX = firstProductCenter - (viewportWidth / 2) - dockMargin;
 
       // To center last product: its center must be at viewportWidth/2
@@ -1018,7 +1022,7 @@ export class LayoutService {
     // (desktop hero row only — for the phone leaf grid this REPLACED the
     // 4700 px pannable range with the middle screenful: the view started
     // mid-grid and the rest was unreachable, 120530)
-    if (viewportHeight && minY !== Infinity && maxY !== -Infinity && !gridOverview) {
+    if (viewportHeight && minY !== Infinity && maxY !== -Infinity && !gridOverview && !phone) {
       // Calculate current content vertical center
       const contentHeight = maxY - minY;
       const contentCenterY = minY + contentHeight / 2;
