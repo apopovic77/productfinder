@@ -2594,25 +2594,56 @@ export default class App extends React.Component<Props, State> {
               </button>
             </div>
 
-            {/* View Mode */}
+            {/* Ansicht: gleicher Pivot/Grouped-Switch wie der Desktop-Header
+                (owner 2026-08-25, media 120666 — Handy und Desktop sollen
+                dieselben Optionen bieten; Family-Grouping- und Lanes-Buttons
+                sind wie am Desktop entfallen). */}
             <div className="pf-mobile-pivot-label">Ansicht</div>
             <div className="pf-mobile-pivot-dims" style={{ marginBottom: 20 }}>
-              <button type="button" className={`pf-mobile-pivot-dim ${!this.controller.isFamilyGrouped() ? 'active' : ''}`}
-                onClick={() => { this.controller.setFamilyGrouped(false); this.syncPivotUI(); }}>
-                <i className="fa-solid fa-palette" style={{ marginRight: 6 }}></i>All Colors
+              {(() => { const grouped = this.controller.isHeroRootOverview() || this.controller.isPivotHeroMode();
+              return (<>
+              <button type="button" className={`pf-mobile-pivot-dim ${!grouped ? 'active' : ''}`}
+                disabled={grouped && !this.controller.canShowPivotColumns()}
+                onClick={() => {
+                  if (grouped) {
+                    this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false, mobilePivotOpen: false });
+                    this.controller.exitHeroPresentation();
+                    this.controller.setViewOverride('pivot');
+                    this.syncPivotUI();
+                  }
+                }}>
+                <i className="fa-solid fa-chart-column" style={{ marginRight: 6 }}></i>Pivot-Spalten
               </button>
-              <button type="button" className={`pf-mobile-pivot-dim ${this.controller.isFamilyGrouped() ? 'active' : ''}`}
-                onClick={() => { this.controller.setFamilyGrouped(true); this.syncPivotUI(); }}>
-                <i className="fa-solid fa-object-group" style={{ marginRight: 6 }}></i>Grouped
+              <button type="button" className={`pf-mobile-pivot-dim ${grouped ? 'active' : ''}`}
+                onClick={() => {
+                  if (!grouped) {
+                    this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false, mobilePivotOpen: false });
+                    this.controller.exitHeroPresentation();
+                    this.controller.setViewOverride('grouped');
+                    this.syncPivotUI();
+                  }
+                }}>
+                <i className="fa-solid fa-grip" style={{ marginRight: 6 }}></i>Grouped View
               </button>
-              <button type="button" className={`pf-mobile-pivot-dim ${this.controller.getLayoutMode() === 'pivot' ? 'active' : ''}`}
-                onClick={() => { this.controller.setLayoutMode('pivot'); this.syncPivotUI(); setTimeout(() => this.controller.handleResize(), 50); }}>
-                <i className="fa-solid fa-grip" style={{ marginRight: 6 }}></i>Pivot
-              </button>
-              <button type="button" className={`pf-mobile-pivot-dim ${this.controller.getLayoutMode() === 'lanes' ? 'active' : ''}`}
-                onClick={() => { this.controller.setLayoutMode('lanes'); this.syncPivotUI(); setTimeout(() => this.controller.handleResize(), 50); }}>
-                <i className="fa-solid fa-bars-staggered" style={{ marginRight: 6 }}></i>Lanes
-              </button>
+              </>); })()}
+            </div>
+
+            {/* Sortierung: gleiche Optionen wie das Desktop-SORT-Dropdown */}
+            <div className="pf-mobile-pivot-label">Sortierung</div>
+            <div className="pf-mobile-pivot-dims" style={{ marginBottom: 20 }}>
+              {([
+                ['none', 'Standard'],
+                ['name-asc', 'Name ↑'], ['name-desc', 'Name ↓'],
+                ['price-asc', 'Price ↑'], ['price-desc', 'Price ↓'],
+                ['weight-asc', 'Weight ↑'], ['weight-desc', 'Weight ↓'],
+                ['color-asc', 'Color ↑'], ['color-desc', 'Color ↓'],
+              ] as Array<[SortMode, string]>).map(([value, label]) => (
+                <button type="button" key={`mobile-sort-${value}`}
+                  className={`pf-mobile-pivot-dim ${this.state.sortMode === value ? 'active' : ''}`}
+                  onClick={() => this.setState({ sortMode: value, selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false })}>
+                  {label}
+                </button>
+              ))}
             </div>
 
             {/* Breadcrumbs */}
