@@ -289,7 +289,17 @@ export const CatalogNavigationGate: React.FC<Props> = ({
             <h1 className="pf-catalog-page-title">{text.chooseCategory}</h1>
           </header>
           <div className="pf-catalog-category-list">
-            {(CATALOG_ENTRY_CONFIG.categoriesBySport[sport.id] ?? []).map(item => {
+            {(CATALOG_ENTRY_CONFIG.categoriesBySport[sport.id] ?? []).filter(item => {
+              // Leere Kategorien ausblenden statt 'Unavailable' zu stapeln
+              // (owner 2026-08-25, media 120655) — solange die Zaehler noch
+              // laden, bleibt die volle Liste stehen (kein Layout-Sprung
+              // ins Leere; Fallback ebenso, falls alle 0 waeren).
+              if (!hasLoadedProducts) return true;
+              const nonEmpty = (CATALOG_ENTRY_CONFIG.categoriesBySport[sport.id] ?? [])
+                .some(candidate => (categoryCounts.get(candidate.id) ?? 0) > 0);
+              if (!nonEmpty) return true;
+              return (categoryCounts.get(item.id) ?? 0) > 0;
+            }).map(item => {
               const count = categoryCounts.get(item.id) ?? 0;
               const bannerUrl = item.banner?.url ?? (item.banner?.storageId
                 ? `${STORAGE_API_BASE}/storage/media/${item.banner.storageId}?format=webp&width=1600`
