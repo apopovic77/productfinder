@@ -1,4 +1,10 @@
-import { ProductsApi, CategoriesFacetsApi, Configuration, type ProductDetail as OnealProduct } from 'arkturian-oneal-sdk';
+import {
+  ProductsApi,
+  CategoriesFacetsApi,
+  Configuration,
+  type ProductDetail as OnealProduct,
+  type ProductSummary,
+} from 'arkturian-oneal-sdk';
 import { Product, type ProductData, ProductAttribute, type PrimitiveAttributeValue, type AttributeType } from '../types/Product';
 import { ACTIVE_PIVOT_PROFILE } from '../config/pivot';
 import { ONEAL_API_BASE, ONEAL_API_KEY } from '../config/apiConfig';
@@ -744,6 +750,11 @@ function mapProduct(p: ApiProduct): Product | null {
   };
 
   return new Product(data);
+}
+
+/** Map the frozen summary returned by the Realtime selection resolver. */
+export function mapProductSummary(summary: ProductSummary): Product | null {
+  return mapProduct(summary as ApiProduct);
 }
 
 const fullCatalogPromises = new Map<string, Promise<Product[]>>();

@@ -13,6 +13,7 @@ import type { Orientation } from '../layout/PivotLayouter';
 import type { PivotGroup } from '../layout/PivotGroup';
 import type { CatalogEntrySelection } from '../config/CatalogEntryConfig';
 import { filterCatalogProducts, getCatalogCategory } from '../utils/catalogEntry';
+import { resolveAgentSelectionProducts } from '../lib/realtime/AgentSelectionProjection';
 
 export type ControllerState = {
   loading: boolean;
@@ -24,6 +25,12 @@ export type ControllerState = {
 };
 
 export type StateChangeListener = (state: ControllerState) => void;
+
+export type AgentSelectionProjection = Readonly<{
+  applied: boolean;
+  productIds: readonly string[];
+  missingProductIds: readonly string[];
+}>;
 
 export class ProductFinderController {
   // Services
@@ -972,6 +979,23 @@ export class ProductFinderController {
   /** Every product of the brand, ignoring the category gate. */
   getCatalogAllProducts(): Product[] {
     return this.catalogAll.length ? this.catalogAll : this.products;
+  }
+
+  /**
+   * Project a server-validated, ordered selection onto the whole catalog.
+   *
+   * The caller may only supply IDs returned by the trusted selection-resolve
+   * endpoint. This method deliberately fails closed when even one product is
+   * absent: silently showing a partial result would make spoken slot numbers
+   * disagree with the visible ordering.
+   */
+  applyAgentSelection(productIds: readonly string[]): AgentSelectionProjection {
+    const resolution = resolveAgentSelectionProducts(this.getCatalogAllProducts(), productIds);
+    if (!resolution.applied) return resolution;
+
+    const orderedProducts = [...resolution.products];
+    this.setGlobalSearchProducts(orderedProducts);
+    return resolution;
   }
 
   isGlobalSearchActive(): boolean {
