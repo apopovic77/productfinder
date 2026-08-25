@@ -2184,7 +2184,7 @@ body {
   line-height: 1;
   display: grid;
   place-items: center;
-  z-index: 3; /* above the input canvas (2 in GPU mode) so taps reach the button */
+  z-index: 4; /* above the canvas (2) AND the dock scrim (3) */
   -webkit-tap-highlight-color: transparent;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 }
@@ -2246,7 +2246,7 @@ body {
 }
 .pf-hero-counter b { color: #e3261b; font-weight: 700; }
 @media (min-width: 768px) {
-  .pf-hero-arrow { width: 56px; height: 56px; min-width: 56px; font-size: 34px; bottom: 28px; z-index: 10001; /* above the docked card (10000) */ }
+  .pf-hero-arrow { width: 56px; height: 56px; min-width: 56px; font-size: 34px; bottom: 28px; }
   .pf-hero-counter { bottom: 22px; left: 32px; }
   .pf-hero-arrow { bottom: 64px; } /* above the counter/dots row, as in the reference */
   .pf-hero-arrow-prev { left: 28px; }
@@ -2334,7 +2334,10 @@ body {
   bottom: 0;
   width: 640px;
   pointer-events: none;
-  z-index: 9990;
+  /* Inside the .pf-stage stacking context: above the canvas (2), below the
+     hero arrows (4). The old 9990 lived outside the stage and greyed the
+     next arrow out (media 120610). */
+  z-index: 3;
   background: linear-gradient(to left,
     rgba(255, 255, 255, 0.92) 0%,
     rgba(255, 255, 255, 0.88) 55%,

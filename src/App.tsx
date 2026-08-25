@@ -2549,6 +2549,13 @@ export default class App extends React.Component<Props, State> {
               headers, hover and selection. Only the product images move to
               the WebGL layer beneath, which mirrors this canvas' transform. */}
           <canvas ref={this.canvasRef} className="pf-canvas" style={this.useArcturianRenderer() ? { zIndex: 2, background: 'transparent' } : undefined} />
+          {/* White fade under the docked card (issue #1307). Lives INSIDE
+              .pf-stage: the stage is a stacking context (z-index: 0), so an
+              outside overlay would cover the hero arrows no matter their
+              z-index (media 120610) — inside, canvas < scrim < arrows works. */}
+          {this.usesHeroDock() && selectedProduct && !this.state.shouldShowV4Dialog && (
+            <div className="pf-hero-dock-scrim" aria-hidden="true" />
+          )}
           {/* Hero mode on phones: previous/next arrows. Swiping works too, but
               a flick between bildfüllend products is easy to overshoot; the
               arrows share the snap targets with the swipe (stepHeroProduct). */}
@@ -2939,13 +2946,6 @@ export default class App extends React.Component<Props, State> {
             </>
           )}
         </div>}
-
-        {/* White fade under the docked card: whatever product lies behind
-            the card/badges is washed out instead of clashing with them
-            (owner idea, issue #1307). */}
-        {this.usesHeroDock() && selectedProduct && !this.state.shouldShowV4Dialog && (
-          <div className="pf-hero-dock-scrim" aria-hidden="true" />
-        )}
 
         {/* React Product Info Panel (fixed right side OR zoom-based V4 Dialog with Video) */}
         <AnimatePresence>
