@@ -340,6 +340,7 @@ export class ProductFinderController {
           vto.setPosition(0, 0, 1);
           setTimeout(() => {
             if (this._heroEntryKey !== entryKey) return;
+            if (this.renderer?.selectedProduct) return;
             this.updateContentBounds();
             vto.setPosition(0, 0, 1);
           }, 350);
@@ -365,6 +366,9 @@ export class ProductFinderController {
           vtp.setPosition(0, 0, 1);
           setTimeout(() => {
             if (this._heroEntryKey !== entryKey) return;
+            // A fast tap can beat this timer — never yank the view away
+            // from a freshly selected product (owner 2026-08-24, 120600).
+            if (this.renderer?.selectedProduct) return;
             this.updateContentBounds();
             vtp.setPosition(0, 0, 1);
           }, 350);
