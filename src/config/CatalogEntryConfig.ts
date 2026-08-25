@@ -114,8 +114,10 @@ const label = (value: string): LocalizedLabel => ({ de: value, en: value });
  */
 export const BRAND_BANNERS: Record<string, CatalogLandingMedia> = {
   "O'Neal": { mode: 'image', storageId: 19018, fit: 'cover', position: 'center 25%' },
-  'ONE Industries': { mode: 'image', storageId: 29424, fit: 'contain' },
-  'Kini Red Bull': { mode: 'image', storageId: 29471, fit: 'contain' },
+  // Seit dem GSG-Portal-Import (Issue #1334) liegen auch KINI/ONE-Mood-
+  // Shots im KG — die Produkt-Helme waren nur Platzhalter (2026-08-25).
+  'ONE Industries': { mode: 'image', storageId: 31795, fit: 'cover', position: 'center 35%' },
+  'Kini Red Bull': { mode: 'image', storageId: 31318, fit: 'cover', position: 'center 30%' },
 };
 
 export const CATALOG_ENTRY_CONFIG: CatalogEntryConfig = {
