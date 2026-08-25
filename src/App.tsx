@@ -1210,7 +1210,7 @@ export default class App extends React.Component<Props, State> {
             role="menuitem"
             key={item.label}
             className={`pf-crumb-menu-item ${item.active ? 'active' : ''}`}
-            onClick={item.active ? undefined : item.onSelect}
+            onClick={item.onSelect}
           >
             {item.label}
           </button>
@@ -1247,7 +1247,17 @@ export default class App extends React.Component<Props, State> {
    * category crumb never opens the selection list (that is MOTO's page).
    */
   private handleCategoryCrumbClick = () => {
-    if (this.state.pivotBreadcrumbs.length > 1) this.handleBreadcrumbClick(0);
+    if (this.state.pivotBreadcrumbs.length > 1) {
+      this.handleBreadcrumbClick(0);
+      return;
+    }
+    // Bereits am Kategorie-Root: Klick faehrt nur die Kamera in die
+    // Startposition zurueck (owner 2026-08-25, media 120645) — offene
+    // Karte schliessen, Hero-Praesentation verlassen, Viewport reset.
+    this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false });
+    this.controller.exitHeroPresentation();
+    this.controller.resetViewport();
+    this.controller.handleResize();
   };
 
   private resetToInitialView = () => {
@@ -2205,7 +2215,10 @@ export default class App extends React.Component<Props, State> {
               {this.renderCrumbMenu(CATALOG_ENTRY_CONFIG.sports.filter(item => item.enabled).map(item => ({
                 label: getLocalizedLabel(item.labels, this.props.locale),
                 active: item.id === this.props.entrySelection?.sportId,
-                onSelect: () => writeCatalogUrl({ sport: item.id, category: null }),
+                // Aktiver Eintrag = Kamera zurueck in die Startposition
+                onSelect: item.id === this.props.entrySelection?.sportId
+                  ? this.handleCategoryCrumbClick
+                  : () => writeCatalogUrl({ sport: item.id, category: null }),
               })))}
               </span>
               </>}
@@ -2229,7 +2242,10 @@ export default class App extends React.Component<Props, State> {
               {this.renderCrumbMenu((CATALOG_ENTRY_CONFIG.categoriesBySport[this.props.entrySelection?.sportId ?? ''] ?? []).map(item => ({
                 label: getLocalizedLabel(item.labels, this.props.locale),
                 active: item.id === this.props.entrySelection?.categoryId,
-                onSelect: () => writeCatalogUrl({ category: item.id }),
+                // Aktiver Eintrag = Kamera zurueck in die Startposition
+                onSelect: item.id === this.props.entrySelection?.categoryId
+                  ? this.handleCategoryCrumbClick
+                  : () => writeCatalogUrl({ category: item.id }),
               })))}
               </span>
               </>}
