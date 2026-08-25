@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   CATALOG_ENTRY_CONFIG,
   SMART_GATE_HERO_THRESHOLD,
+  getCatalogCategoryBanner,
   getCatalogSportBanner,
   getLocalizedLabel,
   type CatalogEntrySelection,
@@ -303,8 +304,11 @@ export const CatalogNavigationGate: React.FC<Props> = ({
               return (categoryCounts.get(item.id) ?? 0) > 0;
             }).map(item => {
               const count = categoryCounts.get(item.id) ?? 0;
-              const bannerUrl = item.banner?.url ?? (item.banner?.storageId
-                ? `${STORAGE_API_BASE}/storage/media/${item.banner.storageId}?format=webp&width=1600`
+              // Markenbezogene Kategorie-Banner (media 120697) — Fallback
+              // bleibt das kuratierte O'Neal-Bild.
+              const catBanner = getCatalogCategoryBanner(item, brand);
+              const bannerUrl = catBanner?.url ?? (catBanner?.storageId
+                ? `${STORAGE_API_BASE}/storage/media/${catBanner.storageId}?format=webp&width=1600`
                 : undefined);
               return (
                 <button
@@ -313,7 +317,7 @@ export const CatalogNavigationGate: React.FC<Props> = ({
                   key={item.id}
                   disabled={count === 0}
                   onClick={() => writeCatalogUrl({ category: item.id })}
-                  style={bannerUrl ? { backgroundImage: `url(${bannerUrl})`, backgroundPosition: item.banner?.position ?? 'center 35%' } : undefined}
+                  style={bannerUrl ? { backgroundImage: `url(${bannerUrl})`, backgroundPosition: catBanner?.position ?? 'center 35%' } : undefined}
                 >
                   <span className="pf-catalog-category-name">{getLocalizedLabel(item.labels, locale)}</span>
                   <span className="pf-catalog-category-count">{count > 0 ? `${count} ${text.products}` : text.unavailable}</span>

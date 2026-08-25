@@ -28,6 +28,8 @@ export type CatalogCategoryConfig = {
   categories: string[];
   targetGroup: 'Erwachsene' | 'Jugendliche';
   banner?: CatalogLandingMedia;
+  /** Markenbezogene Kategorie-Banner; `banner` bleibt der Fallback (media 120697). */
+  bannersByBrand?: Record<string, CatalogLandingMedia>;
   /**
    * How the grid groups this category, depth by depth — the way the B2B
    * shop lays it out (series/line, then model, then colour). Keys are
@@ -158,14 +160,14 @@ export const CATALOG_ENTRY_CONFIG: CatalogEntryConfig = {
   ],
   categoriesBySport: {
     moto: [
-      { id: 'mx-helmets', banner: { mode: 'image', storageId: 10435 }, labels: label('MX HELMETS'), categories: ['Helmets MX'], targetGroup: 'Erwachsene', grouping: HELMETS },
-      { id: 'goggles', banner: { mode: 'image', storageId: 9970 }, labels: label('GOGGLES'), categories: ['Goggles'], targetGroup: 'Erwachsene', grouping: LINE_FIRST },
-      { id: 'mx-gear', banner: { mode: 'image', storageId: 17772 }, labels: label('MX GEAR'), categories: ['Jerseys Offroad', 'Pants MX'], targetGroup: 'Erwachsene', grouping: GEAR },
+      { id: 'mx-helmets', banner: { mode: 'image', storageId: 10435 }, bannersByBrand: { 'Kini Red Bull': { mode: 'image', storageId: 30827, position: 'center 42%' }, 'ONE Industries': { mode: 'image', storageId: 31910, position: 'center 30%' } }, labels: label('MX HELMETS'), categories: ['Helmets MX'], targetGroup: 'Erwachsene', grouping: HELMETS },
+      { id: 'goggles', banner: { mode: 'image', storageId: 9970 }, bannersByBrand: { 'Kini Red Bull': { mode: 'image', storageId: 31474, position: 'center 45%' } }, labels: label('GOGGLES'), categories: ['Goggles'], targetGroup: 'Erwachsene', grouping: LINE_FIRST },
+      { id: 'mx-gear', banner: { mode: 'image', storageId: 17772 }, bannersByBrand: { 'Kini Red Bull': { mode: 'image', storageId: 31136, position: 'center 62%' }, 'ONE Industries': { mode: 'image', storageId: 31968, position: 'center' } }, labels: label('MX GEAR'), categories: ['Jerseys Offroad', 'Pants MX'], targetGroup: 'Erwachsene', grouping: GEAR },
       { id: 'rainwear', banner: { mode: 'image', storageId: 16355 }, labels: label('RAINWEAR'), categories: ['Rain Wear'], targetGroup: 'Erwachsene', grouping: RAIN },
-      { id: 'gloves', banner: { mode: 'image', storageId: 13798 }, labels: label('GLOVES'), categories: ['Gloves'], targetGroup: 'Erwachsene', grouping: LINE_FIRST },
+      { id: 'gloves', banner: { mode: 'image', storageId: 13798 }, bannersByBrand: { 'Kini Red Bull': { mode: 'image', storageId: 31256, position: 'center 45%' }, 'ONE Industries': { mode: 'image', storageId: 31952, position: 'center' } }, labels: label('GLOVES'), categories: ['Gloves'], targetGroup: 'Erwachsene', grouping: LINE_FIRST },
       { id: 'boots', banner: { mode: 'image', storageId: 11767 }, labels: label('BOOTS'), categories: ['Boots MX'], targetGroup: 'Erwachsene', grouping: LINE_FIRST },
-      { id: 'protection', banner: { mode: 'image', storageId: 10916 }, labels: label('PROTECTION'), categories: ['Protection MX', 'Protection MTB'], targetGroup: 'Erwachsene', grouping: PROTECTION },
-      { id: 'street-adventure-helmets', banner: { mode: 'image', storageId: 18556 }, labels: label('STREET/ADVENTURE HELMETS'), categories: ['Helmets Street'], targetGroup: 'Erwachsene', grouping: HELMETS },
+      { id: 'protection', banner: { mode: 'image', storageId: 10916 }, bannersByBrand: { 'Kini Red Bull': { mode: 'image', storageId: 31318, position: 'center 45%' } }, labels: label('PROTECTION'), categories: ['Protection MX', 'Protection MTB'], targetGroup: 'Erwachsene', grouping: PROTECTION },
+      { id: 'street-adventure-helmets', banner: { mode: 'image', storageId: 18556 }, bannersByBrand: { 'Kini Red Bull': { mode: 'image', storageId: 30609, position: 'center 50%' } }, labels: label('STREET/ADVENTURE HELMETS'), categories: ['Helmets Street'], targetGroup: 'Erwachsene', grouping: HELMETS },
       { id: 'street-adventure-jackets-pants', banner: { mode: 'image', storageId: 18695 }, labels: label('STREET/ADVENTURE JACKETS & PANTS'), categories: ['Jackets', 'ADV Pants'], targetGroup: 'Erwachsene', grouping: TYPE_COLOUR },
       { id: 'youth-helmets', banner: { mode: 'image', storageId: 17684 }, labels: label('YOUTH HELMETS'), categories: ['Helmets MX'], targetGroup: 'Jugendliche', grouping: HELMETS },
       { id: 'youth-gear', banner: { mode: 'image', storageId: 17967 }, labels: label('YOUTH GEAR'), categories: ['Jerseys Offroad', 'Pants MX'], targetGroup: 'Jugendliche', grouping: GEAR },
@@ -176,6 +178,7 @@ export const CATALOG_ENTRY_CONFIG: CatalogEntryConfig = {
       {
         id: 'accessories-leisure',
         banner: { mode: 'image', storageId: 15480 },
+        bannersByBrand: { 'Kini Red Bull': { mode: 'image', storageId: 30538, position: 'center 30%' } },
         labels: label('ACCESSORIES & LEISURE'),
         categories: ['Leisure Accessories', 'Casual Wear', 'Bags / Backpacks', 'Grips'],
         targetGroup: 'Erwachsene',
@@ -183,7 +186,7 @@ export const CATALOG_ENTRY_CONFIG: CatalogEntryConfig = {
       },
     ],
     mtb: [
-      { id: 'mtb-helmets', banner: { mode: 'image', storageId: 15962 }, labels: label('MTB HELMETS'), categories: ['Helmets MTB Full Face', 'Helme MTB Open Face'], targetGroup: 'Erwachsene', grouping: HELMETS },
+      { id: 'mtb-helmets', banner: { mode: 'image', storageId: 15962 }, bannersByBrand: { 'Kini Red Bull': { mode: 'image', storageId: 31461, position: 'center 40%' } }, labels: label('MTB HELMETS'), categories: ['Helmets MTB Full Face', 'Helme MTB Open Face'], targetGroup: 'Erwachsene', grouping: HELMETS },
       { id: 'mtb-gear', banner: { mode: 'image', storageId: 17053 }, labels: label('MTB GEAR'), categories: ['Jerseys MTB', 'Pants/ Shorts MTB'], targetGroup: 'Erwachsene', grouping: GEAR },
       { id: 'mtb-goggles', banner: { mode: 'image', storageId: 14971 }, labels: label('GOGGLES'), categories: ['Goggles'], targetGroup: 'Erwachsene', grouping: LINE_FIRST },
       { id: 'mtb-gloves', banner: { mode: 'image', storageId: 15847 }, labels: label('GLOVES'), categories: ['Gloves'], targetGroup: 'Erwachsene', grouping: LINE_FIRST },
@@ -208,6 +211,13 @@ export function getLocalizedLabel(labels: LocalizedLabel, locale: CatalogLocale)
 }
 
 /** Resolve the sport artwork from the selected brand without losing the generic fallback. */
+export function getCatalogCategoryBanner(
+  category: CatalogCategoryConfig,
+  brand?: string | null,
+): CatalogLandingMedia | undefined {
+  return (brand ? category.bannersByBrand?.[brand] : undefined) ?? category.banner;
+}
+
 export function getCatalogSportBanner(
   sport: CatalogSportConfig,
   brand?: string | null,
