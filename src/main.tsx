@@ -15,7 +15,12 @@ import { AppPreloaderWrapper } from './components/AppPreloaderWrapper'
 import { BrandSelectionGate } from './components/BrandSelectionGate'
 import { CatalogLanguageGate } from './components/CatalogLanguageGate'
 import { CatalogNavigationGate } from './components/CatalogNavigationGate'
-import { CATALOG_ENTRY_CONFIG } from './config/CatalogEntryConfig'
+import { CATALOG_ENTRY_CONFIG, resolveCatalogFlow } from './config/CatalogEntryConfig'
+
+// Flow-Variante (?flow=guided|open|direct): welche Taxonomie-Stufen werden
+// als geführte Grafik-Gates präsentiert (owner 2026-08-25). Einmal beim
+// Bootstrap gelesen — ein Wechsel ist ein Reload mit anderem Query-Param.
+const catalogFlow = resolveCatalogFlow()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -44,12 +49,14 @@ createRoot(document.getElementById('root')!).render(
         <Route path="*" element={
           <CatalogLanguageGate>
             {({ locale, requestLanding }) => (
-              <BrandSelectionGate locale={locale}>
+              <BrandSelectionGate locale={locale} enabled={catalogFlow.gates.includes('brand')}>
                 {({ brand, canChangeBrand, requestBrandSelection }) => (
                   <CatalogNavigationGate
                     brand={brand}
                     locale={locale}
                     canChangeBrand={canChangeBrand}
+                    sportGate={catalogFlow.gates.includes('sport')}
+                    categoryGate={catalogFlow.gates.includes('category')}
                     onRequestBrandSelection={requestBrandSelection}
                     onRequestLanding={requestLanding}
                   >
@@ -61,7 +68,7 @@ createRoot(document.getElementById('root')!).render(
                       requestCategorySelection,
                     }) => (
                       <AppPreloaderWrapper
-                        key={`${brand}:${selection.sportId}:${selection.categoryId}`}
+                        key={`${brand ?? 'all'}:${selection?.sportId ?? 'all'}:${selection?.categoryId ?? 'all'}`}
                         brand={brand}
                         entrySelection={selection}
                       >

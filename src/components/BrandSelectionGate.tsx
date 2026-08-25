@@ -4,13 +4,16 @@ import { buildBrandUrl, resolveBrandEntry, type BrandFacet } from '../utils/bran
 import './BrandSelectionGate.css';
 
 export type BrandSelectionContext = {
-  brand: string;
+  /** null = Marken-Gate ist in der Flow-Variante deaktiviert (alle Marken) */
+  brand: string | null;
   canChangeBrand: boolean;
   requestBrandSelection: () => void;
 };
 
 type Props = {
   locale?: string;
+  /** false = Gate überspringen, alle Marken laden (Flow-Variante 'open'/'direct') */
+  enabled?: boolean;
   children: (context: BrandSelectionContext) => React.ReactNode;
 };
 
@@ -85,7 +88,7 @@ const messages: Record<string, Record<string, string>> = {
   },
 };
 
-export const BrandSelectionGate: React.FC<Props> = ({ children, locale = 'en' }) => {
+export const BrandSelectionGate: React.FC<Props> = ({ children, locale = 'en', enabled = true }) => {
   const text = messages[locale] ?? messages.en;
   const [brands, setBrands] = useState<BrandFacet[]>([]);
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
@@ -107,6 +110,7 @@ export const BrandSelectionGate: React.FC<Props> = ({ children, locale = 'en' })
   }, []);
 
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
     setIsLoading(true);
     setError(null);
@@ -133,7 +137,7 @@ export const BrandSelectionGate: React.FC<Props> = ({ children, locale = 'en' })
       });
 
     return () => { cancelled = true; };
-  }, [applyLocation, reloadKey, text.empty, text.failed]);
+  }, [applyLocation, enabled, reloadKey, text.empty, text.failed]);
 
   useEffect(() => {
     const handlePopState = () => applyLocation(brands);
@@ -153,6 +157,10 @@ export const BrandSelectionGate: React.FC<Props> = ({ children, locale = 'en' })
     setSelectedBrand(null);
     setShowSelector(true);
   };
+
+  if (!enabled) {
+    return <>{children({ brand: null, canChangeBrand: false, requestBrandSelection: () => {} })}</>;
+  }
 
   if (isLoading) {
     return (

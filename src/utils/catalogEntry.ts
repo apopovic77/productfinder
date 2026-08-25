@@ -55,13 +55,17 @@ export function matchesCatalogEntrySelection(
   selection: CatalogEntrySelection,
 ): boolean {
   const sport = getCatalogSport(selection.sportId);
-  const category = getCatalogCategory(selection.sportId, selection.categoryId);
-  if (!sport?.enabled || !category) return false;
+  if (!sport?.enabled) return false;
 
   // ANY(sport): MX+MTB belongs to both worlds; this is deliberately not an
   // exclusive assignment.
   const sports = productSports(product);
   const matchesSport = sport.sportValues.some(value => sports.includes(value));
+  // Flow-Variante ohne Kategorie-Gate: nur nach Sport filtern.
+  if (selection.categoryId === null) return matchesSport;
+
+  const category = getCatalogCategory(selection.sportId, selection.categoryId);
+  if (!category) return false;
   return matchesSport
     && category.categories.includes(productCategory(product))
     && category.targetGroup === productTargetGroup(product);

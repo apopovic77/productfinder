@@ -155,7 +155,7 @@ export class ProductFinderController {
       this.pivotAnalyzer.setExcludedDimensions(locked);
       // The entry category prescribes how the grid groups (series > model >
       // colour, the B2B shop's order). Scoring only fills in below that.
-      const entryCategory = this.preConfig.entrySelection
+      const entryCategory = this.preConfig.entrySelection?.categoryId
         ? getCatalogCategory(this.preConfig.entrySelection.sportId, this.preConfig.entrySelection.categoryId)
         : undefined;
       this.layoutService.setGroupingPath(entryCategory?.grouping ?? []);
@@ -933,7 +933,7 @@ export class ProductFinderController {
    * generic dimensions over it. null restores the category set.
    */
   setGlobalSearchProducts(matches: Product[] | null): void {
-    const entryCategory = this.preConfig.entrySelection
+    const entryCategory = this.preConfig.entrySelection?.categoryId
       ? getCatalogCategory(this.preConfig.entrySelection.sportId, this.preConfig.entrySelection.categoryId)
       : undefined;
     if (matches && matches.length) {

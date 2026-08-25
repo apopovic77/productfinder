@@ -44,8 +44,40 @@ const RAIN = ['garment_type', 'design_group', 'color_base', 'color_name'];      
 
 export type CatalogEntrySelection = {
   sportId: string;
-  categoryId: string;
+  /** null = Kategorie-Stufe wurde nicht als Gate durchlaufen (Flow-Variante) */
+  categoryId: string | null;
 };
+
+/**
+ * Geführter Einstiegs-Flow, generisch konfigurierbar (owner 2026-08-25):
+ * Welche Taxonomie-Stufen werden als grafische Gates präsentiert, welche
+ * fallen direkt in den Finder? Eine nicht gelistete Stufe wird übersprungen —
+ * 'brand' übersprungen heißt: alle Marken laden, Marke wird In-App-Dimension.
+ * Auswahl per URL (?flow=<id>), Default ist die erste Variante.
+ */
+export type CatalogGateId = 'brand' | 'sport' | 'category';
+
+export type CatalogFlowVariant = {
+  id: string;
+  gates: CatalogGateId[];
+  description: string;
+};
+
+export const CATALOG_FLOW_VARIANTS: CatalogFlowVariant[] = [
+  { id: 'guided', gates: ['brand', 'sport', 'category'], description: 'Geführte Grafik-Gates: Marke, Sport, Kategorie (Default)' },
+  { id: 'open', gates: ['sport', 'category'], description: 'Keine Marken-Vorauswahl — alle Marken, Marke als Pivot-Dimension' },
+  { id: 'direct', gates: [], description: 'Sofort in den Finder mit dem gesamten Katalog' },
+];
+
+export function resolveCatalogFlow(href?: string): CatalogFlowVariant {
+  try {
+    const url = new URL(href ?? window.location.href);
+    const requested = url.searchParams.get('flow');
+    const match = requested && CATALOG_FLOW_VARIANTS.find(variant => variant.id === requested);
+    if (match) return match;
+  } catch { /* SSR/tests ohne window */ }
+  return CATALOG_FLOW_VARIANTS[0];
+}
 
 export type CatalogEntryConfig = {
   year: number;

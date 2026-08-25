@@ -105,6 +105,9 @@ export class LayoutService {
         // were bucketed by first word: "3SRS Helmet VISION" collapsed into
         // "3SRS" — one group for 65 designs, a wasted click (audit 2026-08-23).
         design_group: { label: 'Design', dataType: 'categorical' },
+        // Flow-Varianten ohne Marken-Gate laden alle Marken — dann ist
+        // Marke eine reguläre Pivot-Dimension (owner 2026-08-25).
+        brand: { label: 'Marke', dataType: 'categorical' },
         product_line: { label: 'Produktlinie', dataType: 'categorical' },
         color_base: { label: 'Farbe', dataType: 'categorical' },
         garment_type: { label: 'Typ', dataType: 'categorical' },

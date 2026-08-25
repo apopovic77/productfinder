@@ -66,12 +66,14 @@ type CartItem = {
 };
 
 type Props = {
-  brand: string;
+  /** null = Flow-Variante ohne Marken-Gate: alle Marken im Katalog */
+  brand: string | null;
   canChangeBrand: boolean;
   onRequestBrandSelection: () => void;
   locale: string;
   catalogYear: number;
-  entrySelection: CatalogEntrySelection;
+  /** null = Flow-Variante 'direct': Finder startet ungefiltert */
+  entrySelection: CatalogEntrySelection | null;
   sportLabel: string;
   categoryLabel: string;
   onRequestCatalogLanding: () => void;
@@ -312,8 +314,8 @@ export default class App extends React.Component<Props, State> {
       minCellSize: this.state.devSettings.minCellSize,
       cellSizeOverride: this.state.devSettings.cellSizeOverride,
       orientation: this.computePivotOrientation(),
-      brand: this.props.brand,
-      entrySelection: this.props.entrySelection,
+      brand: this.props.brand ?? undefined,
+      entrySelection: this.props.entrySelection ?? undefined,
     };
     await this.controller.initialize(canvas);
     await mediaPromise;
@@ -2133,6 +2135,8 @@ export default class App extends React.Component<Props, State> {
               >
                 Catalog {this.props.catalogYear}
               </span>
+              {/* Flow-Varianten: übersprungene Gate-Stufen erscheinen nicht als Crumb */}
+              {this.props.brand && <>
               <span className="pf-header-breadcrumb-sep">›</span>
               <span
                 role={this.props.canChangeBrand ? 'button' : undefined}
@@ -2149,6 +2153,8 @@ export default class App extends React.Component<Props, State> {
               >
                 {this.props.brand}
               </span>
+              </>}
+              {this.props.sportLabel && <>
               <span className="pf-header-breadcrumb-sep">›</span>
               <span
                 role="button"
@@ -2164,6 +2170,8 @@ export default class App extends React.Component<Props, State> {
               >
                 {this.props.sportLabel}
               </span>
+              </>}
+              {this.props.categoryLabel && <>
               <span className="pf-header-breadcrumb-sep">›</span>
               <span
                 role="button"
@@ -2179,6 +2187,7 @@ export default class App extends React.Component<Props, State> {
               >
                 {this.props.categoryLabel}
               </span>
+              </>}
               {pivotBreadcrumbs.slice(1).map((crumb, j) => { const i = j + 1; return (
                 <React.Fragment key={`header-${crumb}-${i}`}>
                   <span className="pf-header-breadcrumb-sep">›</span>
@@ -2389,6 +2398,7 @@ export default class App extends React.Component<Props, State> {
             >
               Catalog {this.props.catalogYear}
             </span>
+            {this.props.brand && <>
             <span className="pf-header-breadcrumb-sep">›</span>
             <span
               role={this.props.canChangeBrand ? 'button' : undefined}
@@ -2404,6 +2414,8 @@ export default class App extends React.Component<Props, State> {
             >
               {this.props.brand}
             </span>
+            </>}
+            {this.props.sportLabel && <>
             <span className="pf-header-breadcrumb-sep">›</span>
             <span
               role="button"
@@ -2419,6 +2431,8 @@ export default class App extends React.Component<Props, State> {
             >
               {this.props.sportLabel}
             </span>
+            </>}
+            {this.props.categoryLabel && <>
             <span className="pf-header-breadcrumb-sep">›</span>
             <span
               role="button"
@@ -2434,6 +2448,7 @@ export default class App extends React.Component<Props, State> {
             >
               {this.props.categoryLabel}
             </span>
+            </>}
             {pivotBreadcrumbs.slice(1).map((crumb, j) => { const i = j + 1; return (
               <React.Fragment key={`mobile-header-${crumb}-${i}`}>
                 <span className="pf-header-breadcrumb-sep">›</span>

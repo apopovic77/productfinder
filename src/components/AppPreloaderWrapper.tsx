@@ -14,8 +14,8 @@ const LOGO_STORAGE_ID = 6615;
  */
 export const AppPreloaderWrapper: React.FC<{
   children: React.ReactNode;
-  brand: string;
-  entrySelection: CatalogEntrySelection;
+  brand: string | null;
+  entrySelection: CatalogEntrySelection | null;
 }> = ({ children, brand, entrySelection }) => {
   const state = useProductPreloader(brand, entrySelection);
   const videoRef = useRef<HTMLVideoElement>(null);

@@ -13,7 +13,8 @@ import { readCatalogQuery, writeCatalogUrl } from '../utils/catalogEntryUrl';
 import './CatalogEntry.css';
 
 export type CatalogNavigationContext = {
-  selection: CatalogEntrySelection;
+  /** null = Sport-Gate deaktiviert (Flow-Variante 'direct'): Finder startet ungefiltert */
+  selection: CatalogEntrySelection | null;
   sportLabel: string;
   categoryLabel: string;
   requestSportSelection: () => void;
@@ -21,9 +22,12 @@ export type CatalogNavigationContext = {
 };
 
 type Props = {
-  brand: string;
+  brand: string | null;
   locale: CatalogLocale;
   canChangeBrand: boolean;
+  /** Flow-Schalter je Taxonomie-Stufe (resolveCatalogFlow) */
+  sportGate?: boolean;
+  categoryGate?: boolean;
   onRequestBrandSelection: () => void;
   onRequestLanding: () => void;
   children: (context: CatalogNavigationContext) => React.ReactNode;
@@ -83,6 +87,8 @@ export const CatalogNavigationGate: React.FC<Props> = ({
   brand,
   locale,
   canChangeBrand,
+  sportGate = true,
+  categoryGate = true,
   onRequestBrandSelection,
   onRequestLanding,
   children,
@@ -125,7 +131,7 @@ export const CatalogNavigationGate: React.FC<Props> = ({
     setIsLoading(true);
     setHasLoadedProducts(false);
     setError(null);
-    fetchProducts({ limit: 10000, brand })
+    fetchProducts({ limit: 10000, brand: brand ?? undefined })
       .then(result => {
         if (!cancelled) {
           setProducts(result);
@@ -159,11 +165,20 @@ export const CatalogNavigationGate: React.FC<Props> = ({
   const breadcrumbs = (tail?: React.ReactNode) => (
     <nav className="pf-catalog-entry-breadcrumbs" aria-label="Catalog navigation">
       <button type="button" onClick={onRequestLanding}>Catalog {CATALOG_ENTRY_CONFIG.year}</button>
-      <span aria-hidden="true">›</span>
-      <button type="button" disabled={!canChangeBrand} onClick={canChangeBrand ? onRequestBrandSelection : undefined}>{brand}</button>
+      {brand && <><span aria-hidden="true">›</span><button type="button" disabled={!canChangeBrand} onClick={canChangeBrand ? onRequestBrandSelection : undefined}>{brand}</button></>}
       {tail}
     </nav>
   );
+
+  if (!sportGate) {
+    return <>{children({
+      selection: null,
+      sportLabel: '',
+      categoryLabel: '',
+      requestSportSelection: () => {},
+      requestCategorySelection: () => {},
+    })}</>;
+  }
 
   if (!sport?.enabled) {
     return (
@@ -209,6 +224,16 @@ export const CatalogNavigationGate: React.FC<Props> = ({
         <div><p>{error}</p><button type="button" onClick={() => setReloadKey(key => key + 1)}>{text.retry}</button></div>
       </main>
     );
+  }
+
+  if (!categoryGate) {
+    return <>{children({
+      selection: { sportId: sport.id, categoryId: null },
+      sportLabel: getLocalizedLabel(sport.labels, locale),
+      categoryLabel: '',
+      requestSportSelection: () => writeCatalogUrl({ sport: null, category: null }),
+      requestCategorySelection: () => {},
+    })}</>;
   }
 
   const selectedCount = category ? categoryCounts.get(category.id) ?? 0 : 0;
