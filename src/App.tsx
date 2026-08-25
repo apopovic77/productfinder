@@ -2289,7 +2289,7 @@ export default class App extends React.Component<Props, State> {
               })))}
               </span>
               </>}
-              {this.props.sportLabel && <>
+              {this.props.sportLabel && !this.controller.isGlobalSearchActive() && <>
               <span className="pf-header-breadcrumb-sep">›</span>
               <span className="pf-crumb-wrap" {...this.crumbWrapProps()}>
               <span
@@ -2316,7 +2316,7 @@ export default class App extends React.Component<Props, State> {
               })))}
               </span>
               </>}
-              {this.props.categoryLabel && <>
+              {this.props.categoryLabel && !this.controller.isGlobalSearchActive() && <>
               <span className="pf-header-breadcrumb-sep">›</span>
               <span className="pf-crumb-wrap" {...this.crumbWrapProps()}>
               <span
@@ -2341,6 +2341,19 @@ export default class App extends React.Component<Props, State> {
                   ? this.handleCategoryCrumbClick
                   : () => writeCatalogUrl({ category: item.id }),
               })))}
+              </span>
+              </>}
+              {this.controller.isGlobalSearchActive() && <>
+              <span className="pf-header-breadcrumb-sep">›</span>
+              <span
+                role="button"
+                tabIndex={0}
+                className="pf-header-breadcrumb pf-catalog-breadcrumb"
+                title="Suche über den gesamten Katalog — Klick beendet die Suche"
+                onClick={this.clearSearchFilter}
+                onKeyDown={evt => { if (evt.key === 'Enter' || evt.key === ' ') { evt.preventDefault(); this.clearSearchFilter(); } }}
+              >
+                Alle Produkte
               </span>
               </>}
               {(() => { const crumbSiblings = this.controller.getPivotBreadcrumbSiblings();
@@ -2588,7 +2601,7 @@ export default class App extends React.Component<Props, State> {
               {this.props.brand}
             </span>
             </>}
-            {this.props.sportLabel && <>
+            {this.props.sportLabel && !this.controller.isGlobalSearchActive() && <>
             <span className="pf-header-breadcrumb-sep">›</span>
             <span
               role="button"
@@ -2605,7 +2618,7 @@ export default class App extends React.Component<Props, State> {
               {this.props.sportLabel}
             </span>
             </>}
-            {this.props.categoryLabel && <>
+            {this.props.categoryLabel && !this.controller.isGlobalSearchActive() && <>
             <span className="pf-header-breadcrumb-sep">›</span>
             <span
               role="button"
@@ -2621,6 +2634,10 @@ export default class App extends React.Component<Props, State> {
             >
               {this.props.categoryLabel}
             </span>
+            </>}
+            {this.controller.isGlobalSearchActive() && <>
+            <span className="pf-header-breadcrumb-sep">›</span>
+            <span role="button" tabIndex={0} className="pf-header-breadcrumb pf-catalog-breadcrumb" onClick={this.clearSearchFilter}>Alle Produkte</span>
             </>}
             {pivotBreadcrumbs.slice(1).map((crumb, j) => { const i = j + 1; return (
               <React.Fragment key={`mobile-header-${crumb}-${i}`}>
