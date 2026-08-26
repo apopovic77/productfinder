@@ -262,7 +262,10 @@ const createInitialState = (): State => {
     orderError: null,
     cartPanelOpen: false,
     cartFullOverlay: false,
-    realtimeShortcutEnabled: false,
+    // ?voice=1 blendet die Realtime-Flaeche ohne Tastatur ein (Handy/Tablet,
+    // owner 2026-08-26 „wie am Handy testen"); Desktop zusaetzlich Ctrl+Shift+V.
+    realtimeShortcutEnabled: typeof window !== 'undefined'
+      && ['1', 'true'].includes(new URLSearchParams(window.location.search).get('voice') ?? ''),
   };
 };
 
