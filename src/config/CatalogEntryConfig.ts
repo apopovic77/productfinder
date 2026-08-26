@@ -224,3 +224,21 @@ export function getCatalogSportBanner(
 ): CatalogLandingMedia | undefined {
   return (brand ? sport.bannersByBrand?.[brand] : undefined) ?? sport.banner;
 }
+
+/**
+ * LIUS-Katalogmarker (Category-Management 2026-08-26): 'A**' Zubehoer/
+ * Ersatzteile und 'Z**' Auslauf sind nicht katalogrelevant. Der Finder
+ * kann auf relevante Produkte einschraenken (?relevant=1 / ?relevant=0);
+ * Default hier — bis das Team den Umfang der Bildluecke freigegeben hat.
+ */
+export const RELEVANT_ONLY_DEFAULT = false;
+
+export function resolveRelevantOnly(href?: string): boolean {
+  try {
+    const url = new URL(href ?? window.location.href);
+    const v = url.searchParams.get('relevant');
+    if (v === '1' || v === 'true') return true;
+    if (v === '0' || v === 'false') return false;
+  } catch { /* SSR/tests */ }
+  return RELEVANT_ONLY_DEFAULT;
+}

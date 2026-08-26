@@ -2,7 +2,7 @@ import { ProductsApi, CategoriesFacetsApi, Configuration, type ProductDetail as 
 import { Product, type ProductData, ProductAttribute, type PrimitiveAttributeValue, type AttributeType } from '../types/Product';
 import { ACTIVE_PIVOT_PROFILE } from '../config/pivot';
 import { ONEAL_API_BASE, ONEAL_API_KEY } from '../config/apiConfig';
-import { CATALOG_ENTRY_CONFIG } from '../config/CatalogEntryConfig';
+import { CATALOG_ENTRY_CONFIG, resolveRelevantOnly } from '../config/CatalogEntryConfig';
 
 const API_BASE = ONEAL_API_BASE;
 const API_KEY = ONEAL_API_KEY;
@@ -41,6 +41,8 @@ export type Query = {
    * Katalogjahr aus CATALOG_ENTRY_CONFIG; `null` schaltet den Filter ab.
    */
   collection_year?: number | null;
+  // Nur katalogrelevante Produkte (LIUS-Marker A** und Z** raus); Default aus URL/Config
+  relevant_only?: boolean;
   search?: string;
   category?: string;
   season?: number;
@@ -751,7 +753,7 @@ const fullCatalogPromises = new Map<string, Promise<Product[]>>();
 function isFullCatalogQuery(query: Query): boolean {
   if (query.limit !== 10000) return false;
   return Object.entries(query).every(([key, value]) =>
-    key === 'limit' || key === 'brand' || key === 'collection_year' || value === undefined || value === null || value === ''
+    key === 'limit' || key === 'brand' || key === 'collection_year' || key === 'relevant_only' || value === undefined || value === null || value === ''
   );
 }
 
@@ -769,6 +771,7 @@ export function buildProductsRequestUrl(query: Query): string {
   params.set('has_image', 'true');
   const collectionYear = query.collection_year === undefined ? CATALOG_ENTRY_CONFIG.year : query.collection_year;
   if (collectionYear != null) params.set('collection_year', String(collectionYear));
+  if (query.relevant_only ?? resolveRelevantOnly()) params.set('relevant_only', 'true');
   return `${API_BASE}/products?${params.toString()}`;
 }
 
@@ -791,6 +794,10 @@ async function fetchProductsFromApi(query: Query): Promise<Product[]> {
     // Kollektionsfilter "Jahr J + Weiterlaeufer" (SDK 1.2.1) — Default aus
     // CATALOG_ENTRY_CONFIG.year, null schaltet ab.
     collectionYear: collectionYear,
+  }, {
+    // relevant_only kennt die SDK 1.2.1 noch nicht — axios haengt options.params
+    // als Query an (Regen via GitHub-Agent nachziehen).
+    params: (query.relevant_only ?? resolveRelevantOnly()) ? { relevant_only: 'true' } : undefined,
   });
 
   const results = (response.data as any).results || [];
@@ -808,7 +815,7 @@ export function fetchProducts(query: Query = {}): Promise<Product[]> {
   // here: only CanvasRenderer knows which products are visible (issue #1066).
   if (!isFullCatalogQuery(query)) return fetchProductsFromApi(query);
 
-  const cacheKey = `${query.brand ?? '__all__'}|${query.collection_year === undefined ? CATALOG_ENTRY_CONFIG.year : query.collection_year}`;
+  const cacheKey = `${query.brand ?? '__all__'}|${query.collection_year === undefined ? CATALOG_ENTRY_CONFIG.year : query.collection_year}|${query.relevant_only ?? resolveRelevantOnly()}`;
   if (!fullCatalogPromises.has(cacheKey)) {
     fullCatalogPromises.set(cacheKey, fetchProductsFromApi(query).catch(error => {
       fullCatalogPromises.delete(cacheKey);
