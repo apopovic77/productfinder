@@ -237,4 +237,110 @@ describe('ProductFinderRealtimeBffClient', () => {
       status: 403,
     });
   });
+
+  it('reports official response.done token details through the browser-safe BFF port', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({
+        clientSecret: 'ek_test',
+        model: 'gpt-realtime',
+        sessionId: 'session-1',
+        tools: ['find_products', 'refine_search'],
+        pushToTalk: true,
+        turnDetection: null,
+      }))
+      .mockResolvedValueOnce(jsonResponse({ accepted: true, deduped: false }));
+    const client = new ProductFinderRealtimeBffClient({
+      usageEndpoint: '/v1/realtime/usage',
+      fetchImpl,
+    });
+    await client.mintSession(context);
+
+    await expect(client.reportUsage({
+      sessionId: 'session-1',
+      usageEventId: 'resp_1',
+      audioInputTokens: 11,
+      audioOutputTokens: 22,
+      textInputTokens: 33,
+      textOutputTokens: 44,
+      cachedTextInputTokens: 5,
+      cachedAudioInputTokens: 7,
+      durationSec: 0,
+    })).resolves.toEqual({ accepted: true, deduped: false });
+    expect(fetchImpl).toHaveBeenLastCalledWith('/v1/realtime/usage', expect.objectContaining({
+      method: 'POST',
+      credentials: 'same-origin',
+      keepalive: true,
+      body: JSON.stringify({
+        sessionId: 'session-1',
+        usageEventId: 'resp_1',
+        audio_input_tokens: 11,
+        audio_output_tokens: 22,
+        text_input_tokens: 33,
+        text_output_tokens: 44,
+        cached_text_input_tokens: 5,
+        cached_audio_input_tokens: 7,
+        duration_sec: 0,
+      }),
+    }));
+  });
+
+  it('ends the minted session idempotently through the unload-safe BFF port', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({
+        clientSecret: 'ek_test',
+        model: 'gpt-realtime',
+        sessionId: 'session-1',
+        tools: ['find_products', 'refine_search'],
+        pushToTalk: true,
+        turnDetection: null,
+      }))
+      .mockResolvedValueOnce(jsonResponse({ released: true }));
+    const client = new ProductFinderRealtimeBffClient({
+      sessionEndEndpoint: '/v1/realtime/session/end',
+      fetchImpl,
+    });
+    await client.mintSession(context);
+
+    await expect(client.endSession({ sessionId: 'session-1' })).resolves.toEqual({ released: true });
+    expect(client.getSessionId()).toBeNull();
+    expect(fetchImpl).toHaveBeenLastCalledWith('/v1/realtime/session/end', expect.objectContaining({
+      method: 'POST',
+      credentials: 'same-origin',
+      keepalive: true,
+      body: JSON.stringify({ sessionId: 'session-1' }),
+    }));
+    await expect(client.endSession({ sessionId: 'session-1' })).rejects.toMatchObject({
+      code: 'realtime_session_mismatch',
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects usage and end reports for a foreign session before the network', async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({
+      clientSecret: 'ek_test',
+      model: 'gpt-realtime',
+      sessionId: 'session-1',
+      tools: ['find_products', 'refine_search'],
+      pushToTalk: true,
+      turnDetection: null,
+    }));
+    const client = new ProductFinderRealtimeBffClient({ fetchImpl });
+    await client.mintSession(context);
+
+    await expect(client.reportUsage({
+      sessionId: 'foreign',
+      usageEventId: 'resp_1',
+      audioInputTokens: 1,
+      audioOutputTokens: 0,
+      textInputTokens: 0,
+      textOutputTokens: 0,
+      cachedTextInputTokens: 0,
+      cachedAudioInputTokens: 0,
+      durationSec: 0,
+    })).rejects.toMatchObject({ code: 'realtime_session_mismatch' });
+    await expect(client.endSession({ sessionId: 'foreign' })).rejects.toMatchObject({
+      code: 'realtime_session_mismatch',
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
 });

@@ -7,6 +7,7 @@ import {
   type RealtimePeerConnection,
   type RealtimeRemoteAudio,
   type RealtimeToolCall,
+  type RealtimeUsageReport,
   type TelemetryPort,
 } from '../../../libs/realtime-agent-web-core/dist/index.js';
 import {
@@ -20,6 +21,10 @@ export interface ProductFinderRealtimeServerPort {
   mintSession(context: ProductFinderEntryContext): Promise<RealtimeMintResult>;
   /** BFF-owned tool dispatch bound to the minted session. */
   executeTool(call: RealtimeToolCall): Promise<unknown>;
+  /** Browser-safe BFF usage projection; model and voice session stay server-owned. */
+  reportUsage(report: RealtimeUsageReport): Promise<unknown>;
+  /** Idempotent BFF release for the currently minted browser session. */
+  endSession(input: Readonly<{ sessionId: string }>): Promise<unknown>;
 }
 
 export interface ProductFinderRealtimeControllerOptions {
@@ -51,6 +56,8 @@ export class ProductFinderRealtimeController {
     this.session = new RealtimeBrowserSession(this.adapter.core, {
       mintSession: context => options.server.mintSession(context),
       executeTool: call => options.server.executeTool(call),
+      reportUsage: report => options.server.reportUsage(report),
+      endSession: input => options.server.endSession(input),
       acquireMicrophone: async () => navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       }) as unknown as RealtimeMediaStream,

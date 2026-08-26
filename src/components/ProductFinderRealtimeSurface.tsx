@@ -79,7 +79,14 @@ export function ProductFinderRealtimeSurface({
     runtime.controller.getSnapshot,
   );
 
-  useEffect(() => () => runtime.controller.dispose(), [runtime]);
+  useEffect(() => {
+    const endOnPageHide = () => runtime.controller.close();
+    window.addEventListener('pagehide', endOnPageHide);
+    return () => {
+      window.removeEventListener('pagehide', endOnPageHide);
+      runtime.controller.dispose();
+    };
+  }, [runtime]);
 
   const start = useCallback(() => {
     void runtime.controller.open(context);
