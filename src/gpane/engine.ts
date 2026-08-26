@@ -61,17 +61,32 @@ export class GPANEEngine {
    * scoring only takes over where the prescription yields nothing usable.
    */
   private _groupingPath: string[] = [];
+  /**
+   * Dynamic prescription (owner 2026-08-26): below a catalog-category root
+   * the order depends on WHICH category was entered (helmets: line > design
+   * > colour; gear: type > line > …). The resolver sees the focus stack and
+   * returns the full path, or null to fall back to the static path.
+   */
+  private _groupingResolver: ((focus: FocusEntry[]) => string[] | null) | null = null;
+
+  setGroupingResolver(resolver: ((focus: FocusEntry[]) => string[] | null) | null): void {
+    this._groupingResolver = resolver;
+  }
+
+  private _effectiveGroupingPath(): string[] {
+    return this._groupingResolver?.(this._focusStack) ?? this._groupingPath;
+  }
 
   setGroupingPath(keys: string[]): void {
     const changed = keys.join('>') !== this._groupingPath.join('>');
     this._groupingPath = [...keys];
     // Category as prescribed root: every category is a column, none may
     // fall into "Sonstige" — lift the bucket cap for this one dimension.
-    if (keys.includes('category_primary')) {
-      const overrides = { ...(this._config.overrides ?? {}) };
-      overrides.category_primary = { ...(overrides.category_primary ?? {}), bucketCount: 64 };
-      this._config = { ...this._config, overrides };
+    const overrides = { ...(this._config.overrides ?? {}) };
+    for (const key of ['category_primary', 'catalog_category']) {
+      if (keys.includes(key)) overrides[key] = { ...(overrides[key] ?? {}), bucketCount: 64 };
     }
+    this._config = { ...this._config, overrides };
     // The prescription is consulted when a level is entered. If the engine
     // already loaded (products arrive before the catalog entry is applied),
     // the root keeps its scored pick — "Preis" instead of the category the
@@ -128,7 +143,7 @@ export class GPANEEngine {
     // from the other side: the overflow lands in "Sonstige". A prescribed
     // level is exempt: the catalog entry asked for exactly this split
     // (23 MX categories as root, ?catview=pivot) and lifts the bucket cap.
-    if (!this._groupingPath.includes(key) && groups.size > this._config.maxBuckets * 1.5) return false;
+    if (!this._effectiveGroupingPath().includes(key) && groups.size > this._config.maxBuckets * 1.5) return false;
     return true;
   }
 
@@ -140,8 +155,9 @@ export class GPANEEngine {
 
   private _prescribedDimension(products: Product[]): ScoredDimension | null {
     const depth = this._focusStack.length;
-    for (let i = depth; i < this._groupingPath.length; i++) {
-      const key = this._groupingPath[i];
+    const path = this._effectiveGroupingPath();
+    for (let i = depth; i < path.length; i++) {
+      const key = path[i];
       const dim = this._scoredDimensions.find(d => d.key === key);
       if (!dim) continue;
       // The level must actually divide: at least two groups that each hold

@@ -361,6 +361,14 @@ export class LayoutService {
     this.drillDownService.setLockedDimensions(keys);
   }
 
+  setGroupingResolver(resolver: ((focus: Array<{ dimension: string; bucketLabel: string }>) => string[] | null) | null): void {
+    this.drillDownService.setGroupingResolver(resolver as any);
+  }
+
+  setCatalogCategoryOrder(order: Map<string, number>): void {
+    this.drillDownService.setDimensionOrder('catalog_category', order);
+  }
+
   setGroupingPath(keys: string[]): void {
     this.drillDownService.setGroupingPath(keys);
   }

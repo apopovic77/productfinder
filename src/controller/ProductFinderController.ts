@@ -12,7 +12,7 @@ import { PivotDimensionAnalyzer, type PivotAnalysisResult, type PivotDimensionDe
 import type { Orientation } from '../layout/PivotLayouter';
 import type { PivotGroup } from '../layout/PivotGroup';
 import type { CatalogEntrySelection } from '../config/CatalogEntryConfig';
-import { filterCatalogProducts, getCatalogCategory } from '../utils/catalogEntry';
+import { filterCatalogProducts, getCatalogCategory, stampCatalogCategory, findCatalogCategoryByLabel, catalogCategoryOrder, CATALOG_CATEGORY_ATTRIBUTE } from '../utils/catalogEntry';
 
 export type ControllerState = {
   loading: boolean;
@@ -146,7 +146,7 @@ export class ProductFinderController {
       // 2026-08-24: "Search auf die gesamte Produktdatenbank").
       this.catalogAll = results || [];
       this.products = this.preConfig.entrySelection
-        ? filterCatalogProducts(results || [], this.preConfig.entrySelection)
+        ? this.applyCatalogCategories(filterCatalogProducts(results || [], this.preConfig.entrySelection))
         : results || [];
       // The catalog entry has already answered "which sport" — the grid must
       // not ask it again. Filtering alone is not enough: accessories with
@@ -1057,7 +1057,7 @@ export class ProductFinderController {
     } else {
       this.globalSearchActive = false;
       this.products = this.preConfig.entrySelection
-        ? filterCatalogProducts(this.catalogAll, this.preConfig.entrySelection)
+        ? this.applyCatalogCategories(filterCatalogProducts(this.catalogAll, this.preConfig.entrySelection))
         : this.catalogAll;
       this.layoutService.setGroupingPath(this.entryGroupingPath(entryCategory));
     }
@@ -1263,8 +1263,33 @@ export class ProductFinderController {
   /** Vorgeschriebene Gruppierung: Kategorie-Config, sonst Kategorie selbst als Ebene 0. */
   private entryGroupingPath(entryCategory: { grouping?: string[] } | undefined): string[] {
     if (entryCategory?.grouping) return entryCategory.grouping;
-    if (this.preConfig.entrySelection && !this.preConfig.entrySelection.categoryId) return ['category_primary'];
+    if (this.preConfig.entrySelection && !this.preConfig.entrySelection.categoryId) return [CATALOG_CATEGORY_ATTRIBUTE];
     return [];
+  }
+
+  /**
+   * Ohne Kategorie-Gate (?catview=pivot|grouped|auto): dieselben Katalog-
+   * Kategorien wie im Gate werden zur Wurzel-Dimension — nicht die rohen
+   * ERP-Kategorien (owner 2026-08-26: "das sind zwei verschiedene Sichten").
+   * Produkte ohne Katalog-Kategorie zeigt auch das Gate nicht — raus.
+   * Unterhalb einer Kategorie gilt deren konfigurierte Gruppierung.
+   */
+  private applyCatalogCategories(products: Product[]): Product[] {
+    const selection = this.preConfig.entrySelection;
+    if (!selection || selection.categoryId) {
+      this.layoutService.setGroupingResolver(null);
+      return products;
+    }
+    const sportId = selection.sportId;
+    const kept = stampCatalogCategory(products, sportId);
+    this.layoutService.setCatalogCategoryOrder(catalogCategoryOrder(sportId));
+    this.layoutService.setGroupingResolver(focus => {
+      const root = focus[0];
+      if (!root || root.dimension !== CATALOG_CATEGORY_ATTRIBUTE) return null;
+      const category = findCatalogCategoryByLabel(sportId, root.bucketLabel);
+      return [CATALOG_CATEGORY_ATTRIBUTE, ...(category?.grouping ?? [])];
+    });
+    return kept;
   }
 
   setViewOverride(override: 'auto' | 'pivot' | 'grouped'): void {

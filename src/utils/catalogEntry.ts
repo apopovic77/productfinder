@@ -1,4 +1,4 @@
-import type { Product } from '../types/Product';
+import { ProductAttribute, type Product } from '../types/Product';
 import {
   CATALOG_ENTRY_CONFIG,
   type CatalogCategoryConfig,
@@ -86,3 +86,62 @@ export function countCatalogCategoryProducts(
   return filterCatalogProducts(products, { sportId, categoryId }).length;
 }
 
+
+/**
+ * Katalog-Kategorie als Produkt-Attribut (owner 2026-08-26): Das Gate zeigt
+ * die konfigurierten Kategorien (MX HELMETS, MX GEAR, RAINWEAR …), der
+ * Pivot zeigte die rohen ERP-Kategorien — zwei verschiedene Sichten. Die
+ * Zuordnung hier ist dieselbe wie im Gate (categories + targetGroup).
+ */
+export const CATALOG_CATEGORY_ATTRIBUTE = 'catalog_category';
+
+export function resolveCatalogCategory(
+  product: CatalogProduct,
+  sportId: string,
+): CatalogCategoryConfig | undefined {
+  const category = productCategory(product);
+  const targetGroup = productTargetGroup(product);
+  return CATALOG_ENTRY_CONFIG.categoriesBySport[sportId]?.find(
+    entry => entry.categories.includes(category) && entry.targetGroup === targetGroup,
+  );
+}
+
+export function catalogCategoryLabel(category: CatalogCategoryConfig, locale = 'de'): string {
+  return category.labels[locale as keyof typeof category.labels] ?? category.labels.de;
+}
+
+export function findCatalogCategoryByLabel(sportId: string, labelText: string): CatalogCategoryConfig | undefined {
+  return CATALOG_ENTRY_CONFIG.categoriesBySport[sportId]?.find(
+    entry => Object.values(entry.labels).includes(labelText),
+  );
+}
+
+/** Stempelt `catalog_category` auf jedes Produkt; liefert nur die, die eine Katalog-Kategorie haben. */
+export function stampCatalogCategory(products: readonly Product[], sportId: string): Product[] {
+  const kept: Product[] = [];
+  for (const product of products) {
+    const category = resolveCatalogCategory(product, sportId);
+    if (!category) {
+      delete product.attributes[CATALOG_CATEGORY_ATTRIBUTE];
+      continue;
+    }
+    product.attributes[CATALOG_CATEGORY_ATTRIBUTE] = new ProductAttribute({
+      key: CATALOG_CATEGORY_ATTRIBUTE,
+      label: 'Kategorie',
+      type: 'enum',
+      value: catalogCategoryLabel(category),
+      sourcePath: 'catalog',
+    });
+    kept.push(product);
+  }
+  return kept;
+}
+
+/** Spaltenreihenfolge = Reihenfolge im Gate. */
+export function catalogCategoryOrder(sportId: string): Map<string, number> {
+  const order = new Map<string, number>();
+  (CATALOG_ENTRY_CONFIG.categoriesBySport[sportId] ?? []).forEach((entry, index) => {
+    order.set(catalogCategoryLabel(entry), index);
+  });
+  return order;
+}

@@ -15,6 +15,7 @@ import type {
   GPANEConfig,
   Bucket,
   TaxonomyNode,
+  FocusEntry,
 } from './types';
 import { getProductValue } from './types';
 import { GPANEEngine } from './engine';
@@ -93,6 +94,10 @@ export class GpanePivotService {
   /** Prescribed grouping order for the current catalog entry (see CatalogCategoryConfig.grouping). */
   setGroupingPath(keys: string[]): void {
     this.engine.setGroupingPath(keys);
+  }
+
+  setGroupingResolver(resolver: ((focus: FocusEntry[]) => string[] | null) | null): void {
+    this.engine.setGroupingResolver(resolver);
   }
 
   /** Dimensions decided upstream (catalog entry) must never be offered. */
