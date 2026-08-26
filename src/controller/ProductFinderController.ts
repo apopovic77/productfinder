@@ -159,7 +159,9 @@ export class ProductFinderController {
       const entryCategory = this.preConfig.entrySelection?.categoryId
         ? getCatalogCategory(this.preConfig.entrySelection.sportId, this.preConfig.entrySelection.categoryId)
         : undefined;
-      this.layoutService.setGroupingPath(entryCategory?.grouping ?? []);
+      // Ohne Kategorie-Gate (?catview=pivot|grouped|auto) ist die Kategorie
+      // die erste Ebene im Finder — sonst startete das Scoring mit 'Preis'.
+      this.layoutService.setGroupingPath(this.entryGroupingPath(entryCategory));
       // Two engines decide grouping: the legacy analyzer feeds the dimension
       // list, but the GPANE engine inside LayoutService picks the actual
       // split. Locking only the first one changed nothing on screen.
@@ -1057,7 +1059,7 @@ export class ProductFinderController {
       this.products = this.preConfig.entrySelection
         ? filterCatalogProducts(this.catalogAll, this.preConfig.entrySelection)
         : this.catalogAll;
-      this.layoutService.setGroupingPath(entryCategory?.grouping ?? []);
+      this.layoutService.setGroupingPath(this.entryGroupingPath(entryCategory));
     }
     // New universe: the engine must reload, not just re-filter.
     (this.layoutService as any).drillDownService.forceReload(this.products);
@@ -1258,6 +1260,13 @@ export class ProductFinderController {
   }
 
   /** Header-Switch Pivot-Spalten <-> Grouped-View (media 120646). */
+  /** Vorgeschriebene Gruppierung: Kategorie-Config, sonst Kategorie selbst als Ebene 0. */
+  private entryGroupingPath(entryCategory: { grouping?: string[] } | undefined): string[] {
+    if (entryCategory?.grouping) return entryCategory.grouping;
+    if (this.preConfig.entrySelection && !this.preConfig.entrySelection.categoryId) return ['category_primary'];
+    return [];
+  }
+
   setViewOverride(override: 'auto' | 'pivot' | 'grouped'): void {
     this.layoutService.setViewOverride(override);
     this.onPivotChanged();

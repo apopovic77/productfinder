@@ -91,6 +91,37 @@ export const CATALOG_FLOW_VARIANTS: CatalogFlowVariant[] = [
   { id: 'direct', gates: [], description: 'Sofort in den Finder mit dem gesamten Katalog' },
 ];
 
+/**
+ * Wie wird die Kategorie-Ebene praesentiert (owner 2026-08-26)?
+ *  - 'gate'    : Kachel-Seite mit Kategorie-Bannern (heutiger Default)
+ *  - 'pivot'   : kein Gate — der Finder startet mit den Kategorien als
+ *                Pivot-Spalten (Histogramm)
+ *  - 'grouped' : kein Gate — Poster-/Gruppen-Overview der Kategorien
+ *  - 'auto'    : kein Gate — die Engine entscheidet (Hero-Schwelle)
+ * Auswahl per URL (?catview=<id>; 'category' ist der Slug der gewaehlten
+ * Kategorie), Default CATEGORY_PRESENTATION_DEFAULT. Einmal beim Boot
+ * gelesen — die Gates schreiben die URL spaeter ohne diesen Param um.
+ */
+export type CategoryPresentation = 'gate' | 'pivot' | 'grouped' | 'auto';
+export const CATEGORY_PRESENTATIONS: CategoryPresentation[] = ['gate', 'pivot', 'grouped', 'auto'];
+export const CATEGORY_PRESENTATION_DEFAULT: CategoryPresentation = 'gate';
+
+let bootCategoryPresentation: CategoryPresentation | null = null;
+
+export function resolveCategoryPresentation(href?: string): CategoryPresentation {
+  if (!href && bootCategoryPresentation) return bootCategoryPresentation;
+  let result: CategoryPresentation = CATEGORY_PRESENTATION_DEFAULT;
+  try {
+    const url = new URL(href ?? window.location.href);
+    const requested = url.searchParams.get('catview');
+    if (requested && (CATEGORY_PRESENTATIONS as string[]).includes(requested)) {
+      result = requested as CategoryPresentation;
+    }
+  } catch { /* SSR/tests ohne window */ }
+  if (!href) bootCategoryPresentation = result;
+  return result;
+}
+
 export function resolveCatalogFlow(href?: string): CatalogFlowVariant {
   try {
     const url = new URL(href ?? window.location.href);

@@ -15,12 +15,14 @@ import { AppPreloaderWrapper } from './components/AppPreloaderWrapper'
 import { BrandSelectionGate } from './components/BrandSelectionGate'
 import { CatalogLanguageGate } from './components/CatalogLanguageGate'
 import { CatalogNavigationGate } from './components/CatalogNavigationGate'
-import { CATALOG_ENTRY_CONFIG, resolveCatalogFlow } from './config/CatalogEntryConfig'
+import { CATALOG_ENTRY_CONFIG, resolveCatalogFlow, resolveCategoryPresentation } from './config/CatalogEntryConfig'
 
 // Flow-Variante (?flow=guided|open|direct): welche Taxonomie-Stufen werden
 // als geführte Grafik-Gates präsentiert (owner 2026-08-25). Einmal beim
 // Bootstrap gelesen — ein Wechsel ist ein Reload mit anderem Query-Param.
 const catalogFlow = resolveCatalogFlow()
+// Kategorie-Ebene als Gate-Seite oder direkt als Finder-Sicht (?catview=…)
+const categoryPresentation = resolveCategoryPresentation()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -56,7 +58,7 @@ createRoot(document.getElementById('root')!).render(
                     locale={locale}
                     canChangeBrand={canChangeBrand}
                     sportGate={catalogFlow.gates.includes('sport')}
-                    categoryGate={catalogFlow.gates.includes('category')}
+                    categoryGate={catalogFlow.gates.includes('category') && categoryPresentation === 'gate'}
                     smartGates={catalogFlow.smartGates !== false}
                     onRequestBrandSelection={requestBrandSelection}
                     onRequestLanding={requestLanding}

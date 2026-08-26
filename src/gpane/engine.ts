@@ -63,7 +63,22 @@ export class GPANEEngine {
   private _groupingPath: string[] = [];
 
   setGroupingPath(keys: string[]): void {
+    const changed = keys.join('>') !== this._groupingPath.join('>');
     this._groupingPath = [...keys];
+    // Category as prescribed root: every category is a column, none may
+    // fall into "Sonstige" — lift the bucket cap for this one dimension.
+    if (keys.includes('category_primary')) {
+      const overrides = { ...(this._config.overrides ?? {}) };
+      overrides.category_primary = { ...(overrides.category_primary ?? {}), bucketCount: 64 };
+      this._config = { ...this._config, overrides };
+    }
+    // The prescription is consulted when a level is entered. If the engine
+    // already loaded (products arrive before the catalog entry is applied),
+    // the root keeps its scored pick — "Preis" instead of the category the
+    // entry asked for (owner 2026-08-26, ?catview=pivot). Re-pick at root.
+    if (changed && this._mode === 'gpane' && this._focusStack.length === 0 && this._allProducts.length > 0) {
+      this._selectInitialDimension();
+    }
   }
 
   /**
@@ -110,8 +125,10 @@ export class GPANEEngine {
     // single product). Skip it; the next level (colour) groups properly.
     if (singles > products.length * 0.4) return false;
     // More groups than the stage can show as columns is the same failure
-    // from the other side: the overflow lands in "Sonstige".
-    if (groups.size > this._config.maxBuckets * 1.5) return false;
+    // from the other side: the overflow lands in "Sonstige". A prescribed
+    // level is exempt: the catalog entry asked for exactly this split
+    // (23 MX categories as root, ?catview=pivot) and lifts the bucket cap.
+    if (!this._groupingPath.includes(key) && groups.size > this._config.maxBuckets * 1.5) return false;
     return true;
   }
 

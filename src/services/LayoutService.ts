@@ -1,4 +1,5 @@
 import type { Product } from '../types/Product';
+import { resolveCategoryPresentation } from '../config/CatalogEntryConfig';
 import { ProductLayoutAccessors } from '../layout/Accessors';
 import { WeightScalePolicy } from '../layout/ScalePolicy';
 import { SimpleLayouter, type SimpleLayoutConfig } from '../layout/SimpleLayouter';
@@ -434,7 +435,21 @@ export class LayoutService {
    * Jede Drill-Aktion setzt auf 'auto' zurueck — dort entscheidet wieder
    * die smarte Logik (Produktanzahl/Hero-Schwelle).
    */
-  private viewOverride: 'auto' | 'pivot' | 'grouped' = 'auto';
+  /**
+   * Start-Sicht der Wurzelebene (owner 2026-08-26, ?category=pivot|grouped):
+   * ersetzt das Kategorie-Gate durch die gewuenschte Finder-Sicht. Gilt
+   * nur auf Ebene 0 — jede Drill-Aktion faellt wie bisher auf 'auto'.
+   */
+  private readonly entryViewOverride: 'auto' | 'pivot' | 'grouped' = ((): 'auto' | 'pivot' | 'grouped' => {
+    const presentation = resolveCategoryPresentation();
+    return presentation === 'pivot' || presentation === 'grouped' ? presentation : 'auto';
+  })();
+  private viewOverride: 'auto' | 'pivot' | 'grouped' = this.entryViewOverride;
+
+  /** 'auto' unterhalb der Wurzel, an der Wurzel die konfigurierte Start-Sicht. */
+  private resetViewOverride(atRoot: boolean): void {
+    this.viewOverride = atRoot ? this.entryViewOverride : 'auto';
+  }
 
   setViewOverride(override: 'auto' | 'pivot' | 'grouped'): void {
     this.viewOverride = override;
@@ -615,7 +630,7 @@ export class LayoutService {
    * Drill down into a pivot group
    */
   drillDownPivot(value: string): void {
-    this.viewOverride = 'auto';
+    this.resetViewOverride(false);
     if (this.mode !== 'pivot' && this.mode !== 'lanes') return;
 
     // Cache positions BEFORE removing nodes — so they can return to same spot
@@ -640,7 +655,7 @@ export class LayoutService {
    * Drill up (remove last filter)
    */
   drillUpPivot(): void {
-    this.viewOverride = 'auto';
+    this.resetViewOverride(this.drillDownService.getRawTrail().length <= 1);
     if (this.mode !== 'pivot' && this.mode !== 'lanes') return;
     this.cacheCurrentNodePositions();
     if (this.drillDownService.drillUp()) {
@@ -655,7 +670,7 @@ export class LayoutService {
    * Reset pivot to top level
    */
   resetPivot(): void {
-    this.viewOverride = 'auto';
+    this.resetViewOverride(true);
     if (this.mode !== 'pivot' && this.mode !== 'lanes') return;
     this.cacheCurrentNodePositions();
     this.drillDownService.reset();
