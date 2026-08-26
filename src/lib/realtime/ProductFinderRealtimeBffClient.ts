@@ -171,7 +171,12 @@ export class ProductFinderRealtimeBffClient implements ProductFinderRealtimeServ
     const model = readString(payload, 'model', 'model');
     const sessionId = readString(payload, 'sessionId', 'session_id');
     const tools = payload.tools;
-    if (!clientSecret || !model || !sessionId || !hasExactToolContract(tools)) {
+    const pushToTalk = payload.pushToTalk ?? payload.push_to_talk;
+    const turnDetection = Object.prototype.hasOwnProperty.call(payload, 'turnDetection')
+      ? payload.turnDetection
+      : payload.turn_detection;
+    if (!clientSecret || !model || !sessionId || !hasExactToolContract(tools)
+      || pushToTalk !== true || turnDetection !== null) {
       throw new ProductFinderRealtimeBffError(502, 'invalid_session_response', payload);
     }
     this.sessionId = sessionId;
@@ -180,6 +185,7 @@ export class ProductFinderRealtimeBffClient implements ProductFinderRealtimeServ
       model,
       sessionId,
       tools: Object.freeze([...tools]) as readonly string[],
+      pushToTalk: true,
     };
   }
 

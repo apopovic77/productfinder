@@ -26,6 +26,8 @@ describe('ProductFinderRealtimeBffClient', () => {
       model: 'gpt-realtime',
       session_id: 'session-1',
       tools: ['find_products', 'refine_search'],
+      push_to_talk: true,
+      turn_detection: null,
     }));
     const client = new ProductFinderRealtimeBffClient({
       sessionEndpoint: '/v1/realtime/session',
@@ -38,6 +40,7 @@ describe('ProductFinderRealtimeBffClient', () => {
       model: 'gpt-realtime',
       sessionId: 'session-1',
       tools: ['find_products', 'refine_search'],
+      pushToTalk: true,
     });
     expect(fetchImpl).toHaveBeenCalledWith('/v1/realtime/session', expect.objectContaining({
       method: 'POST',
@@ -56,6 +59,8 @@ describe('ProductFinderRealtimeBffClient', () => {
         model: 'gpt-realtime',
         sessionId: 'session-1',
         tools: ['find_products', 'prepare_cart'],
+        pushToTalk: true,
+        turnDetection: null,
       })),
     });
 
@@ -72,6 +77,8 @@ describe('ProductFinderRealtimeBffClient', () => {
         model: 'gpt-realtime',
         sessionId: 'session-1',
         tools: ['find_products'],
+        pushToTalk: true,
+        turnDetection: null,
       })),
     });
 
@@ -96,6 +103,8 @@ describe('ProductFinderRealtimeBffClient', () => {
         model: 'gpt-realtime',
         sessionId: 'session-1',
         tools: ['find_products', 'refine_search'],
+        pushToTalk: true,
+        turnDetection: null,
       }))
       .mockResolvedValueOnce(jsonResponse(commandResult));
     const client = new ProductFinderRealtimeBffClient({
@@ -135,6 +144,8 @@ describe('ProductFinderRealtimeBffClient', () => {
         model: 'gpt-realtime',
         sessionId: 'session-1',
         tools: ['find_products', 'refine_search'],
+        pushToTalk: true,
+        turnDetection: null,
       }))
       .mockResolvedValueOnce(jsonResponse({
         call_id: 'call-1',
@@ -159,6 +170,8 @@ describe('ProductFinderRealtimeBffClient', () => {
       model: 'gpt-realtime',
       sessionId: 'session-1',
       tools: ['find_products', 'refine_search'],
+      pushToTalk: true,
+      turnDetection: null,
     };
     const invalidResults = [
       {
@@ -193,6 +206,8 @@ describe('ProductFinderRealtimeBffClient', () => {
       model: 'gpt-realtime',
       sessionId: 'session-1',
       tools: ['find_products', 'refine_search'],
+      pushToTalk: true,
+      turnDetection: null,
     }));
     const client = new ProductFinderRealtimeBffClient({ fetchImpl });
     await client.mintSession(context);

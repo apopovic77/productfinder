@@ -40,8 +40,6 @@ const OPENAI_REALTIME_CALLS_URL = 'https://api.openai.com/v1/realtime/calls';
  */
 export class ProductFinderRealtimeController {
   private readonly adapter: ProductFinderRealtimeAdapter;
-  /** Datenkanal der laufenden Sitzung — fuer PTT-Commit (turn_detection=null). */
-  private channel: RTCDataChannel | null = null;
   private readonly session: RealtimeBrowserSession<ProductFinderEntryContext>;
 
   constructor(options: ProductFinderRealtimeControllerOptions) {
@@ -56,55 +54,22 @@ export class ProductFinderRealtimeController {
       acquireMicrophone: async () => navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       }) as unknown as RealtimeMediaStream,
-      createPeerConnection: () => {
-        const peer = new RTCPeerConnection();
-        // Owner 2026-08-26: „Warum stellt sich der Agent nicht vor?" — der
-        // Core fordert beim Oeffnen keine Antwort an, er wartet auf PTT.
-        // Bis das im Shared Core landet, haengen wir uns per addEventListener
-        // (ueberlebt das onopen des Cores) an den Datenkanal und stossen
-        // genau eine Begruessung an.
-        const createDataChannel = peer.createDataChannel.bind(peer);
-        peer.createDataChannel = ((label: string, init?: RTCDataChannelInit) => {
-          const channel = createDataChannel(label, init);
-          this.channel = channel;
-          channel.addEventListener('open', () => {
-            window.setTimeout(() => {
-              try {
-                channel.send(JSON.stringify({
-                  type: 'response.create',
-                  response: {
-                    instructions: 'Begrüße den Kunden jetzt in ein bis zwei kurzen Sätzen auf Deutsch: '
-                      + 'Stell dich als O\'Neal Sprachberater vor und frag, welches Produkt er sucht. '
-                      + 'Rufe dabei kein Werkzeug auf.',
-                  },
-                }));
-              } catch (error) {
-                options.telemetry?.error?.('realtime.greeting.failed', error);
-              }
-            }, 250);
-          }, { once: true });
-          return channel;
-        }) as typeof peer.createDataChannel;
-        return peer as unknown as RealtimePeerConnection;
-      },
+      createPeerConnection: () => new RTCPeerConnection() as unknown as RealtimePeerConnection,
       createRemoteAudio: () => {
-        // Owner 2026-08-26 (media 120859): Verbindung stand, aber kein Ton.
-        // Ein abgekoppeltes <audio> mit autoplay spielt einen MediaStream in
-        // Safari nicht ab — es muss im DOM haengen, playsInline sein und
-        // play() explizit bekommen, sobald der Track da ist. Ein
-        // Autoplay-Verbot landet als Fehler im Log statt in Stille.
         const audio = document.createElement('audio');
-        audio.setAttribute('playsinline', '');
         audio.style.display = 'none';
         audio.dataset.role = 'productfinder-realtime-remote-audio';
-        document.body.appendChild(audio);
-        audio.addEventListener('loadedmetadata', () => {
-          audio.play().catch(error => {
-            options.telemetry?.error?.('realtime.audio.play_failed', error, { name: (error as Error)?.name });
-          });
-        });
         return audio as unknown as RealtimeRemoteAudio;
       },
+      mountRemoteAudio: audio => document.body.appendChild(audio as unknown as HTMLAudioElement),
+      unmountRemoteAudio: audio => (audio as unknown as HTMLAudioElement).remove(),
+      createOpenGreeting: () => ({
+        instructions: 'Begrüße den Kunden jetzt in ein bis zwei kurzen Sätzen auf Deutsch: '
+          + 'Stell dich als O\'Neal Sprachberater vor und frag, welches Produkt er sucht. '
+          + 'Rufe dabei kein Werkzeug auf.',
+        delayMs: 250,
+      }),
+      reportError: (event, error, context) => options.telemetry?.error?.(event, error, context),
       exchangeSdp: async ({ offerSdp, clientSecret, model }) => {
         const response = await fetch(
           `${OPENAI_REALTIME_CALLS_URL}?model=${encodeURIComponent(model)}`,
@@ -136,29 +101,7 @@ export class ProductFinderRealtimeController {
   }
 
   setPttActive(active: boolean): boolean {
-    const accepted = this.session.setPttActive(active);
-    if (!accepted) return false;
-    // AiApi mintet PTT-Sitzungen mit turn_detection=null — der Server
-    // schliesst keinen Turn von selbst. Die Tschepp-App sendet deshalb
-    // beim Loslassen commit + response.create; der Shared Core tut das
-    // (noch) nicht. Owner 2026-08-26: „ich druecke, aber es kommt nie an".
-    const channel = this.channel;
-    if (!channel || channel.readyState !== 'open') return accepted;
-    try {
-      if (active) {
-        channel.send(JSON.stringify({ type: 'input_audio_buffer.clear' }));
-      } else {
-        // Letzte Audio-Frames noch ankommen lassen, dann Turn schliessen.
-        window.setTimeout(() => {
-          if (channel.readyState !== 'open') return;
-          channel.send(JSON.stringify({ type: 'input_audio_buffer.commit' }));
-          channel.send(JSON.stringify({ type: 'response.create' }));
-        }, 150);
-      }
-    } catch (error) {
-      console.error('[productfinder-realtime] realtime.ptt.commit_failed', error);
-    }
-    return accepted;
+    return this.session.setPttActive(active);
   }
 
   close(): void {

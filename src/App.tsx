@@ -85,6 +85,7 @@ type Props = {
   onRequestSportSelection: () => void;
   onRequestCategorySelection: () => void;
   realtimeDemoEnabled: boolean;
+  realtimeDemoAvailable: boolean;
 };
 
 type State = {
@@ -178,6 +179,7 @@ type State = {
   orderError: string | null;
   cartPanelOpen: boolean;
   cartFullOverlay: boolean;
+  realtimeShortcutEnabled: boolean;
 };
 
 const createInitialState = (): State => {
@@ -260,6 +262,7 @@ const createInitialState = (): State => {
     orderError: null,
     cartPanelOpen: false,
     cartFullOverlay: false,
+    realtimeShortcutEnabled: false,
   };
 };
 
@@ -300,6 +303,7 @@ export default class App extends React.Component<Props, State> {
   state: State = createInitialState();
 
   async componentDidMount() {
+    window.addEventListener('keydown', this.handleRealtimeDemoHotkey);
     // Marken fuer das Breadcrumb-Dropdown (Markenwechsel im Kontext)
     fetchFacets().then((data: any) => {
       const brands = Array.isArray(data?.brands)
@@ -406,6 +410,7 @@ export default class App extends React.Component<Props, State> {
     window.removeEventListener('popstate', this.handlePopState);
     document.removeEventListener('keydown', this.handleKeyDown);
     window.removeEventListener('keydown', this.handleQuickSearchHotkey);
+    window.removeEventListener('keydown', this.handleRealtimeDemoHotkey);
     const canvas = this.canvasRef.current;
     if (canvas) {
       canvas.removeEventListener('click', this.handleCanvasClick);
@@ -2054,6 +2059,17 @@ export default class App extends React.Component<Props, State> {
     }
   };
 
+  private handleRealtimeDemoHotkey = (event: KeyboardEvent) => {
+    if (!this.props.realtimeDemoAvailable
+      || !event.ctrlKey
+      || !event.shiftKey
+      || event.key.toLowerCase() !== 'v') return;
+    event.preventDefault();
+    this.setState(prev => ({
+      realtimeShortcutEnabled: !prev.realtimeShortcutEnabled,
+    }));
+  };
+
   private handleQuickSearchPromptChange = (value: string) => {
     this.setState({ quickSearchPrompt: value });
   };
@@ -3277,7 +3293,7 @@ export default class App extends React.Component<Props, State> {
           }}
         />
 
-        {this.props.realtimeDemoEnabled && (
+        {(this.props.realtimeDemoEnabled || this.state.realtimeShortcutEnabled) && (
           <ProductFinderRealtimeSurface
             finderController={this.controller}
             context={{

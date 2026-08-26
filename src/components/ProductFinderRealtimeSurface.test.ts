@@ -38,11 +38,20 @@ describe('ProductFinderRealtimeSurface contract', () => {
     expect(configSource).toContain("VITE_PRODUCTFINDER_REALTIME_ENABLED === 'true'");
     expect(mainSource).toContain("normalizedPath === '/internal/realtime-demo'");
     expect(mainSource).toContain('realtimeDemoEnabled={realtimeDemoEnabled}');
+    expect(mainSource).toContain('realtimeDemoAvailable={REALTIME_DEMO_ENABLED}');
     expect(deployWorkflowSource).toContain('VITE_PRODUCTFINDER_REALTIME_ENABLED=true');
   });
 
+  it('can be toggled on a regular Finder page with the owner shortcut', () => {
+    expect(appSource).toContain('handleRealtimeDemoHotkey');
+    expect(appSource).toContain("event.key.toLowerCase() !== 'v'");
+    expect(appSource).toContain('!event.ctrlKey');
+    expect(appSource).toContain('!event.shiftKey');
+    expect(appSource).toContain('realtimeShortcutEnabled: !prev.realtimeShortcutEnabled');
+  });
+
   it('does not depend on a controller loading notification emitted before App subscribes', () => {
-    expect(appSource).toContain('{this.props.realtimeDemoEnabled && (');
+    expect(appSource).toContain('(this.props.realtimeDemoEnabled || this.state.realtimeShortcutEnabled)');
     expect(appSource).not.toContain('this.props.realtimeDemoEnabled && !loading');
   });
 });

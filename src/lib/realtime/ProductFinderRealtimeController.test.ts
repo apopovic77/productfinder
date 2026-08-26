@@ -19,4 +19,14 @@ describe('ProductFinderRealtimeController contract', () => {
     expect(source).not.toContain('VITE_AI_API_KEY');
     expect(source).not.toContain("'/ai/realtime/token'");
   });
+
+  it('delegates audio, greeting and PTT lifecycle to the shared core', () => {
+    expect(source).toContain('mountRemoteAudio:');
+    expect(source).toContain('unmountRemoteAudio:');
+    expect(source).toContain('createOpenGreeting:');
+    expect(source).toContain('reportError:');
+    expect(source).not.toContain("addEventListener('loadedmetadata'");
+    expect(source).not.toContain("input_audio_buffer.commit");
+    expect(source).not.toContain('private channel: RTCDataChannel');
+  });
 });

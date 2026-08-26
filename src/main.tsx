@@ -92,6 +92,7 @@ createRoot(document.getElementById('root')!).render(
                           onRequestSportSelection={requestSportSelection}
                           onRequestCategorySelection={requestCategorySelection}
                           realtimeDemoEnabled={realtimeDemoEnabled}
+                          realtimeDemoAvailable={REALTIME_DEMO_ENABLED}
                         />
                       </AppPreloaderWrapper>
                     )}
