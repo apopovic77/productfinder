@@ -1,3 +1,7 @@
 [submodule "libs/arcturian"]
 	path = libs/arcturian
 	url = https://github.com/apopovic77/Arcturian.git
+[submodule "libs/realtime-agent-web-core"]
+	path = libs/realtime-agent-web-core
+	url = git@github.com:apopovic77/realtime-agent-web-core.git
+	branch = dev

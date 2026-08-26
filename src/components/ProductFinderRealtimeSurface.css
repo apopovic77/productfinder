@@ -1,0 +1,155 @@
+.pf-realtime-surface {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 1200;
+  width: min(350px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 18px;
+  color: #fff;
+  background:
+    linear-gradient(145deg, rgba(18, 19, 23, 0.97), rgba(7, 8, 10, 0.94));
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(18px);
+}
+
+.pf-realtime-heading,
+.pf-realtime-status,
+.pf-realtime-start,
+.pf-realtime-ptt {
+  display: flex;
+  align-items: center;
+}
+
+.pf-realtime-heading {
+  min-height: 24px;
+  justify-content: space-between;
+}
+
+.pf-realtime-kicker {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+.pf-realtime-close {
+  width: 28px;
+  height: 28px;
+  padding: 5px;
+  border: 0;
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.pf-realtime-close svg,
+.pf-realtime-start svg,
+.pf-realtime-ptt svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+.pf-realtime-status {
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pf-realtime-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #a8a8ac;
+  box-shadow: 0 0 0 4px rgba(168, 168, 172, 0.12);
+}
+
+.pf-realtime-surface.is-ready .pf-realtime-status-dot,
+.pf-realtime-surface.is-speaking .pf-realtime-status-dot {
+  background: #b8d832;
+  box-shadow: 0 0 0 4px rgba(184, 216, 50, 0.16);
+}
+
+.pf-realtime-surface.is-listening .pf-realtime-status-dot {
+  background: #fff;
+  box-shadow: 0 0 0 4px rgba(184, 216, 50, 0.3);
+}
+
+.pf-realtime-surface.is-error .pf-realtime-status-dot {
+  background: #ff6b62;
+  box-shadow: 0 0 0 4px rgba(255, 107, 98, 0.16);
+}
+
+.pf-realtime-tool,
+.pf-realtime-transcript,
+.pf-realtime-error {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.pf-realtime-tool {
+  color: #cfec52;
+}
+
+.pf-realtime-transcript {
+  max-height: 76px;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.pf-realtime-transcript span {
+  display: block;
+  margin-bottom: 3px;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+.pf-realtime-error {
+  color: #ffaaa4;
+}
+
+.pf-realtime-start,
+.pf-realtime-ptt {
+  width: 100%;
+  min-height: 48px;
+  justify-content: center;
+  gap: 9px;
+  margin-top: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  color: #0b0c0e;
+  background: #b8d832;
+  font: 700 13px/1 'ITC Avant Garde Gothic', sans-serif;
+}
+
+.pf-realtime-ptt[aria-pressed='true'] {
+  color: #fff;
+  background: #e5312f;
+  transform: translateY(1px);
+}
+
+.pf-realtime-ptt:disabled {
+  cursor: wait;
+  color: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 767px) {
+  .pf-realtime-surface {
+    right: 12px;
+    bottom: 76px;
+    width: calc(100vw - 24px);
+    padding: 13px;
+    border-radius: 15px;
+  }
+}
