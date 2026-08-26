@@ -54,9 +54,52 @@ export class ProductFinderRealtimeController {
       acquireMicrophone: async () => navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       }) as unknown as RealtimeMediaStream,
-      createPeerConnection: () => new RTCPeerConnection() as unknown as RealtimePeerConnection,
+      createPeerConnection: () => {
+        const peer = new RTCPeerConnection();
+        // Owner 2026-08-26: „Warum stellt sich der Agent nicht vor?" — der
+        // Core fordert beim Oeffnen keine Antwort an, er wartet auf PTT.
+        // Bis das im Shared Core landet, haengen wir uns per addEventListener
+        // (ueberlebt das onopen des Cores) an den Datenkanal und stossen
+        // genau eine Begruessung an.
+        const createDataChannel = peer.createDataChannel.bind(peer);
+        peer.createDataChannel = ((label: string, init?: RTCDataChannelInit) => {
+          const channel = createDataChannel(label, init);
+          channel.addEventListener('open', () => {
+            window.setTimeout(() => {
+              try {
+                channel.send(JSON.stringify({
+                  type: 'response.create',
+                  response: {
+                    instructions: 'Begrüße den Kunden jetzt in ein bis zwei kurzen Sätzen auf Deutsch: '
+                      + 'Stell dich als O\'Neal Sprachberater vor und frag, welches Produkt er sucht. '
+                      + 'Rufe dabei kein Werkzeug auf.',
+                  },
+                }));
+              } catch (error) {
+                options.telemetry?.error?.('realtime.greeting.failed', error);
+              }
+            }, 250);
+          }, { once: true });
+          return channel;
+        }) as typeof peer.createDataChannel;
+        return peer as unknown as RealtimePeerConnection;
+      },
       createRemoteAudio: () => {
+        // Owner 2026-08-26 (media 120859): Verbindung stand, aber kein Ton.
+        // Ein abgekoppeltes <audio> mit autoplay spielt einen MediaStream in
+        // Safari nicht ab — es muss im DOM haengen, playsInline sein und
+        // play() explizit bekommen, sobald der Track da ist. Ein
+        // Autoplay-Verbot landet als Fehler im Log statt in Stille.
         const audio = document.createElement('audio');
+        audio.setAttribute('playsinline', '');
+        audio.style.display = 'none';
+        audio.dataset.role = 'productfinder-realtime-remote-audio';
+        document.body.appendChild(audio);
+        audio.addEventListener('loadedmetadata', () => {
+          audio.play().catch(error => {
+            options.telemetry?.error?.('realtime.audio.play_failed', error, { name: (error as Error)?.name });
+          });
+        });
         return audio as unknown as RealtimeRemoteAudio;
       },
       exchangeSdp: async ({ offerSdp, clientSecret, model }) => {
