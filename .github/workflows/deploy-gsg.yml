@@ -37,6 +37,9 @@ jobs:
           VITE_STORAGE_PROXY_URL: ${{ secrets.GSG_VITE_STORAGE_PROXY_URL }}
           VITE_STORAGE_API_KEY: ${{ secrets.GSG_VITE_STORAGE_API_KEY }}
           VITE_ARTRACK_API_BASE: ${{ secrets.VITE_ARTRACK_API_BASE }}
+          # Internal demo surface only; the BFF REALTIME_ENABLED switch remains
+          # the authoritative fail-closed production kill switch.
+          VITE_PRODUCTFINDER_REALTIME_ENABLED: 'true'
 
       - name: Deploy to GSG server via arkturian jump host
         uses: appleboy/ssh-action@v1.0.3
@@ -59,6 +62,7 @@ jobs:
             VITE_ONEAL_API_KEY=oneal_demo_token
             VITE_STORAGE_API_URL=https://gsgbot.arkturian.com/storage-api
             VITE_STORAGE_API_KEY=gsg_storage_key_2024
+            VITE_PRODUCTFINDER_REALTIME_ENABLED=true
             EOF
 
               npm install

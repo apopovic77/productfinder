@@ -8,6 +8,10 @@ const source = readFileSync(
 const mainSource = readFileSync(new URL('../main.tsx', import.meta.url), 'utf8');
 const configSource = readFileSync(new URL('../config/apiConfig.ts', import.meta.url), 'utf8');
 const appSource = readFileSync(new URL('../App.tsx', import.meta.url), 'utf8');
+const deployWorkflowSource = readFileSync(
+  new URL('../../.github/workflows/deploy-gsg.yml', import.meta.url),
+  'utf8',
+);
 
 describe('ProductFinderRealtimeSurface contract', () => {
   it('mounts the shared controller only behind the productfinder BFF', () => {
@@ -34,6 +38,7 @@ describe('ProductFinderRealtimeSurface contract', () => {
     expect(configSource).toContain("VITE_PRODUCTFINDER_REALTIME_ENABLED === 'true'");
     expect(mainSource).toContain("normalizedPath === '/internal/realtime-demo'");
     expect(mainSource).toContain('realtimeDemoEnabled={realtimeDemoEnabled}');
+    expect(deployWorkflowSource).toContain('VITE_PRODUCTFINDER_REALTIME_ENABLED=true');
   });
 
   it('does not depend on a controller loading notification emitted before App subscribes', () => {
