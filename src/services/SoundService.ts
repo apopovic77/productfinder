@@ -14,6 +14,7 @@ class SoundService {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private _enabled: boolean;
+  private realtimeOwned = false;
   private lastWhoosh = 0;
 
   constructor() {
@@ -27,6 +28,18 @@ class SoundService {
   setEnabled(on: boolean): void {
     this._enabled = on;
     try { localStorage.setItem(STORAGE_KEY, on ? 'on' : 'off'); } catch { /* ignore */ }
+  }
+
+  /**
+   * Suspend productfinder UI effects while the Realtime voice channel owns
+   * audio. This is deliberately independent from the persisted user setting:
+   * ending a voice session must restore the user's previous preference.
+   */
+  setRealtimeOwned(active: boolean): void {
+    this.realtimeOwned = active;
+    if (active && this.ctx?.state === 'running') {
+      void this.ctx.suspend().catch(() => undefined);
+    }
   }
 
   private ensureContext(): AudioContext | null {
@@ -52,7 +65,7 @@ class SoundService {
    * a fast swipe across many products must not machine-gun.
    */
   whoosh(dir: 1 | -1 = 1): void {
-    if (!this._enabled) return;
+    if (!this._enabled || this.realtimeOwned) return;
     const now = performance.now();
     if (now - this.lastWhoosh < 120) return;
     this.lastWhoosh = now;
@@ -96,7 +109,7 @@ class SoundService {
 
   /** Card/dialog opens: one soft, low sine pop. */
   pop(): void {
-    if (!this._enabled) return;
+    if (!this._enabled || this.realtimeOwned) return;
     const ctx = this.ensureContext();
     if (!ctx || !this.master) return;
     try {
@@ -118,7 +131,7 @@ class SoundService {
 
   /** Small confirmation tick (add to cart, chip select). */
   tick(): void {
-    if (!this._enabled) return;
+    if (!this._enabled || this.realtimeOwned) return;
     const ctx = this.ensureContext();
     if (!ctx || !this.master) return;
     try {

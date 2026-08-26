@@ -1,8 +1,10 @@
 import {
   RealtimeAgentCore,
   createCommandRegistry,
+  type AudioOwnershipPort,
   type CommandRegistry,
   type RealtimeAgentCoreSnapshot,
+  type SessionHistoryPort,
   type TelemetryPort,
 } from '../../../libs/realtime-agent-web-core/dist/index.js';
 
@@ -28,6 +30,8 @@ export interface ProductSelectionProjectionPort {
 
 export interface ProductFinderRealtimeAdapterOptions {
   selectionProjection: ProductSelectionProjectionPort;
+  audioOwnership?: AudioOwnershipPort;
+  history?: SessionHistoryPort<ProductFinderEntryContext>;
   telemetry?: TelemetryPort;
 }
 
@@ -59,6 +63,8 @@ export class ProductFinderRealtimeAdapter {
     });
     this.core = new RealtimeAgentCore<ProductFinderEntryContext>({
       registry: this.registry,
+      audioOwnership: options.audioOwnership,
+      history: options.history,
       telemetry: options.telemetry,
     });
     this.unregisterShowResults = this.registry.register(

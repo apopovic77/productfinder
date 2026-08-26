@@ -1,5 +1,6 @@
 import {
   RealtimeBrowserSession,
+  type AudioOwnershipPort,
   type RealtimeAgentCoreSnapshot,
   type RealtimeMediaStream,
   type RealtimeMintResult,
@@ -24,6 +25,7 @@ export interface ProductFinderRealtimeServerPort {
 export interface ProductFinderRealtimeControllerOptions {
   server: ProductFinderRealtimeServerPort;
   selectionProjection: ProductSelectionProjectionPort;
+  audioOwnership?: AudioOwnershipPort;
   telemetry?: TelemetryPort;
 }
 
@@ -43,6 +45,7 @@ export class ProductFinderRealtimeController {
   constructor(options: ProductFinderRealtimeControllerOptions) {
     this.adapter = new ProductFinderRealtimeAdapter({
       selectionProjection: options.selectionProjection,
+      audioOwnership: options.audioOwnership,
       telemetry: options.telemetry,
     });
     this.session = new RealtimeBrowserSession(this.adapter.core, {

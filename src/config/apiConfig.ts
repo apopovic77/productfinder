@@ -26,3 +26,22 @@ export const STORAGE_API_KEY: string =
 
 export const DISPATCH_BASE: string =
   import.meta.env.VITE_DISPATCH_BASE || 'https://cloud-api.oneal.arkturian.com/api/queue';
+
+/**
+ * Productfinder-owned, same-origin Realtime BFF endpoints.
+ *
+ * These URLs are browser-visible by design; credentials are not. The BFF is
+ * the only component allowed to hold the AuthApi principal JWT and AiApi host
+ * credentials. Defaults follow the oneal-api-v2 `/v1` base used above.
+ */
+export const REALTIME_SESSION_ENDPOINT: string =
+  import.meta.env.VITE_REALTIME_SESSION_ENDPOINT
+  || `${ONEAL_API_BASE}/realtime/session`;
+
+export const REALTIME_TOOL_ENDPOINT: string =
+  import.meta.env.VITE_REALTIME_TOOL_ENDPOINT
+  || `${ONEAL_API_BASE}/realtime/tool`;
+
+/** Display-only gate. The authoritative kill switch lives in the BFF. */
+export const REALTIME_DEMO_ENABLED: boolean =
+  import.meta.env.VITE_PRODUCTFINDER_REALTIME_ENABLED === 'true';

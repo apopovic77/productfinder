@@ -16,11 +16,15 @@ import { BrandSelectionGate } from './components/BrandSelectionGate'
 import { CatalogLanguageGate } from './components/CatalogLanguageGate'
 import { CatalogNavigationGate } from './components/CatalogNavigationGate'
 import { CATALOG_ENTRY_CONFIG, resolveCatalogFlow } from './config/CatalogEntryConfig'
+import { REALTIME_DEMO_ENABLED } from './config/apiConfig'
 
 // Flow-Variante (?flow=guided|open|direct): welche Taxonomie-Stufen werden
 // als geführte Grafik-Gates präsentiert (owner 2026-08-25). Einmal beim
 // Bootstrap gelesen — ein Wechsel ist ein Reload mit anderem Query-Param.
 const catalogFlow = resolveCatalogFlow()
+const normalizedPath = window.location.pathname.replace(/\/+$/, '') || '/'
+const realtimeDemoEnabled = REALTIME_DEMO_ENABLED
+  && normalizedPath === '/internal/realtime-demo'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -85,6 +89,7 @@ createRoot(document.getElementById('root')!).render(
                           onRequestCatalogLanding={requestLanding}
                           onRequestSportSelection={requestSportSelection}
                           onRequestCategorySelection={requestCategorySelection}
+                          realtimeDemoEnabled={realtimeDemoEnabled}
                         />
                       </AppPreloaderWrapper>
                     )}

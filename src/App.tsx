@@ -44,6 +44,7 @@ import { FOOTER_CONFIG, type FooterPosition } from './config/FooterConfig';
 import { STORAGE_API_BASE as CENTRAL_STORAGE_BASE, STORAGE_API_KEY as CENTRAL_STORAGE_KEY } from './config/apiConfig';
 import { CATALOG_ENTRY_CONFIG, getLocalizedLabel, type CatalogEntrySelection } from './config/CatalogEntryConfig';
 import { writeCatalogUrl } from './utils/catalogEntryUrl';
+import { ProductFinderRealtimeSurface } from './components/ProductFinderRealtimeSurface';
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -80,6 +81,7 @@ type Props = {
   onRequestCatalogLanding: () => void;
   onRequestSportSelection: () => void;
   onRequestCategorySelection: () => void;
+  realtimeDemoEnabled: boolean;
 };
 
 type State = {
@@ -3169,6 +3171,23 @@ export default class App extends React.Component<Props, State> {
             this.controller.setProductLimit(limit);
           }}
         />
+
+        {this.props.realtimeDemoEnabled && !loading && (
+          <ProductFinderRealtimeSurface
+            finderController={this.controller}
+            context={{
+              brand: this.props.brand,
+              language: this.props.locale,
+              collection_year: this.props.catalogYear,
+              entry_selection: this.props.entrySelection
+                ? {
+                    sport_id: this.props.entrySelection.sportId,
+                    category_id: this.props.entrySelection.categoryId,
+                  }
+                : null,
+            }}
+          />
+        )}
 
         {/* Cart Panel — Slide-in from right, optional fullscreen overlay */}
         {cartFullOverlay && cartPanelOpen && (

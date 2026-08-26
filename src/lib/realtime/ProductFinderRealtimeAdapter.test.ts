@@ -7,6 +7,19 @@ import {
 } from './ProductFinderRealtimeAdapter';
 
 describe('ProductFinderRealtimeAdapter', () => {
+  it('hands audio ownership to the host for the full session lifecycle', () => {
+    const setRealtimeOwned = vi.fn();
+    const adapter = new ProductFinderRealtimeAdapter({
+      selectionProjection: { showSelection: vi.fn() },
+      audioOwnership: { setRealtimeOwned },
+    });
+
+    adapter.core.beginOpen();
+    expect(setRealtimeOwned).toHaveBeenLastCalledWith(true);
+    adapter.core.failOpen(new Error('test'));
+    expect(setRealtimeOwned).toHaveBeenLastCalledWith(false);
+  });
+
   it('projects only an opaque server selection token', async () => {
     const showSelection = vi.fn(async () => undefined);
     const adapter = new ProductFinderRealtimeAdapter({
