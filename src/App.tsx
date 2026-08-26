@@ -3277,7 +3277,7 @@ export default class App extends React.Component<Props, State> {
           }}
         />
 
-        {this.props.realtimeDemoEnabled && !loading && (
+        {this.props.realtimeDemoEnabled && (
           <ProductFinderRealtimeSurface
             finderController={this.controller}
             context={{
