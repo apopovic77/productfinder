@@ -49,6 +49,7 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
           script: |
+            set -e
             # Deploy to GSG server using the configured SSH key
             ssh -i /root/.ssh/oneal_aiserver -o StrictHostKeyChecking=no gsgbot@aiserver.oneal.eu '
               set -e
@@ -68,9 +69,9 @@ jobs:
               fi
 
               cd "$CI_DIR"
+              git submodule sync --recursive
               git config submodule.libs/realtime-agent-web-core.url \
                 https://github.com/apopovic77/realtime-agent-web-core.git
-              git submodule sync --recursive
               git submodule update --init --recursive
 
               # Create .env with GSG config (using local storage API)
