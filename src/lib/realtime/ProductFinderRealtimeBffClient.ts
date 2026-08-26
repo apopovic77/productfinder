@@ -1,6 +1,7 @@
-import type {
-  RealtimeMintResult,
-  RealtimeToolCall,
+import {
+  APP_COMMAND_KEY,
+  type RealtimeMintResult,
+  type RealtimeToolCall,
 } from '../../../libs/realtime-agent-web-core/dist/index.js';
 import {
   REALTIME_SESSION_ENDPOINT,
@@ -11,6 +12,8 @@ import type { ProductFinderRealtimeServerPort } from './ProductFinderRealtimeCon
 
 const ALLOWED_TOOLS = new Set(['find_products', 'refine_search']);
 const REQUIRED_TOOLS = ['find_products', 'refine_search'] as const;
+const PRODUCT_RESULT_STATUSES = new Set(['matches', 'empty', 'unavailable']);
+const FORBIDDEN_MODEL_RESULT_KEYS = ['selection_token', 'ids', 'name', 'description'] as const;
 
 type FetchPort = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
@@ -77,6 +80,49 @@ function hasExactToolContract(value: unknown): value is string[] {
   const tools = new Set(value);
   return tools.size === REQUIRED_TOOLS.length
     && REQUIRED_TOOLS.every(tool => tools.has(tool));
+}
+
+function validateProductToolResult(payload: unknown): JsonRecord {
+  if (!isRecord(payload)) {
+    throw new ProductFinderRealtimeBffError(502, 'invalid_tool_response', payload);
+  }
+
+  // The Oneal BFF owns AiApi's HTTP transport envelope. Seeing it in the
+  // browser is a contract violation even when `ok` is true: otherwise the
+  // core misses the nested app command and the result surface stays empty.
+  if ('ok' in payload || 'result' in payload || 'call_id' in payload || 'tool' in payload) {
+    const code = payload.ok === false
+      ? 'upstream_tool_failed'
+      : 'transport_envelope_not_unwrapped';
+    throw new ProductFinderRealtimeBffError(502, code, payload);
+  }
+
+  if (typeof payload.status !== 'string' || !PRODUCT_RESULT_STATUSES.has(payload.status)) {
+    throw new ProductFinderRealtimeBffError(502, 'invalid_tool_response', payload);
+  }
+  if (FORBIDDEN_MODEL_RESULT_KEYS.some(key => key in payload)) {
+    throw new ProductFinderRealtimeBffError(502, 'unsafe_tool_response', payload);
+  }
+
+  const rawCommand = payload[APP_COMMAND_KEY];
+  if (payload.status !== 'matches') {
+    if (rawCommand !== undefined) {
+      throw new ProductFinderRealtimeBffError(502, 'unexpected_result_command', payload);
+    }
+    return payload;
+  }
+
+  if (!isRecord(rawCommand) || rawCommand.name !== 'show_product_results'
+    || !isRecord(rawCommand.args)) {
+    throw new ProductFinderRealtimeBffError(502, 'missing_result_command', payload);
+  }
+  const commandArgs = rawCommand.args;
+  const selectionToken = commandArgs.selection_token;
+  if (typeof selectionToken !== 'string' || !selectionToken.trim()
+    || selectionToken.length > 512 || Object.keys(commandArgs).length !== 1) {
+    throw new ProductFinderRealtimeBffError(502, 'invalid_result_command', payload);
+  }
+  return payload;
 }
 
 /**
@@ -163,8 +209,9 @@ export class ProductFinderRealtimeBffClient implements ProductFinderRealtimeServ
         payload,
       );
     }
-    // Intentionally return the complete result. The shared browser core is
-    // the only layer allowed to extract and execute `__app_command__`.
-    return payload;
+    // Return the complete *domain result*. The Oneal BFF must already have
+    // removed AiApi's HTTP envelope; the shared browser core is the only
+    // layer allowed to extract and execute `__app_command__` from this body.
+    return validateProductToolResult(payload);
   }
 }
