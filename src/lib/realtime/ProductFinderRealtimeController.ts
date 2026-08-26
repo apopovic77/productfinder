@@ -40,6 +40,8 @@ const OPENAI_REALTIME_CALLS_URL = 'https://api.openai.com/v1/realtime/calls';
  */
 export class ProductFinderRealtimeController {
   private readonly adapter: ProductFinderRealtimeAdapter;
+  /** Datenkanal der laufenden Sitzung — fuer PTT-Commit (turn_detection=null). */
+  private channel: RTCDataChannel | null = null;
   private readonly session: RealtimeBrowserSession<ProductFinderEntryContext>;
 
   constructor(options: ProductFinderRealtimeControllerOptions) {
@@ -64,6 +66,7 @@ export class ProductFinderRealtimeController {
         const createDataChannel = peer.createDataChannel.bind(peer);
         peer.createDataChannel = ((label: string, init?: RTCDataChannelInit) => {
           const channel = createDataChannel(label, init);
+          this.channel = channel;
           channel.addEventListener('open', () => {
             window.setTimeout(() => {
               try {
@@ -133,7 +136,29 @@ export class ProductFinderRealtimeController {
   }
 
   setPttActive(active: boolean): boolean {
-    return this.session.setPttActive(active);
+    const accepted = this.session.setPttActive(active);
+    if (!accepted) return false;
+    // AiApi mintet PTT-Sitzungen mit turn_detection=null — der Server
+    // schliesst keinen Turn von selbst. Die Tschepp-App sendet deshalb
+    // beim Loslassen commit + response.create; der Shared Core tut das
+    // (noch) nicht. Owner 2026-08-26: „ich druecke, aber es kommt nie an".
+    const channel = this.channel;
+    if (!channel || channel.readyState !== 'open') return accepted;
+    try {
+      if (active) {
+        channel.send(JSON.stringify({ type: 'input_audio_buffer.clear' }));
+      } else {
+        // Letzte Audio-Frames noch ankommen lassen, dann Turn schliessen.
+        window.setTimeout(() => {
+          if (channel.readyState !== 'open') return;
+          channel.send(JSON.stringify({ type: 'input_audio_buffer.commit' }));
+          channel.send(JSON.stringify({ type: 'response.create' }));
+        }, 150);
+      }
+    } catch (error) {
+      console.error('[productfinder-realtime] realtime.ptt.commit_failed', error);
+    }
+    return accepted;
   }
 
   close(): void {
