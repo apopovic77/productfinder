@@ -158,12 +158,43 @@
 /* Voice-Orb (CloudV2-Package): Kreis ueber dem Status, transparent, keine Pointer-Events. */
 .pf-realtime-orb-wrap {
   position: relative;
-  width: 120px;
-  height: 120px;
-  margin: 10px auto 2px;
+  display: block;
+  width: 220px;
+  height: 220px;
+  margin: 6px auto 4px;
   border-radius: 50%;
   pointer-events: none;
+  transition: transform 160ms ease;
 }
+
+/* Ganze Flaeche = Sprechflaeche (owner 2026-08-27, media 120896) */
+.pf-realtime-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  padding: 4px 0 8px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.pf-realtime-stage:disabled { cursor: wait; }
+.pf-realtime-stage.is-talking .pf-realtime-orb-wrap {
+  transform: scale(1.04);
+  box-shadow: 0 0 0 6px rgba(229, 49, 47, 0.35), 0 0 40px rgba(229, 49, 47, 0.35);
+}
+.pf-realtime-stage.is-idle .pf-realtime-orb-wrap { opacity: 0.85; }
+.pf-realtime-stage .pf-realtime-status { display: block; text-align: center; }
+.pf-realtime-stage .pf-realtime-transcript,
+.pf-realtime-stage .pf-realtime-tool,
+.pf-realtime-stage .pf-realtime-error { display: block; width: 100%; }
 
 /* Produktdialog offen (media 120892): Karte weicht nach links aus, damit sie
    den Dialog rechts nicht ueberlappt. Nur Desktop — am Handy liegt der Dialog

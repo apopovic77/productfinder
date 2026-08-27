@@ -199,74 +199,74 @@ export function ProductFinderRealtimeSurface({
         )}
       </div>
 
-      <div className="pf-realtime-orb-wrap" aria-hidden="true">
-        <VoiceOrb
-          ref={orbRef}
-          // Owner 2026-08-27: Der Orb ist der Agent, nicht der Kunde - bei der
-          // Kundenstimme bleibt er ruhig (nur Zustand user_speaking), kein
-          // Mikro-Stream in die Geometrie.
-          inputStream={null}
-          outputStream={media.output}
-          active={orbActive}
-          state={orbState}
-          className="pf-realtime-orb"
-        />
-      </div>
-
-      <div className="pf-realtime-status" aria-live="polite">
-        <span>{STATUS_LABELS[snapshot.status]}</span>
-      </div>
-
-      {snapshot.activeTool && (
-        <div className="pf-realtime-tool">Suche wird aktualisiert …</div>
-      )}
-
-      {latestTranscript && (
-        <p className="pf-realtime-transcript">
-          <span>{latestTranscript.speaker === 'user' ? 'DU' : 'BERATER'}</span>
-          {latestTranscript.text}
-        </p>
-      )}
-
-      {snapshot.errorMessage && (
-        <p className="pf-realtime-error" role="alert">{snapshot.errorMessage}</p>
-      )}
-
-      {canStart ? (
-        <button type="button" className="pf-realtime-start" onClick={start}>
-          <MicrophoneIcon />
-          Sprachberater starten
-        </button>
-      ) : (
-        <button
-          type="button"
-          className="pf-realtime-ptt"
-          disabled={!isConnected}
-          aria-pressed={snapshot.isMicActive}
-          onPointerDown={(event) => {
-            event.currentTarget.setPointerCapture(event.pointerId);
+      {/* Owner 2026-08-27 (media 120896): kein Button unten — die ganze Flaeche
+          ist die Sprechflaeche. Vor dem Start: Klick startet. Verbunden:
+          gedrueckt halten = sprechen, loslassen = senden. */}
+      <button
+        type="button"
+        className={`pf-realtime-stage ${snapshot.isMicActive ? 'is-talking' : ''} ${canStart ? 'is-idle' : ''}`}
+        aria-pressed={isConnected ? snapshot.isMicActive : undefined}
+        aria-label={canStart ? 'Sprachberater starten' : (snapshot.isMicActive ? 'Loslassen zum Senden' : 'Zum Sprechen gedrückt halten')}
+        disabled={!canStart && !isConnected}
+        onClick={canStart ? start : undefined}
+        onPointerDown={isConnected ? (event) => {
+          event.currentTarget.setPointerCapture(event.pointerId);
+          setTalking(true);
+        } : undefined}
+        onPointerUp={isConnected ? () => setTalking(false) : undefined}
+        onPointerCancel={isConnected ? () => setTalking(false) : undefined}
+        onLostPointerCapture={isConnected ? () => setTalking(false) : undefined}
+        onKeyDown={isConnected ? (event) => {
+          if ((event.key === ' ' || event.key === 'Enter') && !event.repeat) {
+            event.preventDefault();
             setTalking(true);
-          }}
-          onPointerUp={() => setTalking(false)}
-          onPointerCancel={() => setTalking(false)}
-          onLostPointerCapture={() => setTalking(false)}
-          onKeyDown={(event) => {
-            if ((event.key === ' ' || event.key === 'Enter') && !event.repeat) {
-              event.preventDefault();
-              setTalking(true);
-            }
-          }}
-          onKeyUp={(event) => {
-            if (event.key === ' ' || event.key === 'Enter') {
-              event.preventDefault();
-              setTalking(false);
-            }
-          }}
-        >
-          <MicrophoneIcon />
-          {snapshot.isMicActive ? 'Loslassen zum Senden' : 'Gedrückt halten und sprechen'}
-        </button>
-      )}
+          }
+        } : undefined}
+        onKeyUp={isConnected ? (event) => {
+          if (event.key === ' ' || event.key === 'Enter') {
+            event.preventDefault();
+            setTalking(false);
+          }
+        } : undefined}
+      >
+        <span className="pf-realtime-orb-wrap" aria-hidden="true">
+          <VoiceOrb
+            ref={orbRef}
+            // Der Orb ist der Agent, nicht der Kunde - bei der Kundenstimme
+            // bleibt er ruhig (nur Zustand user_speaking), kein Mikro-Stream.
+            inputStream={null}
+            outputStream={media.output}
+            active={orbActive}
+            state={orbState}
+            className="pf-realtime-orb"
+          />
+        </span>
+
+        <span className="pf-realtime-status" aria-live="polite">
+          {canStart
+            ? 'Tippen zum Starten'
+            : snapshot.isMicActive
+              ? 'Loslassen zum Senden'
+              : isConnected
+                ? 'Gedrückt halten und sprechen'
+                : STATUS_LABELS[snapshot.status]}
+        </span>
+
+        {snapshot.activeTool && (
+          <span className="pf-realtime-tool">Suche wird aktualisiert …</span>
+        )}
+
+        {latestTranscript && (
+          <span className="pf-realtime-transcript">
+            <span>{latestTranscript.speaker === 'user' ? 'DU' : 'BERATER'}</span>
+            {latestTranscript.text}
+          </span>
+        )}
+
+        {snapshot.errorMessage && (
+          <span className="pf-realtime-error" role="alert">{snapshot.errorMessage}</span>
+        )}
+      </button>
     </aside>
   );
 }
