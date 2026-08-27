@@ -202,7 +202,10 @@ export function ProductFinderRealtimeSurface({
       <div className="pf-realtime-orb-wrap" aria-hidden="true">
         <VoiceOrb
           ref={orbRef}
-          inputStream={media.input}
+          // Owner 2026-08-27: Der Orb ist der Agent, nicht der Kunde - bei der
+          // Kundenstimme bleibt er ruhig (nur Zustand user_speaking), kein
+          // Mikro-Stream in die Geometrie.
+          inputStream={null}
           outputStream={media.output}
           active={orbActive}
           state={orbState}

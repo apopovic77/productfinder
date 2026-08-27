@@ -142,7 +142,10 @@ function validateProductToolResult(payload: unknown): JsonRecord {
 
   const rawCommand = payload[APP_COMMAND_KEY];
   if (payload.status !== 'matches') {
-    if (rawCommand !== undefined) {
+    // Oneal liefert bei `empty` explizit `__app_command__: null` (Log 15:31:58,
+    // Owner-Sitzung): null ist "kein Befehl", kein Verstoss - sonst wird jedes
+    // leere Ergebnis zu "Katalog nicht verfuegbar".
+    if (rawCommand !== undefined && rawCommand !== null) {
       throw new ProductFinderRealtimeBffError(502, 'unexpected_result_command', payload);
     }
     return payload;
