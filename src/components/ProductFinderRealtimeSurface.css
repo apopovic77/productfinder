@@ -164,3 +164,13 @@
   border-radius: 50%;
   pointer-events: none;
 }
+
+/* Produktdialog offen (media 120892): Karte weicht nach links aus, damit sie
+   den Dialog rechts nicht ueberlappt. Nur Desktop — am Handy liegt der Dialog
+   als Sheet unten und die Karte bleibt rechts. */
+@media (min-width: 768px) {
+  body:has(.pf-stage-card-open) .pf-realtime-surface {
+    right: auto;
+    left: 22px;
+  }
+}
