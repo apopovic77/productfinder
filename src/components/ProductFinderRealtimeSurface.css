@@ -57,6 +57,7 @@
 }
 
 .pf-realtime-status {
+  justify-content: center;
   gap: 8px;
   margin-top: 8px;
   font-size: 14px;

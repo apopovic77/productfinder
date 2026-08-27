@@ -187,7 +187,6 @@ export function ProductFinderRealtimeSurface({
       </div>
 
       <div className="pf-realtime-status" aria-live="polite">
-        <span className={`pf-realtime-status-dot is-${orbState}`} />
         <span>{STATUS_LABELS[snapshot.status]}</span>
       </div>
 
