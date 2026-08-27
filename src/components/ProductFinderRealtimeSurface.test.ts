@@ -31,6 +31,7 @@ describe('ProductFinderRealtimeSurface contract', () => {
     expect(appSource).toContain('focusedProductId={selectedProduct');
     expect(appSource).toContain('selectedVariant={this.getRealtimeSelectedVariant()}');
     expect(appSource).toContain('cart={this.getRealtimeCartContext()}');
+    expect(appSource).toContain('brand_open: resolveBrandOpenMintFlag(this.props.brand)');
     expect(source).not.toContain('server.updateProductContext(numericId');
     expect(appSource).toContain('onSelectionProjected={this.handleRealtimeSelectionProjected}');
   });

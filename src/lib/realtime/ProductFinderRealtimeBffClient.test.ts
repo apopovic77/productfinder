@@ -52,6 +52,32 @@ describe('ProductFinderRealtimeBffClient', () => {
     expect(JSON.stringify(request)).not.toMatch(/authorization|api.?key|principal|internal.?key/i);
   });
 
+  it('sends the explicit brand-open authority while omitting it from gated mints', async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({
+      clientSecret: 'ek_test',
+      model: 'gpt-realtime',
+      sessionId: 'session-1',
+      tools: ['find_products', 'refine_search'],
+      pushToTalk: true,
+      turnDetection: null,
+    }));
+    const client = new ProductFinderRealtimeBffClient({ fetchImpl });
+
+    await client.mintSession({ ...context, brand: null, brand_open: true });
+    const requests = fetchImpl.mock.calls as unknown as Array<[RequestInfo | URL, RequestInit]>;
+    const openRequest = requests[0]?.[1];
+    expect(JSON.parse(String(openRequest.body))).toEqual({
+      ...context,
+      brand: null,
+      brand_open: true,
+    });
+
+    await client.mintSession(context);
+    const gatedRequest = requests[1]?.[1];
+    expect(JSON.parse(String(gatedRequest.body))).toEqual(context);
+    expect(JSON.parse(String(gatedRequest.body))).not.toHaveProperty('brand_open');
+  });
+
   it('rejects a mint that advertises a tool outside the read-only allowlist', async () => {
     const client = new ProductFinderRealtimeBffClient({
       fetchImpl: vi.fn(async () => jsonResponse({

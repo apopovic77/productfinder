@@ -12,6 +12,8 @@ export const SHOW_PRODUCT_RESULTS_COMMAND = 'show_product_results' as const;
 
 export interface ProductFinderEntryContext {
   brand: string | null;
+  /** Explicit authority for a brand-open mint; omitted for gated flows. */
+  brand_open?: true;
   language: string;
   collection_year: number;
   entry_selection: Readonly<{

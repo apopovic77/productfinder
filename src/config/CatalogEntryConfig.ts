@@ -132,6 +132,20 @@ export function resolveCatalogFlow(href?: string): CatalogFlowVariant {
   return CATALOG_FLOW_VARIANTS[0];
 }
 
+/**
+ * Marks a Realtime mint as explicitly brand-open only when the active Finder
+ * flow omits the brand gate and therefore has no selected brand authority.
+ * Returning undefined keeps guided-flow request bodies wire-compatible.
+ */
+export function resolveBrandOpenMintFlag(
+  brand: string | null,
+  href?: string,
+): true | undefined {
+  return brand === null && !resolveCatalogFlow(href).gates.includes('brand')
+    ? true
+    : undefined;
+}
+
 export type CatalogEntryConfig = {
   year: number;
   landing: CatalogLandingMedia;

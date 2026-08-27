@@ -47,7 +47,12 @@ import { AiProductQueryService } from './services/AiProductQueryService';
 import { categoryMediaService } from './services/CategoryMediaService';
 import { FOOTER_CONFIG, type FooterPosition } from './config/FooterConfig';
 import { STORAGE_API_BASE as CENTRAL_STORAGE_BASE, STORAGE_API_KEY as CENTRAL_STORAGE_KEY } from './config/apiConfig';
-import { CATALOG_ENTRY_CONFIG, getLocalizedLabel, type CatalogEntrySelection } from './config/CatalogEntryConfig';
+import {
+  CATALOG_ENTRY_CONFIG,
+  getLocalizedLabel,
+  resolveBrandOpenMintFlag,
+  type CatalogEntrySelection,
+} from './config/CatalogEntryConfig';
 import { writeCatalogUrl } from './utils/catalogEntryUrl';
 import { buildBrandUrl, type BrandFacet } from './utils/brandSelection';
 import { createPortal } from 'react-dom';
@@ -3402,6 +3407,7 @@ export default class App extends React.Component<Props, State> {
             cart={this.getRealtimeCartContext()}
             context={{
               brand: this.props.brand,
+              brand_open: resolveBrandOpenMintFlag(this.props.brand),
               language: this.props.locale,
               collection_year: this.props.catalogYear,
               entry_selection: this.props.entrySelection

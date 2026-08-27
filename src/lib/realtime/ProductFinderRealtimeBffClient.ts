@@ -387,10 +387,17 @@ export class ProductFinderRealtimeBffClient implements ProductFinderRealtimeServ
 
   async mintSession(context: ProductFinderEntryContext): Promise<RealtimeMintResult> {
     this.sessionId = null;
+    const mintRequest = {
+      brand: context.brand,
+      ...(context.brand_open === true ? { brand_open: true as const } : {}),
+      language: context.language,
+      collection_year: context.collection_year,
+      entry_selection: context.entry_selection,
+    };
     const response = await this.fetchImpl(this.sessionEndpoint, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(context),
+      body: JSON.stringify(mintRequest),
       credentials: 'same-origin',
     });
     const payload = await readJson(response);
