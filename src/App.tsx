@@ -182,6 +182,23 @@ type State = {
   realtimeShortcutEnabled: boolean;
 };
 
+/**
+ * ?voice=1 startet den Sprachberater einmalig und wird danach aus der URL
+ * entfernt — sonst hing er an jedem Gate-Wechsel/Reload wieder als Overlay
+ * im Finder (owner 2026-08-27: „Overlay blendet er trotzdem standardmaessig
+ * ein"). Der Header-Button ist der Normalweg.
+ */
+function consumeVoiceQueryParam(): boolean {
+  if (typeof window === 'undefined') return false;
+  const url = new URL(window.location.href);
+  const wanted = ['1', 'true'].includes(url.searchParams.get('voice') ?? '');
+  if (url.searchParams.has('voice')) {
+    url.searchParams.delete('voice');
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  }
+  return wanted;
+}
+
 const createInitialState = (): State => {
   const filters = createDefaultFilterState();
   const ui = createDefaultUiState();
@@ -264,8 +281,7 @@ const createInitialState = (): State => {
     cartFullOverlay: false,
     // ?voice=1 blendet die Realtime-Flaeche ohne Tastatur ein (Handy/Tablet,
     // owner 2026-08-26 „wie am Handy testen"); Desktop zusaetzlich Ctrl+Shift+V.
-    realtimeShortcutEnabled: typeof window !== 'undefined'
-      && ['1', 'true'].includes(new URLSearchParams(window.location.search).get('voice') ?? ''),
+    realtimeShortcutEnabled: consumeVoiceQueryParam(),
   };
 };
 

@@ -37,6 +37,16 @@ export interface ProductFinderRealtimeControllerOptions {
   telemetry?: TelemetryPort;
 }
 
+/** Sprachnamen fuer die Begruessungs-Instruktion (Gate-Locale -> Sprache). */
+const GREETING_LANGUAGE: Record<string, string> = {
+  de: 'Deutsch',
+  en: 'Englisch',
+  sl: 'Slowenisch',
+  it: 'Italienisch',
+  es: 'Spanisch',
+  fr: 'Französisch',
+};
+
 const OPENAI_REALTIME_CALLS_URL = 'https://api.openai.com/v1/realtime/calls';
 
 /**
@@ -78,12 +88,18 @@ export class ProductFinderRealtimeController {
       },
       mountRemoteAudio: audio => document.body.appendChild(audio as unknown as HTMLAudioElement),
       unmountRemoteAudio: audio => (audio as unknown as HTMLAudioElement).remove(),
-      createOpenGreeting: () => ({
-        instructions: 'Begrüße den Kunden jetzt in ein bis zwei kurzen Sätzen auf Deutsch: '
-          + 'Stell dich als O\'Neal Sprachberater vor und frag, welches Produkt er sucht. '
-          + 'Rufe dabei kein Werkzeug auf.',
-        delayMs: 250,
-      }),
+      // Sprache aus dem Sprach-Gate (owner 2026-08-27): Begruessung und
+      // Gespraech in der gewaehlten Sprache, nicht fest Deutsch.
+      createOpenGreeting: context => {
+        const language = GREETING_LANGUAGE[(context?.language ?? 'de').toLowerCase().slice(0, 2)] ?? GREETING_LANGUAGE.de;
+        return {
+          instructions: `Antworte ab jetzt ausschließlich auf ${language}. `
+            + `Begrüße den Kunden jetzt in ein bis zwei kurzen Sätzen auf ${language}: `
+            + 'Stell dich als O\'Neal Sprachberater vor und frag, welches Produkt er sucht. '
+            + 'Rufe dabei kein Werkzeug auf.',
+          delayMs: 250,
+        };
+      },
       reportError: (event, error, context) => options.telemetry?.error?.(event, error, context),
       reportInfo: (event, context) => options.telemetry?.info?.(event, context),
       exchangeSdp: async ({ offerSdp, clientSecret, model }) => {
