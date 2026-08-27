@@ -47,6 +47,20 @@ const GREETING_LANGUAGE: Record<string, string> = {
   fr: 'Französisch',
 };
 
+/**
+ * Fester Begruessungssatz je Sprache (owner 2026-08-27: Begruessung kam
+ * trotz Deutsch auf Englisch). Ein Wortlaut laesst dem Modell keinen Raum,
+ * die Sprache zu raten; danach gilt die Persona-Sprachregel von AiApi.
+ */
+const GREETING_TEXT: Record<string, string> = {
+  de: "Hallo! Ich bin der O'Neal Sprachberater. Welches Produkt suchen Sie?",
+  en: "Hello! I'm the O'Neal voice advisor. Which product are you looking for?",
+  sl: "Pozdravljeni! Sem glasovni svetovalec O'Neal. Kateri izdelek iščete?",
+  it: "Ciao! Sono il consulente vocale O'Neal. Quale prodotto stai cercando?",
+  es: "¡Hola! Soy el asesor de voz de O'Neal. ¿Qué producto buscas?",
+  fr: "Bonjour ! Je suis le conseiller vocal O'Neal. Quel produit cherchez-vous ?",
+};
+
 const OPENAI_REALTIME_CALLS_URL = 'https://api.openai.com/v1/realtime/calls';
 
 /**
@@ -91,11 +105,12 @@ export class ProductFinderRealtimeController {
       // Sprache aus dem Sprach-Gate (owner 2026-08-27): Begruessung und
       // Gespraech in der gewaehlten Sprache, nicht fest Deutsch.
       createOpenGreeting: context => {
-        const language = GREETING_LANGUAGE[(context?.language ?? 'de').toLowerCase().slice(0, 2)] ?? GREETING_LANGUAGE.de;
+        const code = (context?.language ?? 'de').toLowerCase().slice(0, 2);
+        const language = GREETING_LANGUAGE[code] ?? GREETING_LANGUAGE.de;
+        const text = GREETING_TEXT[code] ?? GREETING_TEXT.de;
         return {
-          instructions: `Antworte ab jetzt ausschließlich auf ${language}. `
-            + `Begrüße den Kunden jetzt in ein bis zwei kurzen Sätzen auf ${language}: `
-            + 'Stell dich als O\'Neal Sprachberater vor und frag, welches Produkt er sucht. '
+          instructions: `Sprich ab jetzt ausschließlich ${language}. `
+            + `Sage jetzt wörtlich und nur diesen Satz: "${text}" `
             + 'Rufe dabei kein Werkzeug auf.',
           delayMs: 250,
         };
