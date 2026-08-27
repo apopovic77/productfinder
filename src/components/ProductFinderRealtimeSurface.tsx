@@ -176,7 +176,7 @@ export function ProductFinderRealtimeSurface({
   return (
     <aside className={`pf-realtime-surface is-${snapshot.status}`} aria-label="Interner Realtime-Produkttest">
       <div className="pf-realtime-heading">
-        <span className="pf-realtime-kicker">INTERNAL · READ ONLY</span>
+        <span className="pf-realtime-kicker">INTERNAL · TESTPHASE · GESPRÄCH WIRD GESPEICHERT</span>
         {isConnected && (
           <button
             type="button"
