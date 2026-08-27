@@ -75,6 +75,10 @@ jobs:
               git submodule sync --recursive
               git config submodule.libs/realtime-agent-web-core.url \
                 https://github.com/apopovic77/realtime-agent-web-core.git
+              if git -C libs/realtime-agent-web-core rev-parse --git-dir >/dev/null 2>&1; then
+                git -C libs/realtime-agent-web-core remote set-url origin \
+                  https://github.com/apopovic77/realtime-agent-web-core.git
+              fi
               git submodule update --init --recursive
 
               # Create .env with GSG config (using local storage API)
