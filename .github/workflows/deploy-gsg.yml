@@ -98,10 +98,12 @@ jobs:
               echo "Deployment to aiserver completed!"
             '
 
-            # Sync dist from aiserver to arkturian (nginx serves from /var/www/productfinder/dist/)
+            # Sync the verified aiserver build into the actual arkturian nginx
+            # root. Keep this aligned with productfinder.arkturian.com's
+            # `root /var/www/productfinder/site` directive.
             rsync -avz --delete -e "ssh -i /root/.ssh/oneal_aiserver -o StrictHostKeyChecking=no" \
-              gsgbot@aiserver.oneal.eu:/var/www/productfinder/site/ /var/www/productfinder/dist/
-            echo "Synced dist to arkturian nginx root"
+              gsgbot@aiserver.oneal.eu:/var/www/productfinder/site/ /var/www/productfinder/site/
+            echo "Synced site build to arkturian nginx root"
 
       - name: Notify on success
         if: success()
