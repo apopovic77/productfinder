@@ -242,6 +242,42 @@ describe('ProductFinderRealtimeBffClient', () => {
     }
   });
 
+  it('treats a null app command on empty results as absent but rejects executable values', async () => {
+    const mint = {
+      clientSecret: 'ek_test', model: 'gpt-realtime', sessionId: 'session-1',
+      tools: ['find_products', 'refine_search'], pushToTalk: true, turnDetection: null,
+    };
+    const emptyResult = {
+      status: 'empty',
+      count: 0,
+      expires_at: null,
+      [APP_COMMAND_KEY]: null,
+    };
+    const client = new ProductFinderRealtimeBffClient({
+      fetchImpl: vi.fn()
+        .mockResolvedValueOnce(jsonResponse(mint))
+        .mockResolvedValueOnce(jsonResponse(emptyResult)),
+    });
+    await client.mintSession(context);
+    await expect(client.executeTool({
+      name: 'find_products', args: {}, callId: 'empty-1', sessionId: 'session-1',
+    })).resolves.toEqual(emptyResult);
+
+    for (const unexpectedCommand of [{}, false, 'show_product_results']) {
+      const invalidClient = new ProductFinderRealtimeBffClient({
+        fetchImpl: vi.fn()
+          .mockResolvedValueOnce(jsonResponse(mint))
+          .mockResolvedValueOnce(jsonResponse({
+            status: 'empty', count: 0, [APP_COMMAND_KEY]: unexpectedCommand,
+          })),
+      });
+      await invalidClient.mintSession(context);
+      await expect(invalidClient.executeTool({
+        name: 'find_products', args: {}, callId: 'empty-2', sessionId: 'session-1',
+      })).rejects.toMatchObject({ code: 'unexpected_result_command', status: 502 });
+    }
+  });
+
   it('validates closed product_details text separately from search results', async () => {
     const mint = {
       clientSecret: 'ek_test',
