@@ -27,9 +27,10 @@ describe('ProductFinderRealtimeSurface contract', () => {
     expect(source).toContain('runtime.controller.dispose()');
     expect(source).toContain("window.addEventListener('pagehide', endOnPageHide)");
     expect(source).toContain("window.removeEventListener('pagehide', endOnPageHide)");
-    expect(source).toContain('runtime.controller.setFocusedProductId(focusedProductId)');
+    expect(source).toContain('runtime.controller.setProductContext(focusedProductId, selectedVariantContext)');
     expect(appSource).toContain('focusedProductId={selectedProduct');
-    expect(source).toContain('await server.updateFocusedProduct(numericId)');
+    expect(appSource).toContain('selectedVariant={this.getRealtimeSelectedVariant()}');
+    expect(source).not.toContain('server.updateProductContext(numericId');
     expect(appSource).toContain('onSelectionProjected={this.handleRealtimeSelectionProjected}');
   });
 

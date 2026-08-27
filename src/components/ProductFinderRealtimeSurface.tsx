@@ -13,6 +13,7 @@ import {
   ProductFinderRealtimeController,
   createProductFinderSelectionProjection,
   type ProductFinderEntryContext,
+  type ProductFinderSelectedVariantContext,
 } from '../lib/realtime';
 import { soundService } from '../services/SoundService';
 import './ProductFinderRealtimeSurface.css';
@@ -25,6 +26,7 @@ interface ProductFinderRealtimeSurfaceProps {
   finderController: ProductFinderController;
   context: ProductFinderEntryContext;
   focusedProductId: number | null;
+  selectedVariant: ProductFinderSelectedVariantContext | null;
   onSelectionProjected(productId: string, count: number): void;
 }
 
@@ -61,8 +63,17 @@ export function ProductFinderRealtimeSurface({
   autoStart = false,
   onClosed,
   focusedProductId,
+  selectedVariant,
   onSelectionProjected,
 }: ProductFinderRealtimeSurfaceProps) {
+  const selectedVariantContext = useMemo<ProductFinderSelectedVariantContext | null>(() => {
+    if (!selectedVariant) return null;
+    return Object.freeze({
+      ...(selectedVariant.size ? { size: selectedVariant.size } : {}),
+      ...(selectedVariant.color ? { color: selectedVariant.color } : {}),
+    });
+  }, [selectedVariant?.color, selectedVariant?.size]);
+
   const runtime = useMemo(() => {
     const server = new ProductFinderRealtimeBffClient();
     const audit = new ProductFinderRealtimeAuditBuffer(server);
@@ -73,11 +84,6 @@ export function ProductFinderRealtimeSurface({
         () => server.getSessionId(),
         async (productId, count) => {
           onSelectionProjected(productId, count);
-          const numericId = Number(productId);
-          if (!Number.isSafeInteger(numericId) || numericId < 1) {
-            throw new Error('Projected product has no valid numeric identity');
-          }
-          await server.updateFocusedProduct(numericId);
         },
       ),
       audioOwnership: {
@@ -121,20 +127,20 @@ export function ProductFinderRealtimeSurface({
   }, [runtime, snapshot.transcript]);
 
   useEffect(() => {
-    void runtime.controller.setFocusedProductId(focusedProductId).catch(error => {
+    void runtime.controller.setProductContext(focusedProductId, selectedVariantContext).catch(error => {
       console.error('[productfinder-realtime] realtime.context.update_failed', error);
       runtime.audit.recordError('realtime.context.update_failed', error);
     });
-  }, [focusedProductId, runtime]);
+  }, [focusedProductId, runtime, selectedVariantContext]);
 
   const start = useCallback(() => {
-    void runtime.controller.setFocusedProductId(focusedProductId)
+    void runtime.controller.setProductContext(focusedProductId, selectedVariantContext)
       .then(() => runtime.controller.open(context))
       .catch(error => {
         console.error('[productfinder-realtime] realtime.context.open_failed', error);
         runtime.audit.recordError('realtime.context.open_failed', error);
       });
-  }, [context, focusedProductId, runtime]);
+  }, [context, focusedProductId, runtime, selectedVariantContext]);
 
   const setTalking = useCallback((active: boolean) => {
     if (active) void orbRef.current?.resumeAudio();

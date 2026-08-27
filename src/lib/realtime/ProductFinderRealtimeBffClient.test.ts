@@ -104,7 +104,7 @@ describe('ProductFinderRealtimeBffClient', () => {
       contextEndpoint: '/v1/realtime/context',
       fetchImpl,
     });
-    await client.updateFocusedProduct(10407);
+    await client.updateProductContext(10407, { size: 'M', color: 'Schwarz' });
 
     await expect(client.mintSession(context)).resolves.toMatchObject({
       tools: ['find_products', 'refine_search', 'product_details'],
@@ -112,9 +112,52 @@ describe('ProductFinderRealtimeBffClient', () => {
     expect(fetchImpl.mock.calls[1]).toEqual([
       '/v1/realtime/context',
       expect.objectContaining({
-        body: JSON.stringify({ sessionId: 'session-1', focusedProductId: 10407 }),
+        body: JSON.stringify({
+          sessionId: 'session-1',
+          focusedProductId: 10407,
+          selectedVariant: { size: 'M', color: 'Schwarz' },
+        }),
       }),
     ]);
+  });
+
+  it('updates and clears the selected variant atomically with browser focus', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({
+        clientSecret: 'ek_test',
+        model: 'gpt-realtime',
+        sessionId: 'session-1',
+        tools: ['find_products', 'refine_search'],
+        pushToTalk: true,
+        turnDetection: null,
+      }))
+      .mockImplementation(async () => jsonResponse({ focused: true }));
+    const client = new ProductFinderRealtimeBffClient({ fetchImpl });
+    await client.mintSession(context);
+
+    await client.updateProductContext(10407, { size: ' M ', color: ' Schwarz ' });
+    expect(fetchImpl).toHaveBeenLastCalledWith(expect.any(String), expect.objectContaining({
+      body: JSON.stringify({
+        sessionId: 'session-1',
+        focusedProductId: 10407,
+        selectedVariant: { size: 'M', color: 'Schwarz' },
+      }),
+    }));
+
+    await client.updateProductContext(null, { size: 'XL', color: 'Rot' });
+    expect(fetchImpl).toHaveBeenLastCalledWith(expect.any(String), expect.objectContaining({
+      body: JSON.stringify({
+        sessionId: 'session-1',
+        focusedProductId: null,
+        selectedVariant: null,
+      }),
+    }));
+
+    await expect(client.updateProductContext(10407, {
+      size: 'M',
+      sku: 'must-not-cross-the-browser-port',
+    } as never)).rejects.toMatchObject({ code: 'invalid_selected_variant', status: 422 });
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
   });
 
   it('dispatches an allowed tool for the minted session and preserves the app command', async () => {
@@ -159,6 +202,46 @@ describe('ProductFinderRealtimeBffClient', () => {
     }));
   });
 
+  it('accepts applied sort/limit hints and rejects impossible applied values', async () => {
+    const mint = {
+      clientSecret: 'ek_test', model: 'gpt-realtime', sessionId: 'session-1',
+      tools: ['find_products', 'refine_search'], pushToTalk: true, turnDetection: null,
+    };
+    const validResult = {
+      status: 'matches',
+      count: 5,
+      hints: { applied_sort: 'newest', applied_limit: 5 },
+      [APP_COMMAND_KEY]: {
+        name: 'show_product_results', args: { selection_token: 'st_1' },
+      },
+    };
+    const client = new ProductFinderRealtimeBffClient({
+      fetchImpl: vi.fn()
+        .mockResolvedValueOnce(jsonResponse(mint))
+        .mockResolvedValueOnce(jsonResponse(validResult)),
+    });
+    await client.mintSession(context);
+    await expect(client.executeTool({
+      name: 'find_products', args: {}, callId: 'call-1', sessionId: 'session-1',
+    })).resolves.toEqual(validResult);
+
+    for (const hints of [
+      { applied_sort: 'best' },
+      { applied_limit: 0 },
+      { applied_limit: 51 },
+    ]) {
+      const invalidClient = new ProductFinderRealtimeBffClient({
+        fetchImpl: vi.fn()
+          .mockResolvedValueOnce(jsonResponse(mint))
+          .mockResolvedValueOnce(jsonResponse({ ...validResult, hints })),
+      });
+      await invalidClient.mintSession(context);
+      await expect(invalidClient.executeTool({
+        name: 'find_products', args: {}, callId: 'call-2', sessionId: 'session-1',
+      })).rejects.toMatchObject({ code: 'invalid_tool_response', status: 502 });
+    }
+  });
+
   it('validates closed product_details text separately from search results', async () => {
     const mint = {
       clientSecret: 'ek_test',
@@ -179,6 +262,12 @@ describe('ProductFinderRealtimeBffClient', () => {
       colors: ['Schwarz'],
       price_eur: [149.99, 169.99],
       target_group: 'Erwachsene',
+      selected: {
+        size: 'M',
+        color: 'Schwarz',
+        price_eur: 159.99,
+        available: true,
+      },
     };
     const fetchImpl = vi.fn()
       .mockResolvedValueOnce(jsonResponse(mint))
@@ -194,6 +283,7 @@ describe('ProductFinderRealtimeBffClient', () => {
       { status: 'details', name: '<script>alert(1)</script>' },
       { status: 'details', material: 'Mehr unter https://example.test' },
       { status: 'details', product_id: 10407 },
+      { status: 'details', selected: { size: 'M', sku: 'SECRET-SKU' } },
       { status: 'matches', name: 'falscher Zustand' },
     ]) {
       const invalidClient = new ProductFinderRealtimeBffClient({

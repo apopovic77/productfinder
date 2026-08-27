@@ -16,17 +16,20 @@ import type { ProductFinderEntryContext } from './ProductFinderRealtimeAdapter';
 import type {
   ProductFinderRealtimeEventBatch,
   ProductFinderRealtimeServerPort,
+  ProductFinderSelectedVariantContext,
 } from './ProductFinderRealtimeController';
 
 const ALLOWED_TOOLS = new Set(['find_products', 'refine_search', 'product_details']);
 const REQUIRED_TOOLS = ['find_products', 'refine_search'] as const;
 const PRODUCT_RESULT_STATUSES = new Set(['matches', 'empty', 'unavailable']);
 const PRODUCT_DETAILS_STATUSES = new Set(['details', 'no_focus', 'no_such_position', 'unavailable']);
+const APPLIED_SORT_VALUES = new Set(['default', 'newest', 'price_desc', 'price_asc']);
 const FORBIDDEN_MODEL_RESULT_KEYS = ['selection_token', 'ids', 'name', 'description'] as const;
 const PRODUCT_DETAIL_KEYS = new Set([
   'status', 'name', 'line', 'category_label', 'features', 'material',
-  'sizes', 'colors', 'price_eur', 'target_group',
+  'sizes', 'colors', 'price_eur', 'target_group', 'selected',
 ]);
+const PRODUCT_DETAIL_SELECTED_KEYS = new Set(['size', 'color', 'price_eur', 'available']);
 const UNSAFE_DETAIL_TEXT = /(?:<[^>]+>|https?:\/\/|www\.|\[[^\]]+\]\([^)]+\))/i;
 
 type FetchPort = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -124,6 +127,18 @@ function validateProductToolResult(payload: unknown): JsonRecord {
   if (FORBIDDEN_MODEL_RESULT_KEYS.some(key => key in payload)) {
     throw new ProductFinderRealtimeBffError(502, 'unsafe_tool_response', payload);
   }
+  if (payload.hints !== undefined) {
+    if (!isRecord(payload.hints)
+      || (payload.hints.applied_sort !== undefined
+        && (typeof payload.hints.applied_sort !== 'string'
+          || !APPLIED_SORT_VALUES.has(payload.hints.applied_sort)))
+      || (payload.hints.applied_limit !== undefined
+        && (!Number.isSafeInteger(payload.hints.applied_limit)
+          || Number(payload.hints.applied_limit) < 1
+          || Number(payload.hints.applied_limit) > 50))) {
+      throw new ProductFinderRealtimeBffError(502, 'invalid_tool_response', payload);
+    }
+  }
 
   const rawCommand = payload[APP_COMMAND_KEY];
   if (payload.status !== 'matches') {
@@ -162,6 +177,20 @@ function validateDetailList(value: unknown, maxItems: number): boolean {
   );
 }
 
+function validateSelectedVariantDetail(value: unknown): boolean {
+  if (value === null || value === undefined) return true;
+  if (!isRecord(value) || Object.keys(value).some(key => !PRODUCT_DETAIL_SELECTED_KEYS.has(key))) {
+    return false;
+  }
+  return validateDetailString(value.size, 200)
+    && validateDetailString(value.color, 200)
+    && (value.price_eur === null || value.price_eur === undefined
+      || (typeof value.price_eur === 'number'
+        && Number.isFinite(value.price_eur)
+        && value.price_eur >= 0))
+    && (value.available === undefined || typeof value.available === 'boolean');
+}
+
 function validateProductDetailsResult(payload: unknown): JsonRecord {
   if (!isRecord(payload)
     || typeof payload.status !== 'string'
@@ -177,6 +206,7 @@ function validateProductDetailsResult(payload: unknown): JsonRecord {
     || !validateDetailList(payload.sizes, 200)
     || !validateDetailList(payload.colors, 200)
     || !validateDetailString(payload.target_group, 100)
+    || !validateSelectedVariantDetail(payload.selected)
     || !(payload.price_eur === null || payload.price_eur === undefined
       || (Array.isArray(payload.price_eur)
         && payload.price_eur.length === 2
@@ -186,12 +216,37 @@ function validateProductDetailsResult(payload: unknown): JsonRecord {
   return payload;
 }
 
+
+function normalizeSelectedVariantContext(
+  value: ProductFinderSelectedVariantContext | null,
+): ProductFinderSelectedVariantContext | null {
+  if (value === null) return null;
+  if (!isRecord(value) || Object.keys(value).some(key => key !== 'size' && key !== 'color')) {
+    throw new ProductFinderRealtimeBffError(422, 'invalid_selected_variant', null);
+  }
+  const normalize = (candidate: unknown): string | undefined => {
+    if (candidate === undefined) return undefined;
+    if (typeof candidate !== 'string') {
+      throw new ProductFinderRealtimeBffError(422, 'invalid_selected_variant', null);
+    }
+    const normalized = candidate.trim();
+    if (!normalized || normalized.length > 200 || UNSAFE_DETAIL_TEXT.test(normalized)) {
+      throw new ProductFinderRealtimeBffError(422, 'invalid_selected_variant', null);
+    }
+    return normalized;
+  };
+  const size = normalize(value.size);
+  const color = normalize(value.color);
+  if (!size && !color) return null;
+  return Object.freeze({ ...(size ? { size } : {}), ...(color ? { color } : {}) });
+}
+
 /**
  * Browser client for the productfinder-owned Realtime BFF.
  *
  * It never receives or forwards a principal JWT, host key, or internal key.
  * The browser authority is limited to the short-lived session identity minted
- * by the BFF and the two read-only tools advertised for that exact session.
+ * by the BFF and the read-only tools advertised for that exact session.
  */
 export class ProductFinderRealtimeBffClient implements ProductFinderRealtimeServerPort {
   private readonly sessionEndpoint: string;
@@ -205,6 +260,7 @@ export class ProductFinderRealtimeBffClient implements ProductFinderRealtimeServ
   private sessionId: string | null = null;
   private readonly knownSessionIds = new Set<string>();
   private desiredFocusedProductId: number | null = null;
+  private desiredSelectedVariant: ProductFinderSelectedVariantContext | null = null;
   private hasFocusedProductContext = false;
   private contextQueue: Promise<void> = Promise.resolve();
 
@@ -310,12 +366,18 @@ export class ProductFinderRealtimeBffClient implements ProductFinderRealtimeServ
       : validateProductToolResult(payload);
   }
 
-  async updateFocusedProduct(focusedProductId: number | null): Promise<void> {
+  async updateProductContext(
+    focusedProductId: number | null,
+    selectedVariant: ProductFinderSelectedVariantContext | null,
+  ): Promise<void> {
     if (focusedProductId !== null
       && (!Number.isSafeInteger(focusedProductId) || focusedProductId < 1)) {
       throw new ProductFinderRealtimeBffError(422, 'invalid_focused_product_id', null);
     }
     this.desiredFocusedProductId = focusedProductId;
+    this.desiredSelectedVariant = focusedProductId === null
+      ? null
+      : normalizeSelectedVariantContext(selectedVariant);
     this.hasFocusedProductContext = true;
     if (!this.sessionId) return;
     await this.queueContextSync(this.sessionId);
@@ -429,6 +491,7 @@ export class ProductFinderRealtimeBffClient implements ProductFinderRealtimeServ
         body: JSON.stringify({
           sessionId,
           focusedProductId: this.desiredFocusedProductId,
+          selectedVariant: this.desiredSelectedVariant,
         }),
         credentials: 'same-origin',
       });

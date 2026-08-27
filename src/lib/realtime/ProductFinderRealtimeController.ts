@@ -22,8 +22,11 @@ export interface ProductFinderRealtimeServerPort {
   mintSession(context: ProductFinderEntryContext): Promise<RealtimeMintResult>;
   /** BFF-owned tool dispatch bound to the minted session. */
   executeTool(call: RealtimeToolCall): Promise<unknown>;
-  /** Projects browser focus into the server-owned active session context. */
-  updateFocusedProduct(focusedProductId: number | null): Promise<void>;
+  /** Projects browser focus and the visible variant choice into the active session context. */
+  updateProductContext(
+    focusedProductId: number | null,
+    selectedVariant: ProductFinderSelectedVariantContext | null,
+  ): Promise<void>;
   /** Browser-safe BFF usage projection; model and voice session stay server-owned. */
   reportUsage(report: RealtimeUsageReport): Promise<unknown>;
   /** Browser-owned transcript/error/lifecycle audit events only. */
@@ -32,6 +35,11 @@ export interface ProductFinderRealtimeServerPort {
   sendEventsBeacon(input: ProductFinderRealtimeEventBatch): boolean;
   /** Idempotent BFF release for the currently minted browser session. */
   endSession(input: Readonly<{ sessionId: string }>): Promise<unknown>;
+}
+
+export interface ProductFinderSelectedVariantContext {
+  readonly size?: string;
+  readonly color?: string;
 }
 
 export type ProductFinderRealtimeBrowserEventKind = 'transcript' | 'error' | 'lifecycle';
@@ -194,8 +202,11 @@ export class ProductFinderRealtimeController {
     return this.session.setPttActive(active);
   }
 
-  setFocusedProductId(focusedProductId: number | null): Promise<void> {
-    return this.server.updateFocusedProduct(focusedProductId);
+  setProductContext(
+    focusedProductId: number | null,
+    selectedVariant: ProductFinderSelectedVariantContext | null,
+  ): Promise<void> {
+    return this.server.updateProductContext(focusedProductId, selectedVariant);
   }
 
   close(): void {

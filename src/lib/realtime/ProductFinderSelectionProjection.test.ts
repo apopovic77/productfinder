@@ -10,12 +10,12 @@ describe('ProductFinderSelectionProjection', () => {
   it('projects the exact server order and maps summaries missing from the loaded catalog', async () => {
     const loaded = product('2');
     const mapped = product('1');
-    const setGlobalSearchProducts = vi.fn();
+    const applyAgentProducts = vi.fn();
     const onSelectionProjected = vi.fn(async () => undefined);
     const projection = new ProductFinderSelectionProjection({
       controller: {
         getCatalogAllProducts: () => [loaded],
-        setGlobalSearchProducts,
+        applyAgentProducts,
       } as never,
       resolver: {
         resolveSelection: vi.fn(async () => ({
@@ -31,8 +31,8 @@ describe('ProductFinderSelectionProjection', () => {
 
     await projection.showSelection('st_opaque');
 
-    expect(setGlobalSearchProducts).toHaveBeenCalledWith([mapped, loaded]);
-    expect(onSelectionProjected).toHaveBeenCalledWith(mapped);
+    expect(applyAgentProducts).toHaveBeenCalledWith([mapped, loaded]);
+    expect(onSelectionProjected).toHaveBeenCalledWith(mapped, 2);
   });
 
   it('fails closed without a minted session identity', async () => {

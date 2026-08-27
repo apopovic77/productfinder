@@ -155,3 +155,20 @@ export function getVariantSize(variant: ProductVariant | any): string {
   const parts = (variant.name || '').split(' / ').map((s: string) => s.trim());
   return parts[1] || '';
 }
+
+/**
+ * Project only the two values represented by the variant chips into the
+ * Realtime browser contract. The display helpers may fall back to a SKU when
+ * catalog colour data is missing; that fallback must never cross this port.
+ */
+export function getRealtimeVariantContext(
+  variant: Partial<ProductVariant> | null | undefined,
+): { size?: string; color?: string } | null {
+  if (!variant) return null;
+  const size = getVariantSize(variant).trim();
+  const rawColor = getVariantBaseColor(variant).trim();
+  const sku = String(variant.sku ?? '').trim();
+  const color = rawColor && rawColor !== 'Default' && rawColor !== sku ? rawColor : '';
+  if (!size && !color) return null;
+  return { ...(size ? { size } : {}), ...(color ? { color } : {}) };
+}

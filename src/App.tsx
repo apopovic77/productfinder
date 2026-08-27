@@ -32,7 +32,12 @@ import {
   createDefaultPivotState,
   createDefaultUiState,
 } from './config/AppConfig';
-import { getImagesForVariant, getPrimaryVariant, getUniqueColorVariants } from './utils/variantImageHelpers';
+import {
+  getImagesForVariant,
+  getPrimaryVariant,
+  getRealtimeVariantContext,
+  getUniqueColorVariants,
+} from './utils/variantImageHelpers';
 import { globalImageQueue } from './utils/GlobalImageQueue';
 import { buildMediaUrl } from './utils/MediaUrlBuilder';
 import { soundService } from './services/SoundService';
@@ -1030,11 +1035,16 @@ export default class App extends React.Component<Props, State> {
   private handleDialogVariantChange = (variant: any) => {
     // Only update if variant actually changed
     const currentVariant = this.state.selectedVariant;
-    const newVariantId = variant?.sku || variant?.name || '';
-    const currentVariantId = currentVariant?.sku || currentVariant?.name || '';
+    const newVariantId = variant?.sku || variant?.id || variant?.name || '';
+    const currentVariantId = currentVariant?.sku || currentVariant?.id || currentVariant?.name || '';
     if (newVariantId !== currentVariantId) {
       this.setState({ selectedVariant: variant });
     }
+  };
+
+  /** Visible chip selection only; never project a SKU or arbitrary product content. */
+  private getRealtimeSelectedVariant = (): { size?: string; color?: string } | null => {
+    return getRealtimeVariantContext(this.state.selectedVariant);
   };
 
   // Footer drag functionality
@@ -3351,6 +3361,7 @@ export default class App extends React.Component<Props, State> {
               && Number(selectedProduct.id) > 0
               ? Number(selectedProduct.id)
               : null}
+            selectedVariant={this.getRealtimeSelectedVariant()}
             context={{
               brand: this.props.brand,
               language: this.props.locale,
