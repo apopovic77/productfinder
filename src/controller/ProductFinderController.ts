@@ -1056,6 +1056,14 @@ export class ProductFinderController {
 
     const orderedProducts = [...resolution.products];
     this.setGlobalSearchProducts(orderedProducts);
+    // Owner 2026-08-27: Schlaegt der Agent eine GRUPPE vor, ist der
+    // Hero-Fokus auf ein einzelnes Produkt eine falsche Darstellung —
+    // die Smart-Logik (<= 40 -> Hero) gilt hier nicht. Mehrere Treffer:
+    // Gruppen-/Poster-Uebersicht ohne Fokus; genau einer: Hero wie bisher.
+    if (orderedProducts.length > 1) {
+      this.exitHeroPresentation();
+      this.setViewOverride('grouped');
+    }
     return resolution;
   }
 
