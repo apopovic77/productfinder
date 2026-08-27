@@ -3,6 +3,7 @@ import {
   useEffect,
   useMemo,
   useSyncExternalStore,
+  useRef,
 } from 'react';
 import type { ProductFinderController } from '../controller/ProductFinderController';
 import {
@@ -15,6 +16,10 @@ import { soundService } from '../services/SoundService';
 import './ProductFinderRealtimeSurface.css';
 
 interface ProductFinderRealtimeSurfaceProps {
+  /** Sitzung sofort beim Einblenden starten (Header-Button, owner 2026-08-27). */
+  autoStart?: boolean;
+  /** Vom Nutzer per X geschlossen — der Host blendet die Flaeche aus. */
+  onClosed?: () => void;
   finderController: ProductFinderController;
   context: ProductFinderEntryContext;
 }
@@ -49,6 +54,8 @@ function CloseIcon() {
 export function ProductFinderRealtimeSurface({
   finderController,
   context,
+  autoStart = false,
+  onClosed,
 }: ProductFinderRealtimeSurfaceProps) {
   const runtime = useMemo(() => {
     const server = new ProductFinderRealtimeBffClient();
@@ -98,6 +105,15 @@ export function ProductFinderRealtimeSurface({
 
   const isConnected = ['ready', 'speaking', 'listening'].includes(snapshot.status);
   const canStart = ['idle', 'closed', 'error'].includes(snapshot.status);
+
+  // Header-Button: keine zweite Klickstufe — die Karte erscheint und die
+  // Sitzung startet sofort (Mikrofon-Freigabe kommt vom Browser).
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (!autoStart || autoStarted.current || !canStart) return;
+    autoStarted.current = true;
+    start();
+  }, [autoStart, canStart, start]);
   const latestTranscript = [...snapshot.transcript]
     .reverse()
     .find(entry => !entry.partial && entry.text.trim());
@@ -111,7 +127,7 @@ export function ProductFinderRealtimeSurface({
             type="button"
             className="pf-realtime-close"
             aria-label="Sprachsitzung beenden"
-            onClick={() => runtime.controller.close()}
+            onClick={() => { runtime.controller.close(); onClosed?.(); }}
           >
             <CloseIcon />
           </button>

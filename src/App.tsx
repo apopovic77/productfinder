@@ -2571,6 +2571,18 @@ export default class App extends React.Component<Props, State> {
             {/* Desktop: the right pane is gone (owner, 2026-08-23 — it only took
                 space; back is the breadcrumb, dimension/sort already live here).
                 Its two functions move up: AI search and the cart. */}
+            {/* Sprachberater (owner 2026-08-27, media 120882): Personen-Icon
+                startet die Realtime-Sitzung direkt — die Karte erscheint erst
+                dann, nicht vorab als Overlay. Desktop UND Handy. */}
+            <button
+              type="button"
+              className={`pf-header-btn pf-header-voice-btn ${this.state.realtimeShortcutEnabled ? 'active' : ''}`}
+              onClick={() => this.setState(prev => ({ realtimeShortcutEnabled: !prev.realtimeShortcutEnabled }))}
+              title={this.state.realtimeShortcutEnabled ? 'Sprachberater ausblenden' : 'Sprachberater starten'}
+              aria-pressed={this.state.realtimeShortcutEnabled}
+            >
+              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+            </button>
             {!this.isMobileLayout() && (
               <>
                 <button
@@ -3299,6 +3311,8 @@ export default class App extends React.Component<Props, State> {
         {(this.props.realtimeDemoEnabled || this.state.realtimeShortcutEnabled) && (
           <ProductFinderRealtimeSurface
             finderController={this.controller}
+            autoStart={this.state.realtimeShortcutEnabled}
+            onClosed={() => this.setState({ realtimeShortcutEnabled: false })}
             context={{
               brand: this.props.brand,
               language: this.props.locale,

@@ -2214,6 +2214,8 @@ body {
 .pf-header-ai-btn { background: #ff5a1f; color: #fff; font-weight: 700; }
 .pf-header-ai-btn:hover { background: #ff6f3c; }
 .pf-header-cart-btn { position: relative; padding: 0 8px; }
+.pf-header-voice-btn { padding: 0 8px; }
+.pf-header-voice-btn.active { color: #c6f542; }
 .pf-header-cart-btn svg { width: 20px; height: 20px; }
 .pf-header-cart-btn.has-items { color: #fff; }
 .pf-header-cart-count {
