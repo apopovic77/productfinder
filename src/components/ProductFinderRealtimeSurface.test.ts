@@ -57,7 +57,10 @@ describe('ProductFinderRealtimeSurface contract', () => {
   });
 
   it('does not depend on a controller loading notification emitted before App subscribes', () => {
-    expect(appSource).toContain('(this.props.realtimeDemoEnabled || this.state.realtimeShortcutEnabled)');
+    expect(appSource).toContain('this.state.realtimeShortcutEnabled && (');
+    expect(appSource).not.toContain(
+      '(this.props.realtimeDemoEnabled || this.state.realtimeShortcutEnabled)',
+    );
     expect(appSource).not.toContain('this.props.realtimeDemoEnabled && !loading');
   });
 });
