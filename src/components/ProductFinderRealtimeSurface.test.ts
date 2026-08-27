@@ -22,7 +22,7 @@ describe('ProductFinderRealtimeSurface contract', () => {
   });
 
   it('opens from an explicit user action and always disposes the session', () => {
-    expect(source).toContain('onClick={start}');
+    expect(source).toContain('onClick={canStart ? start : undefined}');
     expect(source).toContain('runtime.controller.open(context)');
     expect(source).toContain('runtime.controller.dispose()');
     expect(source).toContain("window.addEventListener('pagehide', endOnPageHide)");
@@ -39,7 +39,7 @@ describe('ProductFinderRealtimeSurface contract', () => {
     expect(source).toContain('onPointerDown');
     expect(source).toContain('onPointerUp');
     expect(source).toContain('onPointerCancel');
-    expect(source).toContain('aria-pressed={snapshot.isMicActive}');
+    expect(source).toContain('aria-pressed={isConnected ? snapshot.isMicActive : undefined}');
   });
 
   it('is absent from public routes unless both the build flag and internal path match', () => {
