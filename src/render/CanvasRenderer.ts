@@ -909,7 +909,12 @@ export class CanvasRenderer<T> {
     let t = label;
     const parent = this.headerParentLabel;
     if (parent && t.toLowerCase().startsWith(parent.toLowerCase() + ' ')) t = t.slice(parent.length).trim();
-    if (this.headerStripNoise) {
+    // Noise-Woerter nur auf Design-/Serien-Ebenen entfernen. Auf der
+    // Katalog-Kategorie-Wurzel (?catview=pivot) machte der Filter aus
+    // "YOUTH HELMETS" ein zweites "HELMETS" (owner 2026-08-27, media 120881).
+    const dim = String(this.getPivotDimension?.() ?? '');
+    const noiseDimension = /design|product_line|family|model/i.test(dim);
+    if (this.headerStripNoise && noiseDimension) {
       t = t.replace(/\b(Helmet|Helm|Youth|Glove|Gloves|Jersey|Pants|Pant|Boot|Boots|Goggle|Jacket|Polyacrylite|Hyperlite|Fidlock®?)\b/gi, ' ').replace(/\s+/g, ' ').trim();
     }
     return t || label;
@@ -2017,8 +2022,12 @@ export class CanvasRenderer<T> {
         }
 
         // Draw each line
+        // textBaseline 'middle' zeichnet um die Zeilenmitte — startY ist aber
+        // die Blockoberkante. Ohne den halben Zeilenabstand sass jedes Label
+        // eine halbe Zeile zu hoch (owner 2026-08-27, media 120881).
+        const baselineShift = this.ctx.textBaseline === 'middle' ? lineHeight / 2 : 0;
         transformedLines.forEach((line, index) => {
-          const lineY = startY + index * lineHeight;
+          const lineY = startY + baselineShift + index * lineHeight;
           this.ctx.fillText(line, textX, lineY);
         });
 

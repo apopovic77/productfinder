@@ -10,7 +10,8 @@ export const BUCKET_BUTTON_CONFIG = {
    * Button height in pixels
    * Default: 40
    */
-  height: 105,
+  // 105 -> 64 (owner 2026-08-27, media 120881: "wie dick die Spalten sind")
+  height: 64,
 
   /**
    * Corner radius in pixels (border-radius)
@@ -91,7 +92,7 @@ export const BUCKET_BUTTON_CONFIG = {
      * Options: 'top', 'center', 'bottom'
      * Default: 'center'
      */
-    alignVertical: 'top' as 'top' | 'center' | 'bottom',
+    alignVertical: 'center' as 'top' | 'center' | 'bottom',
   },
 
   /**
@@ -102,25 +103,25 @@ export const BUCKET_BUTTON_CONFIG = {
      * Top padding inside button (in pixels)
      * Default: 20
      */
-    paddingTop: 20,
+    paddingTop: 8,
 
     /**
      * Right padding inside button (in pixels)
      * Default: 20
      */
-    paddingRight: 30,
+    paddingRight: 14,
 
     /**
      * Bottom padding inside button (in pixels)
      * Default: 20
      */
-    paddingBottom: 20,
+    paddingBottom: 8,
 
     /**
      * Left padding inside button (in pixels)
      * Default: 20
      */
-    paddingLeft: 20,
+    paddingLeft: 12,
   },
 
   /**

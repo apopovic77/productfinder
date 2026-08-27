@@ -13,7 +13,8 @@ export function resolvePivotHeaderHeight(
   orientation: PivotHeaderOrientation,
 ): number {
   if (viewWidth < 768) {
-    return Math.round(BUCKET_BUTTON_CONFIG.height * 0.3);
+    // Handy bleibt bei 32px, unabhaengig von der Desktop-Hoehe.
+    return Math.max(32, Math.round(BUCKET_BUTTON_CONFIG.height * 0.3));
   }
   return orientation === 'rows'
     ? Math.min(DESKTOP_ROW_HEADER_HEIGHT, BUCKET_BUTTON_CONFIG.height)
