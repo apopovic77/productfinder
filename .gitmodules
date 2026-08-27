@@ -5,3 +5,7 @@
 	path = libs/realtime-agent-web-core
 	url = git@github.com:apopovic77/realtime-agent-web-core.git
 	branch = dev
+[submodule "libs/voice-orb-web"]
+	path = libs/voice-orb-web
+	url = https://github.com/apopovic77/voice-orb-web.git
+	branch = dev

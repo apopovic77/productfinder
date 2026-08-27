@@ -30,6 +30,11 @@ export interface ProductFinderRealtimeServerPort {
   endSession(input: Readonly<{ sessionId: string }>): Promise<unknown>;
 }
 
+
+export interface ProductFinderRealtimeMedia {
+  input: MediaStream | null;
+  output: MediaStream | null;
+}
 export interface ProductFinderRealtimeControllerOptions {
   server: ProductFinderRealtimeServerPort;
   selectionProjection: ProductSelectionProjectionPort;
@@ -100,6 +105,10 @@ export class ProductFinderRealtimeController {
         audio.dataset.role = 'productfinder-realtime-remote-audio';
         return audio as unknown as RealtimeRemoteAudio;
       },
+      // Voice-Orb (q-58d6cad02b87): Mikro-/Agent-Stream read-only an die
+      // Visualisierung reichen. Der Orb besitzt kein Audio, stoppt nichts.
+      onInputStreamChanged: stream => this.setMedia({ input: (stream as unknown as MediaStream | null) ?? null }),
+      onOutputStreamChanged: stream => this.setMedia({ output: (stream as unknown as MediaStream | null) ?? null }),
       mountRemoteAudio: audio => document.body.appendChild(audio as unknown as HTMLAudioElement),
       unmountRemoteAudio: audio => (audio as unknown as HTMLAudioElement).remove(),
       // Sprache aus dem Sprach-Gate (owner 2026-08-27): Begruessung und
@@ -138,6 +147,22 @@ export class ProductFinderRealtimeController {
   }
 
   subscribe = (listener: () => void): (() => void) => this.adapter.subscribe(listener);
+
+  /** Mikro-/Agent-Streams fuer den Voice-Orb — eigener, kleiner Store neben dem Core-Snapshot. */
+  private media: ProductFinderRealtimeMedia = { input: null, output: null };
+  private readonly mediaListeners = new Set<() => void>();
+
+  private setMedia(patch: Partial<ProductFinderRealtimeMedia>): void {
+    this.media = { ...this.media, ...patch };
+    for (const listener of this.mediaListeners) listener();
+  }
+
+  subscribeMedia = (listener: () => void): (() => void) => {
+    this.mediaListeners.add(listener);
+    return () => { this.mediaListeners.delete(listener); };
+  };
+
+  getMediaSnapshot = (): ProductFinderRealtimeMedia => this.media;
 
   getSnapshot = (): RealtimeAgentCoreSnapshot<ProductFinderEntryContext> => (
     this.adapter.getSnapshot()

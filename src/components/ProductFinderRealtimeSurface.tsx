@@ -6,6 +6,7 @@ import {
   useRef,
 } from 'react';
 import type { ProductFinderController } from '../controller/ProductFinderController';
+import { VoiceOrb, type VoiceOrbHandle, type VoiceOrbState } from '../../libs/voice-orb-web/dist/index.js';
 import {
   ProductFinderRealtimeBffClient,
   ProductFinderRealtimeController,
@@ -122,6 +123,7 @@ export function ProductFinderRealtimeSurface({
   }, [context, focusedProductId, runtime]);
 
   const setTalking = useCallback((active: boolean) => {
+    if (active) void orbRef.current?.resumeAudio();
     runtime.controller.setPttActive(active);
   }, [runtime]);
 
@@ -140,6 +142,23 @@ export function ProductFinderRealtimeSurface({
     .reverse()
     .find(entry => !entry.partial && entry.text.trim());
 
+  // Voice-Orb (CloudV2-Package, q-58d6cad02b87): Zustandsmapping bleibt hier
+  // im Finder-Adapter. `ready` = Track stumm -> idle (kein offenes Mikro
+  // behaupten); thinking aus responsePending/activeTool/connecting.
+  const media = useSyncExternalStore(
+    runtime.controller.subscribeMedia,
+    runtime.controller.getMediaSnapshot,
+    runtime.controller.getMediaSnapshot,
+  );
+  const orbRef = useRef<VoiceOrbHandle>(null);
+  const orbState: VoiceOrbState = (() => {
+    if (snapshot.status === 'connecting' || snapshot.responsePending || snapshot.activeTool) return 'thinking';
+    if (snapshot.status === 'listening' && snapshot.isMicActive) return 'user_speaking';
+    if (snapshot.status === 'speaking') return 'agent_speaking';
+    return 'idle';
+  })();
+  const orbActive = isConnected || snapshot.status === 'connecting';
+
   return (
     <aside className={`pf-realtime-surface is-${snapshot.status}`} aria-label="Interner Realtime-Produkttest">
       <div className="pf-realtime-heading">
@@ -156,8 +175,19 @@ export function ProductFinderRealtimeSurface({
         )}
       </div>
 
+      <div className="pf-realtime-orb-wrap" aria-hidden="true">
+        <VoiceOrb
+          ref={orbRef}
+          inputStream={media.input}
+          outputStream={media.output}
+          active={orbActive}
+          state={orbState}
+          className="pf-realtime-orb"
+        />
+      </div>
+
       <div className="pf-realtime-status" aria-live="polite">
-        <span className="pf-realtime-status-dot" />
+        <span className={`pf-realtime-status-dot is-${orbState}`} />
         <span>{STATUS_LABELS[snapshot.status]}</span>
       </div>
 
