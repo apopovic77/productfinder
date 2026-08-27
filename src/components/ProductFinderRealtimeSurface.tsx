@@ -194,7 +194,13 @@ export function ProductFinderRealtimeSurface({
       </div>
 
       <div className="pf-realtime-orb-wrap" aria-hidden="true">
+        {/* key: Das Package verwirft beim Stream-Wechsel den WebGL-Kontext
+            (loseContext) und initialisiert auf demselben Canvas neu — das
+            scheitert, es bleibt nur der CSS-Glow (owner 2026-08-27). Ein
+            frisches Canvas je Stream-Kombination umgeht das, bis das Package
+            Renderer und Audio-Quelle getrennt haelt. */}
         <VoiceOrb
+          key={`${media.input?.id ?? 'no-in'}:${media.output?.id ?? 'no-out'}`}
           ref={orbRef}
           inputStream={media.input}
           outputStream={media.output}
