@@ -296,6 +296,64 @@ describe('ProductFinderRealtimeBffClient', () => {
     }
   });
 
+  it('accepts the closed set-selection hints and rejects malformed or unknown hints', async () => {
+    const mint = {
+      clientSecret: 'ek_test', model: 'gpt-realtime', sessionId: 'session-1',
+      tools: ['find_products', 'refine_search'], pushToTalk: true, turnDetection: null,
+    };
+    const validResult = {
+      status: 'matches',
+      count: 5,
+      hints: {
+        price_eur: [99.99, 299.99],
+        sizes: ['M', 'L'],
+        next_question: 'size',
+        ignored_criteria: [],
+        applied_sort: 'price_desc',
+        applied_limit: 5,
+        defaults_applied: ['sport'],
+        groups: [
+          { category_label: 'Helme MX', count: 1 },
+          { category_label: 'Jerseys Offroad', count: 1 },
+          { category_label: 'Stiefel MX', count: 1 },
+        ],
+        applied_per_category_limit: 1,
+        defaults_skipped: ['size'],
+      },
+      [APP_COMMAND_KEY]: {
+        name: 'show_product_results', args: { selection_token: 'st_set_1' },
+      },
+    };
+    const execute = async (hints: unknown) => {
+      const client = new ProductFinderRealtimeBffClient({
+        fetchImpl: vi.fn()
+          .mockResolvedValueOnce(jsonResponse(mint))
+          .mockResolvedValueOnce(jsonResponse({ ...validResult, hints })),
+      });
+      await client.mintSession(context);
+      return client.executeTool({
+        name: 'find_products', args: {}, callId: 'set-1', sessionId: 'session-1',
+      });
+    };
+
+    await expect(execute(validResult.hints)).resolves.toEqual(validResult);
+
+    for (const invalidHints of [
+      { ...validResult.hints, diagnostic: 'internal' },
+      { ...validResult.hints, groups: [{ category_label: '<b>Helme</b>', count: 1 }] },
+      { ...validResult.hints, groups: [{ category_label: 'Helme', count: 11 }] },
+      { ...validResult.hints, groups: [{ category_label: 'Helme', count: 1, id: 7 }] },
+      { ...validResult.hints, applied_per_category_limit: 0 },
+      { ...validResult.hints, applied_per_category_limit: 11 },
+      { ...validResult.hints, defaults_skipped: ['size', 'size'] },
+      { ...validResult.hints, defaults_skipped: ['variant'] },
+    ]) {
+      await expect(execute(invalidHints)).rejects.toMatchObject({
+        code: 'invalid_tool_response', status: 502,
+      });
+    }
+  });
+
   it('treats a null app command on empty results as absent but rejects executable values', async () => {
     const mint = {
       clientSecret: 'ek_test', model: 'gpt-realtime', sessionId: 'session-1',

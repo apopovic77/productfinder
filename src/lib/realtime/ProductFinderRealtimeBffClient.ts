@@ -27,6 +27,19 @@ const PRODUCT_RESULT_STATUSES = new Set(['matches', 'empty', 'unavailable']);
 const PRODUCT_DETAILS_STATUSES = new Set(['details', 'no_focus', 'no_such_position', 'unavailable']);
 const CART_DETAILS_STATUSES = new Set(['cart', 'empty', 'no_such_position']);
 const APPLIED_SORT_VALUES = new Set(['default', 'newest', 'price_desc', 'price_asc']);
+const SEARCH_HINT_KEYS = new Set([
+  'price_eur',
+  'sizes',
+  'next_question',
+  'ignored_criteria',
+  'applied_sort',
+  'applied_limit',
+  'defaults_applied',
+  'groups',
+  'applied_per_category_limit',
+  'defaults_skipped',
+]);
+const DEFAULT_HINT_VALUES = new Set(['sport', 'category', 'size']);
 const FORBIDDEN_MODEL_RESULT_KEYS = ['selection_token', 'ids', 'name', 'description'] as const;
 const PRODUCT_DETAIL_KEYS = new Set([
   'status', 'name', 'line', 'category_label', 'features', 'material',
@@ -113,6 +126,89 @@ function hasCompatibleToolContract(value: unknown): value is string[] {
     && [...tools].every(tool => typeof tool === 'string' && ALLOWED_TOOLS.has(tool));
 }
 
+function isBoundedHintString(value: unknown, maxLength = 100): value is string {
+  return typeof value === 'string'
+    && value.trim().length > 0
+    && value.length <= maxLength
+    && !UNSAFE_DETAIL_TEXT.test(value);
+}
+
+function isUniqueHintList(
+  value: unknown,
+  allowed: ReadonlySet<string>,
+  maxLength: number,
+): value is string[] {
+  return Array.isArray(value)
+    && value.length <= maxLength
+    && new Set(value).size === value.length
+    && value.every(item => typeof item === 'string' && allowed.has(item));
+}
+
+function hasValidSearchHints(value: unknown): value is JsonRecord {
+  if (!isRecord(value) || Object.keys(value).some(key => !SEARCH_HINT_KEYS.has(key))) {
+    return false;
+  }
+  if (value.price_eur !== undefined && value.price_eur !== null) {
+    if (!Array.isArray(value.price_eur)
+      || value.price_eur.length !== 2
+      || value.price_eur.some(price => typeof price !== 'number'
+        || !Number.isFinite(price) || price < 0 || price > 1_000_000)
+      || Number(value.price_eur[0]) > Number(value.price_eur[1])) {
+      return false;
+    }
+  }
+  if (value.sizes !== undefined
+    && (!Array.isArray(value.sizes)
+      || value.sizes.length > 100
+      || value.sizes.some(size => !isBoundedHintString(size)))) {
+    return false;
+  }
+  if (value.next_question !== undefined && value.next_question !== null
+    && value.next_question !== 'size' && value.next_question !== 'price') {
+    return false;
+  }
+  if (value.ignored_criteria !== undefined
+    && (!Array.isArray(value.ignored_criteria)
+      || value.ignored_criteria.length > 100
+      || value.ignored_criteria.some(item => !isBoundedHintString(item)))) {
+    return false;
+  }
+  if (value.applied_sort !== undefined
+    && (typeof value.applied_sort !== 'string'
+      || !APPLIED_SORT_VALUES.has(value.applied_sort))) {
+    return false;
+  }
+  if (value.applied_limit !== undefined
+    && (!Number.isSafeInteger(value.applied_limit)
+      || Number(value.applied_limit) < 1
+      || Number(value.applied_limit) > 50)) {
+    return false;
+  }
+  if (value.defaults_applied !== undefined
+    && !isUniqueHintList(value.defaults_applied, DEFAULT_HINT_VALUES, 3)) {
+    return false;
+  }
+  if (value.groups !== undefined) {
+    if (!Array.isArray(value.groups) || value.groups.length > 100
+      || value.groups.some(group => !isRecord(group)
+        || Object.keys(group).some(key => key !== 'category_label' && key !== 'count')
+        || !isBoundedHintString(group.category_label, 200)
+        || !Number.isSafeInteger(group.count)
+        || Number(group.count) < 0
+        || Number(group.count) > 10)) {
+      return false;
+    }
+  }
+  if (value.applied_per_category_limit !== undefined
+    && (!Number.isSafeInteger(value.applied_per_category_limit)
+      || Number(value.applied_per_category_limit) < 1
+      || Number(value.applied_per_category_limit) > 10)) {
+    return false;
+  }
+  return value.defaults_skipped === undefined
+    || isUniqueHintList(value.defaults_skipped, DEFAULT_HINT_VALUES, 3);
+}
+
 function validateProductToolResult(payload: unknown): JsonRecord {
   if (!isRecord(payload)) {
     throw new ProductFinderRealtimeBffError(502, 'invalid_tool_response', payload);
@@ -134,17 +230,8 @@ function validateProductToolResult(payload: unknown): JsonRecord {
   if (FORBIDDEN_MODEL_RESULT_KEYS.some(key => key in payload)) {
     throw new ProductFinderRealtimeBffError(502, 'unsafe_tool_response', payload);
   }
-  if (payload.hints !== undefined) {
-    if (!isRecord(payload.hints)
-      || (payload.hints.applied_sort !== undefined
-        && (typeof payload.hints.applied_sort !== 'string'
-          || !APPLIED_SORT_VALUES.has(payload.hints.applied_sort)))
-      || (payload.hints.applied_limit !== undefined
-        && (!Number.isSafeInteger(payload.hints.applied_limit)
-          || Number(payload.hints.applied_limit) < 1
-          || Number(payload.hints.applied_limit) > 50))) {
-      throw new ProductFinderRealtimeBffError(502, 'invalid_tool_response', payload);
-    }
+  if (payload.hints !== undefined && !hasValidSearchHints(payload.hints)) {
+    throw new ProductFinderRealtimeBffError(502, 'invalid_tool_response', payload);
   }
 
   const rawCommand = payload[APP_COMMAND_KEY];
