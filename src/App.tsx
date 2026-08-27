@@ -1498,12 +1498,13 @@ export default class App extends React.Component<Props, State> {
     });
   };
 
-  private handleRealtimeSelectionProjected = (productId: string) => {
+  private handleRealtimeSelectionProjected = (productId: string, count: number) => {
     // Owner 2026-08-27 (Log 14:06, „zeig mir die fünf besten Helme"): Bei
     // mehreren Treffern zeigt der Finder die Gruppen-Übersicht — das erste
     // Produkt zu öffnen setzte ungefragt einen Fokus und überschrieb sie.
-    // Nur bei genau EINEM Treffer wird das Produkt geöffnet.
-    if (this.controller.getDisplayOrder().length !== 1) return;
+    // Nur bei genau EINEM Treffer wird das Produkt geöffnet (Zahl kommt aus
+    // der Projektion, nicht aus der evtl. noch nicht aktualisierten Anzeige).
+    if (count !== 1) return;
     const product = this.controller.getCatalogAllProducts().find(item => item.id === productId);
     if (!product) return;
     this.openProductDetails(product, { pushHistory: false });

@@ -25,7 +25,7 @@ interface ProductFinderRealtimeSurfaceProps {
   finderController: ProductFinderController;
   context: ProductFinderEntryContext;
   focusedProductId: number | null;
-  onSelectionProjected(productId: string): void;
+  onSelectionProjected(productId: string, count: number): void;
 }
 
 const STATUS_LABELS = {
@@ -71,8 +71,8 @@ export function ProductFinderRealtimeSurface({
       selectionProjection: createProductFinderSelectionProjection(
         finderController,
         () => server.getSessionId(),
-        async productId => {
-          onSelectionProjected(productId);
+        async (productId, count) => {
+          onSelectionProjected(productId, count);
           const numericId = Number(productId);
           if (!Number.isSafeInteger(numericId) || numericId < 1) {
             throw new Error('Projected product has no valid numeric identity');

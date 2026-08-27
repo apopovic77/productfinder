@@ -1054,17 +1054,23 @@ export class ProductFinderController {
     const resolution = resolveAgentSelectionProducts(this.getCatalogAllProducts(), productIds);
     if (!resolution.applied) return resolution;
 
-    const orderedProducts = [...resolution.products];
-    this.setGlobalSearchProducts(orderedProducts);
-    // Owner 2026-08-27: Schlaegt der Agent eine GRUPPE vor, ist der
-    // Hero-Fokus auf ein einzelnes Produkt eine falsche Darstellung —
-    // die Smart-Logik (<= 40 -> Hero) gilt hier nicht. Mehrere Treffer:
-    // Gruppen-/Poster-Uebersicht ohne Fokus; genau einer: Hero wie bisher.
-    if (orderedProducts.length > 1) {
+    this.applyAgentProducts([...resolution.products]);
+    return resolution;
+  }
+
+  /**
+   * Agent-Treffer als Arbeitsmenge (Sprach-Suche). Owner 2026-08-27: Schlaegt
+   * der Agent eine GRUPPE vor, ist der Hero-Fokus auf ein einzelnes Produkt
+   * eine falsche Darstellung — die Smart-Logik (<= 40 -> Hero) gilt hier
+   * nicht. Mehrere Treffer: Gruppen-/Poster-Uebersicht ohne Fokus; genau
+   * einer: Hero wie bisher. Einziger Eingang fuer die Realtime-Projektion.
+   */
+  applyAgentProducts(products: Product[]): void {
+    this.setGlobalSearchProducts(products);
+    if (products.length > 1) {
       this.exitHeroPresentation();
       this.setViewOverride('grouped');
     }
-    return resolution;
   }
 
   isGlobalSearchActive(): boolean {
