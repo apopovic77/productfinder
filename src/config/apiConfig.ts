@@ -50,6 +50,10 @@ export const REALTIME_USAGE_ENDPOINT: string =
   import.meta.env.VITE_REALTIME_USAGE_ENDPOINT
   || `${ONEAL_API_BASE}/realtime/usage`;
 
+export const REALTIME_EVENTS_ENDPOINT: string =
+  import.meta.env.VITE_REALTIME_EVENTS_ENDPOINT
+  || `${ONEAL_API_BASE}/realtime/events`;
+
 export const REALTIME_SESSION_END_ENDPOINT: string =
   import.meta.env.VITE_REALTIME_SESSION_END_ENDPOINT
   || `${ONEAL_API_BASE}/realtime/session/end`;

@@ -8,11 +8,15 @@ import {
   REALTIME_SESSION_END_ENDPOINT,
   REALTIME_SESSION_ENDPOINT,
   REALTIME_CONTEXT_ENDPOINT,
+  REALTIME_EVENTS_ENDPOINT,
   REALTIME_TOOL_ENDPOINT,
   REALTIME_USAGE_ENDPOINT,
 } from '../../config/apiConfig';
 import type { ProductFinderEntryContext } from './ProductFinderRealtimeAdapter';
-import type { ProductFinderRealtimeServerPort } from './ProductFinderRealtimeController';
+import type {
+  ProductFinderRealtimeEventBatch,
+  ProductFinderRealtimeServerPort,
+} from './ProductFinderRealtimeController';
 
 const ALLOWED_TOOLS = new Set(['find_products', 'refine_search', 'product_details']);
 const REQUIRED_TOOLS = ['find_products', 'refine_search'] as const;
@@ -32,8 +36,10 @@ export interface ProductFinderRealtimeBffClientOptions {
   toolEndpoint?: string;
   contextEndpoint?: string;
   usageEndpoint?: string;
+  eventsEndpoint?: string;
   sessionEndEndpoint?: string;
   fetchImpl?: FetchPort;
+  sendBeaconImpl?: (url: string, data: Blob) => boolean;
 }
 
 interface JsonRecord {
@@ -192,9 +198,12 @@ export class ProductFinderRealtimeBffClient implements ProductFinderRealtimeServ
   private readonly toolEndpoint: string;
   private readonly contextEndpoint: string;
   private readonly usageEndpoint: string;
+  private readonly eventsEndpoint: string;
   private readonly sessionEndEndpoint: string;
   private readonly fetchImpl: FetchPort;
+  private readonly sendBeaconImpl: ((url: string, data: Blob) => boolean) | null;
   private sessionId: string | null = null;
+  private readonly knownSessionIds = new Set<string>();
   private desiredFocusedProductId: number | null = null;
   private hasFocusedProductContext = false;
   private contextQueue: Promise<void> = Promise.resolve();
@@ -204,8 +213,13 @@ export class ProductFinderRealtimeBffClient implements ProductFinderRealtimeServ
     this.toolEndpoint = options.toolEndpoint ?? REALTIME_TOOL_ENDPOINT;
     this.contextEndpoint = options.contextEndpoint ?? REALTIME_CONTEXT_ENDPOINT;
     this.usageEndpoint = options.usageEndpoint ?? REALTIME_USAGE_ENDPOINT;
+    this.eventsEndpoint = options.eventsEndpoint ?? REALTIME_EVENTS_ENDPOINT;
     this.sessionEndEndpoint = options.sessionEndEndpoint ?? REALTIME_SESSION_END_ENDPOINT;
     this.fetchImpl = options.fetchImpl ?? fetch.bind(globalThis);
+    this.sendBeaconImpl = options.sendBeaconImpl
+      ?? (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function'
+        ? navigator.sendBeacon.bind(navigator)
+        : null);
   }
 
   getSessionId(): string | null {
@@ -244,6 +258,7 @@ export class ProductFinderRealtimeBffClient implements ProductFinderRealtimeServ
       throw new ProductFinderRealtimeBffError(502, 'invalid_session_response', payload);
     }
     this.sessionId = sessionId;
+    this.knownSessionIds.add(sessionId);
     if (this.hasFocusedProductContext) {
       try {
         await this.queueContextSync(sessionId);
@@ -336,6 +351,40 @@ export class ProductFinderRealtimeBffClient implements ProductFinderRealtimeServ
     return payload;
   }
 
+  async reportEvents(input: ProductFinderRealtimeEventBatch): Promise<unknown> {
+    this.assertKnownSession(input.sessionId);
+    const response = await this.fetchImpl(this.eventsEndpoint, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input),
+      credentials: 'same-origin',
+      keepalive: true,
+    });
+    const payload = await readJson(response);
+    if (!response.ok) {
+      throw new ProductFinderRealtimeBffError(
+        response.status,
+        errorCode(payload, `realtime_events_${response.status}`),
+        payload,
+      );
+    }
+    if (!isRecord(payload)
+      || typeof payload.accepted !== 'number'
+      || typeof payload.deduped !== 'number') {
+      throw new ProductFinderRealtimeBffError(502, 'invalid_events_response', payload);
+    }
+    return payload;
+  }
+
+  sendEventsBeacon(input: ProductFinderRealtimeEventBatch): boolean {
+    this.assertKnownSession(input.sessionId);
+    if (!this.sendBeaconImpl) return false;
+    return this.sendBeaconImpl(
+      this.eventsEndpoint,
+      new Blob([JSON.stringify(input)], { type: 'application/json' }),
+    );
+  }
+
   async endSession(input: Readonly<{ sessionId: string }>): Promise<unknown> {
     this.assertCurrentSession(input.sessionId);
     // The local authority ends synchronously. A subsequent open must not be
@@ -361,6 +410,12 @@ export class ProductFinderRealtimeBffClient implements ProductFinderRealtimeServ
 
   private assertCurrentSession(sessionId: string): void {
     if (!this.sessionId || sessionId !== this.sessionId) {
+      throw new ProductFinderRealtimeBffError(403, 'realtime_session_mismatch', null);
+    }
+  }
+
+  private assertKnownSession(sessionId: string): void {
+    if (!this.knownSessionIds.has(sessionId)) {
       throw new ProductFinderRealtimeBffError(403, 'realtime_session_mismatch', null);
     }
   }

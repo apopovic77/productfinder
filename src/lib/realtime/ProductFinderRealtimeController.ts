@@ -26,8 +26,26 @@ export interface ProductFinderRealtimeServerPort {
   updateFocusedProduct(focusedProductId: number | null): Promise<void>;
   /** Browser-safe BFF usage projection; model and voice session stay server-owned. */
   reportUsage(report: RealtimeUsageReport): Promise<unknown>;
+  /** Browser-owned transcript/error/lifecycle audit events only. */
+  reportEvents(input: ProductFinderRealtimeEventBatch): Promise<unknown>;
+  /** Best-effort unload delivery for an already validated event batch. */
+  sendEventsBeacon(input: ProductFinderRealtimeEventBatch): boolean;
   /** Idempotent BFF release for the currently minted browser session. */
   endSession(input: Readonly<{ sessionId: string }>): Promise<unknown>;
+}
+
+export type ProductFinderRealtimeBrowserEventKind = 'transcript' | 'error' | 'lifecycle';
+
+export interface ProductFinderRealtimeBrowserEvent {
+  seq: number;
+  ts: string;
+  kind: ProductFinderRealtimeBrowserEventKind;
+  payload: Readonly<Record<string, unknown>>;
+}
+
+export interface ProductFinderRealtimeEventBatch {
+  sessionId: string;
+  events: readonly ProductFinderRealtimeBrowserEvent[];
 }
 
 

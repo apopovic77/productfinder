@@ -9,6 +9,7 @@ import type { ProductFinderController } from '../controller/ProductFinderControl
 import { VoiceOrb, type VoiceOrbHandle, type VoiceOrbState } from '../../libs/voice-orb-web/dist/index.js';
 import {
   ProductFinderRealtimeBffClient,
+  ProductFinderRealtimeAuditBuffer,
   ProductFinderRealtimeController,
   createProductFinderSelectionProjection,
   type ProductFinderEntryContext,
@@ -64,6 +65,7 @@ export function ProductFinderRealtimeSurface({
 }: ProductFinderRealtimeSurfaceProps) {
   const runtime = useMemo(() => {
     const server = new ProductFinderRealtimeBffClient();
+    const audit = new ProductFinderRealtimeAuditBuffer(server);
     const controller = new ProductFinderRealtimeController({
       server,
       selectionProjection: createProductFinderSelectionProjection(
@@ -82,15 +84,17 @@ export function ProductFinderRealtimeSurface({
         setRealtimeOwned: active => soundService.setRealtimeOwned(active),
       },
       telemetry: {
-        info: (event, detail) => console.info(`[productfinder-realtime] ${event}`, detail ?? {}),
-        error: (event, error, detail) => console.error(
-          `[productfinder-realtime] ${event}`,
-          error,
-          detail ?? {},
-        ),
+        info: (event, detail) => {
+          console.info(`[productfinder-realtime] ${event}`, detail ?? {});
+          audit.recordLifecycle(event, detail);
+        },
+        error: (event, error, detail) => {
+          console.error(`[productfinder-realtime] ${event}`, error, detail ?? {});
+          audit.recordError(event, error, detail);
+        },
       },
     });
-    return { controller };
+    return { audit, controller };
   }, [finderController, onSelectionProjected]);
 
   const snapshot = useSyncExternalStore(
@@ -100,17 +104,26 @@ export function ProductFinderRealtimeSurface({
   );
 
   useEffect(() => {
-    const endOnPageHide = () => runtime.controller.close();
+    const endOnPageHide = () => {
+      runtime.audit.flushWithBeacon();
+      runtime.controller.close();
+    };
     window.addEventListener('pagehide', endOnPageHide);
     return () => {
       window.removeEventListener('pagehide', endOnPageHide);
+      runtime.audit.dispose();
       runtime.controller.dispose();
     };
   }, [runtime]);
 
   useEffect(() => {
+    runtime.audit.recordTranscripts(snapshot.transcript);
+  }, [runtime, snapshot.transcript]);
+
+  useEffect(() => {
     void runtime.controller.setFocusedProductId(focusedProductId).catch(error => {
       console.error('[productfinder-realtime] realtime.context.update_failed', error);
+      runtime.audit.recordError('realtime.context.update_failed', error);
     });
   }, [focusedProductId, runtime]);
 
@@ -119,6 +132,7 @@ export function ProductFinderRealtimeSurface({
       .then(() => runtime.controller.open(context))
       .catch(error => {
         console.error('[productfinder-realtime] realtime.context.open_failed', error);
+        runtime.audit.recordError('realtime.context.open_failed', error);
       });
   }, [context, focusedProductId, runtime]);
 
@@ -168,7 +182,11 @@ export function ProductFinderRealtimeSurface({
             type="button"
             className="pf-realtime-close"
             aria-label="Sprachsitzung beenden"
-            onClick={() => { runtime.controller.close(); onClosed?.(); }}
+            onClick={() => {
+              runtime.audit.flushWithBeacon();
+              runtime.controller.close();
+              onClosed?.();
+            }}
           >
             <CloseIcon />
           </button>

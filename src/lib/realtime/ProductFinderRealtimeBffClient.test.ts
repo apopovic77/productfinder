@@ -393,6 +393,54 @@ describe('ProductFinderRealtimeBffClient', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
+  it('reports browser audit events and allows a late beacon after session end', async () => {
+    const sendBeaconImpl = vi.fn(() => true);
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({
+        clientSecret: 'ek_test',
+        model: 'gpt-realtime',
+        sessionId: 'session-1',
+        tools: ['find_products', 'refine_search'],
+        pushToTalk: true,
+        turnDetection: null,
+      }))
+      .mockResolvedValueOnce(jsonResponse({ accepted: 1, deduped: 0 }))
+      .mockResolvedValueOnce(jsonResponse({ released: true }));
+    const client = new ProductFinderRealtimeBffClient({
+      eventsEndpoint: '/v1/realtime/events',
+      sessionEndEndpoint: '/v1/realtime/session/end',
+      fetchImpl,
+      sendBeaconImpl,
+    });
+    const batch = {
+      sessionId: 'session-1',
+      events: [{
+        seq: 1,
+        ts: '2026-08-27T11:55:00.000Z',
+        kind: 'lifecycle' as const,
+        payload: { name: 'realtime.ptt.commit.sent' },
+      }],
+    };
+    await client.mintSession(context);
+
+    await expect(client.reportEvents(batch)).resolves.toEqual({ accepted: 1, deduped: 0 });
+    expect(fetchImpl).toHaveBeenLastCalledWith('/v1/realtime/events', expect.objectContaining({
+      method: 'POST',
+      credentials: 'same-origin',
+      keepalive: true,
+      body: JSON.stringify(batch),
+    }));
+    await client.endSession({ sessionId: 'session-1' });
+    expect(client.sendEventsBeacon(batch)).toBe(true);
+    expect(sendBeaconImpl).toHaveBeenCalledWith(
+      '/v1/realtime/events',
+      expect.objectContaining({ type: 'application/json' }),
+    );
+    expect(() => client.sendEventsBeacon({ ...batch, sessionId: 'foreign' })).toThrow(
+      ProductFinderRealtimeBffError,
+    );
+  });
+
   it('rejects usage and end reports for a foreign session before the network', async () => {
     const fetchImpl = vi.fn(async () => jsonResponse({
       clientSecret: 'ek_test',
