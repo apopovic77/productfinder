@@ -1482,6 +1482,12 @@ export default class App extends React.Component<Props, State> {
     });
   };
 
+  private handleRealtimeSelectionProjected = (productId: string) => {
+    const product = this.controller.getCatalogAllProducts().find(item => item.id === productId);
+    if (!product) return;
+    this.openProductDetails(product, { pushHistory: false });
+  };
+
   private getVariantKeyFromPayload(payload: { product: Product; variant?: any; variantLabel?: string }): string {
     const variant = payload.variant;
     const key = variant?.sku || variant?.id || payload.variantLabel || 'base';
@@ -3313,6 +3319,12 @@ export default class App extends React.Component<Props, State> {
             finderController={this.controller}
             autoStart={this.state.realtimeShortcutEnabled}
             onClosed={() => this.setState({ realtimeShortcutEnabled: false })}
+            onSelectionProjected={this.handleRealtimeSelectionProjected}
+            focusedProductId={selectedProduct
+              && Number.isSafeInteger(Number(selectedProduct.id))
+              && Number(selectedProduct.id) > 0
+              ? Number(selectedProduct.id)
+              : null}
             context={{
               brand: this.props.brand,
               language: this.props.locale,

@@ -9,6 +9,7 @@ export interface ProductFinderSelectionProjectionOptions {
   resolver: ProductSelectionResolveClient;
   getSessionId(): string | null;
   mapSummary(summary: ProductSummary): Product | null;
+  onSelectionProjected?(firstProduct: Product): void | Promise<void>;
 }
 
 /** Projects the server-frozen result order without trusting model/browser IDs. */
@@ -33,6 +34,8 @@ export class ProductFinderSelectionProjection implements ProductSelectionProject
     if (ordered.some(product => !product)) {
       throw new Error('Server selection contains an invalid product summary');
     }
-    this.options.controller.setGlobalSearchProducts(ordered as Product[]);
+    const products = ordered as Product[];
+    this.options.controller.setGlobalSearchProducts(products);
+    await this.options.onSelectionProjected?.(products[0]);
   }
 }

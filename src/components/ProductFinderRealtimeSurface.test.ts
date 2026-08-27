@@ -27,6 +27,10 @@ describe('ProductFinderRealtimeSurface contract', () => {
     expect(source).toContain('runtime.controller.dispose()');
     expect(source).toContain("window.addEventListener('pagehide', endOnPageHide)");
     expect(source).toContain("window.removeEventListener('pagehide', endOnPageHide)");
+    expect(source).toContain('runtime.controller.setFocusedProductId(focusedProductId)');
+    expect(appSource).toContain('focusedProductId={selectedProduct');
+    expect(source).toContain('await server.updateFocusedProduct(numericId)');
+    expect(appSource).toContain('onSelectionProjected={this.handleRealtimeSelectionProjected}');
   });
 
   it('keeps vertical UI interaction separate from push-to-talk pointer state', () => {

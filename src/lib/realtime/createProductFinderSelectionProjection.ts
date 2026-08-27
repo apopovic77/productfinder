@@ -14,6 +14,7 @@ import { ProductSelectionResolveClient } from './ProductSelectionResolveClient';
 export function createProductFinderSelectionProjection(
   controller: ProductFinderController,
   getSessionId: () => string | null,
+  onSelectionProjected?: (productId: string) => void | Promise<void>,
 ): ProductFinderSelectionProjection {
   return new ProductFinderSelectionProjection({
     controller,
@@ -23,5 +24,6 @@ export function createProductFinderSelectionProjection(
       apiKey: ONEAL_API_KEY,
     }),
     mapSummary: mapProductSummary,
+    onSelectionProjected: firstProduct => onSelectionProjected?.(firstProduct.id),
   });
 }

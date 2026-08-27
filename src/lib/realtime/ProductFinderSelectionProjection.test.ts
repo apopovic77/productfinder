@@ -11,6 +11,7 @@ describe('ProductFinderSelectionProjection', () => {
     const loaded = product('2');
     const mapped = product('1');
     const setGlobalSearchProducts = vi.fn();
+    const onSelectionProjected = vi.fn(async () => undefined);
     const projection = new ProductFinderSelectionProjection({
       controller: {
         getCatalogAllProducts: () => [loaded],
@@ -25,11 +26,13 @@ describe('ProductFinderSelectionProjection', () => {
       } as never,
       getSessionId: () => 'session-1',
       mapSummary: value => value.id === 1 ? mapped : null,
+      onSelectionProjected,
     });
 
     await projection.showSelection('st_opaque');
 
     expect(setGlobalSearchProducts).toHaveBeenCalledWith([mapped, loaded]);
+    expect(onSelectionProjected).toHaveBeenCalledWith(mapped);
   });
 
   it('fails closed without a minted session identity', async () => {

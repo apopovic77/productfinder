@@ -7,22 +7,30 @@ import {
 import {
   REALTIME_SESSION_END_ENDPOINT,
   REALTIME_SESSION_ENDPOINT,
+  REALTIME_CONTEXT_ENDPOINT,
   REALTIME_TOOL_ENDPOINT,
   REALTIME_USAGE_ENDPOINT,
 } from '../../config/apiConfig';
 import type { ProductFinderEntryContext } from './ProductFinderRealtimeAdapter';
 import type { ProductFinderRealtimeServerPort } from './ProductFinderRealtimeController';
 
-const ALLOWED_TOOLS = new Set(['find_products', 'refine_search']);
+const ALLOWED_TOOLS = new Set(['find_products', 'refine_search', 'product_details']);
 const REQUIRED_TOOLS = ['find_products', 'refine_search'] as const;
 const PRODUCT_RESULT_STATUSES = new Set(['matches', 'empty', 'unavailable']);
+const PRODUCT_DETAILS_STATUSES = new Set(['details', 'no_focus', 'no_such_position', 'unavailable']);
 const FORBIDDEN_MODEL_RESULT_KEYS = ['selection_token', 'ids', 'name', 'description'] as const;
+const PRODUCT_DETAIL_KEYS = new Set([
+  'status', 'name', 'line', 'category_label', 'features', 'material',
+  'sizes', 'colors', 'price_eur', 'target_group',
+]);
+const UNSAFE_DETAIL_TEXT = /(?:<[^>]+>|https?:\/\/|www\.|\[[^\]]+\]\([^)]+\))/i;
 
 type FetchPort = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
 export interface ProductFinderRealtimeBffClientOptions {
   sessionEndpoint?: string;
   toolEndpoint?: string;
+  contextEndpoint?: string;
   usageEndpoint?: string;
   sessionEndEndpoint?: string;
   fetchImpl?: FetchPort;
@@ -80,11 +88,13 @@ function errorCode(payload: unknown, fallback: string): string {
   return typeof candidate === 'string' && candidate ? candidate : fallback;
 }
 
-function hasExactToolContract(value: unknown): value is string[] {
-  if (!Array.isArray(value) || value.length !== REQUIRED_TOOLS.length) return false;
+function hasCompatibleToolContract(value: unknown): value is string[] {
+  if (!Array.isArray(value)) return false;
   const tools = new Set(value);
-  return tools.size === REQUIRED_TOOLS.length
-    && REQUIRED_TOOLS.every(tool => tools.has(tool));
+  return tools.size === value.length
+    && tools.size >= REQUIRED_TOOLS.length
+    && REQUIRED_TOOLS.every(tool => tools.has(tool))
+    && [...tools].every(tool => typeof tool === 'string' && ALLOWED_TOOLS.has(tool));
 }
 
 function validateProductToolResult(payload: unknown): JsonRecord {
@@ -130,6 +140,46 @@ function validateProductToolResult(payload: unknown): JsonRecord {
   return payload;
 }
 
+function validateDetailString(value: unknown, maxLength: number): boolean {
+  return value === null || value === undefined || (
+    typeof value === 'string'
+    && value.length <= maxLength
+    && !UNSAFE_DETAIL_TEXT.test(value)
+  );
+}
+
+function validateDetailList(value: unknown, maxItems: number): boolean {
+  return value === null || value === undefined || (
+    Array.isArray(value)
+    && value.length <= maxItems
+    && value.every(item => validateDetailString(item, 600))
+  );
+}
+
+function validateProductDetailsResult(payload: unknown): JsonRecord {
+  if (!isRecord(payload)
+    || typeof payload.status !== 'string'
+    || !PRODUCT_DETAILS_STATUSES.has(payload.status)
+    || Object.keys(payload).some(key => !PRODUCT_DETAIL_KEYS.has(key))) {
+    throw new ProductFinderRealtimeBffError(502, 'invalid_tool_response', payload);
+  }
+  if (!validateDetailString(payload.name, 300)
+    || !validateDetailString(payload.line, 200)
+    || !validateDetailString(payload.category_label, 200)
+    || !validateDetailList(payload.features, 20)
+    || !validateDetailString(payload.material, 600)
+    || !validateDetailList(payload.sizes, 200)
+    || !validateDetailList(payload.colors, 200)
+    || !validateDetailString(payload.target_group, 100)
+    || !(payload.price_eur === null || payload.price_eur === undefined
+      || (Array.isArray(payload.price_eur)
+        && payload.price_eur.length === 2
+        && payload.price_eur.every(value => typeof value === 'number' && Number.isFinite(value))))) {
+    throw new ProductFinderRealtimeBffError(502, 'unsafe_tool_response', payload);
+  }
+  return payload;
+}
+
 /**
  * Browser client for the productfinder-owned Realtime BFF.
  *
@@ -140,14 +190,19 @@ function validateProductToolResult(payload: unknown): JsonRecord {
 export class ProductFinderRealtimeBffClient implements ProductFinderRealtimeServerPort {
   private readonly sessionEndpoint: string;
   private readonly toolEndpoint: string;
+  private readonly contextEndpoint: string;
   private readonly usageEndpoint: string;
   private readonly sessionEndEndpoint: string;
   private readonly fetchImpl: FetchPort;
   private sessionId: string | null = null;
+  private desiredFocusedProductId: number | null = null;
+  private hasFocusedProductContext = false;
+  private contextQueue: Promise<void> = Promise.resolve();
 
   constructor(options: ProductFinderRealtimeBffClientOptions = {}) {
     this.sessionEndpoint = options.sessionEndpoint ?? REALTIME_SESSION_ENDPOINT;
     this.toolEndpoint = options.toolEndpoint ?? REALTIME_TOOL_ENDPOINT;
+    this.contextEndpoint = options.contextEndpoint ?? REALTIME_CONTEXT_ENDPOINT;
     this.usageEndpoint = options.usageEndpoint ?? REALTIME_USAGE_ENDPOINT;
     this.sessionEndEndpoint = options.sessionEndEndpoint ?? REALTIME_SESSION_END_ENDPOINT;
     this.fetchImpl = options.fetchImpl ?? fetch.bind(globalThis);
@@ -184,11 +239,19 @@ export class ProductFinderRealtimeBffClient implements ProductFinderRealtimeServ
     const turnDetection = Object.prototype.hasOwnProperty.call(payload, 'turnDetection')
       ? payload.turnDetection
       : payload.turn_detection;
-    if (!clientSecret || !model || !sessionId || !hasExactToolContract(tools)
+    if (!clientSecret || !model || !sessionId || !hasCompatibleToolContract(tools)
       || pushToTalk !== true || turnDetection !== null) {
       throw new ProductFinderRealtimeBffError(502, 'invalid_session_response', payload);
     }
     this.sessionId = sessionId;
+    if (this.hasFocusedProductContext) {
+      try {
+        await this.queueContextSync(sessionId);
+      } catch (error) {
+        await this.endSession({ sessionId }).catch(() => undefined);
+        throw error;
+      }
+    }
     return {
       clientSecret,
       model,
@@ -227,7 +290,20 @@ export class ProductFinderRealtimeBffClient implements ProductFinderRealtimeServ
     // Return the complete *domain result*. The Oneal BFF must already have
     // removed AiApi's HTTP envelope; the shared browser core is the only
     // layer allowed to extract and execute `__app_command__` from this body.
-    return validateProductToolResult(payload);
+    return call.name === 'product_details'
+      ? validateProductDetailsResult(payload)
+      : validateProductToolResult(payload);
+  }
+
+  async updateFocusedProduct(focusedProductId: number | null): Promise<void> {
+    if (focusedProductId !== null
+      && (!Number.isSafeInteger(focusedProductId) || focusedProductId < 1)) {
+      throw new ProductFinderRealtimeBffError(422, 'invalid_focused_product_id', null);
+    }
+    this.desiredFocusedProductId = focusedProductId;
+    this.hasFocusedProductContext = true;
+    if (!this.sessionId) return;
+    await this.queueContextSync(this.sessionId);
   }
 
   async reportUsage(report: RealtimeUsageReport): Promise<unknown> {
@@ -287,5 +363,30 @@ export class ProductFinderRealtimeBffClient implements ProductFinderRealtimeServ
     if (!this.sessionId || sessionId !== this.sessionId) {
       throw new ProductFinderRealtimeBffError(403, 'realtime_session_mismatch', null);
     }
+  }
+
+  private queueContextSync(sessionId: string): Promise<void> {
+    const request = this.contextQueue.then(async () => {
+      if (this.sessionId !== sessionId) return;
+      const response = await this.fetchImpl(this.contextEndpoint, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          focusedProductId: this.desiredFocusedProductId,
+        }),
+        credentials: 'same-origin',
+      });
+      const payload = await readJson(response);
+      if (!response.ok || !isRecord(payload) || typeof payload.focused !== 'boolean') {
+        throw new ProductFinderRealtimeBffError(
+          response.ok ? 502 : response.status,
+          errorCode(payload, response.ok ? 'invalid_context_response' : `realtime_context_${response.status}`),
+          payload,
+        );
+      }
+    });
+    this.contextQueue = request.catch(() => undefined);
+    return request;
   }
 }

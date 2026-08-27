@@ -88,6 +88,35 @@ describe('ProductFinderRealtimeBffClient', () => {
     });
   });
 
+  it('accepts the three-tool cutover contract and projects cached focus before mint resolves', async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse({
+        clientSecret: 'ek_test',
+        model: 'gpt-realtime',
+        sessionId: 'session-1',
+        tools: ['find_products', 'refine_search', 'product_details'],
+        pushToTalk: true,
+        turnDetection: null,
+      }))
+      .mockResolvedValueOnce(jsonResponse({ focused: true }));
+    const client = new ProductFinderRealtimeBffClient({
+      sessionEndpoint: '/v1/realtime/session',
+      contextEndpoint: '/v1/realtime/context',
+      fetchImpl,
+    });
+    await client.updateFocusedProduct(10407);
+
+    await expect(client.mintSession(context)).resolves.toMatchObject({
+      tools: ['find_products', 'refine_search', 'product_details'],
+    });
+    expect(fetchImpl.mock.calls[1]).toEqual([
+      '/v1/realtime/context',
+      expect.objectContaining({
+        body: JSON.stringify({ sessionId: 'session-1', focusedProductId: 10407 }),
+      }),
+    ]);
+  });
+
   it('dispatches an allowed tool for the minted session and preserves the app command', async () => {
     const commandResult = {
       status: 'matches',
@@ -128,6 +157,55 @@ describe('ProductFinderRealtimeBffClient', () => {
         sessionId: 'session-1',
       }),
     }));
+  });
+
+  it('validates closed product_details text separately from search results', async () => {
+    const mint = {
+      clientSecret: 'ek_test',
+      model: 'gpt-realtime',
+      sessionId: 'session-1',
+      tools: ['find_products', 'refine_search', 'product_details'],
+      pushToTalk: true,
+      turnDetection: null,
+    };
+    const safeDetails = {
+      status: 'details',
+      name: 'Blade Polyacrylite Helm',
+      line: 'Blade',
+      category_label: 'Helme',
+      features: ['Leichte Außenschale', 'Herausnehmbares Innenfutter'],
+      material: 'ABS, EPS',
+      sizes: ['S', 'M'],
+      colors: ['Schwarz'],
+      price_eur: [149.99, 169.99],
+      target_group: 'Erwachsene',
+    };
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse(mint))
+      .mockResolvedValueOnce(jsonResponse(safeDetails));
+    const client = new ProductFinderRealtimeBffClient({ fetchImpl });
+    await client.mintSession(context);
+
+    await expect(client.executeTool({
+      name: 'product_details', args: {}, callId: 'detail-1', sessionId: 'session-1',
+    })).resolves.toEqual(safeDetails);
+
+    for (const unsafe of [
+      { status: 'details', name: '<script>alert(1)</script>' },
+      { status: 'details', material: 'Mehr unter https://example.test' },
+      { status: 'details', product_id: 10407 },
+      { status: 'matches', name: 'falscher Zustand' },
+    ]) {
+      const invalidClient = new ProductFinderRealtimeBffClient({
+        fetchImpl: vi.fn()
+          .mockResolvedValueOnce(jsonResponse(mint))
+          .mockResolvedValueOnce(jsonResponse(unsafe)),
+      });
+      await invalidClient.mintSession(context);
+      await expect(invalidClient.executeTool({
+        name: 'product_details', args: {}, callId: 'detail-2', sessionId: 'session-1',
+      })).rejects.toMatchObject({ status: 502 });
+    }
   });
 
   it('rejects the real AiApi transport envelope if the BFF forgot to unwrap it', async () => {

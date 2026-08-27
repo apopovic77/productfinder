@@ -42,6 +42,10 @@ export const REALTIME_TOOL_ENDPOINT: string =
   import.meta.env.VITE_REALTIME_TOOL_ENDPOINT
   || `${ONEAL_API_BASE}/realtime/tool`;
 
+export const REALTIME_CONTEXT_ENDPOINT: string =
+  import.meta.env.VITE_REALTIME_CONTEXT_ENDPOINT
+  || `${ONEAL_API_BASE}/realtime/context`;
+
 export const REALTIME_USAGE_ENDPOINT: string =
   import.meta.env.VITE_REALTIME_USAGE_ENDPOINT
   || `${ONEAL_API_BASE}/realtime/usage`;

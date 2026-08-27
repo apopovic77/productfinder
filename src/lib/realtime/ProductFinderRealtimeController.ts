@@ -1,4 +1,5 @@
 import {
+  PRODUCT_DETAILS_FUNCTION_OUTPUT_KIND,
   RealtimeBrowserSession,
   type AudioOwnershipPort,
   type RealtimeAgentCoreSnapshot,
@@ -21,6 +22,8 @@ export interface ProductFinderRealtimeServerPort {
   mintSession(context: ProductFinderEntryContext): Promise<RealtimeMintResult>;
   /** BFF-owned tool dispatch bound to the minted session. */
   executeTool(call: RealtimeToolCall): Promise<unknown>;
+  /** Projects browser focus into the server-owned active session context. */
+  updateFocusedProduct(focusedProductId: number | null): Promise<void>;
   /** Browser-safe BFF usage projection; model and voice session stay server-owned. */
   reportUsage(report: RealtimeUsageReport): Promise<unknown>;
   /** Idempotent BFF release for the currently minted browser session. */
@@ -46,8 +49,10 @@ const OPENAI_REALTIME_CALLS_URL = 'https://api.openai.com/v1/realtime/calls';
 export class ProductFinderRealtimeController {
   private readonly adapter: ProductFinderRealtimeAdapter;
   private readonly session: RealtimeBrowserSession<ProductFinderEntryContext>;
+  private readonly server: ProductFinderRealtimeServerPort;
 
   constructor(options: ProductFinderRealtimeControllerOptions) {
+    this.server = options.server;
     this.adapter = new ProductFinderRealtimeAdapter({
       selectionProjection: options.selectionProjection,
       audioOwnership: options.audioOwnership,
@@ -56,6 +61,9 @@ export class ProductFinderRealtimeController {
     this.session = new RealtimeBrowserSession(this.adapter.core, {
       mintSession: context => options.server.mintSession(context),
       executeTool: call => options.server.executeTool(call),
+      replaceableToolOutputs: {
+        product_details: PRODUCT_DETAILS_FUNCTION_OUTPUT_KIND,
+      },
       reportUsage: report => options.server.reportUsage(report),
       endSession: input => options.server.endSession(input),
       acquireMicrophone: async () => navigator.mediaDevices.getUserMedia({
@@ -77,6 +85,7 @@ export class ProductFinderRealtimeController {
         delayMs: 250,
       }),
       reportError: (event, error, context) => options.telemetry?.error?.(event, error, context),
+      reportInfo: (event, context) => options.telemetry?.info?.(event, context),
       exchangeSdp: async ({ offerSdp, clientSecret, model }) => {
         const response = await fetch(
           `${OPENAI_REALTIME_CALLS_URL}?model=${encodeURIComponent(model)}`,
@@ -109,6 +118,10 @@ export class ProductFinderRealtimeController {
 
   setPttActive(active: boolean): boolean {
     return this.session.setPttActive(active);
+  }
+
+  setFocusedProductId(focusedProductId: number | null): Promise<void> {
+    return this.server.updateFocusedProduct(focusedProductId);
   }
 
   close(): void {

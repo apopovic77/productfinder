@@ -22,6 +22,8 @@ interface ProductFinderRealtimeSurfaceProps {
   onClosed?: () => void;
   finderController: ProductFinderController;
   context: ProductFinderEntryContext;
+  focusedProductId: number | null;
+  onSelectionProjected(productId: string): void;
 }
 
 const STATUS_LABELS = {
@@ -56,6 +58,8 @@ export function ProductFinderRealtimeSurface({
   context,
   autoStart = false,
   onClosed,
+  focusedProductId,
+  onSelectionProjected,
 }: ProductFinderRealtimeSurfaceProps) {
   const runtime = useMemo(() => {
     const server = new ProductFinderRealtimeBffClient();
@@ -64,6 +68,14 @@ export function ProductFinderRealtimeSurface({
       selectionProjection: createProductFinderSelectionProjection(
         finderController,
         () => server.getSessionId(),
+        async productId => {
+          onSelectionProjected(productId);
+          const numericId = Number(productId);
+          if (!Number.isSafeInteger(numericId) || numericId < 1) {
+            throw new Error('Projected product has no valid numeric identity');
+          }
+          await server.updateFocusedProduct(numericId);
+        },
       ),
       audioOwnership: {
         setRealtimeOwned: active => soundService.setRealtimeOwned(active),
@@ -78,7 +90,7 @@ export function ProductFinderRealtimeSurface({
       },
     });
     return { controller };
-  }, [finderController]);
+  }, [finderController, onSelectionProjected]);
 
   const snapshot = useSyncExternalStore(
     runtime.controller.subscribe,
@@ -95,9 +107,19 @@ export function ProductFinderRealtimeSurface({
     };
   }, [runtime]);
 
+  useEffect(() => {
+    void runtime.controller.setFocusedProductId(focusedProductId).catch(error => {
+      console.error('[productfinder-realtime] realtime.context.update_failed', error);
+    });
+  }, [focusedProductId, runtime]);
+
   const start = useCallback(() => {
-    void runtime.controller.open(context);
-  }, [context, runtime]);
+    void runtime.controller.setFocusedProductId(focusedProductId)
+      .then(() => runtime.controller.open(context))
+      .catch(error => {
+        console.error('[productfinder-realtime] realtime.context.open_failed', error);
+      });
+  }, [context, focusedProductId, runtime]);
 
   const setTalking = useCallback((active: boolean) => {
     runtime.controller.setPttActive(active);
