@@ -3330,7 +3330,11 @@ export default class App extends React.Component<Props, State> {
           }}
         />
 
-        {(this.props.realtimeDemoEnabled || this.state.realtimeShortcutEnabled) && (
+        {/* Nur auf Wunsch (Header-Icon, Ctrl+Shift+V, ?voice=1) — die alte
+            Demo-Route blendete die Karte ungefragt ein (owner 2026-08-27,
+            media 120886). realtimeDemoEnabled bleibt als Flag, mountet aber
+            nichts mehr von selbst. */}
+        {this.state.realtimeShortcutEnabled && (
           <ProductFinderRealtimeSurface
             finderController={this.controller}
             autoStart={this.state.realtimeShortcutEnabled}
