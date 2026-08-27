@@ -69,6 +69,9 @@ jobs:
               fi
 
               cd "$CI_DIR"
+              # oneal intentionally has no GitHub SSH key. Rewrite every SSH
+              # GitHub submodule URL locally in the CI clone before sync/update.
+              git config --local url.https://github.com/.insteadOf git@github.com:
               git submodule sync --recursive
               git config submodule.libs/realtime-agent-web-core.url \
                 https://github.com/apopovic77/realtime-agent-web-core.git
