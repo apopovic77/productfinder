@@ -25,6 +25,8 @@ describe('ProductFinderRealtimeSurface contract', () => {
     expect(source).toContain('onClick={start}');
     expect(source).toContain('runtime.controller.open(context)');
     expect(source).toContain('runtime.controller.dispose()');
+    expect(source).toContain("window.addEventListener('pagehide', endOnPageHide)");
+    expect(source).toContain("window.removeEventListener('pagehide', endOnPageHide)");
   });
 
   it('keeps vertical UI interaction separate from push-to-talk pointer state', () => {

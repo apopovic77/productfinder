@@ -2,10 +2,13 @@ import {
   APP_COMMAND_KEY,
   type RealtimeMintResult,
   type RealtimeToolCall,
+  type RealtimeUsageReport,
 } from '../../../libs/realtime-agent-web-core/dist/index.js';
 import {
+  REALTIME_SESSION_END_ENDPOINT,
   REALTIME_SESSION_ENDPOINT,
   REALTIME_TOOL_ENDPOINT,
+  REALTIME_USAGE_ENDPOINT,
 } from '../../config/apiConfig';
 import type { ProductFinderEntryContext } from './ProductFinderRealtimeAdapter';
 import type { ProductFinderRealtimeServerPort } from './ProductFinderRealtimeController';
@@ -20,6 +23,8 @@ type FetchPort = (input: RequestInfo | URL, init?: RequestInit) => Promise<Respo
 export interface ProductFinderRealtimeBffClientOptions {
   sessionEndpoint?: string;
   toolEndpoint?: string;
+  usageEndpoint?: string;
+  sessionEndEndpoint?: string;
   fetchImpl?: FetchPort;
 }
 
@@ -135,12 +140,16 @@ function validateProductToolResult(payload: unknown): JsonRecord {
 export class ProductFinderRealtimeBffClient implements ProductFinderRealtimeServerPort {
   private readonly sessionEndpoint: string;
   private readonly toolEndpoint: string;
+  private readonly usageEndpoint: string;
+  private readonly sessionEndEndpoint: string;
   private readonly fetchImpl: FetchPort;
   private sessionId: string | null = null;
 
   constructor(options: ProductFinderRealtimeBffClientOptions = {}) {
     this.sessionEndpoint = options.sessionEndpoint ?? REALTIME_SESSION_ENDPOINT;
     this.toolEndpoint = options.toolEndpoint ?? REALTIME_TOOL_ENDPOINT;
+    this.usageEndpoint = options.usageEndpoint ?? REALTIME_USAGE_ENDPOINT;
+    this.sessionEndEndpoint = options.sessionEndEndpoint ?? REALTIME_SESSION_END_ENDPOINT;
     this.fetchImpl = options.fetchImpl ?? fetch.bind(globalThis);
   }
 
@@ -219,5 +228,64 @@ export class ProductFinderRealtimeBffClient implements ProductFinderRealtimeServ
     // removed AiApi's HTTP envelope; the shared browser core is the only
     // layer allowed to extract and execute `__app_command__` from this body.
     return validateProductToolResult(payload);
+  }
+
+  async reportUsage(report: RealtimeUsageReport): Promise<unknown> {
+    this.assertCurrentSession(report.sessionId);
+    const response = await this.fetchImpl(this.usageEndpoint, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: report.sessionId,
+        usageEventId: report.usageEventId,
+        audio_input_tokens: report.audioInputTokens,
+        audio_output_tokens: report.audioOutputTokens,
+        text_input_tokens: report.textInputTokens,
+        text_output_tokens: report.textOutputTokens,
+        cached_text_input_tokens: report.cachedTextInputTokens,
+        cached_audio_input_tokens: report.cachedAudioInputTokens,
+        duration_sec: report.durationSec,
+      }),
+      credentials: 'same-origin',
+      keepalive: true,
+    });
+    const payload = await readJson(response);
+    if (!response.ok) {
+      throw new ProductFinderRealtimeBffError(
+        response.status,
+        errorCode(payload, `realtime_usage_${response.status}`),
+        payload,
+      );
+    }
+    return payload;
+  }
+
+  async endSession(input: Readonly<{ sessionId: string }>): Promise<unknown> {
+    this.assertCurrentSession(input.sessionId);
+    // The local authority ends synchronously. A subsequent open must not be
+    // cleared by the completion of this idempotent network release.
+    this.sessionId = null;
+    const response = await this.fetchImpl(this.sessionEndEndpoint, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ sessionId: input.sessionId }),
+      credentials: 'same-origin',
+      keepalive: true,
+    });
+    const payload = await readJson(response);
+    if (!response.ok) {
+      throw new ProductFinderRealtimeBffError(
+        response.status,
+        errorCode(payload, `realtime_session_end_${response.status}`),
+        payload,
+      );
+    }
+    return payload;
+  }
+
+  private assertCurrentSession(sessionId: string): void {
+    if (!this.sessionId || sessionId !== this.sessionId) {
+      throw new ProductFinderRealtimeBffError(403, 'realtime_session_mismatch', null);
+    }
   }
 }

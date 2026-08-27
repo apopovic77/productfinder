@@ -49,11 +49,30 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
           script: |
+            set -e
             # Deploy to GSG server using the configured SSH key
             ssh -i /root/.ssh/oneal_aiserver -o StrictHostKeyChecking=no gsgbot@aiserver.oneal.eu '
-              cd /var/www/productfinder/repo
-              git fetch origin main
-              git reset --hard origin/main
+              set -e
+              CI_DIR=/var/www/productfinder/ci
+              SITE_DIR=/var/www/productfinder/site
+              REPOSITORY_URL=https://github.com/apopovic77/productfinder.git
+
+              # This clone belongs exclusively to CI. Never mutate the shared
+              # operator checkout in /var/www/productfinder/repo.
+              if [ ! -d "$CI_DIR/.git" ]; then
+                mkdir -p "$(dirname "$CI_DIR")"
+                git clone --branch main --single-branch "$REPOSITORY_URL" "$CI_DIR"
+              else
+                git -C "$CI_DIR" remote set-url origin "$REPOSITORY_URL"
+                git -C "$CI_DIR" fetch origin main
+                git -C "$CI_DIR" reset --hard origin/main
+              fi
+
+              cd "$CI_DIR"
+              git submodule sync --recursive
+              git config submodule.libs/realtime-agent-web-core.url \
+                https://github.com/apopovic77/realtime-agent-web-core.git
+              git submodule update --init --recursive
 
               # Create .env with GSG config (using local storage API)
               cat > .env << EOF
@@ -67,8 +86,8 @@ jobs:
 
               npm install
               VITE_BASE_PATH=/ npm run build
-              mkdir -p /var/www/productfinder/site
-              rsync -av --delete dist/ /var/www/productfinder/site/
+              mkdir -p "$SITE_DIR"
+              rsync -av --delete dist/ "$SITE_DIR/"
               echo "Deployment to aiserver completed!"
             '
 

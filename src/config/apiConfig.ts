@@ -42,6 +42,14 @@ export const REALTIME_TOOL_ENDPOINT: string =
   import.meta.env.VITE_REALTIME_TOOL_ENDPOINT
   || `${ONEAL_API_BASE}/realtime/tool`;
 
+export const REALTIME_USAGE_ENDPOINT: string =
+  import.meta.env.VITE_REALTIME_USAGE_ENDPOINT
+  || `${ONEAL_API_BASE}/realtime/usage`;
+
+export const REALTIME_SESSION_END_ENDPOINT: string =
+  import.meta.env.VITE_REALTIME_SESSION_END_ENDPOINT
+  || `${ONEAL_API_BASE}/realtime/session/end`;
+
 /** Display-only gate. The authoritative kill switch lives in the BFF. */
 export const REALTIME_DEMO_ENABLED: boolean =
   import.meta.env.VITE_PRODUCTFINDER_REALTIME_ENABLED === 'true';
