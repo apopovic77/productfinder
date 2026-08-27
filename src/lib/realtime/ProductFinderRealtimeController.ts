@@ -58,12 +58,12 @@ const GREETING_LANGUAGE: Record<string, string> = {
  * die Sprache zu raten; danach gilt die Persona-Sprachregel von AiApi.
  */
 const GREETING_TEXT: Record<string, string> = {
-  de: "Hallo! Ich bin der O'Neal Sprachberater. Welches Produkt suchen Sie?",
-  en: "Hello! I'm the O'Neal voice advisor. Which product are you looking for?",
-  sl: "Pozdravljeni! Sem glasovni svetovalec O'Neal. Kateri izdelek iščete?",
-  it: "Ciao! Sono il consulente vocale O'Neal. Quale prodotto stai cercando?",
-  es: "¡Hola! Soy el asesor de voz de O'Neal. ¿Qué producto buscas?",
-  fr: "Bonjour ! Je suis le conseiller vocal O'Neal. Quel produit cherchez-vous ?",
+  de: 'Wie kann ich Ihnen helfen?',
+  en: 'How can I help you?',
+  sl: 'Kako vam lahko pomagam?',
+  it: 'Come posso aiutarla?',
+  es: '¿En qué puedo ayudarle?',
+  fr: 'Comment puis-je vous aider ?',
 };
 
 const OPENAI_REALTIME_CALLS_URL = 'https://api.openai.com/v1/realtime/calls';
