@@ -53,6 +53,11 @@ import { buildBrandUrl, type BrandFacet } from './utils/brandSelection';
 import { createPortal } from 'react-dom';
 import { fetchFacets } from './data/ProductRepository';
 import { ProductFinderRealtimeSurface } from './components/ProductFinderRealtimeSurface';
+import {
+  buildProductFinderCartContext,
+  resolveProductPriceEur,
+  type ProductFinderCartContext,
+} from './lib/realtime';
 
 function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
@@ -65,6 +70,7 @@ type CartItem = {
   name: string;
   variantLabel?: string;
   priceText?: string;
+  priceEur?: number;
   imageUrl?: string;
   quantity: number;
   // For new tabular cart view
@@ -297,6 +303,8 @@ export default class App extends React.Component<Props, State> {
   private fpsRaf: number | null = null;
   private fpsLastSample = 0;
   private fpsFrameCount = 0;
+  private realtimeCartSource: readonly CartItem[] | null = null;
+  private realtimeCartContext: ProductFinderCartContext | null = null;
 
   // Use global shared image queue for truly sequential loading
   private imageLoadQueue = globalImageQueue;
@@ -1526,6 +1534,14 @@ export default class App extends React.Component<Props, State> {
     return String(key);
   }
 
+  private getRealtimeCartContext(): ProductFinderCartContext | null {
+    if (this.realtimeCartSource !== this.state.cartItems) {
+      this.realtimeCartSource = this.state.cartItems;
+      this.realtimeCartContext = buildProductFinderCartContext(this.state.cartItems);
+    }
+    return this.realtimeCartContext;
+  }
+
   private handleProductBuy = (payload: {
     product: Product;
     variant?: any;
@@ -1555,6 +1571,7 @@ export default class App extends React.Component<Props, State> {
 
       if (existingIndex >= 0) {
         const existing = cartItems[existingIndex];
+        const priceEur = resolveProductPriceEur(payload.product, payload.variant);
         const sizes = { ...(existing.sizes || {}) };
         const nextSizeQty = (sizes[chosenSize] || 0) + delta;
         if (nextSizeQty <= 0) delete sizes[chosenSize];
@@ -1563,7 +1580,12 @@ export default class App extends React.Component<Props, State> {
         if (newQuantity <= 0) {
           cartItems.splice(existingIndex, 1);
         } else {
-          cartItems[existingIndex] = { ...existing, sizes, quantity: newQuantity };
+          cartItems[existingIndex] = {
+            ...existing,
+            sizes,
+            quantity: newQuantity,
+            ...(priceEur !== null ? { priceEur } : {}),
+          };
         }
       } else if (delta > 0) {
         // Extract available colors and sizes from product variants
@@ -1583,6 +1605,7 @@ export default class App extends React.Component<Props, State> {
           name: payload.product.name,
           variantLabel: payload.variantLabel || payload.variant?.name || payload.variant?.sku,
           priceText: payload.priceText,
+          priceEur: resolveProductPriceEur(payload.product, payload.variant) ?? undefined,
           imageUrl: payload.imageUrl,
           quantity: delta,
           articleNumber: payload.product.sku || (payload.product.raw as any)?.product_code || '',
@@ -1620,7 +1643,21 @@ export default class App extends React.Component<Props, State> {
   private handleCartChangeColor = (itemId: string, newColor: string) => {
     this.setState(prev => ({
       cartItems: prev.cartItems.map(item =>
-        item.id === itemId ? { ...item, color: newColor } : item
+        item.id === itemId ? (() => {
+          const product = this.controller.getCatalogAllProducts()
+            .find(candidate => candidate.id === item.productId);
+          const variant = product?.variants?.find(candidate => (
+            candidate.color || candidate.option1 || candidate.name
+          ) === newColor);
+          const priceEur = product
+            ? resolveProductPriceEur(product, variant ?? null)
+            : null;
+          return {
+            ...item,
+            color: newColor,
+            ...(priceEur !== null ? { priceEur } : {}),
+          };
+        })() : item
       ),
     }));
   };
@@ -3362,6 +3399,7 @@ export default class App extends React.Component<Props, State> {
               ? Number(selectedProduct.id)
               : null}
             selectedVariant={this.getRealtimeSelectedVariant()}
+            cart={this.getRealtimeCartContext()}
             context={{
               brand: this.props.brand,
               language: this.props.locale,

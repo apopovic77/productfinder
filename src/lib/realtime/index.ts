@@ -2,6 +2,7 @@ export * from './ProductFinderRealtimeAdapter';
 export * from './ProductFinderRealtimeBffClient';
 export * from './AgentSelectionProjection';
 export * from './ProductFinderRealtimeController';
+export * from './ProductFinderCartContext';
 export * from './ProductFinderRealtimeAuditBuffer';
 export * from './ProductSelectionResolveClient';
 export * from './ProductFinderSelectionProjection';

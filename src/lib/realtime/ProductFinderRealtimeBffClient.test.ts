@@ -104,7 +104,11 @@ describe('ProductFinderRealtimeBffClient', () => {
       contextEndpoint: '/v1/realtime/context',
       fetchImpl,
     });
-    await client.updateProductContext(10407, { size: 'M', color: 'Schwarz' });
+    await client.updateProductContext(10407, { size: 'M', color: 'Schwarz' }, {
+      items: [{ productId: 14491, size: 'M', color: 'Rot', quantity: 2, priceEur: 119.99 }],
+      count: 999,
+      totalEur: 0,
+    });
 
     await expect(client.mintSession(context)).resolves.toMatchObject({
       tools: ['find_products', 'refine_search', 'product_details'],
@@ -116,9 +120,31 @@ describe('ProductFinderRealtimeBffClient', () => {
           sessionId: 'session-1',
           focusedProductId: 10407,
           selectedVariant: { size: 'M', color: 'Schwarz' },
+          cart: {
+            items: [{ productId: 14491, size: 'M', color: 'Rot', quantity: 2, priceEur: 119.99 }],
+            count: 2,
+            totalEur: 239.98,
+          },
         }),
       }),
     ]);
+  });
+
+  it('accepts the backward-compatible four-tool mint while keeping the two-tool baseline', async () => {
+    const client = new ProductFinderRealtimeBffClient({
+      fetchImpl: vi.fn(async () => jsonResponse({
+        clientSecret: 'ek_test',
+        model: 'gpt-realtime',
+        sessionId: 'session-1',
+        tools: ['find_products', 'refine_search', 'product_details', 'cart_details'],
+        pushToTalk: true,
+        turnDetection: null,
+      })),
+    });
+
+    await expect(client.mintSession(context)).resolves.toMatchObject({
+      tools: ['find_products', 'refine_search', 'product_details', 'cart_details'],
+    });
   });
 
   it('updates and clears the selected variant atomically with browser focus', async () => {
@@ -135,28 +161,30 @@ describe('ProductFinderRealtimeBffClient', () => {
     const client = new ProductFinderRealtimeBffClient({ fetchImpl });
     await client.mintSession(context);
 
-    await client.updateProductContext(10407, { size: ' M ', color: ' Schwarz ' });
+    await client.updateProductContext(10407, { size: ' M ', color: ' Schwarz ' }, null);
     expect(fetchImpl).toHaveBeenLastCalledWith(expect.any(String), expect.objectContaining({
       body: JSON.stringify({
         sessionId: 'session-1',
         focusedProductId: 10407,
         selectedVariant: { size: 'M', color: 'Schwarz' },
+        cart: null,
       }),
     }));
 
-    await client.updateProductContext(null, { size: 'XL', color: 'Rot' });
+    await client.updateProductContext(null, { size: 'XL', color: 'Rot' }, null);
     expect(fetchImpl).toHaveBeenLastCalledWith(expect.any(String), expect.objectContaining({
       body: JSON.stringify({
         sessionId: 'session-1',
         focusedProductId: null,
         selectedVariant: null,
+        cart: null,
       }),
     }));
 
     await expect(client.updateProductContext(10407, {
       size: 'M',
       sku: 'must-not-cross-the-browser-port',
-    } as never)).rejects.toMatchObject({ code: 'invalid_selected_variant', status: 422 });
+    } as never, null)).rejects.toMatchObject({ code: 'invalid_selected_variant', status: 422 });
     expect(fetchImpl).toHaveBeenCalledTimes(3);
   });
 
@@ -331,6 +359,63 @@ describe('ProductFinderRealtimeBffClient', () => {
       await expect(invalidClient.executeTool({
         name: 'product_details', args: {}, callId: 'detail-2', sessionId: 'session-1',
       })).rejects.toMatchObject({ status: 502 });
+    }
+  });
+
+  it('validates closed cart_details results without accepting IDs, SKUs, URLs or markup', async () => {
+    const mint = {
+      clientSecret: 'ek_test',
+      model: 'gpt-realtime',
+      sessionId: 'session-1',
+      tools: ['find_products', 'refine_search', 'product_details', 'cart_details'],
+      pushToTalk: true,
+      turnDetection: null,
+    };
+    const safeCart = {
+      status: 'cart',
+      count: 3,
+      total_eur: 359.97,
+      items: [{
+        name: '3SRS Helmet',
+        line: '3SRS',
+        category_label: 'Helme MX',
+        size: 'M',
+        color: 'Schwarz',
+        quantity: 3,
+        price_eur: 119.99,
+      }],
+    };
+    const client = new ProductFinderRealtimeBffClient({
+      fetchImpl: vi.fn()
+        .mockResolvedValueOnce(jsonResponse(mint))
+        .mockResolvedValueOnce(jsonResponse(safeCart))
+        .mockResolvedValueOnce(jsonResponse({ status: 'empty', count: 0, total_eur: 0 }))
+        .mockResolvedValueOnce(jsonResponse({ status: 'no_such_position', count: 0, total_eur: 0 })),
+    });
+    await client.mintSession(context);
+    const call = { name: 'cart_details', args: {}, callId: 'cart-1', sessionId: 'session-1' };
+    await expect(client.executeTool(call)).resolves.toEqual(safeCart);
+    await expect(client.executeTool({ ...call, callId: 'cart-2' })).resolves.toEqual({
+      status: 'empty', count: 0, total_eur: 0,
+    });
+    await expect(client.executeTool({ ...call, callId: 'cart-3' })).resolves.toEqual({
+      status: 'no_such_position', count: 0, total_eur: 0,
+    });
+
+    for (const unsafe of [
+      { ...safeCart, items: [{ ...safeCart.items[0], product_id: 14491 }] },
+      { ...safeCart, items: [{ ...safeCart.items[0], sku: 'SECRET-SKU' }] },
+      { ...safeCart, items: [{ ...safeCart.items[0], name: '<b>3SRS</b>' }] },
+      { ...safeCart, items: [{ ...safeCart.items[0], line: 'https://example.test' }] },
+      { status: 'empty', count: 1, total_eur: 119.99, items: [] },
+    ]) {
+      const invalidClient = new ProductFinderRealtimeBffClient({
+        fetchImpl: vi.fn()
+          .mockResolvedValueOnce(jsonResponse(mint))
+          .mockResolvedValueOnce(jsonResponse(unsafe)),
+      });
+      await invalidClient.mintSession(context);
+      await expect(invalidClient.executeTool(call)).rejects.toMatchObject({ status: 502 });
     }
   });
 

@@ -16,15 +16,16 @@ describe('ProductFinderRealtimeController contract', () => {
   it('keeps credentials behind the injected BFF port', () => {
     expect(source).toContain('options.server.mintSession(context)');
     expect(source).toContain('options.server.executeTool(call)');
-    expect(source).toContain('this.server.updateProductContext(focusedProductId, selectedVariant)');
+    expect(source).toContain('this.server.updateProductContext(focusedProductId, selectedVariant, cart)');
     expect(source).toContain('options.server.reportUsage(report)');
     expect(source).toContain('options.server.endSession(input)');
     expect(source).not.toContain('VITE_AI_API_KEY');
     expect(source).not.toContain("'/ai/realtime/token'");
   });
 
-  it('registers only product details as replaceable conversation context', () => {
+  it('registers mutable detail and cart outputs as separate replacement scopes', () => {
     expect(source).toContain('product_details: PRODUCT_DETAILS_FUNCTION_OUTPUT_KIND');
+    expect(source).toContain('cart_details: CART_DETAILS_FUNCTION_OUTPUT_KIND');
     expect(source).not.toContain('find_products: PRODUCT_DETAILS_FUNCTION_OUTPUT_KIND');
   });
 

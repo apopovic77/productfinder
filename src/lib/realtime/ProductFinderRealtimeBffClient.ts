@@ -15,14 +15,17 @@ import {
 import type { ProductFinderEntryContext } from './ProductFinderRealtimeAdapter';
 import type {
   ProductFinderRealtimeEventBatch,
+  ProductFinderCartContext,
+  ProductFinderCartItemContext,
   ProductFinderRealtimeServerPort,
   ProductFinderSelectedVariantContext,
 } from './ProductFinderRealtimeController';
 
-const ALLOWED_TOOLS = new Set(['find_products', 'refine_search', 'product_details']);
+const ALLOWED_TOOLS = new Set(['find_products', 'refine_search', 'product_details', 'cart_details']);
 const REQUIRED_TOOLS = ['find_products', 'refine_search'] as const;
 const PRODUCT_RESULT_STATUSES = new Set(['matches', 'empty', 'unavailable']);
 const PRODUCT_DETAILS_STATUSES = new Set(['details', 'no_focus', 'no_such_position', 'unavailable']);
+const CART_DETAILS_STATUSES = new Set(['cart', 'empty', 'no_such_position']);
 const APPLIED_SORT_VALUES = new Set(['default', 'newest', 'price_desc', 'price_asc']);
 const FORBIDDEN_MODEL_RESULT_KEYS = ['selection_token', 'ids', 'name', 'description'] as const;
 const PRODUCT_DETAIL_KEYS = new Set([
@@ -30,6 +33,10 @@ const PRODUCT_DETAIL_KEYS = new Set([
   'sizes', 'colors', 'price_eur', 'target_group', 'selected',
 ]);
 const PRODUCT_DETAIL_SELECTED_KEYS = new Set(['size', 'color', 'price_eur', 'available']);
+const CART_DETAIL_KEYS = new Set(['status', 'count', 'total_eur', 'items']);
+const CART_DETAIL_ITEM_KEYS = new Set([
+  'name', 'line', 'category_label', 'size', 'color', 'quantity', 'price_eur',
+]);
 const UNSAFE_DETAIL_TEXT = /(?:<[^>]+>|https?:\/\/|www\.|\[[^\]]+\]\([^)]+\))/i;
 
 type FetchPort = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -219,6 +226,47 @@ function validateProductDetailsResult(payload: unknown): JsonRecord {
   return payload;
 }
 
+function validateCartDetailsResult(payload: unknown): JsonRecord {
+  if (!isRecord(payload)
+    || typeof payload.status !== 'string'
+    || !CART_DETAILS_STATUSES.has(payload.status)
+    || Object.keys(payload).some(key => !CART_DETAIL_KEYS.has(key))
+    || !Number.isSafeInteger(payload.count)
+    || Number(payload.count) < 0
+    || typeof payload.total_eur !== 'number'
+    || !Number.isFinite(payload.total_eur)
+    || payload.total_eur < 0) {
+    throw new ProductFinderRealtimeBffError(502, 'invalid_tool_response', payload);
+  }
+  const items = payload.items;
+  if (payload.status !== 'cart') {
+    if (payload.count !== 0 || payload.total_eur !== 0
+      || (items !== undefined && (!Array.isArray(items) || items.length !== 0))) {
+      throw new ProductFinderRealtimeBffError(502, 'invalid_tool_response', payload);
+    }
+    return payload;
+  }
+  if (!Array.isArray(items) || items.length < 1 || items.length > 100
+    || items.some(item => !isRecord(item)
+      || Object.keys(item).some(key => !CART_DETAIL_ITEM_KEYS.has(key))
+      || !validateDetailString(item.name, 300)
+      || typeof item.name !== 'string'
+      || !item.name.trim()
+      || !validateDetailString(item.line, 200)
+      || !validateDetailString(item.category_label, 200)
+      || !validateDetailString(item.size, 100)
+      || !validateDetailString(item.color, 100)
+      || !Number.isSafeInteger(item.quantity)
+      || Number(item.quantity) < 1
+      || Number(item.quantity) > 100
+      || typeof item.price_eur !== 'number'
+      || !Number.isFinite(item.price_eur)
+      || item.price_eur < 0)) {
+    throw new ProductFinderRealtimeBffError(502, 'unsafe_tool_response', payload);
+  }
+  return payload;
+}
+
 
 function normalizeSelectedVariantContext(
   value: ProductFinderSelectedVariantContext | null,
@@ -244,6 +292,57 @@ function normalizeSelectedVariantContext(
   return Object.freeze({ ...(size ? { size } : {}), ...(color ? { color } : {}) });
 }
 
+function normalizeCartContext(value: ProductFinderCartContext | null): ProductFinderCartContext | null {
+  if (value === null) return null;
+  if (!isRecord(value)
+    || Object.keys(value).some(key => !['items', 'count', 'totalEur'].includes(key))
+    || !Array.isArray(value.items)
+    || value.items.length > 100) {
+    throw new ProductFinderRealtimeBffError(422, 'invalid_cart_context', null);
+  }
+  const items: ProductFinderCartItemContext[] = value.items.map(raw => {
+    if (!isRecord(raw)
+      || Object.keys(raw).some(key => !['productId', 'size', 'color', 'quantity', 'priceEur'].includes(key))
+      || !Number.isSafeInteger(raw.productId)
+      || Number(raw.productId) < 1
+      || !Number.isSafeInteger(raw.quantity)
+      || Number(raw.quantity) < 1
+      || Number(raw.quantity) > 100
+      || typeof raw.priceEur !== 'number'
+      || !Number.isFinite(raw.priceEur)
+      || raw.priceEur < 0
+      || raw.priceEur > 1_000_000) {
+      throw new ProductFinderRealtimeBffError(422, 'invalid_cart_context', null);
+    }
+    const normalizeLabel = (candidate: unknown): string | undefined => {
+      if (candidate === undefined || candidate === null) return undefined;
+      if (typeof candidate !== 'string') {
+        throw new ProductFinderRealtimeBffError(422, 'invalid_cart_context', null);
+      }
+      const normalized = candidate.trim();
+      if (!normalized || normalized.length > 100 || UNSAFE_DETAIL_TEXT.test(normalized)) {
+        throw new ProductFinderRealtimeBffError(422, 'invalid_cart_context', null);
+      }
+      return normalized;
+    };
+    const size = normalizeLabel(raw.size);
+    const color = normalizeLabel(raw.color);
+    return Object.freeze({
+      productId: Number(raw.productId),
+      ...(size ? { size } : {}),
+      ...(color ? { color } : {}),
+      quantity: Number(raw.quantity),
+      priceEur: raw.priceEur,
+    });
+  });
+  const count = items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalEur = Number(items.reduce(
+    (sum, item) => sum + item.quantity * item.priceEur,
+    0,
+  ).toFixed(2));
+  return Object.freeze({ items: Object.freeze(items), count, totalEur });
+}
+
 /**
  * Browser client for the productfinder-owned Realtime BFF.
  *
@@ -264,7 +363,8 @@ export class ProductFinderRealtimeBffClient implements ProductFinderRealtimeServ
   private readonly knownSessionIds = new Set<string>();
   private desiredFocusedProductId: number | null = null;
   private desiredSelectedVariant: ProductFinderSelectedVariantContext | null = null;
-  private hasFocusedProductContext = false;
+  private desiredCart: ProductFinderCartContext | null = null;
+  private hasProductContext = false;
   private contextQueue: Promise<void> = Promise.resolve();
 
   constructor(options: ProductFinderRealtimeBffClientOptions = {}) {
@@ -318,7 +418,7 @@ export class ProductFinderRealtimeBffClient implements ProductFinderRealtimeServ
     }
     this.sessionId = sessionId;
     this.knownSessionIds.add(sessionId);
-    if (this.hasFocusedProductContext) {
+    if (this.hasProductContext) {
       try {
         await this.queueContextSync(sessionId);
       } catch (error) {
@@ -364,14 +464,15 @@ export class ProductFinderRealtimeBffClient implements ProductFinderRealtimeServ
     // Return the complete *domain result*. The Oneal BFF must already have
     // removed AiApi's HTTP envelope; the shared browser core is the only
     // layer allowed to extract and execute `__app_command__` from this body.
-    return call.name === 'product_details'
-      ? validateProductDetailsResult(payload)
-      : validateProductToolResult(payload);
+    if (call.name === 'product_details') return validateProductDetailsResult(payload);
+    if (call.name === 'cart_details') return validateCartDetailsResult(payload);
+    return validateProductToolResult(payload);
   }
 
   async updateProductContext(
     focusedProductId: number | null,
     selectedVariant: ProductFinderSelectedVariantContext | null,
+    cart: ProductFinderCartContext | null,
   ): Promise<void> {
     if (focusedProductId !== null
       && (!Number.isSafeInteger(focusedProductId) || focusedProductId < 1)) {
@@ -381,7 +482,8 @@ export class ProductFinderRealtimeBffClient implements ProductFinderRealtimeServ
     this.desiredSelectedVariant = focusedProductId === null
       ? null
       : normalizeSelectedVariantContext(selectedVariant);
-    this.hasFocusedProductContext = true;
+    this.desiredCart = normalizeCartContext(cart);
+    this.hasProductContext = true;
     if (!this.sessionId) return;
     await this.queueContextSync(this.sessionId);
   }
@@ -495,6 +597,7 @@ export class ProductFinderRealtimeBffClient implements ProductFinderRealtimeServ
           sessionId,
           focusedProductId: this.desiredFocusedProductId,
           selectedVariant: this.desiredSelectedVariant,
+          cart: this.desiredCart,
         }),
         credentials: 'same-origin',
       });

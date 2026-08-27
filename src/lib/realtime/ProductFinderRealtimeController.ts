@@ -1,4 +1,5 @@
 import {
+  CART_DETAILS_FUNCTION_OUTPUT_KIND,
   PRODUCT_DETAILS_FUNCTION_OUTPUT_KIND,
   RealtimeBrowserSession,
   type AudioOwnershipPort,
@@ -26,6 +27,7 @@ export interface ProductFinderRealtimeServerPort {
   updateProductContext(
     focusedProductId: number | null,
     selectedVariant: ProductFinderSelectedVariantContext | null,
+    cart: ProductFinderCartContext | null,
   ): Promise<void>;
   /** Browser-safe BFF usage projection; model and voice session stay server-owned. */
   reportUsage(report: RealtimeUsageReport): Promise<unknown>;
@@ -40,6 +42,20 @@ export interface ProductFinderRealtimeServerPort {
 export interface ProductFinderSelectedVariantContext {
   readonly size?: string;
   readonly color?: string;
+}
+
+export interface ProductFinderCartItemContext {
+  readonly productId: number;
+  readonly size?: string;
+  readonly color?: string;
+  readonly quantity: number;
+  readonly priceEur: number;
+}
+
+export interface ProductFinderCartContext {
+  readonly items: readonly ProductFinderCartItemContext[];
+  readonly count: number;
+  readonly totalEur: number;
 }
 
 export type ProductFinderRealtimeBrowserEventKind = 'transcript' | 'error' | 'lifecycle';
@@ -118,6 +134,7 @@ export class ProductFinderRealtimeController {
       executeTool: call => options.server.executeTool(call),
       replaceableToolOutputs: {
         product_details: PRODUCT_DETAILS_FUNCTION_OUTPUT_KIND,
+        cart_details: CART_DETAILS_FUNCTION_OUTPUT_KIND,
       },
       reportUsage: report => options.server.reportUsage(report),
       endSession: input => options.server.endSession(input),
@@ -205,8 +222,9 @@ export class ProductFinderRealtimeController {
   setProductContext(
     focusedProductId: number | null,
     selectedVariant: ProductFinderSelectedVariantContext | null,
+    cart: ProductFinderCartContext | null,
   ): Promise<void> {
-    return this.server.updateProductContext(focusedProductId, selectedVariant);
+    return this.server.updateProductContext(focusedProductId, selectedVariant, cart);
   }
 
   close(): void {

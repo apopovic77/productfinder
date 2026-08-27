@@ -13,6 +13,7 @@ import {
   ProductFinderRealtimeController,
   createProductFinderSelectionProjection,
   type ProductFinderEntryContext,
+  type ProductFinderCartContext,
   type ProductFinderSelectedVariantContext,
 } from '../lib/realtime';
 import { soundService } from '../services/SoundService';
@@ -27,6 +28,7 @@ interface ProductFinderRealtimeSurfaceProps {
   context: ProductFinderEntryContext;
   focusedProductId: number | null;
   selectedVariant: ProductFinderSelectedVariantContext | null;
+  cart: ProductFinderCartContext | null;
   onSelectionProjected(productId: string, count: number): void;
 }
 
@@ -64,6 +66,7 @@ export function ProductFinderRealtimeSurface({
   onClosed,
   focusedProductId,
   selectedVariant,
+  cart,
   onSelectionProjected,
 }: ProductFinderRealtimeSurfaceProps) {
   const selectedVariantContext = useMemo<ProductFinderSelectedVariantContext | null>(() => {
@@ -127,20 +130,20 @@ export function ProductFinderRealtimeSurface({
   }, [runtime, snapshot.transcript]);
 
   useEffect(() => {
-    void runtime.controller.setProductContext(focusedProductId, selectedVariantContext).catch(error => {
+    void runtime.controller.setProductContext(focusedProductId, selectedVariantContext, cart).catch(error => {
       console.error('[productfinder-realtime] realtime.context.update_failed', error);
       runtime.audit.recordError('realtime.context.update_failed', error);
     });
-  }, [focusedProductId, runtime, selectedVariantContext]);
+  }, [cart, focusedProductId, runtime, selectedVariantContext]);
 
   const start = useCallback(() => {
-    void runtime.controller.setProductContext(focusedProductId, selectedVariantContext)
+    void runtime.controller.setProductContext(focusedProductId, selectedVariantContext, cart)
       .then(() => runtime.controller.open(context))
       .catch(error => {
         console.error('[productfinder-realtime] realtime.context.open_failed', error);
         runtime.audit.recordError('realtime.context.open_failed', error);
       });
-  }, [context, focusedProductId, runtime, selectedVariantContext]);
+  }, [cart, context, focusedProductId, runtime, selectedVariantContext]);
 
   const setTalking = useCallback((active: boolean) => {
     if (active) void orbRef.current?.resumeAudio();
