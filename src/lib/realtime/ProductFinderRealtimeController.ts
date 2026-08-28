@@ -122,10 +122,7 @@ export class ProductFinderRealtimeController {
   private readonly session: RealtimeBrowserSession<ProductFinderEntryContext>;
   private readonly server: ProductFinderRealtimeServerPort;
 
-  private readonly options: ProductFinderRealtimeControllerOptions;
-
   constructor(options: ProductFinderRealtimeControllerOptions) {
-    this.options = options;
     this.server = options.server;
     this.adapter = new ProductFinderRealtimeAdapter({
       selectionProjection: options.selectionProjection,
@@ -229,17 +226,21 @@ export class ProductFinderRealtimeController {
 
   /**
    * Owner 2026-08-27: „Wenn er spricht und ich klicke, soll er sofort still
-   * sein." Sofort wirksam: Agent-Audio stumm + Playback anhalten. Der echte
-   * Abbruch der Antwort (response.cancel + output_audio_buffer.clear) gehoert
-   * in den Shared Core (Tschepp-Codex2, Auftrag erteilt) — bis dahin laeuft
-   * die Antwort serverseitig weiter, ist aber nicht mehr zu hoeren; der
-   * naechste Turn (PTT loslassen) hebt die Stummschaltung wieder auf.
+   * sein." Der Shared Core bricht die Provider-Antwort autoritativ ab; der
+   * lokale Audio-Stopp bleibt als synchrone Ergaenzung, bis der Clear-Frame
+   * vom Provider verarbeitet ist.
    */
   interruptAgentSpeech(): boolean {
+    const interrupted = this.session.interrupt();
+    const muted = this.muteAgentAudio();
+    return interrupted || muted;
+  }
+
+  private muteAgentAudio(): boolean {
     const audio = this.remoteAudio;
     if (!audio) return false;
     audio.muted = true;
-    this.options.telemetry?.info?.('realtime.agent.interrupted', { source: 'user' });
+    audio.pause();
     return true;
   }
 
@@ -251,9 +252,9 @@ export class ProductFinderRealtimeController {
   }
 
   setPttActive(active: boolean): boolean {
-    // Druecken unterbricht den Agenten, Loslassen (= neuer Turn) gibt das
-    // Audio fuer die naechste Antwort wieder frei.
-    if (active) this.interruptAgentSpeech();
+    // Der Core unterbricht beim Druecken selbst. Lokal stoppen wir nur das
+    // Audio sofort, damit response.cancel nicht doppelt auf den Wire geht.
+    if (active) this.muteAgentAudio();
     else this.resumeAgentAudio();
     return this.session.setPttActive(active);
   }

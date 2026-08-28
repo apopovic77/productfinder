@@ -21,8 +21,11 @@ describe('ProductFinderRealtimeSurface contract', () => {
     expect(source).not.toMatch(/VITE_.*(?:KEY|SECRET|TOKEN)/);
   });
 
-  it('opens from an explicit user action and always disposes the session', () => {
-    expect(source).toContain('onClick={canStart ? start : undefined}');
+  it('opens from an explicit user action, supports card barge-in and always disposes the session', () => {
+    expect(source).toContain('onClick={canStart');
+    expect(source).toContain('? start');
+    expect(source).toContain("orbState === 'agent_speaking' || orbState === 'thinking'");
+    expect(source).toContain('runtime.controller.interruptAgentSpeech()');
     expect(source).toContain('runtime.controller.open(context)');
     expect(source).toContain('runtime.controller.dispose()');
     expect(source).toContain("window.addEventListener('pagehide', endOnPageHide)");

@@ -38,4 +38,14 @@ describe('ProductFinderRealtimeController contract', () => {
     expect(source).not.toContain("input_audio_buffer.commit");
     expect(source).not.toContain('private channel: RTCDataChannel');
   });
+
+  it('delegates direct barge-in once and keeps immediate local audio silence', () => {
+    expect(source.match(/this\.session\.interrupt\(\)/g)).toHaveLength(1);
+    expect(source).toContain('const interrupted = this.session.interrupt()');
+    expect(source).toContain('const muted = this.muteAgentAudio()');
+    expect(source).toContain('audio.muted = true');
+    expect(source).toContain('audio.pause()');
+    expect(source).toContain('if (active) this.muteAgentAudio()');
+    expect(source).toContain('return this.session.setPttActive(active)');
+  });
 });
