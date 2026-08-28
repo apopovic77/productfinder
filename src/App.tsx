@@ -2690,8 +2690,13 @@ export default class App extends React.Component<Props, State> {
             <button type="button" className="pf-mobile-icon-btn" onClick={() => this.setState({ mobilePivotOpen: !this.state.mobilePivotOpen })}>
               <i className="fa-solid fa-bars"></i>
             </button>
-            <button type="button" className="pf-mobile-icon-btn" onClick={() => window.dispatchEvent(new Event('pf-toggle-dev-overlay'))}>
-              <i className="fa-solid fa-gear"></i>
+            <button
+              type="button"
+              className={`pf-mobile-icon-btn pf-mobile-voice-btn ${this.state.realtimeShortcutEnabled ? 'active' : ''}`}
+              aria-label={this.state.realtimeShortcutEnabled ? 'Sprachberater ausblenden' : 'Sprachberater starten'}
+              onClick={() => this.setState(prev => ({ realtimeShortcutEnabled: !prev.realtimeShortcutEnabled, mobilePivotOpen: false }))}
+            >
+              <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
             </button>
           </div>
         </div>
@@ -2804,13 +2809,30 @@ export default class App extends React.Component<Props, State> {
 
         {/* Mobile Pivot Overlay */}
         {this.state.mobilePivotOpen && (
-          <div className="pf-mobile-pivot-overlay">
+          <div className="pf-mobile-pivot-overlay" onClick={(e) => { if (e.target === e.currentTarget) this.setState({ mobilePivotOpen: false }); }}>
+           <div className="pf-mobile-sheet" role="dialog" aria-label="Menü">
+            <div className="pf-mobile-sheet-handle" aria-hidden="true" />
             <div className="pf-mobile-pivot-header">
-              <span>Menu</span>
-              <button type="button" className="pf-mobile-search-close" onClick={() => this.setState({ mobilePivotOpen: false })}>
+              <span>Menü</span>
+              <button type="button" className="pf-mobile-search-close" aria-label="Schließen" onClick={() => this.setState({ mobilePivotOpen: false })}>
                 <i className="fa-solid fa-xmark"></i>
               </button>
             </div>
+
+            {/* Sprachberater (owner 2026-08-27, Handy): Start direkt aus dem Menü. */}
+            <button
+              type="button"
+              className={`pf-mobile-voice-cta ${this.state.realtimeShortcutEnabled ? 'active' : ''}`}
+              onClick={() => this.setState(prev => ({ realtimeShortcutEnabled: !prev.realtimeShortcutEnabled, mobilePivotOpen: false }))}
+            >
+              <span className="pf-mobile-voice-cta-icon" aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3M8.5 21h7"/></svg>
+              </span>
+              <span className="pf-mobile-voice-cta-text">
+                <strong>{this.state.realtimeShortcutEnabled ? 'Sprachberater beenden' : 'Sprachberater starten'}</strong>
+                <small>{this.state.realtimeShortcutEnabled ? 'Sitzung läuft — tippen zum Ausblenden' : 'Sprechen statt tippen · Testphase, Gespräch wird gespeichert'}</small>
+              </span>
+            </button>
 
             {/* Ansicht: gleicher Pivot/Grouped-Switch wie der Desktop-Header
                 (owner 2026-08-25, media 120666 — Handy und Desktop sollen
@@ -2889,6 +2911,13 @@ export default class App extends React.Component<Props, State> {
                   </button>
                 ))}
             </div>
+            <div className="pf-mobile-pivot-label" style={{ marginTop: 20 }}>Entwickler</div>
+            <div className="pf-mobile-pivot-dims">
+              <button type="button" className="pf-mobile-pivot-dim" onClick={() => { this.setState({ mobilePivotOpen: false }); window.dispatchEvent(new Event('pf-toggle-dev-overlay')); }}>
+                <i className="fa-solid fa-gear" style={{ marginRight: 6 }}></i>Dev-Overlay
+              </button>
+            </div>
+           </div>
           </div>
         )}
 
