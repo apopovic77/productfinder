@@ -211,7 +211,11 @@ export function ProductFinderRealtimeSurface({
         aria-pressed={isConnected ? snapshot.isMicActive : undefined}
         aria-label={canStart ? 'Sprachberater starten' : (snapshot.isMicActive ? 'Loslassen zum Senden' : 'Zum Sprechen gedrückt halten')}
         disabled={!canStart && !isConnected}
-        onClick={canStart ? start : undefined}
+        onClick={canStart
+          ? start
+          : (orbState === 'agent_speaking' || orbState === 'thinking')
+            ? () => { runtime.controller.interruptAgentSpeech(); }
+            : undefined}
         onPointerDown={isConnected ? (event) => {
           event.currentTarget.setPointerCapture(event.pointerId);
           setTalking(true);
@@ -250,9 +254,11 @@ export function ProductFinderRealtimeSurface({
             ? 'Tippen zum Starten'
             : snapshot.isMicActive
               ? 'Loslassen zum Senden'
-              : isConnected
-                ? 'Gedrückt halten und sprechen'
-                : STATUS_LABELS[snapshot.status]}
+              : orbState === 'agent_speaking'
+                ? 'Tippen zum Stoppen · Halten zum Sprechen'
+                : isConnected
+                  ? 'Gedrückt halten und sprechen'
+                  : STATUS_LABELS[snapshot.status]}
         </span>
 
         {snapshot.activeTool && (

@@ -122,7 +122,10 @@ export class ProductFinderRealtimeController {
   private readonly session: RealtimeBrowserSession<ProductFinderEntryContext>;
   private readonly server: ProductFinderRealtimeServerPort;
 
+  private readonly options: ProductFinderRealtimeControllerOptions;
+
   constructor(options: ProductFinderRealtimeControllerOptions) {
+    this.options = options;
     this.server = options.server;
     this.adapter = new ProductFinderRealtimeAdapter({
       selectionProjection: options.selectionProjection,
@@ -152,8 +155,14 @@ export class ProductFinderRealtimeController {
       // Visualisierung reichen. Der Orb besitzt kein Audio, stoppt nichts.
       onInputStreamChanged: stream => this.setMedia({ input: (stream as unknown as MediaStream | null) ?? null }),
       onOutputStreamChanged: stream => this.setMedia({ output: (stream as unknown as MediaStream | null) ?? null }),
-      mountRemoteAudio: audio => document.body.appendChild(audio as unknown as HTMLAudioElement),
-      unmountRemoteAudio: audio => (audio as unknown as HTMLAudioElement).remove(),
+      mountRemoteAudio: audio => {
+        this.remoteAudio = audio as unknown as HTMLAudioElement;
+        document.body.appendChild(this.remoteAudio);
+      },
+      unmountRemoteAudio: audio => {
+        (audio as unknown as HTMLAudioElement).remove();
+        if (this.remoteAudio === audio) this.remoteAudio = null;
+      },
       // Sprache aus dem Sprach-Gate (owner 2026-08-27): Begruessung und
       // Gespraech in der gewaehlten Sprache, nicht fest Deutsch.
       createOpenGreeting: context => {
@@ -215,7 +224,37 @@ export class ProductFinderRealtimeController {
     return this.session.open(context);
   }
 
+  /** Remote-<audio> des Agenten (fuer Sofort-Stopp beim Barge-in). */
+  private remoteAudio: HTMLAudioElement | null = null;
+
+  /**
+   * Owner 2026-08-27: „Wenn er spricht und ich klicke, soll er sofort still
+   * sein." Sofort wirksam: Agent-Audio stumm + Playback anhalten. Der echte
+   * Abbruch der Antwort (response.cancel + output_audio_buffer.clear) gehoert
+   * in den Shared Core (Tschepp-Codex2, Auftrag erteilt) — bis dahin laeuft
+   * die Antwort serverseitig weiter, ist aber nicht mehr zu hoeren; der
+   * naechste Turn (PTT loslassen) hebt die Stummschaltung wieder auf.
+   */
+  interruptAgentSpeech(): boolean {
+    const audio = this.remoteAudio;
+    if (!audio) return false;
+    audio.muted = true;
+    this.options.telemetry?.info?.('realtime.agent.interrupted', { source: 'user' });
+    return true;
+  }
+
+  private resumeAgentAudio(): void {
+    const audio = this.remoteAudio;
+    if (!audio) return;
+    audio.muted = false;
+    void audio.play().catch(() => undefined);
+  }
+
   setPttActive(active: boolean): boolean {
+    // Druecken unterbricht den Agenten, Loslassen (= neuer Turn) gibt das
+    // Audio fuer die naechste Antwort wieder frei.
+    if (active) this.interruptAgentSpeech();
+    else this.resumeAgentAudio();
     return this.session.setPttActive(active);
   }
 
