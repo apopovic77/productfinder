@@ -122,6 +122,21 @@ export function resolveCategoryPresentation(href?: string): CategoryPresentation
   return result;
 }
 
+/**
+ * Hero-Darstellung (owner 2026-08-29, Vorbild TimGuignard/swiper-carousel):
+ * 'row' = bestehende Reihe (Default, unveraendert), 'reveal' = Parallaxe mit
+ * Aufrichten und Bodenschatten. Auswahl per URL `?hero=reveal`.
+ */
+export type HeroVariant = 'row' | 'reveal';
+
+export function resolveHeroVariant(href?: string): HeroVariant {
+  try {
+    const url = new URL(href ?? window.location.href);
+    if (url.searchParams.get('hero') === 'reveal') return 'reveal';
+  } catch { /* SSR/tests ohne window */ }
+  return 'row';
+}
+
 export function resolveCatalogFlow(href?: string): CatalogFlowVariant {
   try {
     const url = new URL(href ?? window.location.href);

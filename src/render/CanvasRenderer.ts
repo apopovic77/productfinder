@@ -23,6 +23,43 @@ type LoadTask = {
 };
 
 export class CanvasRenderer<T> {
+  /**
+   * Zweite Hero-Variante (?hero=reveal, owner 2026-08-29). Standard bleibt
+   * die bestehende Reihe; diese hier gleitet/kippt/schattet nach dem Vorbild
+   * des swiper-carousel-Prototyps.
+   */
+  public heroRevealMode = false;
+  /**
+   * Nur in der Hero-Reihe anwenden, nicht in Overview/Poster/Grid. Wird aus
+   * dem vorhandenen Renderer-State abgeleitet (isHeroMode ohne Root-Overview),
+   * damit kein zweiter Zustand gepflegt werden muss.
+   */
+  private get heroRowActive(): boolean {
+    // Gleiche Bedingung wie das Hero-Dock (Zeile ~1443): Praesentationsreihe
+    // oder geoeffnetes Produkt.
+    return (this.isHeroMode && !this.isRootOverview) || !!this.selectedProduct;
+  }
+
+  /** Weicher Bodenschatten (Vorbild: 20px-Kreis mit grossem box-shadow). */
+  private drawHeroRevealShadow(cx: number, baseY: number, width: number, alpha: number): void {
+    if (alpha <= 0.01) return;
+    const rx = Math.max(8, width * 0.42);
+    const ry = Math.max(4, width * 0.075);
+    const cy = baseY - ry * 0.35;
+    const g = this.ctx.createRadialGradient(cx, cy, 0, cx, cy, rx);
+    g.addColorStop(0, `rgba(0,0,0,${0.32 * alpha})`);
+    g.addColorStop(0.55, `rgba(0,0,0,${0.14 * alpha})`);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    this.ctx.save();
+    this.ctx.translate(cx, cy);
+    this.ctx.scale(1, ry / rx);
+    this.ctx.beginPath();
+    this.ctx.arc(0, 0, rx, 0, Math.PI * 2);
+    this.ctx.fillStyle = g;
+    this.ctx.fill();
+    this.ctx.restore();
+  }
+
   private rafId: number | null = null;
   private lodUpdateInterval: number | null = null;
   public hoveredItem: T | null = null;
@@ -1459,10 +1496,32 @@ export class CanvasRenderer<T> {
 
       // Images are loaded with ?trim=true — transparent border already removed.
       // No client-side scale correction needed.
-      const drawW = w;
-      const drawH = h;
-      const drawX = x;
-      const drawY = y;
+      let drawW = w;
+      let drawH = h;
+      let drawX = x;
+      let drawY = y;
+      // Zweite Hero-Variante (owner 2026-08-29, Vorbild TimGuignard/
+      // swiper-carousel): Fortschritts-Parallaxe statt starrer Reihe. Das
+      // Produkt gleitet gegen die Karte, kippt zur Mitte auf, wird kleiner
+      // je weiter es aussen liegt, und traegt einen weichen Bodenschatten,
+      // der sich halb so schnell bewegt. Kein Swiper noetig — den
+      // Fortschritt liefert unsere Viewport-Mitte.
+      let revealProgress = 0;
+      let revealRotation = 0;
+      if (this.heroRevealMode && this.heroRowActive) {
+        const centerX = (this.viewportLeft + this.viewportRight) / 2;
+        const span = Math.max(1, (this.viewportRight - this.viewportLeft) * 0.5);
+        revealProgress = Math.max(-1, Math.min(1, ((x + w / 2) - centerX) / span));
+        const abs = Math.abs(revealProgress);
+        const scale = 1 - abs * 0.2;
+        const shiftX = revealProgress * -w * 0.12;
+        revealRotation = ((abs * 15) - 15) * (Math.PI / 180) * (revealProgress < 0 ? -1 : 1);
+        drawW = w * scale;
+        drawH = h * scale;
+        drawX = x + (w - drawW) / 2 + shiftX;
+        drawY = y + (h - drawH) / 2;
+        this.drawHeroRevealShadow(drawX + drawW / 2 + shiftX * 0.5, drawY + drawH, drawW, opacity * (1 - abs * 0.6));
+      }
 
       // Get product and ensure image is loaded (OOP self-managed)
       const product = n.data as any as Product;
@@ -1679,6 +1738,13 @@ export class CanvasRenderer<T> {
           this.imageScaleFactor.targetValue = 1.0;
           this.drawImageFitFaded(img, drawX, drawY, drawW, drawH);
         }
+      } else if (revealRotation !== 0) {
+        // Aufrichten zur Mitte: um den Bildmittelpunkt drehen.
+        this.ctx.save();
+        this.ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
+        this.ctx.rotate(revealRotation);
+        this.drawImageFitFaded(img, -drawW / 2, -drawH / 2, drawW, drawH);
+        this.ctx.restore();
       } else {
         // Non-selected cells must NOT touch the shared imageScaleFactor —
         // the frame-level reset above owns the "no selection" case (issue #300).

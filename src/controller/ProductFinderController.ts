@@ -12,6 +12,7 @@ import { PivotDimensionAnalyzer, type PivotAnalysisResult, type PivotDimensionDe
 import type { Orientation } from '../layout/PivotLayouter';
 import type { PivotGroup } from '../layout/PivotGroup';
 import type { CatalogEntrySelection } from '../config/CatalogEntryConfig';
+import { resolveHeroVariant } from '../config/CatalogEntryConfig';
 import { filterCatalogProducts, getCatalogCategory, stampCatalogCategory, findCatalogCategoryByLabel, catalogCategoryOrder, CATALOG_CATEGORY_ATTRIBUTE } from '../utils/catalogEntry';
 import { resolveAgentSelectionProducts } from '../lib/realtime/AgentSelectionProjection';
 
@@ -113,6 +114,8 @@ export class ProductFinderController {
       () => this.layoutService.getPivotDimension()
     );
     this.renderer.productsOnGpu = this.productsOnGpu;
+    // Hero-Variante einmal beim Bootstrap (?hero=reveal), Default unveraendert.
+    this.renderer.heroRevealMode = resolveHeroVariant() === 'reveal';
     }
 
     // Setup favorites listener
