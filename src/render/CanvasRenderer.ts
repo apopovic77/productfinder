@@ -40,9 +40,6 @@ export class CanvasRenderer<T> {
     return (this.isHeroMode && !this.isRootOverview) || !!this.selectedProduct;
   }
 
-  /** Bewegungszustand pro Node fuer die Reveal-Kippung (dp/Frame, geglaettet). */
-  private heroRevealMotion = new Map<string, { p: number; e: number; rot: number }>();
-
   /** Weicher Bodenschatten (Vorbild: 20px-Kreis mit grossem box-shadow). */
   private drawHeroRevealShadow(cx: number, baseY: number, width: number, alpha: number): void {
     if (alpha <= 0.01) return;
@@ -1505,12 +1502,12 @@ export class CanvasRenderer<T> {
       let drawY = y;
       // Zweite Hero-Variante (owner 2026-08-29, Vorbild TimGuignard/
       // swiper-carousel): Fortschritts-Parallaxe statt starrer Reihe. Das
-      // Produkt gleitet gegen die Karte, kippt zur Mitte auf, wird kleiner
-      // je weiter es aussen liegt, und traegt einen weichen Bodenschatten,
-      // der sich halb so schnell bewegt. Kein Swiper noetig — den
-      // Fortschritt liefert unsere Viewport-Mitte.
+      // Produkt gleitet gegen die Reihe, wird kleiner je weiter es aussen
+      // liegt, und traegt einen weichen Bodenschatten, der sich halb so
+      // schnell bewegt. Die Kipp-Rotation des Vorbilds ist bewusst draussen
+      // (Owner 2026-08-30: wackelte / endete schraeg). Kein Swiper noetig —
+      // den Fortschritt liefert unsere Viewport-Mitte.
       let revealProgress = 0;
-      let revealRotation = 0;
       if (this.heroRevealMode && this.heroRowActive) {
         const centerX = (this.viewportLeft + this.viewportRight) / 2;
         const span = Math.max(1, (this.viewportRight - this.viewportLeft) * 0.5);
@@ -1524,19 +1521,6 @@ export class CanvasRenderer<T> {
         // BEWEGUNG (Fortschritts-Delta pro Frame, weich ausklingend): beim
         // Wischen lehnen sich die Produkte in die Richtung, im Stand richten
         // sich ALLE — auch die seitlichen — wieder exakt auf.
-        // Stil = glatte Positions-Kurve des Vorbilds (Rotation folgt p, kein
-        // per-Frame-Differenzieren der Rotation selbst — das zitterte).
-        // Aufrecht im Stand kommt ueber einen traegen Energie-Faktor: er
-        // springt bei Bewegung sofort auf 1 und klingt danach langsam aus,
-        // skaliert nur die AMPLITUDE — Vorzeichen/Verlauf bleiben ruhig.
-        const maxTilt = 15 * (Math.PI / 180);
-        const motion = this.heroRevealMotion.get(n.id);
-        const dp = motion ? Math.abs(revealProgress - motion.p) : 0;
-        const energy = Math.max(Math.min(1, dp * 60), (motion?.e ?? 0) * 0.9);
-        const targetRot = revealProgress * maxTilt * energy;
-        revealRotation = motion ? motion.rot + (targetRot - motion.rot) * 0.25 : 0;
-        if (Math.abs(revealRotation) < 0.002 && energy < 0.02) revealRotation = 0;
-        this.heroRevealMotion.set(n.id, { p: revealProgress, e: energy, rot: revealRotation });
         drawW = w * scale;
         drawH = h * scale;
         drawX = x + (w - drawW) / 2 + shiftX;
@@ -1759,13 +1743,6 @@ export class CanvasRenderer<T> {
           this.imageScaleFactor.targetValue = 1.0;
           this.drawImageFitFaded(img, drawX, drawY, drawW, drawH);
         }
-      } else if (revealRotation !== 0) {
-        // Aufrichten zur Mitte: um den Bildmittelpunkt drehen.
-        this.ctx.save();
-        this.ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
-        this.ctx.rotate(revealRotation);
-        this.drawImageFitFaded(img, -drawW / 2, -drawH / 2, drawW, drawH);
-        this.ctx.restore();
       } else {
         // Non-selected cells must NOT touch the shared imageScaleFactor —
         // the frame-level reset above owns the "no selection" case (issue #300).
