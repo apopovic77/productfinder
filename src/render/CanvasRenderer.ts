@@ -40,6 +40,9 @@ export class CanvasRenderer<T> {
     return (this.isHeroMode && !this.isRootOverview) || !!this.selectedProduct;
   }
 
+  /** Bewegungszustand pro Node fuer die Reveal-Kippung (dp/Frame, geglaettet). */
+  private heroRevealMotion = new Map<string, { p: number; rot: number }>();
+
   /** Weicher Bodenschatten (Vorbild: 20px-Kreis mit grossem box-shadow). */
   private drawHeroRevealShadow(cx: number, baseY: number, width: number, alpha: number): void {
     if (alpha <= 0.01) return;
@@ -1515,7 +1518,19 @@ export class CanvasRenderer<T> {
         const abs = Math.abs(revealProgress);
         const scale = 1 - abs * 0.2;
         const shiftX = revealProgress * -w * 0.12;
-        revealRotation = ((abs * 15) - 15) * (Math.PI / 180) * (revealProgress < 0 ? -1 : 1);
+        // Ruhelage AUFRECHT (owner 2026-08-30): Das Vorbild kippt das aktive
+        // Produkt dauerhaft um -15 Grad — fuer Helme/Regenjacken liest sich
+        // das als Darstellungsfehler. Deshalb haengt die Kippung an der
+        // BEWEGUNG (Fortschritts-Delta pro Frame, weich ausklingend): beim
+        // Wischen lehnen sich die Produkte in die Richtung, im Stand richten
+        // sich ALLE — auch die seitlichen — wieder exakt auf.
+        const maxTilt = 15 * (Math.PI / 180);
+        const motion = this.heroRevealMotion.get(n.id);
+        const dp = motion ? revealProgress - motion.p : 0;
+        const targetRot = Math.max(-maxTilt, Math.min(maxTilt, dp * 40 * maxTilt));
+        revealRotation = motion ? motion.rot + (targetRot - motion.rot) * 0.15 : 0;
+        if (Math.abs(revealRotation) < 0.002) revealRotation = 0;
+        this.heroRevealMotion.set(n.id, { p: revealProgress, rot: revealRotation });
         drawW = w * scale;
         drawH = h * scale;
         drawX = x + (w - drawW) / 2 + shiftX;
