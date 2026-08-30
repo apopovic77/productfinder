@@ -41,7 +41,7 @@ export class CanvasRenderer<T> {
   }
 
   /** Bewegungszustand pro Node fuer die Reveal-Kippung (dp/Frame, geglaettet). */
-  private heroRevealMotion = new Map<string, { p: number; rot: number }>();
+  private heroRevealMotion = new Map<string, { p: number; e: number; rot: number }>();
 
   /** Weicher Bodenschatten (Vorbild: 20px-Kreis mit grossem box-shadow). */
   private drawHeroRevealShadow(cx: number, baseY: number, width: number, alpha: number): void {
@@ -1524,13 +1524,19 @@ export class CanvasRenderer<T> {
         // BEWEGUNG (Fortschritts-Delta pro Frame, weich ausklingend): beim
         // Wischen lehnen sich die Produkte in die Richtung, im Stand richten
         // sich ALLE — auch die seitlichen — wieder exakt auf.
+        // Stil = glatte Positions-Kurve des Vorbilds (Rotation folgt p, kein
+        // per-Frame-Differenzieren der Rotation selbst — das zitterte).
+        // Aufrecht im Stand kommt ueber einen traegen Energie-Faktor: er
+        // springt bei Bewegung sofort auf 1 und klingt danach langsam aus,
+        // skaliert nur die AMPLITUDE — Vorzeichen/Verlauf bleiben ruhig.
         const maxTilt = 15 * (Math.PI / 180);
         const motion = this.heroRevealMotion.get(n.id);
-        const dp = motion ? revealProgress - motion.p : 0;
-        const targetRot = Math.max(-maxTilt, Math.min(maxTilt, dp * 40 * maxTilt));
-        revealRotation = motion ? motion.rot + (targetRot - motion.rot) * 0.15 : 0;
-        if (Math.abs(revealRotation) < 0.002) revealRotation = 0;
-        this.heroRevealMotion.set(n.id, { p: revealProgress, rot: revealRotation });
+        const dp = motion ? Math.abs(revealProgress - motion.p) : 0;
+        const energy = Math.max(Math.min(1, dp * 60), (motion?.e ?? 0) * 0.9);
+        const targetRot = revealProgress * maxTilt * energy;
+        revealRotation = motion ? motion.rot + (targetRot - motion.rot) * 0.25 : 0;
+        if (Math.abs(revealRotation) < 0.002 && energy < 0.02) revealRotation = 0;
+        this.heroRevealMotion.set(n.id, { p: revealProgress, e: energy, rot: revealRotation });
         drawW = w * scale;
         drawH = h * scale;
         drawX = x + (w - drawW) / 2 + shiftX;
