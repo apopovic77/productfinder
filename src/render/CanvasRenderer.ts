@@ -1502,12 +1502,15 @@ export class CanvasRenderer<T> {
       let drawY = y;
       // Zweite Hero-Variante (owner 2026-08-29, Vorbild TimGuignard/
       // swiper-carousel): Fortschritts-Parallaxe statt starrer Reihe. Das
-      // Produkt gleitet gegen die Reihe, wird kleiner je weiter es aussen
-      // liegt, und traegt einen weichen Bodenschatten, der sich halb so
-      // schnell bewegt. Die Kipp-Rotation des Vorbilds ist bewusst draussen
-      // (Owner 2026-08-30: wackelte / endete schraeg). Kein Swiper noetig —
-      // den Fortschritt liefert unsere Viewport-Mitte.
+      // Produkt gleitet gegen die Reihe, kippt wie im Original (-15 Grad in
+      // der Mitte, aufrecht aussen), wird kleiner je weiter es aussen liegt,
+      // und traegt einen weichen Bodenschatten mit halber Geschwindigkeit.
+      // Der Productfinder nutzt die Variante nicht als Default — sie bleibt
+      // als 1:1-Portierung fuer Produkte, zu denen die Schraeglage passt
+      // (Owner 2026-08-30). Kein Swiper noetig — den Fortschritt liefert
+      // unsere Viewport-Mitte.
       let revealProgress = 0;
+      let revealRotation = 0;
       if (this.heroRevealMode && this.heroRowActive) {
         const centerX = (this.viewportLeft + this.viewportRight) / 2;
         const span = Math.max(1, (this.viewportRight - this.viewportLeft) * 0.5);
@@ -1521,6 +1524,7 @@ export class CanvasRenderer<T> {
         // BEWEGUNG (Fortschritts-Delta pro Frame, weich ausklingend): beim
         // Wischen lehnen sich die Produkte in die Richtung, im Stand richten
         // sich ALLE — auch die seitlichen — wieder exakt auf.
+        revealRotation = ((abs * 15) - 15) * (Math.PI / 180) * (revealProgress < 0 ? -1 : 1);
         drawW = w * scale;
         drawH = h * scale;
         drawX = x + (w - drawW) / 2 + shiftX;
@@ -1743,6 +1747,13 @@ export class CanvasRenderer<T> {
           this.imageScaleFactor.targetValue = 1.0;
           this.drawImageFitFaded(img, drawX, drawY, drawW, drawH);
         }
+      } else if (revealRotation !== 0) {
+        // Original-Kippung des Vorbilds: um den Bildmittelpunkt drehen.
+        this.ctx.save();
+        this.ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
+        this.ctx.rotate(revealRotation);
+        this.drawImageFitFaded(img, -drawW / 2, -drawH / 2, drawW, drawH);
+        this.ctx.restore();
       } else {
         // Non-selected cells must NOT touch the shared imageScaleFactor —
         // the frame-level reset above owns the "no selection" case (issue #300).
