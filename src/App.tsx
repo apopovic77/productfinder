@@ -2,6 +2,12 @@ import React, { lazy, Suspense } from 'react';
 import './App.css';
 import { CartView } from './components/cart/CartView';
 import { submitOrder } from './services/OrderService';
+import {
+  b2bCreateOrder, b2bFetchPrices, b2bLogin, b2bLogout, b2bValidateSession, loadB2BSession,
+  type B2BPrice, type B2BSession,
+} from './services/B2BService';
+import { resolveCartLineSkus } from './utils/cartSku';
+import type { CartB2BState } from './components/cart/CartView';
 import { SlidePanel, SlidePanelBackdrop } from './components/cart/SlidePanel';
 import './components/cart/CartView.css';
 import type { CartItem as CartViewItem, ProductSearchResult } from './components/cart/types';
@@ -10,7 +16,7 @@ import type { CartItem as CartViewItem, ProductSearchResult } from './components
 const ArcturianRendererComponent = lazy(() =>
   import('./render/ArcturianRenderer').then(m => ({ default: m.ArcturianRendererComponent }))
 );
-import type { Product } from './types/Product';
+import type { Product, ProductVariant } from './types/Product';
 import { ProductFinderController } from './controller/ProductFinderController';
 import { ProductAnnotations } from './components/ProductAnnotations';
 import { ProductOverlayModalV2 as ProductOverlayModal } from './components/ProductOverlayModalV2';
@@ -56,7 +62,7 @@ import {
 import { writeCatalogUrl } from './utils/catalogEntryUrl';
 import { buildBrandUrl, type BrandFacet } from './utils/brandSelection';
 import { createPortal } from 'react-dom';
-import { fetchFacets } from './data/ProductRepository';
+import { fetchFacets, fetchProductById } from './data/ProductRepository';
 import { ProductFinderRealtimeSurface } from './components/ProductFinderRealtimeSurface';
 import {
   buildProductFinderCartContext,
@@ -193,6 +199,19 @@ type State = {
   orderSubmitting: boolean;
   orderResult: string | null;
   orderError: string | null;
+  /** Händler-Sitzung (Veloconnect, Post #4851) — null = nicht angemeldet. */
+  b2bSession: B2BSession | null;
+  b2bLoginPending: boolean;
+  b2bLoginError: string | null;
+  /** Händlerpreise je Varianten-SKU, geladen nach Login / Warenkorb-Änderung. */
+  b2bPrices: Record<string, B2BPrice>;
+  b2bPricesPending: boolean;
+  /**
+   * Varianten (SKU je Farbe/Größe) je Produkt-ID. Die Katalogliste liefert
+   * keine Varianten — sie kommen nur aus dem Detail-Endpunkt und werden für
+   * Warenkorb-Produkte bei Login/Absenden nachgeladen.
+   */
+  b2bVariantsById: Record<string, ProductVariant[]>;
   cartPanelOpen: boolean;
   cartFullOverlay: boolean;
   realtimeShortcutEnabled: boolean;
@@ -293,6 +312,12 @@ const createInitialState = (): State => {
     orderSubmitting: false,
     orderResult: null,
     orderError: null,
+    b2bSession: loadB2BSession(),
+    b2bLoginPending: false,
+    b2bLoginError: null,
+    b2bPrices: {},
+    b2bPricesPending: false,
+    b2bVariantsById: {},
     cartPanelOpen: false,
     cartFullOverlay: false,
     // ?voice=1 blendet die Realtime-Flaeche ohne Tastatur ein (Handy/Tablet,
@@ -340,6 +365,8 @@ export default class App extends React.Component<Props, State> {
   state: State = createInitialState();
 
   async componentDidMount() {
+    // Gespeicherte Händler-Sitzung (Veloconnect) prüfen — nicht blockierend.
+    void this.validateB2BSessionOnBoot();
     window.addEventListener('keydown', this.handleRealtimeDemoHotkey);
     // Marken fuer das Breadcrumb-Dropdown (Markenwechsel im Kontext)
     fetchFacets().then((data: any) => {
@@ -462,6 +489,9 @@ export default class App extends React.Component<Props, State> {
   private sheetObserver: ResizeObserver | null = null;
 
   componentDidUpdate(prevProps: Props, prevState: State): void {
+    if (this.state.b2bSession && prevState.cartItems !== this.state.cartItems) {
+      this.scheduleB2BPriceRefresh();
+    }
     // Phone bottom sheet: publish its real height so the hero arrows and
     // counter sit just above it (48vh is only the sheet's maximum).
     if ((prevState.selectedProduct !== this.state.selectedProduct
@@ -1716,12 +1746,177 @@ export default class App extends React.Component<Props, State> {
 
     this.setState({ orderSubmitting: true, orderResult: null, orderError: null });
     try {
+      const session = this.state.b2bSession;
+      if (session) {
+        // Angemeldeter Händler: Übergabe an den B2B-Shop über Veloconnect.
+        await this.ensureB2BVariants();
+        const { lines, unresolved } = this.resolveB2BOrderLines();
+        if (unresolved.length > 0) {
+          throw new Error(`Keine Artikelnummer für: ${unresolved.join(', ')}`);
+        }
+        const result = await b2bCreateOrder(session, lines);
+        if (result.status !== 'finished') {
+          throw new Error('Der B2B-Shop hat die Bestellung nicht abgeschlossen.');
+        }
+        this.setState({
+          orderSubmitting: false,
+          orderResult: result.orderId ? `B2B ${result.orderId}` : `B2B ${result.transactionId ?? ''}`.trim(),
+          cartItems: [],
+          b2bPrices: {},
+        });
+        return;
+      }
       const result = await submitOrder({ items });
       // Success: clear the cart, keep the confirmation visible
       this.setState({ orderSubmitting: false, orderResult: result.order_number, cartItems: [] });
     } catch (e: any) {
       this.setState({ orderSubmitting: false, orderError: String(e?.message || e) });
     }
+  };
+
+  // === Händler-Login / Veloconnect (Post #4851, Section „Veloconnect-Integration") ===
+
+  /** Varianten eines Warenkorb-Produkts: aus dem Produkt selbst oder dem Detail-Cache. */
+  private variantsForCartItem = (productId: string): ProductVariant[] | undefined => {
+    const cached = this.state.b2bVariantsById[productId];
+    if (cached?.length) return cached;
+    const product = this.controller.getAllProducts().find(p => p.id === productId);
+    return product?.variants?.length ? product.variants : undefined;
+  };
+
+  private b2bVariantFetches = new Map<string, Promise<void>>();
+
+  /** Fehlende Varianten für alle Warenkorb-Produkte nachladen (Detail-Endpunkt). */
+  private ensureB2BVariants = async (): Promise<void> => {
+    const missing = Array.from(new Set(
+      this.state.cartItems.map(i => i.productId).filter(id => !this.variantsForCartItem(id)),
+    ));
+    await Promise.all(missing.map(id => {
+      let inflight = this.b2bVariantFetches.get(id);
+      if (!inflight) {
+        inflight = fetchProductById(id).then(detail => {
+          const variants = detail?.variants || [];
+          this.setState(prev => ({ b2bVariantsById: { ...prev.b2bVariantsById, [id]: variants } }));
+        }).finally(() => { this.b2bVariantFetches.delete(id); });
+        this.b2bVariantFetches.set(id, inflight);
+      }
+      return inflight;
+    }));
+  };
+
+  /** Alle Warenkorb-Zeilen auf Varianten-SKUs auflösen (Produkt aus dem Katalog). */
+  private resolveB2BOrderLines = (): { lines: Array<{ sku: string; quantity: number }>; unresolved: string[]; bySku: Record<string, string[]> } => {
+    const lines: Array<{ sku: string; quantity: number }> = [];
+    const unresolved: string[] = [];
+    const bySku: Record<string, string[]> = {};
+    for (const item of this.state.cartItems) {
+      const r = resolveCartLineSkus(item, this.variantsForCartItem(item.productId));
+      for (const l of r.lines) {
+        const existing = lines.find(x => x.sku === l.sku);
+        if (existing) existing.quantity += l.quantity; else lines.push({ sku: l.sku, quantity: l.quantity });
+        (bySku[l.sku] ||= []).push(item.id);
+      }
+      for (const u of r.unresolved) unresolved.push(`${item.name} ${item.color || ''} ${u.size}`.trim());
+    }
+    return { lines, unresolved, bySku };
+  };
+
+  private b2bPriceRefreshTimer: number | null = null;
+
+  /** Händlerpreise für den aktuellen Warenkorb nachladen (entprellt). */
+  private scheduleB2BPriceRefresh = () => {
+    if (!this.state.b2bSession) return;
+    if (this.b2bPriceRefreshTimer) window.clearTimeout(this.b2bPriceRefreshTimer);
+    this.b2bPriceRefreshTimer = window.setTimeout(() => {
+      this.b2bPriceRefreshTimer = null;
+      void this.refreshB2BPrices();
+    }, 300);
+  };
+
+  private refreshB2BPrices = async () => {
+    const session = this.state.b2bSession;
+    if (!session) return;
+    await this.ensureB2BVariants();
+    if (!this.state.b2bSession) return;
+    const skus = new Set<string>();
+    for (const item of this.state.cartItems) {
+      // Alle Varianten der gewählten Farbe — damit die Preise schon da sind,
+      // wenn der Händler weitere Größen einträgt.
+      for (const v of this.variantsForCartItem(item.productId) || []) {
+        const vColor = (v.color || v.option1 || '').trim().toLowerCase();
+        if (v.sku && (!item.color || !vColor || vColor === item.color.trim().toLowerCase())) skus.add(v.sku);
+      }
+    }
+    const missing = Array.from(skus).filter(sku => !(sku in this.state.b2bPrices));
+    if (missing.length === 0) return;
+    this.setState({ b2bPricesPending: true });
+    try {
+      const prices = await b2bFetchPrices(session, missing);
+      this.setState(prev => ({ b2bPrices: { ...prev.b2bPrices, ...prices }, b2bPricesPending: false }));
+    } catch (e: any) {
+      const status = typeof e?.status === 'number' ? e.status : 0;
+      // Sitzung abgelaufen → abmelden, alles andere still (Preise bleiben UVP).
+      if (status === 401) this.setState({ b2bSession: null, b2bPrices: {}, b2bPricesPending: false });
+      else this.setState({ b2bPricesPending: false });
+    }
+  };
+
+  private handleB2BLogin = async (customerNumber: string, password: string) => {
+    if (this.state.b2bLoginPending) return;
+    this.setState({ b2bLoginPending: true, b2bLoginError: null });
+    try {
+      const session = await b2bLogin(customerNumber, password);
+      this.setState({ b2bSession: session, b2bLoginPending: false, b2bPrices: {} }, () => { void this.refreshB2BPrices(); });
+    } catch (e: any) {
+      this.setState({ b2bLoginPending: false, b2bLoginError: String(e?.message || e) });
+    }
+  };
+
+  private handleB2BLogout = async () => {
+    const session = this.state.b2bSession;
+    this.setState({ b2bSession: null, b2bPrices: {}, b2bLoginError: null });
+    await b2bLogout(session);
+  };
+
+  /** Beim Start: gespeicherte Händler-Sitzung gegen den BFF prüfen. */
+  private validateB2BSessionOnBoot = async () => {
+    const session = this.state.b2bSession;
+    if (!session) return;
+    const fresh = await b2bValidateSession(session);
+    if (!fresh) this.setState({ b2bSession: null, b2bPrices: {} });
+    else if (fresh !== session) this.setState({ b2bSession: fresh });
+  };
+
+  private buildCartB2BState = (): CartB2BState => {
+    const { lines, bySku } = this.state.b2bSession ? this.resolveB2BOrderLines() : { lines: [], bySku: {} as Record<string, string[]> };
+    const unitPrices: CartB2BState['unitPrices'] = {};
+    let dealerTotal: number | null = 0;
+    for (const line of lines) {
+      const price = this.state.b2bPrices[line.sku];
+      for (const itemId of bySku[line.sku] || []) {
+        if (!unitPrices[itemId]) {
+          unitPrices[itemId] = {
+            unit: price?.dealerPrice ?? null,
+            currency: price?.currency || 'EUR',
+            unknown: Boolean(price?.unknown),
+          };
+        }
+      }
+      if (dealerTotal !== null) {
+        if (price?.dealerPrice === null || price?.dealerPrice === undefined) dealerTotal = null;
+        else dealerTotal += price.dealerPrice * line.quantity;
+      }
+    }
+    return {
+      customerNumber: this.state.b2bSession?.customerNumber ?? null,
+      loginPending: this.state.b2bLoginPending,
+      loginError: this.state.b2bLoginError,
+      unitPrices,
+      pricesPending: this.state.b2bPricesPending,
+      dealerTotal: lines.length ? dealerTotal : null,
+      onLogin: (c, pw) => { void this.handleB2BLogin(c, pw); },
+      onLogout: () => { void this.handleB2BLogout(); },
+    };
   };
 
   private toCartViewItems = (): CartViewItem[] => {
@@ -3490,6 +3685,7 @@ export default class App extends React.Component<Props, State> {
                 orderError={this.state.orderError}
                 onDismissOrderStatus={() => this.setState({ orderResult: null, orderError: null })}
                 onClose={() => this.setState({ cartPanelOpen: false, cartFullOverlay: false })}
+                b2b={this.buildCartB2BState()}
               />
             </div>
           </div>

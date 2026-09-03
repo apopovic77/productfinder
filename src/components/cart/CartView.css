@@ -428,3 +428,70 @@
 .cart-table th, .cart-table td { box-sizing: border-box; }
 .cart-col-size { min-width: 0 !important; width: 84px; }
 .cart-cell-qty { width: 84px; }
+
+/* Händler-Login / Veloconnect (Post #4851) */
+.cart-b2b-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 13px;
+  color: #8b949e;
+  flex-shrink: 0;
+}
+.cart-b2b-active { color: #c9d1d9; background: rgba(63, 185, 80, 0.08); }
+.cart-b2b-active strong { color: #fff; }
+.cart-b2b-link {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #c9d1d9;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.cart-b2b-link:hover:not(:disabled) { border-color: #fff; color: #fff; }
+.cart-b2b-form { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%; }
+.cart-b2b-input {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+  min-width: 140px;
+}
+.cart-b2b-submit {
+  background: #3fb950;
+  border: none;
+  color: #fff;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.cart-b2b-submit:disabled { background: rgba(63, 185, 80, 0.3); cursor: not-allowed; }
+.cart-b2b-error { color: #f85149; font-size: 12px; width: 100%; }
+.cart-col-ek, .cart-cell-ek, .cart-foot-ek { text-align: right; white-space: nowrap; }
+.cart-cell-ek { color: #c9d1d9; font-variant-numeric: tabular-nums; }
+.cart-cell-ek.is-unknown { color: #f85149; }
+.cart-foot-ek { font-weight: 700; color: #fff; }
+.cart-footer { align-items: center; gap: 16px; }
+.cart-footer-summary { margin-right: auto; font-size: 13px; color: #8b949e; }
+.cart-footer-summary strong { color: #fff; font-size: 15px; }
+.cart-footer-hint { margin-right: auto; font-size: 12px; color: #8b949e; }
+.cart-view.cart-light .cart-b2b-bar { color: #555; }
+.cart-view.cart-light .cart-b2b-active { color: #1a1a1a; background: #e8f7ee; }
+.cart-view.cart-light .cart-b2b-active strong, .cart-view.cart-light .cart-foot-ek,
+.cart-view.cart-light .cart-footer-summary strong { color: #1a1a1a; }
+.cart-view.cart-light .cart-b2b-input { background: #f5f5f5; color: #1a1a1a; border-color: #ddd; }
+.cart-view.cart-light .cart-b2b-link { color: #333; border-color: #ccc; }
+.cart-view.cart-light .cart-cell-ek { color: #333; }

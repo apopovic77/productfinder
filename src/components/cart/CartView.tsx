@@ -31,6 +31,23 @@ function sortSizes(sizes: string[]): string[] {
   });
 }
 
+/**
+ * Händler-Kontext (Veloconnect, Post #4851): Login mit Kundennummer, danach
+ * Händlerpreise je Zeile und Übergabe an den B2B-Shop. Optional — ohne
+ * `b2b` verhält sich die Ansicht wie bisher.
+ */
+export interface CartB2BState {
+  customerNumber: string | null;
+  loginPending: boolean;
+  loginError: string | null;
+  /** Händler-Einzelpreis je Zeilen-ID (erste bestellte Variante). */
+  unitPrices: Record<string, { unit: number | null; currency: string; unknown: boolean }>;
+  pricesPending: boolean;
+  dealerTotal: number | null;
+  onLogin: (customerNumber: string, password: string) => void;
+  onLogout: () => void;
+}
+
 interface CartViewProps extends CartViewCallbacks {
   items: CartItem[];
   title?: string;
@@ -38,6 +55,71 @@ interface CartViewProps extends CartViewCallbacks {
   orderResult?: string | null;
   orderError?: string | null;
   onDismissOrderStatus?: () => void;
+  b2b?: CartB2BState;
+}
+
+function formatMoney(value: number | null, currency: string): string {
+  if (value === null || !Number.isFinite(value)) return '–';
+  try {
+    return new Intl.NumberFormat('de-DE', { style: 'currency', currency }).format(value);
+  } catch {
+    return `${value.toFixed(2)} ${currency}`;
+  }
+}
+
+function B2BLoginBar({ b2b }: { b2b: CartB2BState }) {
+  const [open, setOpen] = useState(false);
+  const [customerNumber, setCustomerNumber] = useState('');
+  const [password, setPassword] = useState('');
+  if (b2b.customerNumber) {
+    return (
+      <div className="cart-b2b-bar cart-b2b-active">
+        <span className="cart-b2b-label">
+          Kunde <strong>{b2b.customerNumber}</strong> · Händlerpreise{b2b.pricesPending ? ' werden geladen …' : ' aktiv'}
+        </span>
+        <button type="button" className="cart-b2b-link" onClick={b2b.onLogout}>Abmelden</button>
+      </div>
+    );
+  }
+  return (
+    <div className="cart-b2b-bar">
+      {!open ? (
+        <>
+          <span className="cart-b2b-label">Für Händlerpreise und Übergabe an den B2B-Shop anmelden.</span>
+          <button type="button" className="cart-b2b-link" onClick={() => setOpen(true)}>Händler-Login</button>
+        </>
+      ) : (
+        <form
+          className="cart-b2b-form"
+          onSubmit={e => { e.preventDefault(); if (customerNumber.trim() && password) b2b.onLogin(customerNumber, password); }}
+        >
+          <input
+            className="cart-b2b-input"
+            placeholder="Kundennummer"
+            inputMode="numeric"
+            autoComplete="username"
+            value={customerNumber}
+            onChange={e => setCustomerNumber(e.target.value)}
+            disabled={b2b.loginPending}
+          />
+          <input
+            className="cart-b2b-input"
+            type="password"
+            placeholder="Passwort"
+            autoComplete="current-password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            disabled={b2b.loginPending}
+          />
+          <button type="submit" className="cart-b2b-submit" disabled={b2b.loginPending || !customerNumber.trim() || !password}>
+            {b2b.loginPending ? 'Anmelden …' : 'Anmelden'}
+          </button>
+          <button type="button" className="cart-b2b-link" onClick={() => setOpen(false)} disabled={b2b.loginPending}>Abbrechen</button>
+          {b2b.loginError && <span className="cart-b2b-error">{b2b.loginError}</span>}
+        </form>
+      )}
+    </div>
+  );
 }
 
 export function CartView({
@@ -45,7 +127,9 @@ export function CartView({
   onSetQuantity, onChangeColor, onRemoveItem,
   onSearchProducts, onAddProduct, onUploadB2B, onClose,
   orderSubmitting, orderResult, orderError, onDismissOrderStatus,
+  b2b,
 }: CartViewProps) {
+  const b2bActive = Boolean(b2b?.customerNumber);
   // Compute union of all sizes across all items (column headers)
   const allSizes = useMemo(() => {
     const set = new Set<string>();
@@ -112,6 +196,7 @@ export function CartView({
           <button className="cart-close" onClick={onClose} aria-label="Schließen">✕</button>
         )}
       </div>
+      {b2b && <B2BLoginBar b2b={b2b} />}
 
       {/* Empty State */}
       {items.length === 0 ? (
@@ -132,6 +217,7 @@ export function CartView({
                   <th key={size} className="cart-col-size">{size}</th>
                 ))}
                 <th className="cart-col-total">Σ</th>
+                {b2bActive && <th className="cart-col-ek" title="Händler-Einkaufspreis je Stück">EK</th>}
                 <th className="cart-col-actions"></th>
               </tr>
             </thead>
@@ -197,6 +283,15 @@ export function CartView({
                     );
                   })}
                   <td className="cart-cell-total">{rowTotal(item)}</td>
+                  {b2bActive && (() => {
+                    const up = b2b?.unitPrices[item.id];
+                    const cls = `cart-cell-ek${up?.unknown ? ' is-unknown' : ''}`;
+                    return (
+                      <td className={cls} title={up?.unknown ? 'Artikel im B2B-Shop unbekannt' : 'Händler-Einkaufspreis je Stück'}>
+                        {up?.unknown ? 'unbekannt' : (up ? formatMoney(up.unit, up.currency) : (b2b?.pricesPending ? '…' : '–'))}
+                      </td>
+                    );
+                  })()}
                   <td className="cart-cell-actions">
                     <button
                       className="cart-remove-btn"
@@ -211,6 +306,9 @@ export function CartView({
               <tr>
                 <td colSpan={3 + allSizes.length} className="cart-foot-label">Gesamt</td>
                 <td className="cart-foot-total">{grandTotal}</td>
+                {b2bActive && (
+                  <td className="cart-foot-ek">{b2b?.dealerTotal !== null && b2b?.dealerTotal !== undefined ? formatMoney(b2b.dealerTotal, 'EUR') : '–'}</td>
+                )}
                 <td></td>
               </tr>
             </tfoot>
@@ -268,12 +366,19 @@ export function CartView({
             ✕ Übermittlung fehlgeschlagen — bitte erneut versuchen.
           </div>
         )}
+        {b2bActive ? (
+          <div className="cart-footer-summary">
+            Summe Händler-EK: <strong>{b2b?.dealerTotal !== null && b2b?.dealerTotal !== undefined ? formatMoney(b2b.dealerTotal, 'EUR') : '–'}</strong>
+          </div>
+        ) : (b2b ? (
+          <div className="cart-footer-hint">Ohne Händler-Login wird die Bestellung an den Innendienst übermittelt.</div>
+        ) : null)}
         <button
           className="cart-upload-btn"
           onClick={onUploadB2B}
           disabled={orderSubmitting || items.length === 0 || grandTotal === 0}
         >
-          {orderSubmitting ? 'Wird übermittelt …' : 'Bestellung absenden →'}
+          {orderSubmitting ? 'Wird übermittelt …' : (b2bActive ? 'An B2B-Shop übergeben →' : 'Bestellung absenden →')}
         </button>
       </div>
     </div>
