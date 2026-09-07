@@ -113,11 +113,21 @@ export class CanvasRenderer<T> {
     return this._selectedVariantHeroImage;
   }
 
+  /** Produkt, zu dem das aktuelle Hero-Bild gehoert — Crossfade nur innerhalb desselben Produkts. */
+  private _selectedHeroImageOwnerId: string | null = null;
+
   public set selectedVariantHeroImage(img: HTMLImageElement | null) {
     const prev = this._selectedVariantHeroImage;
     if (img === prev) return;
     const ready = (i: HTMLImageElement | null): boolean => !!(i && i.complete && i.naturalWidth > 0);
-    if (ready(img) && ready(prev)) {
+    // Owner 2026-09-07 (media 123668): Beim Weiterblaettern wurde das alte
+    // Produktbild in das NEUE Produkt hineingeblendet — zwei verschiedene
+    // Helme morphen ineinander, das liest sich als Zoom rein/raus. Fade nur,
+    // wenn das Bild zum selben Produkt gehoert (Varianten-/LOD-Wechsel).
+    const ownerId = (this.selectedProduct as any)?.id ?? null;
+    const sameProduct = ownerId !== null && ownerId === this._selectedHeroImageOwnerId;
+    this._selectedHeroImageOwnerId = ownerId;
+    if (ready(img) && ready(prev) && sameProduct) {
       this.heroFadeFrom = prev;
       this.heroFadeStart = performance.now();
     } else {
@@ -168,6 +178,7 @@ export class CanvasRenderer<T> {
   public resetSelectedHeroImage(): void {
     this.selectedVariantHeroImage = null;
     this.heroFadeFrom = null;
+    this._selectedHeroImageOwnerId = null;
     this.pivotHeroLoadedSize = null;
   }
 

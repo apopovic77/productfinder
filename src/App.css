@@ -2056,7 +2056,7 @@ body {
 .pf-mobile-pivot-overlay {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  z-index: 100;
+  z-index: 10010; /* ueber dem Produkt-Sheet (pom-modal 10000), owner 2026-09-07 media 123669 */
   background: rgba(0, 0, 0, 0.92);
   backdrop-filter: blur(20px);
   padding: 16px;
@@ -2562,3 +2562,22 @@ body {
 .pf-mobile-voice-cta-text small { font-size: 12px; opacity: 0.75; }
 .pf-mobile-voice-btn.active { background: #c6f542; color: #111; }
 .pf-mobile-voice-btn svg { width: 20px; height: 20px; display: block; flex: 0 0 auto; }
+
+/* Warenkorb im Handy-Header + Menü-Eintrag (owner 2026-09-07, media 123668) */
+.pf-mobile-cart-btn { position: relative; }
+.pf-mobile-cart-btn.has-items { background: rgba(63, 185, 80, 0.28); }
+.pf-mobile-cart-badge {
+  position: absolute; top: -5px; right: -5px;
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+  background: #3fb950; color: #fff; font-size: 11px; font-weight: 800; line-height: 18px; text-align: center;
+}
+.pf-mobile-sheet-row {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  margin: 12px 0 18px; padding: 13px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06); color: #fff;
+  font: inherit; font-size: 15px; font-weight: 600; text-align: left; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.pf-mobile-sheet-row:active { background: rgba(255, 255, 255, 0.14); }
+.pf-mobile-sheet-row-meta { margin-left: auto; font-size: 12px; font-weight: 500; color: #8b949e; }

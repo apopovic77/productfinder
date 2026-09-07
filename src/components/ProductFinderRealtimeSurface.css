@@ -205,3 +205,31 @@
     left: 22px;
   }
 }
+
+/* Handy (owner 2026-09-07, media 123669): kompakte Querkarte statt Desktop-
+   Groesse — Orb 72px links, Status rechts, ca. 100px hoch, oben rechts unter
+   der Breadcrumb-Zeile. Unter dem Menue-Sheet (10010) und dem Produkt-Sheet
+   (10000) einsortiert, damit sie nie etwas verdeckt, das der Nutzer gerade
+   bedient. */
+@media (max-width: 767px) {
+  .pf-realtime-surface {
+    z-index: 90;
+    top: calc(env(safe-area-inset-top) + 112px);
+    bottom: auto;
+    right: 10px;
+    left: auto;
+    width: min(320px, calc(100vw - 20px));
+    padding: 8px 10px 8px 8px;
+    border-radius: 14px;
+  }
+  .pf-realtime-heading { min-height: 0; margin-bottom: 2px; }
+  .pf-realtime-kicker { font-size: 7px; letter-spacing: 0.1em; opacity: 0.7; }
+  .pf-realtime-stage { display: grid; grid-template-columns: 72px minmax(0, 1fr); column-gap: 10px; row-gap: 2px; align-items: center; padding: 0; text-align: left; }
+  .pf-realtime-orb-wrap { grid-column: 1; grid-row: 1 / span 4; width: 72px; height: 72px; margin: 0; }
+  .pf-realtime-stage > :not(.pf-realtime-orb-wrap) { grid-column: 2; }
+  .pf-realtime-stage .pf-realtime-status { text-align: left; font-size: 12px; line-height: 1.25; }
+  .pf-realtime-stage .pf-realtime-transcript { display: none; }
+  .pf-realtime-stage .pf-realtime-tool { font-size: 10px; }
+  .pf-realtime-stage .pf-realtime-error { font-size: 11px; }
+  .pf-realtime-stage.is-talking .pf-realtime-orb-wrap { transform: none; box-shadow: 0 0 0 3px rgba(229, 49, 47, 0.35); }
+}

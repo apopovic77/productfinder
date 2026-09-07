@@ -2899,6 +2899,17 @@ export default class App extends React.Component<Props, State> {
             <button type="button" className="pf-mobile-icon-btn" onClick={() => this.setState({ mobilePivotOpen: !this.state.mobilePivotOpen })}>
               <i className="fa-solid fa-bars"></i>
             </button>
+            {/* Warenkorb am Handy (owner 2026-09-07, media 123668): vorher nur ueber
+                die Desktop-Bottom-Bar erreichbar. */}
+            <button
+              type="button"
+              className={`pf-mobile-icon-btn pf-mobile-cart-btn ${cartItems.length > 0 ? 'has-items' : ''}`}
+              aria-label={cartItems.length ? `Bestellübersicht, ${cartItems.length} Positionen` : 'Bestellübersicht'}
+              onClick={() => this.setState({ cartPanelOpen: true, mobilePivotOpen: false })}
+            >
+              <i className="fa-solid fa-cart-shopping"></i>
+              {cartItems.length > 0 && <span className="pf-mobile-cart-badge">{cartItems.length}</span>}
+            </button>
             <button
               type="button"
               className={`pf-mobile-icon-btn pf-mobile-voice-btn ${this.state.realtimeShortcutEnabled ? 'active' : ''}`}
@@ -3047,6 +3058,15 @@ export default class App extends React.Component<Props, State> {
                 (owner 2026-08-25, media 120666 — Handy und Desktop sollen
                 dieselben Optionen bieten; Family-Grouping- und Lanes-Buttons
                 sind wie am Desktop entfallen). */}
+            <button
+              type="button"
+              className="pf-mobile-sheet-row"
+              onClick={() => this.setState({ cartPanelOpen: true, mobilePivotOpen: false })}
+            >
+              <i className="fa-solid fa-cart-shopping" aria-hidden="true"></i>
+              <span>Bestellübersicht</span>
+              <span className="pf-mobile-sheet-row-meta">{cartItems.length ? `${cartItems.length} ${cartItems.length === 1 ? 'Position' : 'Positionen'}` : 'leer'}</span>
+            </button>
             <div className="pf-mobile-pivot-label">Ansicht</div>
             <div className="pf-mobile-pivot-dims" style={{ marginBottom: 20 }}>
               {(() => { const grouped = this.controller.isHeroRootOverview() || this.controller.isPivotHeroMode();
