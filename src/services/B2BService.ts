@@ -53,6 +53,39 @@ export class B2BError extends Error {
 }
 
 const SESSION_KEY = 'pf.b2b.session.v1';
+const CHECKOUT_REF_KEY = 'pf.b2b.checkoutRef.v1';
+
+/**
+ * Testmodus: Solange der Build nicht ausdrücklich Echtbestellungen freigibt,
+ * geht jede Übergabe mit `is_test=true` an den Shop (fail-safe Richtung —
+ * Vertrag contracts/b2b-veloconnect-1.0.0.md). Freigabe nur per Build-Flag.
+ */
+export const B2B_LIVE_ORDERS: boolean = import.meta.env.VITE_PRODUCTFINDER_B2B_LIVE_ORDERS === 'true';
+
+/**
+ * Idempotente Bestellreferenz je Checkout: wird beim ersten Absenden erzeugt,
+ * bei Wiederholung (Timeout, Login-Erneuerung) wiederverwendet und erst nach
+ * Erfolg bzw. bewusstem Verwerfen ersetzt. So erkennt der BFF Doppel-Sends.
+ */
+export function getOrCreateCheckoutRef(customerNumber: string): string {
+  try {
+    const raw = localStorage.getItem(CHECKOUT_REF_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as { ref: string; customer: string };
+      if (parsed?.ref && parsed.customer === customerNumber) return parsed.ref;
+    }
+  } catch { /* fall through */ }
+  const rand = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  const ref = `PF-${customerNumber}-${rand}`;
+  try { localStorage.setItem(CHECKOUT_REF_KEY, JSON.stringify({ ref, customer: customerNumber })); } catch { /* memory only */ }
+  return ref;
+}
+
+export function clearCheckoutRef(): void {
+  try { localStorage.removeItem(CHECKOUT_REF_KEY); } catch { /* ignore */ }
+}
 
 export function loadB2BSession(): B2BSession | null {
   try {
@@ -111,6 +144,14 @@ function describeError(status: number, code: string, body: any): string {
       return 'Die B2B-Anbindung ist derzeit nicht verfügbar.';
     case 'unknown_items':
       return 'Einige Artikel sind im B2B-Shop unbekannt — Bestellung wurde nicht übergeben.';
+    case 'b2b_order_uncertain': {
+      const ref = body?.order_reference ?? body?.local_order_id ?? body?.detail?.order_reference;
+      return `Bestellstatus unklar — bitte NICHT erneut absenden. Der Innendienst prüft die Übergabe${ref ? ` (Referenz ${ref})` : ''}.`;
+    }
+    case 'b2b_order_conflict':
+      return 'Diese Bestellreferenz wurde bereits mit anderem Inhalt verwendet — bitte Warenkorb prüfen und erneut absenden.';
+    case 'veloconnect_test_not_allowed':
+      return 'Der B2B-Shop erlaubt für dieses Konto keine Testbestellung.';
     case 'veloconnect_error': {
       const detail = body?.message ?? body?.detail?.message;
       return detail ? `B2B-Shop meldet: ${detail}` : 'Der B2B-Shop hat die Anfrage abgelehnt.';

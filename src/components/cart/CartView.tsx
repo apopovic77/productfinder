@@ -44,6 +44,8 @@ export interface CartB2BState {
   unitPrices: Record<string, { unit: number | null; currency: string; unknown: boolean }>;
   pricesPending: boolean;
   dealerTotal: number | null;
+  /** true = Übergabe als Testbestellung (IsTest), sichtbar markiert. */
+  testMode?: boolean;
   onLogin: (customerNumber: string, password: string) => void;
   onLogout: () => void;
 }
@@ -76,6 +78,7 @@ function B2BLoginBar({ b2b }: { b2b: CartB2BState }) {
       <div className="cart-b2b-bar cart-b2b-active">
         <span className="cart-b2b-label">
           Kunde <strong>{b2b.customerNumber}</strong> · Händlerpreise{b2b.pricesPending ? ' werden geladen …' : ' aktiv'}
+          {b2b.testMode && <span className="cart-b2b-testbadge" title="Bestellungen gehen als Testbestellung (IsTest) an den B2B-Shop">TESTMODUS</span>}
         </span>
         <button type="button" className="cart-b2b-link" onClick={b2b.onLogout}>Abmelden</button>
       </div>
@@ -378,7 +381,7 @@ export function CartView({
           onClick={onUploadB2B}
           disabled={orderSubmitting || items.length === 0 || grandTotal === 0}
         >
-          {orderSubmitting ? 'Wird übermittelt …' : (b2bActive ? 'An B2B-Shop übergeben →' : 'Bestellung absenden →')}
+          {orderSubmitting ? 'Wird übermittelt …' : (b2bActive ? (b2b?.testMode ? 'Testbestellung an B2B-Shop →' : 'An B2B-Shop übergeben →') : 'Bestellung absenden →')}
         </button>
       </div>
     </div>

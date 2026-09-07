@@ -3,7 +3,8 @@ import './App.css';
 import { CartView } from './components/cart/CartView';
 import { submitOrder } from './services/OrderService';
 import {
-  b2bCreateOrder, b2bFetchPrices, b2bLogin, b2bLogout, b2bValidateSession, loadB2BSession,
+  B2B_LIVE_ORDERS, b2bCreateOrder, b2bFetchPrices, b2bLogin, b2bLogout, b2bValidateSession,
+  clearCheckoutRef, getOrCreateCheckoutRef, loadB2BSession,
   type B2BPrice, type B2BSession,
 } from './services/B2BService';
 import { resolveCartLineSkus } from './utils/cartSku';
@@ -1754,13 +1755,25 @@ export default class App extends React.Component<Props, State> {
         if (unresolved.length > 0) {
           throw new Error(`Keine Artikelnummer für: ${unresolved.join(', ')}`);
         }
-        const result = await b2bCreateOrder(session, lines);
+        // Testmodus ist Default (fail-safe); Referenz bleibt über Wieder-
+        // holungen stabil, damit der BFF Doppel-Sends erkennt.
+        const externalRef = getOrCreateCheckoutRef(session.customerNumber);
+        let result;
+        try {
+          result = await b2bCreateOrder(session, lines, { isTest: !B2B_LIVE_ORDERS, externalRef });
+        } catch (e: any) {
+          // Referenz mit anderem Inhalt bereits verbraucht → neue Referenz für den nächsten Versuch.
+          if (e?.code === 'b2b_order_conflict') clearCheckoutRef();
+          throw e;
+        }
         if (result.status !== 'finished') {
           throw new Error('Der B2B-Shop hat die Bestellung nicht abgeschlossen.');
         }
+        clearCheckoutRef();
+        const label = result.orderId ? `B2B ${result.orderId}` : `B2B ${result.transactionId ?? ''}`.trim();
         this.setState({
           orderSubmitting: false,
-          orderResult: result.orderId ? `B2B ${result.orderId}` : `B2B ${result.transactionId ?? ''}`.trim(),
+          orderResult: B2B_LIVE_ORDERS ? label : `${label} (TEST)`,
           cartItems: [],
           b2bPrices: {},
         });
@@ -1914,6 +1927,7 @@ export default class App extends React.Component<Props, State> {
       unitPrices,
       pricesPending: this.state.b2bPricesPending,
       dealerTotal: lines.length ? dealerTotal : null,
+      testMode: !B2B_LIVE_ORDERS,
       onLogin: (c, pw) => { void this.handleB2BLogin(c, pw); },
       onLogout: () => { void this.handleB2BLogout(); },
     };
