@@ -1,0 +1,60 @@
+/* Händler-Login-Dialog — über Produkt-Sheet (10000) und Menü (10010). */
+.pf-b2b-dialog-backdrop {
+  position: fixed; inset: 0; z-index: 10020;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(6px);
+}
+.pf-b2b-dialog {
+  width: min(420px, 100%);
+  border-radius: 18px;
+  background: #16181d;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+.pf-b2b-dialog-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  padding: 18px 20px 12px;
+}
+.pf-b2b-dialog-kicker { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #8b949e; }
+.pf-b2b-dialog-title { margin: 4px 0 0; font-size: 20px; font-weight: 800; }
+.pf-b2b-dialog-close {
+  width: 32px; height: 32px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.14);
+  background: rgba(255,255,255,0.06); color: #ccc; cursor: pointer; font-size: 14px;
+}
+.pf-b2b-dialog-body { display: flex; flex-direction: column; gap: 12px; padding: 4px 20px 20px; }
+.pf-b2b-dialog-intro { margin: 0; font-size: 13px; line-height: 1.45; color: #c9d1d9; }
+.pf-b2b-dialog-label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #8b949e; }
+.pf-b2b-dialog-input {
+  padding: 11px 12px; border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06);
+  color: #fff; font: inherit; font-size: 15px;
+}
+.pf-b2b-dialog-input:focus { outline: none; border-color: #c6f542; }
+.pf-b2b-dialog-error { font-size: 13px; color: #f85149; }
+.pf-b2b-dialog-note { font-size: 12px; color: #e5a50a; line-height: 1.4; }
+.pf-b2b-dialog-row { display: flex; justify-content: space-between; font-size: 14px; color: #c9d1d9; }
+.pf-b2b-dialog-row strong { color: #fff; }
+.pf-b2b-dialog-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
+.pf-b2b-dialog-primary {
+  padding: 11px 18px; border: 0; border-radius: 10px;
+  background: #3fb950; color: #fff; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+}
+.pf-b2b-dialog-primary:disabled { background: rgba(63,185,80,0.3); cursor: not-allowed; }
+.pf-b2b-dialog-secondary {
+  padding: 10px 16px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.18);
+  background: transparent; color: #fff; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.pf-b2b-dialog-link { margin-left: auto; font-size: 12px; color: #8b949e; text-decoration: underline; }
+
+/* Header-Button (Desktop + Handy) */
+.pf-header-dealer-btn { display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; }
+.pf-header-dealer-btn.active { color: #c6f542; border-color: rgba(198, 245, 66, 0.5); }
+.pf-header-dealer-btn .pf-header-dealer-label { font-size: 11px; font-weight: 700; letter-spacing: 0.02em; }
+.pf-mobile-dealer-btn.active { background: rgba(198, 245, 66, 0.22); color: #c6f542; }
+/* Header ist bei 1500px eng — Text erst ab 1700px, sonst nur Icon + Tooltip. */
+@media (max-width: 1699px) { .pf-header-dealer-btn .pf-header-dealer-label { display: none; } }
+.pf-header-dealer-btn { white-space: nowrap; }

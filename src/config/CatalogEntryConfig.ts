@@ -291,7 +291,7 @@ export function getCatalogSportBanner(
  * kann auf relevante Produkte einschraenken (?relevant=1 / ?relevant=0);
  * Default hier — bis das Team den Umfang der Bildluecke freigegeben hat.
  */
-export const RELEVANT_ONLY_DEFAULT = false;
+export const RELEVANT_ONLY_DEFAULT = true; // owner 2026-09-11: Ersatzteile/Auslauf standardmäßig raus (?relevant=0 zeigt alles)
 
 export function resolveRelevantOnly(href?: string): boolean {
   try {

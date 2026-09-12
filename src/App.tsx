@@ -9,6 +9,8 @@ import {
 } from './services/B2BService';
 import { resolveCartLineSkus } from './utils/cartSku';
 import type { CartB2BState } from './components/cart/CartView';
+import type { CheckoutOptions, OrderConfirmation } from './components/cart/CheckoutPanel';
+import { B2BLoginDialog } from './components/b2b/B2BLoginDialog';
 import { SlidePanel, SlidePanelBackdrop } from './components/cart/SlidePanel';
 import './components/cart/CartView.css';
 import type { CartItem as CartViewItem, ProductSearchResult } from './components/cart/types';
@@ -213,6 +215,10 @@ type State = {
    * Warenkorb-Produkte bei Login/Absenden nachgeladen.
    */
   b2bVariantsById: Record<string, ProductVariant[]>;
+  /** Händler-Login-Dialog (Header) offen. */
+  b2bLoginOpen: boolean;
+  /** Letzte Übergabe an den B2B-Shop (Bestätigungsansicht). */
+  orderConfirmation: OrderConfirmation | null;
   cartPanelOpen: boolean;
   cartFullOverlay: boolean;
   realtimeShortcutEnabled: boolean;
@@ -319,6 +325,8 @@ const createInitialState = (): State => {
     b2bPrices: {},
     b2bPricesPending: false,
     b2bVariantsById: {},
+    b2bLoginOpen: false,
+    orderConfirmation: null,
     cartPanelOpen: false,
     cartFullOverlay: false,
     // ?voice=1 blendet die Realtime-Flaeche ohne Tastatur ein (Handy/Tablet,
@@ -490,7 +498,8 @@ export default class App extends React.Component<Props, State> {
   private sheetObserver: ResizeObserver | null = null;
 
   componentDidUpdate(prevProps: Props, prevState: State): void {
-    if (this.state.b2bSession && prevState.cartItems !== this.state.cartItems) {
+    if (this.state.b2bSession && (prevState.cartItems !== this.state.cartItems
+        || prevState.selectedProduct?.id !== this.state.selectedProduct?.id)) {
       this.scheduleB2BPriceRefresh();
     }
     // Phone bottom sheet: publish its real height so the hero arrows and
@@ -1726,7 +1735,7 @@ export default class App extends React.Component<Props, State> {
     });
   };
 
-  private handleCartUploadB2B = async () => {
+  private handleCartUploadB2B = async (checkout?: CheckoutOptions) => {
     if (this.state.orderSubmitting) return;
     const items = this.state.cartItems.flatMap(item => {
       const price = item.priceText ? parseFloat(item.priceText.replace(/[^0-9.,]/g, '').replace(',', '.')) : undefined;
@@ -1751,16 +1760,26 @@ export default class App extends React.Component<Props, State> {
       if (session) {
         // Angemeldeter Händler: Übergabe an den B2B-Shop über Veloconnect.
         await this.ensureB2BVariants();
-        const { lines, unresolved } = this.resolveB2BOrderLines();
+        const { lines, unresolved, bySku } = this.resolveB2BOrderLines();
         if (unresolved.length > 0) {
           throw new Error(`Keine Artikelnummer für: ${unresolved.join(', ')}`);
         }
+        // Checkout-Angaben: bis der BFF eigene Felder hat (Issue folgt), gehen
+        // Wunschtermin, Bestellnummer, frachtfrei und Vororder als Klartext in
+        // die Bemerkung — der Shop zeigt sie dem Innendienst an.
+        const noteParts: string[] = [];
+        if (checkout?.customerOrderNumber) noteParts.push(`Bestellnummer Händler: ${checkout.customerOrderNumber}`);
+        if (checkout?.deliveryDate) noteParts.push(`Wunschliefertermin: ${checkout.deliveryDate}`);
+        if (checkout?.preorder) noteParts.push('VORORDER 2027');
+        if (checkout?.freightFree) noteParts.push('Bitte frachtfrei liefern');
+        if (checkout?.note) noteParts.push(checkout.note);
+        const note = noteParts.join(' | ').slice(0, 2000) || undefined;
         // Testmodus ist Default (fail-safe); Referenz bleibt über Wieder-
         // holungen stabil, damit der BFF Doppel-Sends erkennt.
         const externalRef = getOrCreateCheckoutRef(session.customerNumber);
         let result;
         try {
-          result = await b2bCreateOrder(session, lines, { isTest: !B2B_LIVE_ORDERS, externalRef });
+          result = await b2bCreateOrder(session, lines, { isTest: !B2B_LIVE_ORDERS, externalRef, note });
         } catch (e: any) {
           // Referenz mit anderem Inhalt bereits verbraucht → neue Referenz für den nächsten Versuch.
           if (e?.code === 'b2b_order_conflict') clearCheckoutRef();
@@ -1771,9 +1790,29 @@ export default class App extends React.Component<Props, State> {
         }
         clearCheckoutRef();
         const label = result.orderId ? `B2B ${result.orderId}` : `B2B ${result.transactionId ?? ''}`.trim();
+        const itemById = new Map(this.state.cartItems.map(i => [i.id, i]));
+        const confirmation: OrderConfirmation = {
+          orderId: result.orderId,
+          transactionId: result.transactionId,
+          customerNumber: session.customerNumber,
+          isTest: !B2B_LIVE_ORDERS,
+          submittedAt: new Date().toISOString(),
+          options: checkout ?? { deliveryDate: null, note: '', customerOrderNumber: '', freightFree: false, preorder: false },
+          lines: lines.map(l => {
+            const r = result.lines.find(x => x.sku === l.sku);
+            const item = itemById.get((bySku[l.sku] || [])[0]);
+            const size = Object.entries(item?.sizes || {}).find(([sz]) => this.skuForItemSize(item, sz) === l.sku)?.[0];
+            return { sku: l.sku, quantity: l.quantity, unitPrice: r?.unitPrice ?? this.state.b2bPrices[l.sku]?.dealerPrice ?? null, name: item?.name, size };
+          }),
+          dealerTotal: lines.reduce<number | null>((acc, l) => {
+            const unit = result.lines.find(x => x.sku === l.sku)?.unitPrice ?? this.state.b2bPrices[l.sku]?.dealerPrice ?? null;
+            return acc === null || unit === null ? null : acc + unit * l.quantity;
+          }, 0),
+        };
         this.setState({
           orderSubmitting: false,
           orderResult: B2B_LIVE_ORDERS ? label : `${label} (TEST)`,
+          orderConfirmation: confirmation,
           cartItems: [],
           b2bPrices: {},
         });
@@ -1801,9 +1840,9 @@ export default class App extends React.Component<Props, State> {
 
   /** Fehlende Varianten für alle Warenkorb-Produkte nachladen (Detail-Endpunkt). */
   private ensureB2BVariants = async (): Promise<void> => {
-    const missing = Array.from(new Set(
-      this.state.cartItems.map(i => i.productId).filter(id => !this.variantsForCartItem(id)),
-    ));
+    const wanted = this.state.cartItems.map(i => i.productId);
+    if (this.state.selectedProduct) wanted.push(String(this.state.selectedProduct.id));
+    const missing = Array.from(new Set(wanted.filter(id => !this.variantsForCartItem(id))));
     await Promise.all(missing.map(id => {
       let inflight = this.b2bVariantFetches.get(id);
       if (!inflight) {
@@ -1815,6 +1854,29 @@ export default class App extends React.Component<Props, State> {
       }
       return inflight;
     }));
+  };
+
+  /** SKU einer Warenkorb-Zeile für eine bestimmte Größe (Farbe der Zeile). */
+  private skuForItemSize = (item: CartItem | undefined, size: string): string | undefined => {
+    if (!item) return undefined;
+    const r = resolveCartLineSkus({ articleNumber: item.articleNumber, color: item.color, sizes: { [size]: 1 } }, this.variantsForCartItem(item.productId));
+    return r.lines[0]?.sku;
+  };
+
+  /** CSV „Artikel-Nr;Anzahl" für den Datenimport des B2B-Shops (Post #4969). */
+  private handleCartExportCsv = async () => {
+    await this.ensureB2BVariants();
+    const { lines, unresolved } = this.resolveB2BOrderLines();
+    if (lines.length === 0) { this.setState({ orderError: 'Keine Artikelnummern für den Export gefunden.' }); return; }
+    const csv = lines.map(l => `${l.sku};${l.quantity};`).join('\r\n') + '\r\n';
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    const customer = this.state.b2bSession?.customerNumber ?? 'gast';
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = `bestellung_PF_${stamp}_${customer}.csv`; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    if (unresolved.length > 0) this.setState({ orderError: `Nicht exportiert (keine Artikelnummer): ${unresolved.join(', ')}` });
   };
 
   /** Alle Warenkorb-Zeilen auf Varianten-SKUs auflösen (Produkt aus dem Katalog). */
@@ -1860,6 +1922,11 @@ export default class App extends React.Component<Props, State> {
         if (v.sku && (!item.color || !vColor || vColor === item.color.trim().toLowerCase())) skus.add(v.sku);
       }
     }
+    // Geöffnete Produktkarte: alle Varianten, damit HEK + Verfügbarkeit je
+    // Größe direkt auf der Karte stehen (owner 2026-09-11).
+    if (this.state.selectedProduct) {
+      for (const v of this.variantsForCartItem(String(this.state.selectedProduct.id)) || []) if (v.sku) skus.add(v.sku);
+    }
     const missing = Array.from(skus).filter(sku => !(sku in this.state.b2bPrices));
     if (missing.length === 0) return;
     this.setState({ b2bPricesPending: true });
@@ -1879,7 +1946,7 @@ export default class App extends React.Component<Props, State> {
     this.setState({ b2bLoginPending: true, b2bLoginError: null });
     try {
       const session = await b2bLogin(customerNumber, password);
-      this.setState({ b2bSession: session, b2bLoginPending: false, b2bPrices: {} }, () => { void this.refreshB2BPrices(); });
+      this.setState({ b2bSession: session, b2bLoginPending: false, b2bPrices: {}, b2bLoginOpen: false }, () => { void this.refreshB2BPrices(); });
     } catch (e: any) {
       this.setState({ b2bLoginPending: false, b2bLoginError: String(e?.message || e) });
     }
@@ -1920,7 +1987,24 @@ export default class App extends React.Component<Props, State> {
         else dealerTotal += price.dealerPrice * line.quantity;
       }
     }
+    const availabilityBySize: NonNullable<CartB2BState['availabilityBySize']> = {};
+    if (this.state.b2bSession) {
+      for (const item of this.state.cartItems) {
+        const row: Record<string, { code: string | null; qty: number | null; unknown: boolean }> = {};
+        for (const size of item.availableSizes || []) {
+          const sku = this.skuForItemSize(item, size);
+          const p = sku ? this.state.b2bPrices[sku] : undefined;
+          if (p) row[size] = { code: p.availabilityCode, qty: p.availableQuantity, unknown: p.unknown };
+        }
+        availabilityBySize[item.id] = row;
+      }
+    }
     return {
+      availabilityBySize,
+      onCheckout: (opts) => { void this.handleCartUploadB2B(opts); },
+      onExportCsv: () => { void this.handleCartExportCsv(); },
+      confirmation: this.state.orderConfirmation,
+      onDismissConfirmation: () => this.setState({ orderConfirmation: null, orderResult: null, orderError: null }),
       customerNumber: this.state.b2bSession?.customerNumber ?? null,
       loginPending: this.state.b2bLoginPending,
       loginError: this.state.b2bLoginError,
@@ -1930,6 +2014,7 @@ export default class App extends React.Component<Props, State> {
       testMode: !B2B_LIVE_ORDERS,
       onLogin: (c, pw) => { void this.handleB2BLogin(c, pw); },
       onLogout: () => { void this.handleB2BLogout(); },
+      onOpenLogin: () => this.setState({ b2bLoginOpen: true }),
     };
   };
 
@@ -2860,6 +2945,19 @@ export default class App extends React.Component<Props, State> {
             {/* Desktop: the right pane is gone (owner, 2026-08-23 — it only took
                 space; back is the breadcrumb, dimension/sort already live here).
                 Its two functions move up: AI search and the cart. */}
+            {/* Händler-Login im Header (owner 2026-09-11): Konto-Zustand sichtbar,
+                Dialog statt Formular im Warenkorb. */}
+            <button
+              type="button"
+              className={`pf-header-btn pf-header-dealer-btn ${this.state.b2bSession ? 'active' : ''}`}
+              onClick={() => this.setState({ b2bLoginOpen: true })}
+              title={this.state.b2bSession ? `Händlerkonto ${this.state.b2bSession.customerNumber}` : 'Händler-Login (B2B-Shop)'}
+            >
+              <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l1-5h16l1 5"/><path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/><path d="M5 12v8h14v-8"/><path d="M10 20v-5h4v5"/></svg>
+              {!this.isMobileLayout() && (
+                <span className="pf-header-dealer-label">{this.state.b2bSession ? `Kunde ${this.state.b2bSession.customerNumber}` : 'Händler-Login'}</span>
+              )}
+            </button>
             {/* Sprachberater (owner 2026-08-27, media 120882): Personen-Icon
                 startet die Realtime-Sitzung direkt — die Karte erscheint erst
                 dann, nicht vorab als Overlay. Desktop UND Handy. */}
@@ -2898,6 +2996,14 @@ export default class App extends React.Component<Props, State> {
           <div className="pf-mobile-icons">
             <button type="button" className="pf-mobile-icon-btn" onClick={() => this.setState({ mobilePivotOpen: !this.state.mobilePivotOpen })}>
               <i className="fa-solid fa-bars"></i>
+            </button>
+            <button
+              type="button"
+              className={`pf-mobile-icon-btn pf-mobile-dealer-btn ${this.state.b2bSession ? 'active' : ''}`}
+              aria-label={this.state.b2bSession ? `Händlerkonto ${this.state.b2bSession.customerNumber}` : 'Händler-Login'}
+              onClick={() => this.setState({ b2bLoginOpen: true, mobilePivotOpen: false })}
+            >
+              <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l1-5h16l1 5"/><path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/><path d="M5 12v8h14v-8"/><path d="M10 20v-5h4v5"/></svg>
             </button>
             {/* Warenkorb am Handy (owner 2026-09-07, media 123668): vorher nur ueber
                 die Desktop-Bottom-Bar erreichbar. */}
@@ -3622,11 +3728,24 @@ export default class App extends React.Component<Props, State> {
                   return true;
                 }}
                 onBuy={this.handleProductBuy}
+                dealerPrices={this.state.b2bSession ? this.state.b2bPrices : undefined}
               />
             </>
             );
           })()}
         </AnimatePresence>
+
+        <B2BLoginDialog
+          open={this.state.b2bLoginOpen}
+          customerNumber={this.state.b2bSession?.customerNumber ?? null}
+          loginPending={this.state.b2bLoginPending}
+          loginError={this.state.b2bLoginError}
+          testMode={!B2B_LIVE_ORDERS}
+          onLogin={(c, pw) => { void this.handleB2BLogin(c, pw); }}
+          onLogout={() => { void this.handleB2BLogout(); this.setState({ b2bLoginOpen: false }); }}
+          onClose={() => this.setState({ b2bLoginOpen: false, b2bLoginError: null })}
+          onOpenCart={() => this.setState({ cartPanelOpen: true })}
+        />
         
         {/* Product hover tooltip removed */}
 

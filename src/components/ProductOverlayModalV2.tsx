@@ -38,6 +38,11 @@ type Props = {
   /** Catalog language for the description text (LIUS language ids). */
   locale?: string;
   onShowDetails?: () => void;
+  /**
+   * Händlerpreise/Verfügbarkeit je Varianten-SKU aus Veloconnect (owner
+   * 2026-09-11) — nur gesetzt, wenn ein Händler angemeldet ist.
+   */
+  dealerPrices?: Record<string, { dealerPrice: number | null; rrp: number | null; currency: string; availabilityCode: string | null; availableQuantity: number | null; unknown: boolean }>;
   onBuy?: (payload: {
     product: Product;
     variant?: any;
@@ -60,7 +65,7 @@ interface ParsedFeature {
  * Product Overlay Modal V2 - HALF WIDTH VERSION (240px)
  * Same design as V1, but with compact half-width layout
  */
-export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady, onShowDetails, expanded = false, onCollapse, locale, onSiblingSelect, onStepProduct }) => {
+export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady, onShowDetails, expanded = false, onCollapse, locale, onSiblingSelect, onStepProduct, dealerPrices }) => {
   const isMobilePortrait = window.innerWidth <= 768 && window.innerHeight > window.innerWidth;
   // Phone: the dark hero card as a full-width bottom sheet (owner 2026-08-23,
   // "die Karte auch im Desktop-Style"). Same markup as the desktop dock,
@@ -558,6 +563,16 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   const productUrl = activeVariant?.url || (product as any).meta?.product_url;
 
   const variantLabel = [selectedColor, selectedSize].filter(Boolean).join(' / ');
+  // Händlerpreis + Veloconnect-Verfügbarkeit (nur angemeldet)
+  const dealer = dealerPrices && activeVariant?.sku ? dealerPrices[activeVariant.sku] : undefined;
+  const dealerForSize = (size: string) => {
+    if (!dealerPrices) return undefined;
+    const v = variants.find((x: any) => getColor(x) === selectedColor && getSize(x) === size);
+    return v?.sku ? dealerPrices[v.sku] : undefined;
+  };
+  const availabilityDot = (code: string | null | undefined, unknown?: boolean) =>
+    unknown ? '#ef4444' : !code ? null : /^(available|instock|in_stock|lieferbar)$/i.test(code) ? '#10b981' : /^(unavailable|outofstock|out_of_stock)$/i.test(code) ? '#ef4444' : '#f59e0b';
+  const formatDealer = (value: number | null, currency: string) => value === null ? '–' : new Intl.NumberFormat('de-DE', { style: 'currency', currency: currency || 'EUR' }).format(value);
 
   const getCartImageUrl = (): string | undefined => {
     const storageId = getCurrentStorageId();
@@ -983,7 +998,17 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       {/* Price & Availability - Compact */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
         <div className="pom-price" style={{ fontSize: '16px' }}>{priceText}</div>
-        {activeVariant && (
+        {dealer && (
+          <div className="pom-dealer-price" title="Dein Händler-Einkaufspreis (netto, laut B2B-Shop)" style={{ fontSize: '12px', fontWeight: 700, padding: '4px 8px', borderRadius: '6px', background: 'rgba(63,185,80,0.18)', color: '#9be59b' }}>
+            HEK {dealer.unknown ? 'unbekannt' : formatDealer(dealer.dealerPrice, dealer.currency)}
+          </div>
+        )}
+        {dealer && availabilityDot(dealer.availabilityCode, dealer.unknown) && (
+          <div title={dealer.availableQuantity !== null ? `Verfügbar: ${dealer.availableQuantity}` : 'Verfügbarkeit laut B2B-Shop'} style={{ fontSize: '10px', fontWeight: 600, color: availabilityDot(dealer.availabilityCode, dealer.unknown) as string, padding: '4px 8px', background: 'rgba(255,255,255,0.2)', borderRadius: '6px' }}>
+            {dealer.unknown ? 'im Shop unbekannt' : /^(available|instock|in_stock|lieferbar)$/i.test(dealer.availabilityCode || '') ? 'Lieferbar' : (dealer.availabilityCode || '')}
+          </div>
+        )}
+        {activeVariant && !dealer && (
           <div style={{
             fontSize: '10px',
             fontWeight: '600',
@@ -1084,6 +1109,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                     fontVariantNumeric: 'tabular-nums',
                   }}
                 >
+                  {(() => { const d = dealerForSize(size); const c = d ? availabilityDot(d.availabilityCode, d.unknown) : null; return c ? <span aria-hidden="true" style={{ display: 'inline-block', width: 7, height: 7, borderRadius: 4, background: c, marginRight: 6, verticalAlign: 'middle' }} /> : null; })()}
                   {size}
                 </button>
               );

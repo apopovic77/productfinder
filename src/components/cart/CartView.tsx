@@ -7,6 +7,7 @@
  */
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import type { CartItem, CartViewCallbacks, ProductSearchResult } from './types';
+import { CheckoutPanel, OrderConfirmationView, type CheckoutOptions, type OrderConfirmation } from './CheckoutPanel';
 
 // Standard size order — used for sorting columns
 const SIZE_ORDER = [
@@ -48,7 +49,22 @@ export interface CartB2BState {
   testMode?: boolean;
   onLogin: (customerNumber: string, password: string) => void;
   onLogout: () => void;
+  /** Öffnet den Händler-Login-Dialog (Header) — der Warenkorb führt kein eigenes Formular mehr. */
+  onOpenLogin?: () => void;
+  /** Verfügbarkeit je Zeile und Größe (Veloconnect), für die Ampel in der Matrix. */
+  availabilityBySize?: Record<string, Record<string, { code: string | null; qty: number | null; unknown: boolean }>>;
+  /** Übergabe mit Checkout-Angaben; ersetzt den direkten onUploadB2B im Händlermodus. */
+  onCheckout?: (options: CheckoutOptions) => void;
+  /** CSV „Artikel-Nr;Anzahl" für den Datenimport des B2B-Shops. */
+  onExportCsv?: () => void;
+  confirmation?: OrderConfirmation | null;
+  onDismissConfirmation?: () => void;
 }
+
+const availabilityColor = (a?: { code: string | null; unknown: boolean }) =>
+  !a ? null : a.unknown ? '#ef4444' : !a.code ? null
+    : /^(available|instock|in_stock|lieferbar)$/i.test(a.code) ? '#10b981'
+    : /^(unavailable|outofstock|out_of_stock)$/i.test(a.code) ? '#ef4444' : '#f59e0b';
 
 interface CartViewProps extends CartViewCallbacks {
   items: CartItem[];
@@ -70,9 +86,6 @@ function formatMoney(value: number | null, currency: string): string {
 }
 
 function B2BLoginBar({ b2b }: { b2b: CartB2BState }) {
-  const [open, setOpen] = useState(false);
-  const [customerNumber, setCustomerNumber] = useState('');
-  const [password, setPassword] = useState('');
   if (b2b.customerNumber) {
     return (
       <div className="cart-b2b-bar cart-b2b-active">
@@ -86,41 +99,8 @@ function B2BLoginBar({ b2b }: { b2b: CartB2BState }) {
   }
   return (
     <div className="cart-b2b-bar">
-      {!open ? (
-        <>
-          <span className="cart-b2b-label">Für Händlerpreise und Übergabe an den B2B-Shop anmelden.</span>
-          <button type="button" className="cart-b2b-link" onClick={() => setOpen(true)}>Händler-Login</button>
-        </>
-      ) : (
-        <form
-          className="cart-b2b-form"
-          onSubmit={e => { e.preventDefault(); if (customerNumber.trim() && password) b2b.onLogin(customerNumber, password); }}
-        >
-          <input
-            className="cart-b2b-input"
-            placeholder="Kundennummer"
-            inputMode="numeric"
-            autoComplete="username"
-            value={customerNumber}
-            onChange={e => setCustomerNumber(e.target.value)}
-            disabled={b2b.loginPending}
-          />
-          <input
-            className="cart-b2b-input"
-            type="password"
-            placeholder="Passwort"
-            autoComplete="current-password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            disabled={b2b.loginPending}
-          />
-          <button type="submit" className="cart-b2b-submit" disabled={b2b.loginPending || !customerNumber.trim() || !password}>
-            {b2b.loginPending ? 'Anmelden …' : 'Anmelden'}
-          </button>
-          <button type="button" className="cart-b2b-link" onClick={() => setOpen(false)} disabled={b2b.loginPending}>Abbrechen</button>
-          {b2b.loginError && <span className="cart-b2b-error">{b2b.loginError}</span>}
-        </form>
-      )}
+      <span className="cart-b2b-label">Für Händlerpreise und Übergabe an den B2B-Shop anmelden.</span>
+      <button type="button" className="cart-b2b-link" onClick={() => (b2b.onOpenLogin ? b2b.onOpenLogin() : undefined)}>Händler-Login</button>
     </div>
   );
 }
@@ -133,6 +113,8 @@ export function CartView({
   b2b,
 }: CartViewProps) {
   const b2bActive = Boolean(b2b?.customerNumber);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  useEffect(() => { if (!b2bActive) setCheckoutOpen(false); }, [b2bActive]);
   // Compute union of all sizes across all items (column headers)
   const allSizes = useMemo(() => {
     const set = new Set<string>();
@@ -201,6 +183,21 @@ export function CartView({
       </div>
       {b2b && <B2BLoginBar b2b={b2b} />}
 
+      {b2b?.confirmation ? (
+        <OrderConfirmationView confirmation={b2b.confirmation} onNewOrder={() => { b2b.onDismissConfirmation?.(); setCheckoutOpen(false); }} />
+      ) : checkoutOpen && b2bActive && b2b?.onCheckout ? (
+        <CheckoutPanel
+          customerNumber={b2b.customerNumber as string}
+          testMode={!!b2b.testMode}
+          positions={items.length}
+          pieces={grandTotal}
+          dealerTotal={b2b.dealerTotal}
+          submitting={!!orderSubmitting}
+          error={orderError ?? null}
+          onSubmit={opts => b2b.onCheckout?.(opts)}
+          onBack={() => { setCheckoutOpen(false); onDismissOrderStatus?.(); }}
+        />
+      ) : (<>
       {/* Empty State */}
       {items.length === 0 ? (
         <div className="cart-empty">
@@ -254,6 +251,7 @@ export function CartView({
                     const qty = item.sizes[size] || 0;
                     return (
                       <td key={size} className={`cart-cell-qty ${!available ? 'cart-cell-na' : ''}`}>
+                        {available && b2bActive && (() => { const a = b2b?.availabilityBySize?.[item.id]?.[size]; const c = availabilityColor(a); return c ? <span className="cart-avail-dot" style={{ background: c }} title={a?.unknown ? 'Im B2B-Shop unbekannt' : a?.qty !== null && a?.qty !== undefined ? `Verfügbar: ${a.qty}` : (a?.code || '')} /> : null; })()}
                         {available ? (
                           <div className="cart-qty-stepper">
                             <button
@@ -376,14 +374,18 @@ export function CartView({
         ) : (b2b ? (
           <div className="cart-footer-hint">Ohne Händler-Login wird die Bestellung an den Innendienst übermittelt.</div>
         ) : null)}
+        {b2bActive && b2b?.onExportCsv && items.length > 0 && (
+          <button type="button" className="cart-b2b-link" onClick={b2b.onExportCsv} title={'Artikel-Nr;Anzahl – für „Bestellung per Datenimport“ im B2B-Shop'}>CSV für Shop-Import</button>
+        )}
         <button
           className="cart-upload-btn"
-          onClick={onUploadB2B}
+          onClick={() => (b2bActive && b2b?.onCheckout ? setCheckoutOpen(true) : onUploadB2B())}
           disabled={orderSubmitting || items.length === 0 || grandTotal === 0}
         >
-          {orderSubmitting ? 'Wird übermittelt …' : (b2bActive ? (b2b?.testMode ? 'Testbestellung an B2B-Shop →' : 'An B2B-Shop übergeben →') : 'Bestellung absenden →')}
+          {orderSubmitting ? 'Wird übermittelt …' : (b2bActive ? 'Weiter zur Übergabe →' : 'Bestellung absenden →')}
         </button>
       </div>
+      </>)}
     </div>
   );
 }
