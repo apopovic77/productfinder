@@ -93,7 +93,6 @@ function B2BLoginBar({ b2b }: { b2b: CartB2BState }) {
           Kunde <strong>{b2b.customerNumber}</strong> · Händlerpreise{b2b.pricesPending ? ' werden geladen …' : ' aktiv'}
           {b2b.testMode && <span className="cart-b2b-testbadge" title="Bestellungen gehen als Testbestellung (IsTest) an den B2B-Shop">TESTMODUS</span>}
         </span>
-        <button type="button" className="cart-b2b-link" onClick={b2b.onLogout}>Abmelden</button>
       </div>
     );
   }

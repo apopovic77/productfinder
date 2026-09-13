@@ -217,6 +217,8 @@ type State = {
   b2bVariantsById: Record<string, ProductVariant[]>;
   /** Händler-Login-Dialog (Header) offen. */
   b2bLoginOpen: boolean;
+  /** Kleines Konto-Menü unter dem Header-Icon (nur angemeldet). */
+  b2bMenuOpen: boolean;
   /** Letzte Übergabe an den B2B-Shop (Bestätigungsansicht). */
   orderConfirmation: OrderConfirmation | null;
   cartPanelOpen: boolean;
@@ -326,6 +328,7 @@ const createInitialState = (): State => {
     b2bPricesPending: false,
     b2bVariantsById: {},
     b2bLoginOpen: false,
+    b2bMenuOpen: false,
     orderConfirmation: null,
     cartPanelOpen: false,
     cartFullOverlay: false,
@@ -2951,7 +2954,7 @@ export default class App extends React.Component<Props, State> {
               type="button"
               className={`pf-header-btn pf-header-dealer-btn ${this.state.b2bSession ? 'active' : ''}`}
               onClick={() => (this.state.b2bSession
-                ? this.setState({ cartPanelOpen: true })
+                ? this.setState(prev => ({ b2bMenuOpen: !prev.b2bMenuOpen }))
                 : this.setState({ b2bLoginOpen: true }))}
               title={this.state.b2bSession ? `Händlerkonto ${this.state.b2bSession.customerNumber}` : 'Händler-Login (B2B-Shop)'}
             >
@@ -3004,7 +3007,7 @@ export default class App extends React.Component<Props, State> {
               className={`pf-mobile-icon-btn pf-mobile-dealer-btn ${this.state.b2bSession ? 'active' : ''}`}
               aria-label={this.state.b2bSession ? `Händlerkonto ${this.state.b2bSession.customerNumber}` : 'Händler-Login'}
               onClick={() => (this.state.b2bSession
-                ? this.setState({ cartPanelOpen: true, mobilePivotOpen: false })
+                ? this.setState(prev => ({ b2bMenuOpen: !prev.b2bMenuOpen, mobilePivotOpen: false }))
                 : this.setState({ b2bLoginOpen: true, mobilePivotOpen: false }))}
             >
               <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l1-5h16l1 5"/><path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/><path d="M5 12v8h14v-8"/><path d="M10 20v-5h4v5"/></svg>
@@ -3739,6 +3742,15 @@ export default class App extends React.Component<Props, State> {
           })()}
         </AnimatePresence>
 
+        {this.state.b2bMenuOpen && this.state.b2bSession && (
+          <div className="pf-b2b-menu-backdrop" onClick={() => this.setState({ b2bMenuOpen: false })}>
+            <div className="pf-b2b-menu" role="menu" onClick={e => e.stopPropagation()}>
+              <div className="pf-b2b-menu-head">Kunde <strong>{this.state.b2bSession.customerNumber}</strong>{this.state.b2bSession.customerClass ? ` · ${this.state.b2bSession.customerClass}` : ''}</div>
+              <button type="button" className="pf-b2b-menu-item" onClick={() => this.setState({ b2bMenuOpen: false, cartPanelOpen: true })}>Bestellübersicht</button>
+              <button type="button" className="pf-b2b-menu-item pf-b2b-menu-danger" onClick={() => { this.setState({ b2bMenuOpen: false }); void this.handleB2BLogout(); }}>Abmelden</button>
+            </div>
+          </div>
+        )}
         <B2BLoginDialog
           open={this.state.b2bLoginOpen && !this.state.b2bSession}
           customerNumber={this.state.b2bSession?.customerNumber ?? null}
@@ -3815,20 +3827,6 @@ export default class App extends React.Component<Props, State> {
           side="right"
         >
           <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <div style={{
-              display: 'flex', justifyContent: 'flex-end', gap: 8,
-              padding: '8px 16px 0', background: '#0f0f12',
-            }}>
-              <button
-                onClick={() => this.setState({ cartFullOverlay: !cartFullOverlay })}
-                style={{
-                  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-                  color: '#aaa', padding: '4px 10px', borderRadius: 4,
-                  fontSize: 11, cursor: 'pointer', fontFamily: 'inherit',
-                }}
-                title={cartFullOverlay ? 'Side Panel' : 'Vollbild'}
-              >{cartFullOverlay ? '◐ Side' : '◯ Full'}</button>
-            </div>
             <div style={{ flex: 1, minHeight: 0 }}>
               <CartView
                 items={this.toCartViewItems()}
