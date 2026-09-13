@@ -1467,18 +1467,29 @@ export default class App extends React.Component<Props, State> {
     const tokens = term.trim().toLowerCase().split(/\s+/).filter(Boolean);
     if (tokens.length === 0) return [];
     const all = this.controller.getCatalogAllProducts();
-    const results: Product[] = [];
+    // Owner 2026-09-13 (media 125018): „3srs solid" lieferte 1SRS-Helme und
+    // 3SRS-Stiefel, weil die Tokens ODER-verknüpft waren. Jetzt: ALLE Tokens
+    // müssen treffen (Name, SKU, Artikelcode, Design, Farbe, Kategorie);
+    // erst wenn das nichts ergibt, fällt die Suche auf Teiltreffer zurück,
+    // sortiert nach Anzahl getroffener Tokens.
+    const haystack = (product: Product): string => {
+      const raw = (product.raw as any) || {};
+      return [
+        product.name, product.sku, raw.product_code, raw.design_group, raw.color_name,
+        raw.category, raw.product_line, product.displayName,
+      ].filter(Boolean).join(' ').toLowerCase();
+    };
+    const scored: Array<{ product: Product; hits: number }> = [];
     for (const product of all) {
-      const name = (product.name || '').toLowerCase();
-      const sku = (product.sku || '').toLowerCase();
-      const code = ((product.raw as any)?.product_code || '').toString().toLowerCase();
-      const matches = tokens.some(t => name.includes(t) || sku.includes(t) || code.includes(t));
-      if (matches) {
-        results.push(product);
-        if (limit > 0 && results.length >= limit) break;
-      }
+      const text = haystack(product);
+      const hits = tokens.reduce((n, t) => n + (text.includes(t) ? 1 : 0), 0);
+      if (hits > 0) scored.push({ product, hits });
     }
-    return results;
+    const full = scored.filter(x => x.hits === tokens.length).map(x => x.product);
+    const ranked = full.length > 0
+      ? full
+      : scored.sort((a, b) => b.hits - a.hits).map(x => x.product);
+    return limit > 0 ? ranked.slice(0, limit) : ranked;
   }
 
   private filterFooterSearchResults(term: string): Product[] {
