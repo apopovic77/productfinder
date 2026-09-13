@@ -1764,22 +1764,22 @@ export default class App extends React.Component<Props, State> {
         if (unresolved.length > 0) {
           throw new Error(`Keine Artikelnummer für: ${unresolved.join(', ')}`);
         }
-        // Checkout-Angaben: bis der BFF eigene Felder hat (Issue folgt), gehen
-        // Wunschtermin, Bestellnummer, frachtfrei und Vororder als Klartext in
-        // die Bemerkung — der Shop zeigt sie dem Innendienst an.
-        const noteParts: string[] = [];
-        if (checkout?.customerOrderNumber) noteParts.push(`Bestellnummer Händler: ${checkout.customerOrderNumber}`);
-        if (checkout?.deliveryDate) noteParts.push(`Wunschliefertermin: ${checkout.deliveryDate}`);
-        if (checkout?.preorder) noteParts.push('VORORDER 2027');
-        if (checkout?.freightFree) noteParts.push('Bitte frachtfrei liefern');
-        if (checkout?.note) noteParts.push(checkout.note);
-        const note = noteParts.join(' | ').slice(0, 2000) || undefined;
+        // Checkout-Angaben strukturiert (Vertrag 1.1.0, Codex 1d80452):
+        // Wunschtermin → DeliveryDate je Zeile, Bestellnummer → Note-Präfix im
+        // BFF, frachtfrei/Vororder → Pseudo-Artikel des Shops.
+        const note = (checkout?.note || '').slice(0, 2000) || undefined;
         // Testmodus ist Default (fail-safe); Referenz bleibt über Wieder-
         // holungen stabil, damit der BFF Doppel-Sends erkennt.
         const externalRef = getOrCreateCheckoutRef(session.customerNumber);
         let result;
         try {
-          result = await b2bCreateOrder(session, lines, { isTest: !B2B_LIVE_ORDERS, externalRef, note });
+          result = await b2bCreateOrder(session, lines, {
+            isTest: !B2B_LIVE_ORDERS, externalRef, note,
+            deliveryDate: checkout?.deliveryDate ?? null,
+            customerOrderNumber: checkout?.customerOrderNumber || undefined,
+            freightFree: checkout?.freightFree || false,
+            preorder: checkout?.preorder || false,
+          });
         } catch (e: any) {
           // Referenz mit anderem Inhalt bereits verbraucht → neue Referenz für den nächsten Versuch.
           if (e?.code === 'b2b_order_conflict') clearCheckoutRef();
@@ -2950,12 +2950,14 @@ export default class App extends React.Component<Props, State> {
             <button
               type="button"
               className={`pf-header-btn pf-header-dealer-btn ${this.state.b2bSession ? 'active' : ''}`}
-              onClick={() => this.setState({ b2bLoginOpen: true })}
+              onClick={() => (this.state.b2bSession
+                ? this.setState({ cartPanelOpen: true })
+                : this.setState({ b2bLoginOpen: true }))}
               title={this.state.b2bSession ? `Händlerkonto ${this.state.b2bSession.customerNumber}` : 'Händler-Login (B2B-Shop)'}
             >
               <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l1-5h16l1 5"/><path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/><path d="M5 12v8h14v-8"/><path d="M10 20v-5h4v5"/></svg>
               {!this.isMobileLayout() && (
-                <span className="pf-header-dealer-label">{this.state.b2bSession ? `Kunde ${this.state.b2bSession.customerNumber}` : 'Händler-Login'}</span>
+                <span className="pf-header-dealer-label">{this.state.b2bSession ? `Kunde ${this.state.b2bSession.customerNumber}${this.state.b2bSession.customerClass ? ` · ${this.state.b2bSession.customerClass}` : ''}` : 'Händler-Login'}</span>
               )}
             </button>
             {/* Sprachberater (owner 2026-08-27, media 120882): Personen-Icon
@@ -3001,7 +3003,9 @@ export default class App extends React.Component<Props, State> {
               type="button"
               className={`pf-mobile-icon-btn pf-mobile-dealer-btn ${this.state.b2bSession ? 'active' : ''}`}
               aria-label={this.state.b2bSession ? `Händlerkonto ${this.state.b2bSession.customerNumber}` : 'Händler-Login'}
-              onClick={() => this.setState({ b2bLoginOpen: true, mobilePivotOpen: false })}
+              onClick={() => (this.state.b2bSession
+                ? this.setState({ cartPanelOpen: true, mobilePivotOpen: false })
+                : this.setState({ b2bLoginOpen: true, mobilePivotOpen: false }))}
             >
               <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l1-5h16l1 5"/><path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/><path d="M5 12v8h14v-8"/><path d="M10 20v-5h4v5"/></svg>
             </button>
@@ -3736,8 +3740,9 @@ export default class App extends React.Component<Props, State> {
         </AnimatePresence>
 
         <B2BLoginDialog
-          open={this.state.b2bLoginOpen}
+          open={this.state.b2bLoginOpen && !this.state.b2bSession}
           customerNumber={this.state.b2bSession?.customerNumber ?? null}
+          customerClass={this.state.b2bSession?.customerClass ?? null}
           loginPending={this.state.b2bLoginPending}
           loginError={this.state.b2bLoginError}
           testMode={!B2B_LIVE_ORDERS}

@@ -571,7 +571,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     return v?.sku ? dealerPrices[v.sku] : undefined;
   };
   const availabilityDot = (code: string | null | undefined, unknown?: boolean) =>
-    unknown ? '#ef4444' : !code ? null : /^(available|instock|in_stock|lieferbar)$/i.test(code) ? '#10b981' : /^(unavailable|outofstock|out_of_stock)$/i.test(code) ? '#ef4444' : '#f59e0b';
+    unknown ? '#9ca3af' : !code ? null : /^(available|instock|in_stock|lieferbar)$/i.test(code) ? '#10b981' : /^(unavailable|outofstock|out_of_stock)$/i.test(code) ? '#ef4444' : '#f59e0b';
   const formatDealer = (value: number | null, currency: string) => value === null ? '–' : new Intl.NumberFormat('de-DE', { style: 'currency', currency: currency || 'EUR' }).format(value);
 
   const getCartImageUrl = (): string | undefined => {
@@ -1000,12 +1000,12 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         <div className="pom-price" style={{ fontSize: '16px' }}>{priceText}</div>
         {dealer && (
           <div className="pom-dealer-price" title="Dein Händler-Einkaufspreis (netto, laut B2B-Shop)" style={{ fontSize: '12px', fontWeight: 700, padding: '4px 8px', borderRadius: '6px', background: 'rgba(63,185,80,0.18)', color: '#9be59b' }}>
-            HEK {dealer.unknown ? 'unbekannt' : formatDealer(dealer.dealerPrice, dealer.currency)}
+            HEK {dealer.unknown ? '–' : formatDealer(dealer.dealerPrice, dealer.currency)}
           </div>
         )}
         {dealer && availabilityDot(dealer.availabilityCode, dealer.unknown) && (
           <div title={dealer.availableQuantity !== null ? `Verfügbar: ${dealer.availableQuantity}` : 'Verfügbarkeit laut B2B-Shop'} style={{ fontSize: '10px', fontWeight: 600, color: availabilityDot(dealer.availabilityCode, dealer.unknown) as string, padding: '4px 8px', background: 'rgba(255,255,255,0.2)', borderRadius: '6px' }}>
-            {dealer.unknown ? 'im Shop unbekannt' : /^(available|instock|in_stock|lieferbar)$/i.test(dealer.availabilityCode || '') ? 'Lieferbar' : (dealer.availabilityCode || '')}
+            {dealer.unknown ? 'derzeit nicht über den Shop bestellbar' : /^(available|instock|in_stock|lieferbar)$/i.test(dealer.availabilityCode || '') ? 'Lieferbar' : /expect/i.test(dealer.availabilityCode || '') ? 'Nachlieferung erwartet' : (dealer.availabilityCode || '')}
           </div>
         )}
         {activeVariant && !dealer && (

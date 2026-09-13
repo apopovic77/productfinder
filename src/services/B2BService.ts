@@ -14,6 +14,9 @@ export interface B2BSession {
   token: string;
   customerNumber: string;
   expiresAt: string; // ISO
+  /** Kundenklasse laut Shop (z. B. GOLD), Vertrag 1.1. */
+  customerClass?: string | null;
+  contractVersion?: string;
 }
 
 export interface B2BPrice {
@@ -163,7 +166,7 @@ function describeError(status: number, code: string, body: any): string {
 }
 
 export async function b2bLogin(customerNumber: string, password: string): Promise<B2BSession> {
-  const r = await request<{ session_token: string; expires_at: string; customer_number: string }>(
+  const r = await request<{ session_token: string; expires_at: string; customer_number: string; customer_class?: string | null; contract_version?: string }>(
     '/login',
     { method: 'POST', body: JSON.stringify({ customer_number: customerNumber.trim(), password }) },
   );
@@ -171,6 +174,8 @@ export async function b2bLogin(customerNumber: string, password: string): Promis
     token: r.session_token,
     customerNumber: r.customer_number || customerNumber.trim(),
     expiresAt: r.expires_at,
+    customerClass: r.customer_class ?? null,
+    contractVersion: r.contract_version,
   };
   storeB2BSession(session);
   return session;
@@ -187,8 +192,8 @@ export async function b2bLogout(session: B2BSession | null): Promise<void> {
 /** Prüft die gespeicherte Sitzung gegen den BFF; null wenn ungültig. */
 export async function b2bValidateSession(session: B2BSession): Promise<B2BSession | null> {
   try {
-    const r = await request<{ customer_number: string; expires_at: string }>('/session', { token: session.token });
-    const fresh = { ...session, customerNumber: r.customer_number, expiresAt: r.expires_at };
+    const r = await request<{ customer_number: string; expires_at: string; customer_class?: string | null; contract_version?: string }>('/session', { token: session.token });
+    const fresh: B2BSession = { ...session, customerNumber: r.customer_number, expiresAt: r.expires_at, customerClass: r.customer_class ?? session.customerClass ?? null, contractVersion: r.contract_version ?? session.contractVersion };
     storeB2BSession(fresh);
     return fresh;
   } catch (e) {
@@ -225,7 +230,7 @@ export async function b2bFetchPrices(session: B2BSession, skus: string[]): Promi
 export async function b2bCreateOrder(
   session: B2BSession,
   lines: B2BOrderLineIn[],
-  opts: { note?: string; isTest?: boolean; externalRef?: string } = {},
+  opts: { note?: string; isTest?: boolean; externalRef?: string; deliveryDate?: string | null; customerOrderNumber?: string; freightFree?: boolean; preorder?: boolean } = {},
 ): Promise<B2BOrderResult> {
   const r = await request<any>(
     '/orders',
@@ -237,6 +242,11 @@ export async function b2bCreateOrder(
         note: opts.note || undefined,
         is_test: opts.isTest || undefined,
         external_ref: opts.externalRef || undefined,
+        // Vertrag 1.1.0 (Codex 1d80452): strukturierte Checkout-Angaben
+        delivery_date: opts.deliveryDate || undefined,
+        customer_order_number: opts.customerOrderNumber || undefined,
+        freight_free: opts.freightFree || undefined,
+        preorder: opts.preorder || undefined,
       }),
     },
   );

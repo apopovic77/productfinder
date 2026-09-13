@@ -10,6 +10,7 @@ import './B2BLoginDialog.css';
 export interface B2BLoginDialogProps {
   open: boolean;
   customerNumber: string | null;
+  customerClass?: string | null;
   loginPending: boolean;
   loginError: string | null;
   testMode: boolean;
@@ -20,7 +21,7 @@ export interface B2BLoginDialogProps {
 }
 
 export function B2BLoginDialog({
-  open, customerNumber, loginPending, loginError, testMode, onLogin, onLogout, onClose, onOpenCart,
+  open, customerNumber, customerClass, loginPending, loginError, testMode, onLogin, onLogout, onClose, onOpenCart,
 }: B2BLoginDialogProps) {
   const [number, setNumber] = useState('');
   const [password, setPassword] = useState('');
@@ -50,6 +51,7 @@ export function B2BLoginDialog({
         {customerNumber ? (
           <div className="pf-b2b-dialog-body">
             <div className="pf-b2b-dialog-row"><span>Kundennummer</span><strong>{customerNumber}</strong></div>
+            {customerClass && <div className="pf-b2b-dialog-row"><span>Kundenklasse</span><strong>{customerClass}</strong></div>}
             <div className="pf-b2b-dialog-row"><span>Preise</span><strong>Händlerpreise aktiv</strong></div>
             {testMode && (
               <div className="pf-b2b-dialog-note">

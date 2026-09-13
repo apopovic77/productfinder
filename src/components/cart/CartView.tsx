@@ -62,7 +62,7 @@ export interface CartB2BState {
 }
 
 const availabilityColor = (a?: { code: string | null; unknown: boolean }) =>
-  !a ? null : a.unknown ? '#ef4444' : !a.code ? null
+  !a ? null : a.unknown ? '#9ca3af' : !a.code ? null
     : /^(available|instock|in_stock|lieferbar)$/i.test(a.code) ? '#10b981'
     : /^(unavailable|outofstock|out_of_stock)$/i.test(a.code) ? '#ef4444' : '#f59e0b';
 
@@ -251,7 +251,7 @@ export function CartView({
                     const qty = item.sizes[size] || 0;
                     return (
                       <td key={size} className={`cart-cell-qty ${!available ? 'cart-cell-na' : ''}`}>
-                        {available && b2bActive && (() => { const a = b2b?.availabilityBySize?.[item.id]?.[size]; const c = availabilityColor(a); return c ? <span className="cart-avail-dot" style={{ background: c }} title={a?.unknown ? 'Im B2B-Shop unbekannt' : a?.qty !== null && a?.qty !== undefined ? `Verfügbar: ${a.qty}` : (a?.code || '')} /> : null; })()}
+                        {available && b2bActive && (() => { const a = b2b?.availabilityBySize?.[item.id]?.[size]; const c = availabilityColor(a); return c ? <span className="cart-avail-dot" style={{ background: c }} title={a?.unknown ? 'Derzeit nicht über den Shop bestellbar' : a?.qty !== null && a?.qty !== undefined ? `Verfügbar: ${a.qty}` : (a?.code || '')} /> : null; })()}
                         {available ? (
                           <div className="cart-qty-stepper">
                             <button
@@ -288,8 +288,8 @@ export function CartView({
                     const up = b2b?.unitPrices[item.id];
                     const cls = `cart-cell-ek${up?.unknown ? ' is-unknown' : ''}`;
                     return (
-                      <td className={cls} title={up?.unknown ? 'Artikel im B2B-Shop unbekannt' : 'Händler-Einkaufspreis je Stück'}>
-                        {up?.unknown ? 'unbekannt' : (up ? formatMoney(up.unit, up.currency) : (b2b?.pricesPending ? '…' : '–'))}
+                      <td className={cls} title={up?.unknown ? 'Derzeit nicht über den B2B-Shop bestellbar (z. B. neue Kollektion nur per Vororder oder Auslauf)' : 'Händler-Einkaufspreis je Stück'}>
+                        {up?.unknown ? 'n. bestellbar' : (up ? formatMoney(up.unit, up.currency) : (b2b?.pricesPending ? '…' : '–'))}
                       </td>
                     );
                   })()}
