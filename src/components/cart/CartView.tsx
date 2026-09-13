@@ -61,6 +61,14 @@ export interface CartB2BState {
   onDismissConfirmation?: () => void;
 }
 
+/** Verfügbarkeit als Zellen-Klasse (owner 2026-09-13, media 125020: keine Punkte, nur dezenter Rahmen). */
+const availabilityClass = (a?: { code: string | null; unknown: boolean }) =>
+  !a || a.unknown || !a.code ? ''
+    : /^(available|instock|in_stock|lieferbar)$/i.test(a.code) ? 'is-available'
+    : /^(unavailable|outofstock|out_of_stock)$/i.test(a.code) ? 'is-unavailable' : 'is-backorder';
+const availabilityTitle = (a?: { code: string | null; qty: number | null; unknown: boolean }) =>
+  !a ? undefined : a.unknown ? 'Derzeit nicht über den B2B-Shop bestellbar'
+    : a.qty !== null && a.qty !== undefined ? `Verfügbar: ${a.qty}` : (a.code || undefined);
 const availabilityColor = (a?: { code: string | null; unknown: boolean }) =>
   !a ? null : a.unknown ? '#9ca3af' : !a.code ? null
     : /^(available|instock|in_stock|lieferbar)$/i.test(a.code) ? '#10b981'
@@ -249,8 +257,11 @@ export function CartView({
                     const available = item.availableSizes.includes(size);
                     const qty = item.sizes[size] || 0;
                     return (
-                      <td key={size} className={`cart-cell-qty ${!available ? 'cart-cell-na' : ''}`}>
-                        {available && b2bActive && (() => { const a = b2b?.availabilityBySize?.[item.id]?.[size]; const c = availabilityColor(a); return c ? <span className="cart-avail-dot" style={{ background: c }} title={a?.unknown ? 'Derzeit nicht über den Shop bestellbar' : a?.qty !== null && a?.qty !== undefined ? `Verfügbar: ${a.qty}` : (a?.code || '')} /> : null; })()}
+                      <td
+                        key={size}
+                        className={`cart-cell-qty ${!available ? 'cart-cell-na' : ''} ${available && b2bActive ? availabilityClass(b2b?.availabilityBySize?.[item.id]?.[size]) : ''}`}
+                        title={available && b2bActive ? availabilityTitle(b2b?.availabilityBySize?.[item.id]?.[size]) : undefined}
+                      >
                         {available ? (
                           <div className="cart-qty-stepper">
                             <button

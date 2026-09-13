@@ -540,3 +540,8 @@
 .cart-view.cart-light .cart-checkout-input { background: #fff; color: #1a1a1a; border-color: #ddd; }
 .cart-view.cart-light .cart-checkout-row, .cart-view.cart-light .cart-checkout-row strong { color: #1a1a1a; }
 @media (max-width: 767px) { .cart-footer-hint { display: none; } .cart-footer { flex-wrap: wrap; } }
+/* Verfügbarkeit dezent am Mengenfeld statt als Punkt (owner 2026-09-13) */
+.cart-cell-qty.is-available .cart-qty-input { border-color: rgba(16, 185, 129, 0.7); }
+.cart-cell-qty.is-backorder .cart-qty-input { border-color: rgba(245, 158, 11, 0.8); }
+.cart-cell-qty.is-unavailable .cart-qty-input { border-color: rgba(239, 68, 68, 0.7); }
+.cart-avail-dot { display: none; }
