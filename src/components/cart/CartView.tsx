@@ -55,6 +55,8 @@ export interface CartB2BState {
   availabilityBySize?: Record<string, Record<string, { code: string | null; qty: number | null; unknown: boolean }>>;
   /** Übergabe mit Checkout-Angaben; ersetzt den direkten onUploadB2B im Händlermodus. */
   onCheckout?: (options: CheckoutOptions) => void;
+  /** Positionen, die der B2B-Shop derzeit nicht kennt (Veloconnect ItemUnknown) — blockieren die Übergabe. */
+  notOrderable?: Array<{ itemId: string; name: string; size: string | null; sku: string | null }>;
   /** CSV „Artikel-Nr;Anzahl" für den Datenimport des B2B-Shops. */
   onExportCsv?: () => void;
   confirmation?: OrderConfirmation | null;
@@ -199,6 +201,7 @@ export function CartView({
           positions={items.length}
           pieces={grandTotal}
           dealerTotal={b2b.dealerTotal}
+          notOrderable={b2b.notOrderable ?? []}
           submitting={!!orderSubmitting}
           error={orderError ?? null}
           onSubmit={opts => b2b.onCheckout?.(opts)}
@@ -375,6 +378,11 @@ export function CartView({
         {orderError && (
           <div className="cart-order-status cart-order-error" onClick={onDismissOrderStatus}>
             ✕ Übermittlung fehlgeschlagen — bitte erneut versuchen.
+          </div>
+        )}
+        {b2bActive && (b2b?.notOrderable?.length ?? 0) > 0 && (
+          <div className="cart-footer-warn" role="status">
+            {b2b!.notOrderable!.length === 1 ? '1 Position ist' : `${b2b!.notOrderable!.length} Positionen sind`} derzeit nicht über den B2B-Shop bestellbar — bitte vor der Übergabe entfernen.
           </div>
         )}
         {b2bActive ? (

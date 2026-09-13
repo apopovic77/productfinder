@@ -545,3 +545,7 @@
 .cart-cell-qty.is-backorder .cart-qty-input { border-color: rgba(245, 158, 11, 0.8); }
 .cart-cell-qty.is-unavailable .cart-qty-input { border-color: rgba(239, 68, 68, 0.7); }
 .cart-avail-dot { display: none; }
+/* Nicht bestellbare Positionen (Shop kennt Artikel nicht) — Hinweis + Sperre (2026-09-13) */
+.cart-footer-warn { flex: 1 1 100%; font-size: 12px; font-weight: 600; color: #8f1d1d; background: #fdecec; border: 1px solid #f3b8b8; border-radius: 8px; padding: 8px 10px; }
+.cart-checkout-blocklist { margin: 6px 0 8px; padding-left: 18px; font-size: 13px; }
+.cart-checkout-blocklist li { margin: 2px 0; }

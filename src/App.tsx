@@ -1784,20 +1784,22 @@ export default class App extends React.Component<Props, State> {
         const note = (checkout?.note || '').slice(0, 2000) || undefined;
         // Testmodus ist Default (fail-safe); Referenz bleibt über Wieder-
         // holungen stabil, damit der BFF Doppel-Sends erkennt.
-        const externalRef = getOrCreateCheckoutRef(session.customerNumber);
+        const send = () => b2bCreateOrder(session, lines, {
+          isTest: !B2B_LIVE_ORDERS, externalRef: getOrCreateCheckoutRef(session.customerNumber), note,
+          deliveryDate: checkout?.deliveryDate ?? null,
+          customerOrderNumber: checkout?.customerOrderNumber || undefined,
+          freightFree: checkout?.freightFree || false,
+          preorder: checkout?.preorder || false,
+        });
         let result;
         try {
-          result = await b2bCreateOrder(session, lines, {
-            isTest: !B2B_LIVE_ORDERS, externalRef, note,
-            deliveryDate: checkout?.deliveryDate ?? null,
-            customerOrderNumber: checkout?.customerOrderNumber || undefined,
-            freightFree: checkout?.freightFree || false,
-            preorder: checkout?.preorder || false,
-          });
+          result = await send();
         } catch (e: any) {
-          // Referenz mit anderem Inhalt bereits verbraucht → neue Referenz für den nächsten Versuch.
-          if (e?.code === 'b2b_order_conflict') clearCheckoutRef();
-          throw e;
+          // Referenz gehört zu einem früheren, anders befüllten Versuch (z. B. nach
+          // entfernten Artikeln) → neue Referenz und genau ein automatischer Neuversuch.
+          if (e?.code !== 'b2b_order_conflict') throw e;
+          clearCheckoutRef();
+          result = await send();
         }
         if (result.status !== 'finished') {
           throw new Error('Der B2B-Shop hat die Bestellung nicht abgeschlossen.');
@@ -2002,6 +2004,9 @@ export default class App extends React.Component<Props, State> {
       }
     }
     const availabilityBySize: NonNullable<CartB2BState['availabilityBySize']> = {};
+    // Bestellte Größen, die der Shop nicht kennt (ItemUnknown, 2026-09-13 Auftrag 3:
+    // 0625-051/052/053) — sie blockieren die Übergabe statt erst beim Shop zu scheitern.
+    const notOrderable: NonNullable<CartB2BState['notOrderable']> = [];
     if (this.state.b2bSession) {
       for (const item of this.state.cartItems) {
         const row: Record<string, { code: string | null; qty: number | null; unknown: boolean }> = {};
@@ -2011,10 +2016,18 @@ export default class App extends React.Component<Props, State> {
           if (p) row[size] = { code: p.availabilityCode, qty: p.availableQuantity, unknown: p.unknown };
         }
         availabilityBySize[item.id] = row;
+        const ordered = Object.entries(item.sizes || {}).filter(([, q]) => (q || 0) > 0).map(([sz]) => sz);
+        const sizesToCheck = ordered.length > 0 ? ordered : (item.quantity > 0 ? [null] : []);
+        for (const size of sizesToCheck) {
+          const sku = size ? this.skuForItemSize(item, size) : (item.articleNumber || null);
+          const p = sku ? this.state.b2bPrices[sku] : undefined;
+          if (p?.unknown) notOrderable.push({ itemId: item.id, name: `${item.name}${item.color ? ` ${item.color}` : ''}`, size, sku: sku ?? null });
+        }
       }
     }
     return {
       availabilityBySize,
+      notOrderable,
       onCheckout: (opts) => { void this.handleCartUploadB2B(opts); },
       onExportCsv: () => { void this.handleCartExportCsv(); },
       confirmation: this.state.orderConfirmation,

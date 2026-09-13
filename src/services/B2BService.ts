@@ -145,8 +145,10 @@ function describeError(status: number, code: string, body: any): string {
     case 'b2b_unavailable':
     case 'veloconnect_unavailable':
       return 'Die B2B-Anbindung ist derzeit nicht verfügbar.';
-    case 'unknown_items':
-      return 'Einige Artikel sind im B2B-Shop unbekannt — Bestellung wurde nicht übergeben.';
+    case 'unknown_items': {
+      const skus: string[] = body?.skus ?? body?.detail?.skus ?? body?.unknown_skus ?? [];
+      return `Der B2B-Shop kennt ${skus.length ? `die Artikel ${skus.join(', ')}` : 'einige Artikel'} nicht — die Bestellung wurde nicht übergeben. Bitte diese Positionen entfernen.`;
+    }
     case 'b2b_order_uncertain': {
       const ref = body?.order_reference ?? body?.local_order_id ?? body?.detail?.order_reference;
       return `Bestellstatus unklar — bitte NICHT erneut absenden. Der Innendienst prüft die Übergabe${ref ? ` (Referenz ${ref})` : ''}.`;

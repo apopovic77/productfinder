@@ -32,6 +32,8 @@ interface CheckoutPanelProps {
   positions: number;
   pieces: number;
   dealerTotal: number | null;
+  /** Positionen, die der Shop nicht kennt — die Übergabe bleibt gesperrt, bis sie entfernt sind. */
+  notOrderable?: Array<{ itemId: string; name: string; size: string | null; sku: string | null }>;
   submitting: boolean;
   error: string | null;
   onSubmit: (options: CheckoutOptions) => void;
@@ -40,7 +42,7 @@ interface CheckoutPanelProps {
 
 const money = (v: number | null) => (v === null ? '–' : new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' }).format(v));
 
-export function CheckoutPanel({ customerNumber, testMode, positions, pieces, dealerTotal, submitting, error, onSubmit, onBack }: CheckoutPanelProps) {
+export function CheckoutPanel({ customerNumber, testMode, positions, pieces, dealerTotal, notOrderable = [], submitting, error, onSubmit, onBack }: CheckoutPanelProps) {
   const [asap, setAsap] = useState(true);
   const [date, setDate] = useState('');
   const [note, setNote] = useState('');
@@ -49,7 +51,8 @@ export function CheckoutPanel({ customerNumber, testMode, positions, pieces, dea
   const [preorder, setPreorder] = useState(false);
   const [agb, setAgb] = useState(false);
   const today = new Date().toISOString().slice(0, 10);
-  const canSubmit = agb && !submitting && positions > 0 && (asap || !!date) && (!preorder || !!date);
+  const blocked = notOrderable.length > 0;
+  const canSubmit = agb && !submitting && !blocked && positions > 0 && (asap || !!date) && (!preorder || !!date);
 
   return (
     <form
@@ -96,6 +99,17 @@ export function CheckoutPanel({ customerNumber, testMode, positions, pieces, dea
             <input type="checkbox" checked={agb} onChange={e => setAgb(e.target.checked)} />
             <span>Ich habe die <a href="https://www.oneal-b2b.com/shop/?content=agb" target="_blank" rel="noopener noreferrer">Händler-AGB</a> gelesen und akzeptiere sie.</span>
           </label>
+          {blocked && (
+            <div className="cart-order-status cart-order-error" role="alert">
+              <strong>Nicht über den B2B-Shop bestellbar:</strong>
+              <ul className="cart-checkout-blocklist">
+                {notOrderable.map(n => (
+                  <li key={`${n.itemId}-${n.size ?? ''}`}>{n.name}{n.size ? ` · ${n.size}` : ''}{n.sku ? ` (${n.sku})` : ''}</li>
+                ))}
+              </ul>
+              Diese Positionen kennt der Shop derzeit nicht (z. B. Auslaufmodell oder noch nicht freigeschaltet). Bitte im Warenkorb entfernen, dann kann übergeben werden.
+            </div>
+          )}
           {error && <div className="cart-order-status cart-order-error">{error}</div>}
           <div className="cart-checkout-actions">
             <button type="button" className="cart-b2b-link" onClick={onBack} disabled={submitting}>← Zurück zum Warenkorb</button>
