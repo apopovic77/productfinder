@@ -3002,16 +3002,6 @@ export default class App extends React.Component<Props, State> {
             <button type="button" className="pf-mobile-icon-btn" onClick={() => this.setState({ mobilePivotOpen: !this.state.mobilePivotOpen })}>
               <i className="fa-solid fa-bars"></i>
             </button>
-            <button
-              type="button"
-              className={`pf-mobile-icon-btn pf-mobile-dealer-btn ${this.state.b2bSession ? 'active' : ''}`}
-              aria-label={this.state.b2bSession ? `Händlerkonto ${this.state.b2bSession.customerNumber}` : 'Händler-Login'}
-              onClick={() => (this.state.b2bSession
-                ? this.setState(prev => ({ b2bMenuOpen: !prev.b2bMenuOpen, mobilePivotOpen: false }))
-                : this.setState({ b2bLoginOpen: true, mobilePivotOpen: false }))}
-            >
-              <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l1-5h16l1 5"/><path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/><path d="M5 12v8h14v-8"/><path d="M10 20v-5h4v5"/></svg>
-            </button>
             {/* Warenkorb am Handy (owner 2026-09-07, media 123668): vorher nur ueber
                 die Desktop-Bottom-Bar erreichbar. */}
             <button
@@ -3171,6 +3161,17 @@ export default class App extends React.Component<Props, State> {
                 (owner 2026-08-25, media 120666 — Handy und Desktop sollen
                 dieselben Optionen bieten; Family-Grouping- und Lanes-Buttons
                 sind wie am Desktop entfallen). */}
+            <button
+              type="button"
+              className="pf-mobile-sheet-row"
+              onClick={() => (this.state.b2bSession
+                ? (() => { this.setState({ mobilePivotOpen: false }); void this.handleB2BLogout(); })()
+                : this.setState({ b2bLoginOpen: true, mobilePivotOpen: false }))}
+            >
+              <i className="fa-solid fa-store" aria-hidden="true"></i>
+              <span>{this.state.b2bSession ? `Kunde ${this.state.b2bSession.customerNumber}` : 'Händler-Login'}</span>
+              <span className="pf-mobile-sheet-row-meta">{this.state.b2bSession ? 'Abmelden' : 'B2B-Shop'}</span>
+            </button>
             <button
               type="button"
               className="pf-mobile-sheet-row"
@@ -3823,7 +3824,7 @@ export default class App extends React.Component<Props, State> {
         )}
         <SlidePanel
           open={cartPanelOpen}
-          width={cartFullOverlay ? '90vw' : '60vw'}
+          width={this.isMobileLayout() ? '100vw' : (cartFullOverlay ? '90vw' : '60vw')}
           side="right"
         >
           <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
