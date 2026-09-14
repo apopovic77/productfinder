@@ -2652,6 +2652,9 @@ export default class App extends React.Component<Props, State> {
         position={this.state.quickSearchPosition ?? undefined}
         onAutoPosition={this.handleQuickSearchAutoPosition}
         onDrag={this.handleQuickSearchDrag}
+          onStartVoice={this.props.realtimeDemoAvailable
+            ? () => this.setState({ isQuickSearchOpen: false, quickSearchError: null, realtimeShortcutEnabled: true })
+            : undefined}
         />
         {aiFilterProductIds.length > 0 && (
           <div className="quicksearch-indicator">
@@ -2987,25 +2990,28 @@ export default class App extends React.Component<Props, State> {
                 <span className="pf-header-dealer-label">{this.state.b2bSession ? `Kunde ${this.state.b2bSession.customerNumber}${this.state.b2bSession.customerClass ? ` · ${this.state.b2bSession.customerClass}` : ''}` : 'Händler-Login'}</span>
               )}
             </button>
-            {/* Sprachberater (owner 2026-08-27, media 120882): Personen-Icon
-                startet die Realtime-Sitzung direkt — die Karte erscheint erst
-                dann, nicht vorab als Overlay. Desktop UND Handy. */}
-            <button
-              type="button"
-              className={`pf-header-btn pf-header-voice-btn ${this.state.realtimeShortcutEnabled ? 'active' : ''}`}
-              onClick={() => this.setState(prev => ({ realtimeShortcutEnabled: !prev.realtimeShortcutEnabled }))}
-              title={this.state.realtimeShortcutEnabled ? 'Sprachberater ausblenden' : 'Sprachberater starten'}
-              aria-pressed={this.state.realtimeShortcutEnabled}
-            >
-              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
-            </button>
+            {/* Sprachberater: kein eigener Header-Button mehr (owner 2026-09-14,
+                media 125063: „nur Ask AI") — Start über „Sprechen" in der
+                Ask-AI-Palette, Ctrl+Shift+V oder ?voice=1. Am Handy bleibt das
+                Personen-Icon, dort gibt es keinen Ask-AI-Button im Header. */}
+            {this.isMobileLayout() && (
+              <button
+                type="button"
+                className={`pf-header-btn pf-header-voice-btn ${this.state.realtimeShortcutEnabled ? 'active' : ''}`}
+                onClick={() => this.setState(prev => ({ realtimeShortcutEnabled: !prev.realtimeShortcutEnabled }))}
+                title={this.state.realtimeShortcutEnabled ? 'Sprachberater ausblenden' : 'Sprachberater starten'}
+                aria-pressed={this.state.realtimeShortcutEnabled}
+              >
+                <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+              </button>
+            )}
             {!this.isMobileLayout() && (
               <>
                 <button
                   type="button"
-                  className="pf-header-btn pf-header-ai-btn"
+                  className={`pf-header-btn pf-header-ai-btn ${this.state.realtimeShortcutEnabled ? 'active' : ''}`}
                   onClick={() => this.setState({ isQuickSearchOpen: true })}
-                  title="Ask AI"
+                  title="Ask AI — tippen oder sprechen"
                 >
                   Ask AI
                 </button>

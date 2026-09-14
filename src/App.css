@@ -2581,3 +2581,5 @@ body {
 }
 .pf-mobile-sheet-row:active { background: rgba(255, 255, 255, 0.14); }
 .pf-mobile-sheet-row-meta { margin-left: auto; font-size: 12px; font-weight: 500; color: #8b949e; }
+/* „Sprechen" in der Ask-AI-Palette (2026-09-14) — links vom Abbrechen/Suchen-Paar */
+.quicksearch-voice { display: inline-flex; align-items: center; gap: 6px; margin-right: auto; }
