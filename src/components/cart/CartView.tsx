@@ -390,18 +390,26 @@ export function CartView({
             Summe Händler-EK: <strong>{b2b?.dealerTotal !== null && b2b?.dealerTotal !== undefined ? formatMoney(b2b.dealerTotal, 'EUR') : '–'}</strong>
           </div>
         ) : (b2b ? (
-          <div className="cart-footer-hint">Ohne Händler-Login wird die Bestellung an den Innendienst übermittelt.</div>
+          <div className="cart-footer-hint">Bestellen ist nur mit Händler-Login möglich — der Warenkorb bleibt gespeichert.</div>
         ) : null)}
-        {b2bActive && b2b?.onExportCsv && items.length > 0 && (
+        {b2b?.onExportCsv && items.length > 0 && (
           <button type="button" className="cart-b2b-link" onClick={b2b.onExportCsv} title={'Artikel-Nr;Anzahl – für „Bestellung per Datenimport“ im B2B-Shop'}>CSV für Shop-Import</button>
         )}
-        <button
-          className="cart-upload-btn"
-          onClick={() => (b2bActive && b2b?.onCheckout ? setCheckoutOpen(true) : onUploadB2B())}
-          disabled={orderSubmitting || items.length === 0 || grandTotal === 0}
-        >
-          {orderSubmitting ? 'Wird übermittelt …' : (b2bActive ? 'Weiter zur Übergabe →' : 'Bestellung absenden →')}
-        </button>
+        {/* Gast-Bestellung abgeschafft (owner 2026-09-15): der alte Orders-Endpunkt
+            hatte keinen Empfänger. Ohne Login führt der Button zum Händler-Login. */}
+        {b2bActive || !b2b ? (
+          <button
+            className="cart-upload-btn"
+            onClick={() => (b2bActive && b2b?.onCheckout ? setCheckoutOpen(true) : onUploadB2B())}
+            disabled={orderSubmitting || items.length === 0 || grandTotal === 0}
+          >
+            {orderSubmitting ? 'Wird übermittelt …' : 'Weiter zur Übergabe →'}
+          </button>
+        ) : (
+          <button className="cart-upload-btn" onClick={() => b2b.onOpenLogin?.()} disabled={b2b.loginPending}>
+            {b2b.loginPending ? 'Anmelden …' : 'Als Händler anmelden, um zu bestellen'}
+          </button>
+        )}
       </div>
       </>)}
     </div>

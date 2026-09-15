@@ -47,6 +47,23 @@ export interface B2BOrderResult {
   }>;
 }
 
+/** Ein über den Finder übergebener Auftrag aus dem BFF-Audit (Vertrag 1.2, Issue #1896). */
+export interface B2BStoredOrder {
+  orderNumber: string;
+  orderId: string | null;
+  transactionId: string | null;
+  status: 'finished' | 'failed' | 'uncertain';
+  isTest: boolean;
+  createdAt: string;
+  customerOrderNumber: string | null;
+  deliveryDate: string | null;
+  freightFree: boolean;
+  preorder: boolean;
+  note: string | null;
+  lines: Array<{ sku: string; quantity: number; unitPrice: number | null; currency: string; productName?: string | null; color?: string | null; size?: string | null }>;
+  totalNet: number | null;
+}
+
 export class B2BError extends Error {
   constructor(public readonly status: number, public readonly code: string, message: string,
               public readonly detail?: unknown) {
@@ -273,4 +290,38 @@ function toNumber(v: unknown): number | null {
   if (v === null || v === undefined || v === '') return null;
   const n = typeof v === 'number' ? v : parseFloat(String(v).replace(',', '.'));
   return Number.isFinite(n) ? n : null;
+}
+
+/** „Meine Bestellungen": Aufträge dieses Kunden aus dem Finder, neueste zuerst. */
+export async function b2bListOrders(session: B2BSession, limit = 50): Promise<B2BStoredOrder[]> {
+  const r = await request<{ orders: any[] }>(`/orders?limit=${limit}`, { token: session.token });
+  return (r.orders || []).map((o: any): B2BStoredOrder => {
+    const lines: B2BStoredOrder['lines'] = (o.lines || []).map((l: any) => ({
+      sku: String(l.sku),
+      quantity: Number(l.quantity) || 0,
+      unitPrice: l.unit_price === null || l.unit_price === undefined ? null : Number(l.unit_price),
+      currency: l.currency || 'EUR',
+      productName: l.product_name ?? null,
+      color: l.color ?? null,
+      size: l.size ?? null,
+    }));
+    const total = o.total_net === null || o.total_net === undefined
+      ? lines.reduce<number | null>((acc, l) => (acc === null || l.unitPrice === null ? null : acc + l.unitPrice * l.quantity), 0)
+      : Number(o.total_net);
+    return {
+      orderNumber: String(o.order_number ?? o.local_order_id ?? ''),
+      orderId: o.order_id ?? null,
+      transactionId: o.transaction_id ?? null,
+      status: o.status === 'finished' || o.status === 'failed' ? o.status : 'uncertain',
+      isTest: Boolean(o.is_test),
+      createdAt: o.created_at,
+      customerOrderNumber: o.customer_order_number ?? null,
+      deliveryDate: o.delivery_date ?? null,
+      freightFree: Boolean(o.freight_free),
+      preorder: Boolean(o.preorder),
+      note: o.note ?? null,
+      lines,
+      totalNet: total,
+    };
+  });
 }

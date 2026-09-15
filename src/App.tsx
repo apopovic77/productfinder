@@ -1,16 +1,16 @@
 import React, { lazy, Suspense } from 'react';
 import './App.css';
 import { CartView } from './components/cart/CartView';
-import { submitOrder } from './services/OrderService';
 import {
   B2B_LIVE_ORDERS, b2bCreateOrder, b2bFetchPrices, b2bLogin, b2bLogout, b2bValidateSession,
-  clearCheckoutRef, getOrCreateCheckoutRef, loadB2BSession,
-  type B2BPrice, type B2BSession,
+  b2bListOrders, clearCheckoutRef, getOrCreateCheckoutRef, loadB2BSession,
+  B2BError, type B2BPrice, type B2BSession, type B2BStoredOrder,
 } from './services/B2BService';
 import { resolveCartLineSkus } from './utils/cartSku';
 import type { CartB2BState } from './components/cart/CartView';
 import type { CheckoutOptions, OrderConfirmation } from './components/cart/CheckoutPanel';
 import { B2BLoginDialog } from './components/b2b/B2BLoginDialog';
+import { B2BOrdersPanel } from './components/b2b/B2BOrdersPanel';
 import { SlidePanel, SlidePanelBackdrop } from './components/cart/SlidePanel';
 import './components/cart/CartView.css';
 import type { CartItem as CartViewItem, ProductSearchResult } from './components/cart/types';
@@ -222,6 +222,11 @@ type State = {
   /** Letzte Übergabe an den B2B-Shop (Bestätigungsansicht). */
   orderConfirmation: OrderConfirmation | null;
   cartPanelOpen: boolean;
+  /** Warenkorb-Panel zeigt „Meine Bestellungen" statt des Warenkorbs (owner 2026-09-15). */
+  b2bOrdersOpen: boolean;
+  b2bOrders: B2BStoredOrder[] | null;
+  b2bOrdersLoading: boolean;
+  b2bOrdersError: string | null;
   cartFullOverlay: boolean;
   realtimeShortcutEnabled: boolean;
 };
@@ -331,6 +336,10 @@ const createInitialState = (): State => {
     b2bMenuOpen: false,
     orderConfirmation: null,
     cartPanelOpen: false,
+    b2bOrdersOpen: false,
+    b2bOrders: null,
+    b2bOrdersLoading: false,
+    b2bOrdersError: null,
     cartFullOverlay: false,
     // ?voice=1 blendet die Realtime-Flaeche ohne Tastatur ein (Handy/Tablet,
     // owner 2026-08-26 „wie am Handy testen"); Desktop zusaetzlich Ctrl+Shift+V.
@@ -1834,9 +1843,9 @@ export default class App extends React.Component<Props, State> {
         });
         return;
       }
-      const result = await submitOrder({ items });
-      // Success: clear the cart, keep the confirmation visible
-      this.setState({ orderSubmitting: false, orderResult: result.order_number, cartItems: [] });
+      // Kein Gastpfad mehr (owner 2026-09-15): ohne Händler-Login gibt es keine
+      // Übergabe — der alte Orders-Endpunkt hatte keinen Empfänger.
+      this.setState({ orderSubmitting: false, b2bLoginOpen: true });
     } catch (e: any) {
       this.setState({ orderSubmitting: false, orderError: String(e?.message || e) });
     }
@@ -1880,6 +1889,26 @@ export default class App extends React.Component<Props, State> {
   };
 
   /** CSV „Artikel-Nr;Anzahl" für den Datenimport des B2B-Shops (Post #4969). */
+  /** „Meine Bestellungen" laden (BFF-Audit; bis Codex #1896 liefert, meldet der BFF 404/405). */
+  private loadB2BOrders = async () => {
+    const session = this.state.b2bSession;
+    if (!session || this.state.b2bOrdersLoading) return;
+    this.setState({ b2bOrdersLoading: true, b2bOrdersError: null });
+    try {
+      const orders = await b2bListOrders(session);
+      this.setState({ b2bOrders: orders, b2bOrdersLoading: false });
+    } catch (e: any) {
+      const notYet = e instanceof B2BError && (e.status === 404 || e.status === 405 || e.status === 501);
+      this.setState({
+        b2bOrdersLoading: false,
+        b2bOrders: this.state.b2bOrders ?? [],
+        b2bOrdersError: notYet
+          ? 'Die Bestellliste ist im B2B-Backend noch nicht freigeschaltet — bis dahin bitte „Offene Aufträge" im Shop nutzen.'
+          : String(e?.message || e),
+      });
+    }
+  };
+
   private handleCartExportCsv = async () => {
     await this.ensureB2BVariants();
     const { lines, unresolved } = this.resolveB2BOrderLines();
@@ -1970,7 +1999,7 @@ export default class App extends React.Component<Props, State> {
 
   private handleB2BLogout = async () => {
     const session = this.state.b2bSession;
-    this.setState({ b2bSession: null, b2bPrices: {}, b2bLoginError: null });
+    this.setState({ b2bSession: null, b2bPrices: {}, b2bLoginError: null, b2bOrders: null, b2bOrdersOpen: false, b2bOrdersError: null });
     await b2bLogout(session);
   };
 
@@ -3777,7 +3806,8 @@ export default class App extends React.Component<Props, State> {
           <div className="pf-b2b-menu-backdrop" onClick={() => this.setState({ b2bMenuOpen: false })}>
             <div className="pf-b2b-menu" role="menu" onClick={e => e.stopPropagation()}>
               <div className="pf-b2b-menu-head">Kunde <strong>{this.state.b2bSession.customerNumber}</strong>{this.state.b2bSession.customerClass ? ` · ${this.state.b2bSession.customerClass}` : ''}</div>
-              <button type="button" className="pf-b2b-menu-item" onClick={() => this.setState({ b2bMenuOpen: false, cartPanelOpen: true })}>Bestellübersicht</button>
+              <button type="button" className="pf-b2b-menu-item" onClick={() => this.setState({ b2bMenuOpen: false, cartPanelOpen: true, b2bOrdersOpen: false })}>Bestellübersicht</button>
+              <button type="button" className="pf-b2b-menu-item" onClick={() => this.setState({ b2bMenuOpen: false, cartPanelOpen: true, b2bOrdersOpen: true })}>Meine Bestellungen</button>
               <button type="button" className="pf-b2b-menu-item pf-b2b-menu-danger" onClick={() => { this.setState({ b2bMenuOpen: false }); void this.handleB2BLogout(); }}>Abmelden</button>
             </div>
           </div>
@@ -3859,6 +3889,17 @@ export default class App extends React.Component<Props, State> {
         >
           <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
             <div style={{ flex: 1, minHeight: 0 }}>
+              {this.state.b2bOrdersOpen && this.state.b2bSession ? (
+                <B2BOrdersPanel
+                  customerNumber={this.state.b2bSession.customerNumber}
+                  orders={this.state.b2bOrders}
+                  loading={this.state.b2bOrdersLoading}
+                  error={this.state.b2bOrdersError}
+                  onRefresh={this.loadB2BOrders}
+                  onOpenCart={() => this.setState({ b2bOrdersOpen: false })}
+                  onClose={() => this.setState({ cartPanelOpen: false, cartFullOverlay: false, b2bOrdersOpen: false })}
+                />
+              ) : (
               <CartView
                 items={this.toCartViewItems()}
                 onSetQuantity={this.handleCartSetQuantity}
@@ -3874,6 +3915,7 @@ export default class App extends React.Component<Props, State> {
                 onClose={() => this.setState({ cartPanelOpen: false, cartFullOverlay: false })}
                 b2b={this.buildCartB2BState()}
               />
+              )}
             </div>
           </div>
         </SlidePanel>
