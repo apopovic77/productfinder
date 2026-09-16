@@ -433,8 +433,21 @@ export class LayoutService {
     return this._heroPresentation;
   }
 
+  /**
+   * Gruppen-Sicht lohnt nur, wenn wenigstens eine Gruppe mehr als ein Produkt
+   * enthaelt (owner 2026-09-16, media 125406). Egal ob zwei oder acht Gruppen:
+   * hat jede nur einen Artikel, sagt die Gruppierung nichts und kostet nur
+   * Platz — dann direkt die Hero-Sicht. Gilt auch fuer 'Grouped' im Header,
+   * weil es dort sonst gar nichts zu gruppieren gibt.
+   */
+  private groupedViewWorthwhile(): boolean {
+    const buckets = this.drillDownService.getCurrentBuckets().filter(b => !b.isUnknown);
+    if (buckets.length === 0) return true;
+    return buckets.some(b => (b.objectIds?.length ?? 0) > 1);
+  }
+
   isHeroRootOverview(): boolean {
-    return this.isPivotHeroMode() && !this._heroPresentation;
+    return this.isPivotHeroMode() && !this._heroPresentation && this.groupedViewWorthwhile();
   }
 
   /**
