@@ -43,6 +43,10 @@ type Props = {
    * 2026-09-11) — nur gesetzt, wenn ein Händler angemeldet ist.
    */
   dealerPrices?: Record<string, { dealerPrice: number | null; rrp: number | null; currency: string; availabilityCode: string | null; availableQuantity: number | null; unknown: boolean }>;
+  /** Haendler angemeldet — nur dann gibt es eine belastbare Verfuegbarkeit. */
+  dealerActive?: boolean;
+  /** Haendlerpreise werden gerade geladen. */
+  dealerPricesPending?: boolean;
   onBuy?: (payload: {
     product: Product;
     variant?: any;
@@ -65,7 +69,7 @@ interface ParsedFeature {
  * Product Overlay Modal V2 - HALF WIDTH VERSION (240px)
  * Same design as V1, but with compact half-width layout
  */
-export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady, onShowDetails, expanded = false, onCollapse, locale, onSiblingSelect, onStepProduct, dealerPrices }) => {
+export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady, onShowDetails, expanded = false, onCollapse, locale, onSiblingSelect, onStepProduct, dealerPrices, dealerActive = false, dealerPricesPending = false }) => {
   const isMobilePortrait = window.innerWidth <= 768 && window.innerHeight > window.innerWidth;
   // Phone: the dark hero card as a full-width bottom sheet (owner 2026-08-23,
   // "die Karte auch im Desktop-Style"). Same markup as the desktop dock,
@@ -549,15 +553,24 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     ? getVariantPrice(activeVariant)
     : (product.price?.formatted || `€ ${product.price?.value?.toFixed(2) || '0.00'}`);
 
-  // Get availability - supports V2 (is_available: bool) and V1 (availability: string)
-  const availability = activeVariant?.is_available != null
-    ? (activeVariant.is_available ? 'In Stock' : 'Out of Stock')
-    : (activeVariant?.availability || 'Unknown');
-  const availabilityColor = (activeVariant?.is_available === true || availability === 'InStock' || availability === 'In Stock')
-    ? '#10b981'
-    : (activeVariant?.is_available === false || availability === 'OutOfStock' || availability === 'Out of Stock')
-      ? '#ef4444'
-      : '#f59e0b';
+  // Lagerbestand aus unserem Katalog (naechtlicher LIUS-Sync). Das alte Feld
+  // is_available taugte nicht: es stand bei 36.002 von 36.003 Varianten auf true
+  // und zeigte gruen „In Stock", waehrend rechnerisch nichts verfuegbar war
+  // (owner 2026-09-16). stock_available = Lager minus reserviert, kann negativ
+  // sein. Fuer den Bestand braucht es KEINEN Haendler-Login — der ist nur fuer
+  // Preise und die Bestellbarkeit ueber den B2B-Shop noetig.
+  const stockAvailable = typeof activeVariant?.stock_available === 'number'
+    ? activeVariant.stock_available
+    : null;
+  const stockLabel = stockAvailable === null
+    ? null
+    : stockAvailable > 0 ? 'Auf Lager' : 'Nicht auf Lager';
+  const stockColor = stockAvailable === null
+    ? 'rgba(255,255,255,0.65)'
+    : stockAvailable > 0 ? '#10b981' : '#f59e0b';
+  const stockTitle = stockAvailable === null
+    ? 'Für diese Variante liegt kein Bestand vor'
+    : `${stockAvailable > 0 ? stockAvailable : 0} Stück verfügbar (Lager ${activeVariant?.stock_on_hand ?? '–'}, reserviert ${activeVariant?.stock_reserved ?? '–'}, Stand letzte Nacht)`;
 
   // Get product URL
   const productUrl = activeVariant?.url || (product as any).meta?.product_url;
@@ -1010,16 +1023,32 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
             {dealer.unknown ? 'derzeit nicht über den Shop bestellbar' : /^(available|instock|in_stock|lieferbar)$/i.test(dealer.availabilityCode || '') ? 'Lieferbar' : /expect/i.test(dealer.availabilityCode || '') ? 'Nachlieferung erwartet' : (dealer.availabilityCode || '')}
           </div>
         )}
-        {activeVariant && !dealer && (
-          <div style={{
-            fontSize: '10px',
-            fontWeight: '600',
-            color: availabilityColor,
-            padding: '4px 8px',
-            background: 'rgba(255, 255, 255, 0.2)',
-            borderRadius: '6px'
-          }}>
-            {availability}
+        {/* Kein lokales „In Stock" mehr (owner 2026-09-16): das Feld is_available
+            steht bei 36.002 von 36.003 Varianten auf true und sagte damit nichts —
+            es widersprach nur der Veloconnect-Auskunft. Ohne Haendlerdaten steht
+            hier jetzt ein neutraler Hinweis statt einer gruenen Zusage. */}
+        {/* Lagerbestand — immer, ohne Login. */}
+        {activeVariant && stockLabel && (
+          <div
+            title={stockTitle}
+            style={{
+              fontSize: '10px', fontWeight: 600, color: stockColor,
+              padding: '4px 8px', background: 'rgba(255,255,255,0.15)', borderRadius: '6px',
+            }}
+          >
+            {stockLabel}{stockAvailable !== null && stockAvailable > 0 ? ` · ${stockAvailable}` : ''}
+          </div>
+        )}
+        {/* Bestellbarkeit ueber den B2B-Shop kennt nur Veloconnect — erst nach Login. */}
+        {activeVariant && !dealer && dealerActive && (
+          <div
+            title="Bestellbarkeit wird beim B2B-Shop abgefragt"
+            style={{
+              fontSize: '10px', fontWeight: 600, color: 'rgba(255,255,255,0.65)',
+              padding: '4px 8px', background: 'rgba(255,255,255,0.12)', borderRadius: '6px',
+            }}
+          >
+            Bestellbarkeit wird geprüft …
           </div>
         )}
       </div>

@@ -1855,6 +1855,12 @@ export default class App extends React.Component<Props, State> {
 
   /** Varianten eines Warenkorb-Produkts: aus dem Produkt selbst oder dem Detail-Cache. */
   private variantsForCartItem = (productId: string): ProductVariant[] | undefined => {
+    // Synchroner Cache zuerst: setState wirkt erst im naechsten Render, dadurch
+    // fand die Preisabfrage direkt nach ensureB2BVariants() keine SKUs und brach
+    // still ab — HEK und Verfuegbarkeit erschienen erst nach einer zweiten
+    // Aktion (owner 2026-09-16).
+    const fresh = this.b2bVariantsCache.get(productId);
+    if (fresh?.length) return fresh;
     const cached = this.state.b2bVariantsById[productId];
     if (cached?.length) return cached;
     const product = this.controller.getAllProducts().find(p => p.id === productId);
@@ -1862,6 +1868,8 @@ export default class App extends React.Component<Props, State> {
   };
 
   private b2bVariantFetches = new Map<string, Promise<void>>();
+  /** Varianten synchron verfuegbar, unabhaengig vom setState-Takt. */
+  private b2bVariantsCache = new Map<string, ProductVariant[]>();
 
   /** Fehlende Varianten für alle Warenkorb-Produkte nachladen (Detail-Endpunkt). */
   private ensureB2BVariants = async (): Promise<void> => {
@@ -1873,6 +1881,7 @@ export default class App extends React.Component<Props, State> {
       if (!inflight) {
         inflight = fetchProductById(id).then(detail => {
           const variants = detail?.variants || [];
+          this.b2bVariantsCache.set(id, variants);
           this.setState(prev => ({ b2bVariantsById: { ...prev.b2bVariantsById, [id]: variants } }));
         }).finally(() => { this.b2bVariantFetches.delete(id); });
         this.b2bVariantFetches.set(id, inflight);
@@ -3796,6 +3805,8 @@ export default class App extends React.Component<Props, State> {
                 }}
                 onBuy={this.handleProductBuy}
                 dealerPrices={this.state.b2bSession ? this.state.b2bPrices : undefined}
+                dealerActive={!!this.state.b2bSession}
+                dealerPricesPending={this.state.b2bPricesPending}
               />
             </>
             );

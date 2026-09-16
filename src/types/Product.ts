@@ -88,11 +88,17 @@ export type ProductVariant = {
   storage?: { id?: number; media_url?: string; thumbnail_url?: string | null } | null;
   images?: VariantImage[];
   is_available?: boolean;
+  /** Echter Lagerbestand aus LIUS (naechtlicher Sync; von oneal-api-v2 erst seit
+   *  2026-09-16 ausgeliefert). is_available ist KEINE Verfuegbarkeitsaussage —
+   *  es steht bei 36.002 von 36.003 Varianten auf true. */
+  stock_on_hand?: number | null;
+  stock_reserved?: number | null;
   ean?: string;
   weight_grams?: number | null;
   material?: string | null;
   customs_tariff?: string | null;
   model_year?: number | null;
+  /** Lager minus reserviert; kann negativ sein. */
   stock_available?: number | null;
   is_nos?: boolean;
 };
