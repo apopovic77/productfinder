@@ -998,9 +998,11 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       {/* Price & Availability - Compact */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
         <div className="pom-price" style={{ fontSize: '16px' }}>{priceText}</div>
-        {dealer && (
+        {/* HEK nur zeigen, wenn es wirklich einen Preis gibt — sonst stand dort nur
+            ein Strich (owner 2026-09-16, media 125394). */}
+        {dealer && !dealer.unknown && dealer.dealerPrice !== null && dealer.dealerPrice !== undefined && (
           <div className="pom-dealer-price" title="Dein Händler-Einkaufspreis (netto, laut B2B-Shop)" style={{ fontSize: '12px', fontWeight: 700, padding: '4px 8px', borderRadius: '6px', background: 'rgba(63,185,80,0.18)', color: '#9be59b' }}>
-            HEK {dealer.unknown ? '–' : formatDealer(dealer.dealerPrice, dealer.currency)}
+            HEK {formatDealer(dealer.dealerPrice, dealer.currency)}
           </div>
         )}
         {dealer && availabilityDot(dealer.availabilityCode, dealer.unknown) && (
@@ -1022,6 +1024,10 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         )}
       </div>
 
+      {/* Farbe und Groesse nebeneinander (owner 2026-09-16, media 125393): gestapelt
+          wurde die Karte so hoch, dass „Add to Cart" aus dem Bild rutschte. Bei zu
+          wenig Breite bricht die Zeile von selbst wieder um. */}
+      <div style={{ display: 'flex', gap: '12px 20px', flexWrap: 'wrap', alignItems: 'flex-start', marginBottom: '12px' }}>
       {/* Color — rectangles (selectable, switches to sibling product) */}
       {(() => {
         const activeRaw = (activeProduct as any)?.raw || {};
@@ -1038,7 +1044,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         if (options.length === 0) return null;
 
         return (
-          <div style={{ marginBottom: '12px' }}>
+          <div style={{ flex: '0 1 auto', minWidth: 0 }}>
             <div style={{ fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.8, marginBottom: '6px' }}>
               Color: <span style={{ opacity: 1 }}>{currentColor}</span>
             </div>
@@ -1086,7 +1092,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       {/* Sizes — selectable chips; the chosen size goes into the cart via
           activeVariant (owner 2026-08-23: plain text left no way to pick). */}
       {availableSizes.length > 0 && (
-        <div className="pom-size-block" style={{ marginBottom: '12px' }}>
+        <div className="pom-size-block" style={{ flex: '0 1 auto', minWidth: 0 }}>
           <div style={{ fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.8, marginBottom: '6px' }}>
             Size: <span style={{ opacity: 1 }}>{selectedSize || availableSizes[0]}</span>
           </div>
@@ -1117,6 +1123,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
           </div>
         </div>
       )}
+      </div>
 
       {/* Features - Compact, 2 per row */}
       {features.length > 0 && (
