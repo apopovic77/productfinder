@@ -39,7 +39,7 @@
 
 .pf-catalog-wordmark-logo {
   justify-self: center;
-  width: min(760px, 78vw);
+  width: min(420px, 62vw);
   height: auto;
   display: block;
 }
