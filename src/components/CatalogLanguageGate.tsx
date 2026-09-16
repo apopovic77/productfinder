@@ -100,10 +100,16 @@ export const CatalogLanguageGate: React.FC<Props> = ({ children }) => {
       )}
       <div className="pf-catalog-landing-shade" />
       <div className="pf-catalog-landing-content">
-        <div className="pf-catalog-wordmark" aria-label="Gravity Sports Group">
-          Gravity
-          <span>Sports Group</span>
-        </div>
+        {/* Offizielles Gravity-Sports-Group-Logo statt Schriftzug (Sonja Goldmann,
+            2026-09-14). Quelle: Gravity_Sports_Group_Logo_POS.ai, für den dunklen
+            Grund auf Weiß umgesetzt; Red-Bull-Farben bleiben unverändert. */}
+        <img
+          className="pf-catalog-wordmark-logo"
+          src="/gsg-logo-white.png"
+          alt="Gravity Sports Group"
+          width={4992}
+          height={1377}
+        />
         <div className="pf-catalog-landing-copy">
           <h1>Catalog {CATALOG_ENTRY_CONFIG.year}</h1>
         </div>

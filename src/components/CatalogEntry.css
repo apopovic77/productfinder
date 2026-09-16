@@ -37,6 +37,13 @@
   gap: clamp(42px, 9vh, 92px);
 }
 
+.pf-catalog-wordmark-logo {
+  justify-self: center;
+  width: min(760px, 78vw);
+  height: auto;
+  display: block;
+}
+
 .pf-catalog-wordmark {
   justify-self: center;
   text-align: center;
