@@ -745,12 +745,6 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     maxHeight: heroSheet || isMobilePortrait
       ? (expanded ? Math.round(window.innerHeight * 0.9) - 16 : Math.round(window.innerHeight * 0.5))
       : (expanded ? Math.round(window.innerHeight * 0.86) : window.innerHeight - 150),
-    // Aufgeklappt muss die Karte das fest positionierte Bildfeld (top 14vh+20px,
-    // bottom 20px) immer umschliessen. Mit nur maxHeight blieb sie bei wenig
-    // Text niedrig, und das Bildfeld ragte oben heraus (owner 2026-09-22,
-    // media 125880/125881). Zahlenwert statt undefined, damit der Morph
-    // animierbar bleibt.
-    minHeight: !(heroSheet || isMobilePortrait) && expanded ? Math.round(window.innerHeight * 0.86) : 0,
     rotateY: !isMobilePortrait && !expanded ? -7 : 0,
     transformPerspective: 1400,
   };
@@ -775,6 +769,12 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         // heroSheet scrollt: mit 'hidden' war 'Mehr Details' unterhalb der
         // Sheet-Kante unerreichbar (Befund 2026-08-25 bei media 120674).
         overflowY: expanded ? 'auto' : heroSheet ? 'auto' : isMobilePortrait ? 'auto' : 'visible',
+        // Aufgeklappt muss die Karte das fest positionierte Bildfeld (top
+        // 14vh+20px, bottom 20px) immer umschliessen. Nur mit maxHeight blieb sie
+        // bei wenig Text niedrig, und das Bildfeld ragte oben heraus (owner
+        // 2026-09-22, media 125880/125881). Bewusst im festen Stil, nicht im
+        // animierten morphTarget: dort kam minHeight beim Aufklappen als 0 an.
+        minHeight: !(heroSheet || isMobilePortrait) && expanded ? Math.round(window.innerHeight * 0.86) : undefined,
       }}
       animate={{
         opacity: 1,
