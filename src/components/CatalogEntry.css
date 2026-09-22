@@ -401,3 +401,37 @@ body.pf-finder-active .pf-full-mode-floating:not(.pf-series-gate-toggle) { displ
   .pf-full-mode-floating { top: 10px; right: 10px; padding: 7px 10px; font-size: 10px; }
   .pf-catalog-page { padding-top: 62px; }
 }
+
+/* Sport-Kachel ohne kuratiertes Motiv: Produktbilder statt leerer Flaeche. */
+.pf-catalog-tile-images {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 58%;
+  padding: 0 12px;
+}
+.pf-catalog-tile-images img {
+  height: 100%;
+  width: auto;
+  max-width: 30%;
+  object-fit: contain;
+  filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.6));
+}
+
+/* Sechs Bereiche statt zwei (2026-09-22): "Merchandise" und "Motorrad"
+   sind laenger als "MTB"/"MX" und liefen ueber die Kachel hinaus. */
+.pf-catalog-sport-name {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  font-size: clamp(30px, 4.6vw, 64px);
+  line-height: 1.02;
+}
+.pf-catalog-sport-card { align-items: flex-end; }
+.pf-catalog-sport-card .pf-catalog-tile-images {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 10%;
+  height: 48%;
+}

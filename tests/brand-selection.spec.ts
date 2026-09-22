@@ -36,20 +36,20 @@ test('multi-brand entry selects exact brand and exposes mobile-safe breadcrumb',
   await page.getByRole('button', { name: /O'Neal 579 products/ }).click();
   await expect(page.getByRole('heading', { name: 'Choose your sport' })).toBeVisible();
   await expect(page.getByRole('button', { name: /MTB/ })).toBeDisabled();
-  await page.getByRole('button', { name: 'MOTO' }).click();
+  await page.getByRole('button', { name: 'MX' }).click();
   await expect(page.getByRole('heading', { name: 'Choose your product category' })).toBeVisible({ timeout: 30_000 });
-  await page.getByRole('button', { name: /MX HELMETS/ }).click();
+  await page.getByRole('button', { name: /Helmets/ }).click();
   await expect(page.locator('canvas')).toBeVisible({ timeout: 30_000 });
   await expect.poll(() => catalogRequestUrl).toContain('brand=O%27Neal');
   expect(new URL(catalogRequestUrl).searchParams.get('has_image')).toBe('true');
   await expect(page.locator('.pf-header .pf-brand-breadcrumb')).toHaveText("O'Neal");
   await expect(page).toHaveURL(/brand=O%27Neal/);
-  await expect(page).toHaveURL(/sport=moto/);
-  await expect(page).toHaveURL(/category=mx-helmets/);
+  await expect(page).toHaveURL(/sport=mx/);
+  await expect(page).toHaveURL(/category=helme/);
 
   await page.goBack();
   await expect(page.getByRole('heading', { name: 'Choose your product category' })).toBeVisible();
-  await expect(page).not.toHaveURL(/category=mx-helmets/);
+  await expect(page).not.toHaveURL(/category=helme/);
   await page.goForward();
   await expect(page.locator('canvas')).toBeVisible({ timeout: 30_000 });
 
@@ -65,17 +65,19 @@ test('multi-brand entry selects exact brand and exposes mobile-safe breadcrumb',
   await expect(page.getByRole('heading', { name: 'Choose your brand' })).toBeVisible();
 });
 
+// Die alte Adresse bleibt gueltig: seit der Baum-Zusammenfuehrung
+// (2026-09-22) leitet sie auf ?sport=mx&category=helme um.
 test('stable guided-entry deep link reaches the existing catalog', async ({ page }) => {
   await page.goto(`${APP_URL}?lang=en&brand=O%27Neal&sport=moto&category=mx-helmets`, {
     waitUntil: 'domcontentloaded',
   });
   await expect(page.locator('canvas')).toBeVisible({ timeout: 30_000 });
   await expect(page).toHaveURL(/lang=en/);
-  await expect(page).toHaveURL(/sport=moto/);
-  await expect(page).toHaveURL(/category=mx-helmets/);
+  await expect(page).toHaveURL(/sport=mx/);
+  await expect(page).toHaveURL(/category=helme/);
   await expect(page.locator('.pf-header .pf-catalog-breadcrumb')).toContainText([
     'Catalog 2027',
-    'MOTO',
-    'MX HELMETS',
+    'MX',
+    'Helmets',
   ]);
 });

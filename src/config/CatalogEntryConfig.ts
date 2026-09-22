@@ -1,3 +1,5 @@
+import type { TaxonomyNode } from '../gpane/types';
+import { ONEAL_TAXONOMY } from '../gpane/oneal-taxonomy';
 export type CatalogLocale = 'de' | 'en' | string;
 
 export type LocalizedLabel = Record<string, string>;
@@ -14,7 +16,10 @@ export type CatalogLandingMedia = {
 export type CatalogSportConfig = {
   id: string;
   labels: LocalizedLabel;
+  /** Alte Sport-Zuordnung; leer, wenn `match` den Knoten bestimmt. */
   sportValues: string[];
+  /** Zugehoerigkeit laut Baum — hat Vorrang vor sportValues. */
+  match?: (product: any) => boolean;
   enabled: boolean;
   comingSoon?: boolean;
   /** Markenbezogene Mood-Shots; `banner` bleibt der Fallback für offene/unbekannte Marken. */
@@ -25,8 +30,11 @@ export type CatalogSportConfig = {
 export type CatalogCategoryConfig = {
   id: string;
   labels: LocalizedLabel;
+  /** Alte ERP-Kategorien; leer, wenn `match` den Knoten bestimmt. */
   categories: string[];
   targetGroup: 'Erwachsene' | 'Jugendliche';
+  /** Zugehoerigkeit laut Baum — hat Vorrang vor categories/targetGroup. */
+  match?: (product: any) => boolean;
   banner?: CatalogLandingMedia;
   /** Markenbezogene Kategorie-Banner; `banner` bleibt der Fallback (media 120697). */
   bannersByBrand?: Record<string, CatalogLandingMedia>;
@@ -40,13 +48,6 @@ export type CatalogCategoryConfig = {
   grouping?: string[];
 };
 
-// Shared grouping orders (owner decision 2026-08-23, from the pivot-tree audit)
-const HELMETS = ['product_line', 'design_group', 'color_base', 'color_name']; // 3SRS > design > base colour > colour
-const GEAR = ['product_type', 'product_line', 'design_group', 'color_base', 'color_name']; // jersey/pants > ELEMENT > design > base colour > colour
-const LINE_FIRST = ['product_line', 'design_group', 'color_base', 'color_name']; // gloves, boots, goggles
-const PROTECTION = ['body_part', 'product_line', 'color_base', 'color_name']; // chest/knee > line > base colour > colour
-const TYPE_COLOUR = ['product_type', 'color_base', 'color_name'];            // jackets, accessories
-const RAIN = ['garment_type', 'design_group', 'color_base', 'color_name'];               // jacket/pants derived from the model name (garment_type)
 
 export type CatalogEntrySelection = {
   sportId: string;
@@ -168,8 +169,6 @@ export type CatalogEntryConfig = {
   categoriesBySport: Record<string, CatalogCategoryConfig[]>;
 };
 
-const label = (value: string): LocalizedLabel => ({ de: value, en: value });
-
 /**
  * Media je Marken-Kachel im Brand-Gate (owner 2026-08-25, media 120623).
  * Schluessel = Facet-Name aus der API. Unbekannte Marken rendern ohne Bild.
@@ -184,86 +183,107 @@ export const BRAND_BANNERS: Record<string, CatalogLandingMedia> = {
   'Kini Red Bull': { mode: 'image', storageId: 31318, fit: 'cover', position: 'center 30%' },
 };
 
+/**
+ * Einstiegs-Stufen aus dem Shop-Baum ableiten (owner 2026-09-22).
+ *
+ * Bis dahin gab es ZWEI von Hand gepflegte Baeume: hier ein kuratierter
+ * Marketing-Baum (MOTO -> MX HELMETS, GOGGLES, MX GEAR …) und in
+ * `gpane/oneal-taxonomy.ts` der Baum des Shops (MTB, MX, Motorrad, Frauen,
+ * Kinder, Merchandise). Der gefuehrte Einstieg zeigte den einen, der volle
+ * Finder den anderen — gleiche Produkte, andere Namen, andere Schnitte.
+ * Jetzt ist der Shop-Baum die einzige Quelle; die Banner und die
+ * Gruppierungen haengen als `entry`-Angaben an seinen Knoten.
+ *
+ * Erste Ebene = Sport-Stufe, zweite Ebene = Kategorie-Stufe. Tiefere Ebenen
+ * (Kleidung -> Jerseys, Helme -> Full Face) bleiben dem Finder ueberlassen,
+ * der sie ueber die Gruppierung zeigt.
+ */
+function nodeLabels(node: TaxonomyNode): LocalizedLabel {
+  return { de: node.label, en: node.label, ...(node.entry?.labels ?? {}) };
+}
+
+function sportFromNode(node: TaxonomyNode): CatalogSportConfig {
+  return {
+    id: node.slug,
+    labels: nodeLabels(node),
+    sportValues: [],
+    match: node.match,
+    enabled: true,
+    comingSoon: node.entry?.comingSoon,
+    banner: node.entry?.banner,
+    bannersByBrand: node.entry?.bannersByBrand,
+  };
+}
+
+function categoryFromNode(node: TaxonomyNode): CatalogCategoryConfig {
+  return {
+    id: node.slug,
+    labels: nodeLabels(node),
+    categories: [],
+    targetGroup: 'Erwachsene',
+    match: node.match,
+    banner: node.entry?.banner,
+    bannersByBrand: node.entry?.bannersByBrand,
+    grouping: node.entry?.grouping,
+  };
+}
+
+const TREE_SPORTS: CatalogSportConfig[] = ONEAL_TAXONOMY.map(sportFromNode);
+
+const TREE_CATEGORIES: Record<string, CatalogCategoryConfig[]> = Object.fromEntries(
+  ONEAL_TAXONOMY.map(node => [node.slug, (node.children ?? []).map(categoryFromNode)]),
+);
+
+/**
+ * Alte Adressen weiterleiten: Links und Lesezeichen aus der Zeit der zwei
+ * Baeume (?sport=moto&category=mx-helmets) landen auf dem passenden Knoten.
+ * Schluessel ist `sport/kategorie`, `sport/` steht fuer den Sport allein.
+ */
+export const LEGACY_ENTRY_ALIASES: Record<string, { sport: string; category: string | null }> = {
+  'moto/': { sport: 'mx', category: null },
+  'moto/mx-helmets': { sport: 'mx', category: 'helme' },
+  'moto/goggles': { sport: 'mx', category: 'brillen' },
+  'moto/mx-gear': { sport: 'mx', category: 'kleidung' },
+  'moto/rainwear': { sport: 'mx', category: 'kleidung' },
+  'moto/gloves': { sport: 'mx', category: 'kleidung' },
+  'moto/boots': { sport: 'mx', category: 'stiefel' },
+  'moto/protection': { sport: 'mx', category: 'protektoren' },
+  'moto/accessories-leisure': { sport: 'mx', category: 'accessories' },
+  'moto/street-adventure-helmets': { sport: 'motorrad', category: 'helme' },
+  'moto/street-adventure-jackets-pants': { sport: 'motorrad', category: 'kleidung' },
+  'moto/youth-helmets': { sport: 'kinder', category: 'kinder-mx' },
+  'moto/youth-gear': { sport: 'kinder', category: 'kinder-mx' },
+  'moto/youth-goggles': { sport: 'kinder', category: 'kinder-mx' },
+  'moto/youth-gloves': { sport: 'kinder', category: 'kinder-mx' },
+  'moto/youth-boots': { sport: 'kinder', category: 'kinder-mx' },
+  'moto/youth-protection': { sport: 'kinder', category: 'kinder-mx' },
+  'mtb/mtb-helmets': { sport: 'mtb', category: 'helme' },
+  'mtb/mtb-gear': { sport: 'mtb', category: 'kleidung' },
+  'mtb/mtb-goggles': { sport: 'mtb', category: 'brillen' },
+  'mtb/mtb-gloves': { sport: 'mtb', category: 'kleidung' },
+  'mtb/mtb-shoes': { sport: 'mtb', category: 'schuhe' },
+  'mtb/mtb-protection': { sport: 'mtb', category: 'protektoren' },
+  'mtb/mtb-accessories-leisure': { sport: 'mtb', category: 'accessories' },
+  'mtb/mtb-youth-helmets': { sport: 'kinder', category: 'kinder-mtb' },
+  'mtb/mtb-youth-gear': { sport: 'kinder', category: 'kinder-mtb' },
+};
+
+export function resolveLegacyEntry(
+  sport: string | null,
+  category: string | null,
+): { sport: string; category: string | null } | null {
+  if (!sport) return null;
+  return LEGACY_ENTRY_ALIASES[`${sport}/${category ?? ''}`] ?? null;
+}
+
 export const CATALOG_ENTRY_CONFIG: CatalogEntryConfig = {
   year: 2027,
   // Alex' finale Medienwahl bleibt ein einzelner Config-Wechsel. Solange kein
   // freigegebenes GSG-Asset vorliegt, rendert die Landing das typografische
   // Gravity-Sports-Group-Logo und benötigt weder Platzhalterdatei noch URL.
   landing: { mode: 'logo' },
-  sports: [
-    {
-      id: 'moto',
-      labels: label('MOTO'),
-      sportValues: ['MX'],
-      enabled: true,
-      banner: { mode: 'image', storageId: 17577 },
-      bannersByBrand: {
-        "O'Neal": { mode: 'image', storageId: 17577 },
-        'Kini Red Bull': { mode: 'image', storageId: 30976, position: 'center 45%' },
-        'ONE Industries': { mode: 'image', storageId: 31795, position: 'center 42%' },
-      },
-    },
-    {
-      id: 'mtb',
-      labels: label('MTB'),
-      sportValues: ['MTB'],
-      enabled: true,
-      banner: { mode: 'image', storageId: 15344 },
-      bannersByBrand: {
-        "O'Neal": { mode: 'image', storageId: 15344 },
-        'Kini Red Bull': { mode: 'image', storageId: 31537, position: 'center 42%' },
-        // Das ONE-Portal liefert keine Area-Zuordnung; dieser zweite echte
-        // ONE-Mood-Shot hält die Markenidentität auch am MTB-Einstieg stabil.
-        'ONE Industries': { mode: 'image', storageId: 31802, position: 'center 44%' },
-      },
-    },
-  ],
-  categoriesBySport: {
-    moto: [
-      { id: 'mx-helmets', banner: { mode: 'image', storageId: 10435 }, bannersByBrand: { 'Kini Red Bull': { mode: 'image', storageId: 30827, position: 'center 42%' }, 'ONE Industries': { mode: 'image', storageId: 31910, position: 'center 30%' } }, labels: label('MX HELMETS'), categories: ['Helmets MX'], targetGroup: 'Erwachsene', grouping: HELMETS },
-      { id: 'goggles', banner: { mode: 'image', storageId: 9970 }, bannersByBrand: { 'Kini Red Bull': { mode: 'image', storageId: 31474, position: 'center 45%' } }, labels: label('GOGGLES'), categories: ['Goggles'], targetGroup: 'Erwachsene', grouping: LINE_FIRST },
-      { id: 'mx-gear', banner: { mode: 'image', storageId: 17772 }, bannersByBrand: { 'Kini Red Bull': { mode: 'image', storageId: 31136, position: 'center 62%' }, 'ONE Industries': { mode: 'image', storageId: 31968, position: 'center' } }, labels: label('MX GEAR'), categories: ['Jerseys Offroad', 'Pants MX'], targetGroup: 'Erwachsene', grouping: GEAR },
-      { id: 'rainwear', banner: { mode: 'image', storageId: 16355 }, labels: label('RAINWEAR'), categories: ['Rain Wear'], targetGroup: 'Erwachsene', grouping: RAIN },
-      { id: 'gloves', banner: { mode: 'image', storageId: 13798 }, bannersByBrand: { 'Kini Red Bull': { mode: 'image', storageId: 31256, position: 'center 45%' }, 'ONE Industries': { mode: 'image', storageId: 31952, position: 'center' } }, labels: label('GLOVES'), categories: ['Gloves'], targetGroup: 'Erwachsene', grouping: LINE_FIRST },
-      { id: 'boots', banner: { mode: 'image', storageId: 11767 }, labels: label('BOOTS'), categories: ['Boots MX'], targetGroup: 'Erwachsene', grouping: LINE_FIRST },
-      { id: 'protection', banner: { mode: 'image', storageId: 10916 }, bannersByBrand: { 'Kini Red Bull': { mode: 'image', storageId: 31318, position: 'center 45%' } }, labels: label('PROTECTION'), categories: ['Protection MX', 'Protection MTB'], targetGroup: 'Erwachsene', grouping: PROTECTION },
-      { id: 'street-adventure-helmets', banner: { mode: 'image', storageId: 18556 }, bannersByBrand: { 'Kini Red Bull': { mode: 'image', storageId: 30609, position: 'center 50%' } }, labels: label('STREET/ADVENTURE HELMETS'), categories: ['Helmets Street'], targetGroup: 'Erwachsene', grouping: HELMETS },
-      { id: 'street-adventure-jackets-pants', banner: { mode: 'image', storageId: 18695 }, labels: label('STREET/ADVENTURE JACKETS & PANTS'), categories: ['Jackets', 'ADV Pants'], targetGroup: 'Erwachsene', grouping: TYPE_COLOUR },
-      { id: 'youth-helmets', banner: { mode: 'image', storageId: 17684 }, labels: label('YOUTH HELMETS'), categories: ['Helmets MX'], targetGroup: 'Jugendliche', grouping: HELMETS },
-      { id: 'youth-gear', banner: { mode: 'image', storageId: 17967 }, labels: label('YOUTH GEAR'), categories: ['Jerseys Offroad', 'Pants MX'], targetGroup: 'Jugendliche', grouping: GEAR },
-      { id: 'youth-goggles', banner: { mode: 'image', storageId: 17698 }, labels: label('YOUTH GOGGLES'), categories: ['Goggles'], targetGroup: 'Jugendliche', grouping: LINE_FIRST },
-      { id: 'youth-gloves', banner: { mode: 'image', storageId: 17969 }, labels: label('YOUTH GLOVES'), categories: ['Gloves'], targetGroup: 'Jugendliche', grouping: LINE_FIRST },
-      { id: 'youth-boots', banner: { mode: 'image', storageId: 17686 }, labels: label('YOUTH BOOTS'), categories: ['Boots MX'], targetGroup: 'Jugendliche', grouping: LINE_FIRST },
-      { id: 'youth-protection', banner: { mode: 'image', storageId: 18009 }, labels: label('YOUTH PROTECTION'), categories: ['Protection MX', 'Protection MTB'], targetGroup: 'Jugendliche', grouping: PROTECTION },
-      {
-        id: 'accessories-leisure',
-        banner: { mode: 'image', storageId: 15480 },
-        bannersByBrand: { 'Kini Red Bull': { mode: 'image', storageId: 30538, position: 'center 30%' } },
-        labels: label('ACCESSORIES & LEISURE'),
-        categories: ['Leisure Accessories', 'Casual Wear', 'Bags / Backpacks', 'Grips'],
-        targetGroup: 'Erwachsene',
-        grouping: TYPE_COLOUR,
-      },
-    ],
-    mtb: [
-      { id: 'mtb-helmets', banner: { mode: 'image', storageId: 15962 }, bannersByBrand: { 'Kini Red Bull': { mode: 'image', storageId: 31461, position: 'center 40%' } }, labels: label('MTB HELMETS'), categories: ['Helmets MTB Full Face', 'Helme MTB Open Face'], targetGroup: 'Erwachsene', grouping: HELMETS },
-      { id: 'mtb-gear', banner: { mode: 'image', storageId: 17053 }, labels: label('MTB GEAR'), categories: ['Jerseys MTB', 'Pants/ Shorts MTB'], targetGroup: 'Erwachsene', grouping: GEAR },
-      { id: 'mtb-goggles', banner: { mode: 'image', storageId: 14971 }, labels: label('GOGGLES'), categories: ['Goggles'], targetGroup: 'Erwachsene', grouping: LINE_FIRST },
-      { id: 'mtb-gloves', banner: { mode: 'image', storageId: 15847 }, labels: label('GLOVES'), categories: ['Gloves'], targetGroup: 'Erwachsene', grouping: LINE_FIRST },
-      { id: 'mtb-shoes', banner: { mode: 'image', storageId: 15811 }, labels: label('SHOES'), categories: ['Shoes'], targetGroup: 'Erwachsene', grouping: LINE_FIRST },
-      { id: 'mtb-protection', banner: { mode: 'image', storageId: 15316 }, labels: label('PROTECTION'), categories: ['Protection MTB', 'Protection MX'], targetGroup: 'Erwachsene', grouping: PROTECTION },
-      { id: 'mtb-youth-helmets', banner: { mode: 'image', storageId: 17829 }, labels: label('YOUTH HELMETS'), categories: ['Helmets MTB Full Face', 'Helme MTB Open Face'], targetGroup: 'Jugendliche', grouping: HELMETS },
-      { id: 'mtb-youth-gear', banner: { mode: 'image', storageId: 14432 }, labels: label('YOUTH GEAR'), categories: ['Jerseys MTB', 'Pants/ Shorts MTB'], targetGroup: 'Jugendliche', grouping: GEAR },
-      {
-        id: 'mtb-accessories-leisure',
-        banner: { mode: 'image', storageId: 15480 },
-        labels: label('ACCESSORIES & LEISURE'),
-        categories: ['Leisure Accessories', 'Casual Wear', 'Bags / Backpacks', 'Grips'],
-        targetGroup: 'Erwachsene',
-        grouping: TYPE_COLOUR,
-      },
-    ],
-  },
+  sports: TREE_SPORTS,
+  categoriesBySport: TREE_CATEGORIES,
 };
 
 export function getLocalizedLabel(labels: LocalizedLabel, locale: CatalogLocale): string {
