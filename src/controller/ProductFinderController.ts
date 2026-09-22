@@ -1240,6 +1240,11 @@ export class ProductFinderController {
     return this.layoutService.isHeroPresentation();
   }
 
+  /** Engine-Buckets der aktuellen Ebene (Serien-Stufe, owner 2026-09-22). */
+  getCurrentBuckets(): Array<{ label: string; objectIds: string[]; isUnknown?: boolean }> {
+    return this.layoutService.getCurrentBuckets() as any;
+  }
+
   /** Card closed: the hero row flows back into the overview grid. */
   exitHeroPresentation(): void {
     if (!this.layoutService.isHeroPresentation()) return;

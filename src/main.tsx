@@ -15,6 +15,7 @@ import { AppPreloaderWrapper } from './components/AppPreloaderWrapper'
 import { BrandSelectionGate } from './components/BrandSelectionGate'
 import { CatalogLanguageGate } from './components/CatalogLanguageGate'
 import { CatalogNavigationGate } from './components/CatalogNavigationGate'
+import { FullModeToggle } from './components/FullModeToggle'
 import { CATALOG_ENTRY_CONFIG, resolveCatalogFlow, resolveCategoryPresentation } from './config/CatalogEntryConfig'
 import { REALTIME_DEMO_ENABLED } from './config/apiConfig'
 
@@ -53,6 +54,8 @@ createRoot(document.getElementById('root')!).render(
           </PreloaderProvider>
         } />
         <Route path="*" element={
+          <>
+          <FullModeToggle />
           <CatalogLanguageGate>
             {({ locale, requestLanding }) => (
               <BrandSelectionGate locale={locale} enabled={catalogFlow.gates.includes('brand')}>
@@ -101,6 +104,7 @@ createRoot(document.getElementById('root')!).render(
               </BrandSelectionGate>
             )}
           </CatalogLanguageGate>
+          </>
         } />
       </Routes>
     </BrowserRouter>

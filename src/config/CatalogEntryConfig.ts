@@ -61,7 +61,7 @@ export type CatalogEntrySelection = {
  * 'brand' übersprungen heißt: alle Marken laden, Marke wird In-App-Dimension.
  * Auswahl per URL (?flow=<id>), Default ist die erste Variante.
  */
-export type CatalogGateId = 'brand' | 'sport' | 'category';
+export type CatalogGateId = 'brand' | 'sport' | 'category' | 'series';
 
 export type CatalogFlowVariant = {
   id: string;
@@ -86,8 +86,8 @@ export type CatalogFlowVariant = {
 export const SMART_GATE_HERO_THRESHOLD = 40;
 
 export const CATALOG_FLOW_VARIANTS: CatalogFlowVariant[] = [
-  { id: 'guided', gates: ['brand', 'sport', 'category'], description: 'Geführte Grafik-Gates: Marke, Sport, Kategorie (Default)' },
-  { id: 'open', gates: ['sport', 'category'], description: 'Keine Marken-Vorauswahl — alle Marken, Marke als Pivot-Dimension' },
+  { id: 'guided', gates: ['brand', 'sport', 'category', 'series'], description: 'Geführte Grafik-Gates: Marke, Sport, Kategorie, Serie (Default)' },
+  { id: 'open', gates: ['sport', 'category', 'series'], description: 'Keine Marken-Vorauswahl — alle Marken, Marke als Pivot-Dimension' },
   { id: 'direct', gates: [], description: 'Sofort in den Finder mit dem gesamten Katalog' },
 ];
 

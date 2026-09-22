@@ -67,6 +67,9 @@ import { buildBrandUrl, type BrandFacet } from './utils/brandSelection';
 import { createPortal } from 'react-dom';
 import { fetchFacets, fetchProductById } from './data/ProductRepository';
 import { ProductFinderRealtimeSurface } from './components/ProductFinderRealtimeSurface';
+import { SeriesSelectionGate, type SeriesGateEntry } from './components/SeriesSelectionGate';
+import { FullModeIcon, fullModeHref, fullModeLabel, isFullFinderMode } from './components/FullModeToggle';
+import { resolveCatalogFlow } from './config/CatalogEntryConfig';
 import {
   buildProductFinderCartContext,
   resolveProductPriceEur,
@@ -224,6 +227,8 @@ type State = {
   cartPanelOpen: boolean;
   /** Warenkorb-Panel zeigt „Meine Bestellungen" statt des Warenkorbs (owner 2026-09-15). */
   b2bOrdersOpen: boolean;
+  /** Serien-Stufe per „Alle Produkte anzeigen“ übersprungen (owner 2026-09-22). */
+  seriesGateDismissed: boolean;
   b2bOrders: B2BStoredOrder[] | null;
   b2bOrdersLoading: boolean;
   b2bOrdersError: string | null;
@@ -337,6 +342,7 @@ const createInitialState = (): State => {
     orderConfirmation: null,
     cartPanelOpen: false,
     b2bOrdersOpen: false,
+    seriesGateDismissed: false,
     b2bOrders: null,
     b2bOrdersLoading: false,
     b2bOrdersError: null,
@@ -386,6 +392,9 @@ export default class App extends React.Component<Props, State> {
   state: State = createInitialState();
 
   async componentDidMount() {
+    // Finder aktiv: der schwebende Vollmodus-Schalter der Gate-Seiten tritt
+    // zurück, der Finder hat ihn im Header.
+    document.body.classList.add('pf-finder-active');
     // Gespeicherte Händler-Sitzung (Veloconnect) prüfen — nicht blockierend.
     void this.validateB2BSessionOnBoot();
     window.addEventListener('keydown', this.handleRealtimeDemoHotkey);
@@ -489,6 +498,7 @@ export default class App extends React.Component<Props, State> {
   }
 
   componentWillUnmount(): void {
+    document.body.classList.remove('pf-finder-active');
     this.controller.destroy();
     this.stopFPSCounter();
     window.removeEventListener('resize', this.handleResize);
@@ -2419,6 +2429,11 @@ export default class App extends React.Component<Props, State> {
     // Esc in der Hero-Ansicht (owner 2026-09-22): erst eine offene Karte
     // schließen (das beendet auch die Hero-Präsentation), sonst zurück zur
     // vorigen Übersicht. Andere Dialoge regeln Esc selbst — dann nichts tun.
+    if (e.key === 'Escape' && this.getSeriesGate()) {
+      e.preventDefault();
+      this.props.onRequestCategorySelection();
+      return;
+    }
     if (e.key === 'Escape') {
       const tag = (e.target as HTMLElement)?.tagName;
       const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
@@ -2714,8 +2729,26 @@ export default class App extends React.Component<Props, State> {
 
     if (error) return <div className="container"><div className="error">{error}</div></div>;
 
+    const seriesGate = this.getSeriesGate();
+
     return (
       <div className="pf-root">
+        {seriesGate && (
+          <SeriesSelectionGate
+            locale={this.props.locale}
+            catalogYear={this.props.catalogYear}
+            brand={this.props.brand}
+            sportLabel={this.props.sportLabel}
+            categoryLabel={this.props.categoryLabel}
+            series={seriesGate.entries}
+            totalCount={seriesGate.total}
+            onSelect={this.handleSeriesSelect}
+            onShowAll={() => this.setState({ seriesGateDismissed: true })}
+            onRequestCategorySelection={this.props.onRequestCategorySelection}
+            onRequestSportSelection={this.props.onRequestSportSelection}
+            onRequestLanding={this.props.onRequestCatalogLanding}
+          />
+        )}
         <QuickSearchCommandPalette
           isOpen={isQuickSearchOpen}
           prompt={quickSearchPrompt}
@@ -3053,6 +3086,18 @@ export default class App extends React.Component<Props, State> {
                 Its two functions move up: AI search and the cart. */}
             {/* Händler-Login im Header (owner 2026-09-11): Konto-Zustand sichtbar,
                 Dialog statt Formular im Warenkorb. */}
+            {/* Vollmodus (owner 2026-09-22): geführt starten, aber jederzeit
+                in den vollen Finder mit allen Produkten — und zurück. */}
+            {(() => { const targetFull = !isFullFinderMode(); return (
+            <a
+              className={`pf-header-btn pf-header-full-mode-btn ${!targetFull ? 'active' : ''}`}
+              href={fullModeHref(targetFull)}
+              title={targetFull ? 'Finder mit allen Produkten öffnen' : 'Zurück zur geführten Auswahl'}
+            >
+              <FullModeIcon full={targetFull} />
+              {!this.isMobileLayout() && <span className="pf-header-dealer-label">{fullModeLabel(targetFull)}</span>}
+            </a>
+            ); })()}
             <button
               type="button"
               className={`pf-header-btn pf-header-dealer-btn ${this.state.b2bSession ? 'active' : ''}`}
@@ -4029,6 +4074,47 @@ export default class App extends React.Component<Props, State> {
     }
     return sportValue.toUpperCase();
   }
+
+  /**
+   * Serien-Stufe (Sonja Goldmann / owner 2026-09-22): nach der Kategorie
+   * eine Banner-Auswahl der Serien (MX Helme → 1SRS · 2SRS · 3SRS …).
+   * Die Serien sind die erste Gruppierungsebene des Finders, wenn die
+   * Kategorie mit product_line beginnt — die Stufe ist also nur die
+   * Banner-Darstellung der Wurzelebene. Sie steht, solange der Finder auf
+   * dieser Ebene ist: Zurück aus einer Serie (Browser, Pfeil, Esc) bringt
+   * sie wieder. Keine Stufe, wenn es nichts zu wählen gibt (weniger als
+   * zwei Serien oder jede Serie nur ein Produkt) oder eine Suche läuft.
+   */
+  private getSeriesGate(): { entries: SeriesGateEntry[]; total: number } | null {
+    if (this.state.seriesGateDismissed) return null;
+    if (!resolveCatalogFlow().gates.includes('series')) return null;
+    const selection = this.props.entrySelection;
+    if (!selection?.categoryId) return null;
+    const category = (CATALOG_ENTRY_CONFIG.categoriesBySport[selection.sportId] ?? [])
+      .find(item => item.id === selection.categoryId);
+    if (category?.grouping?.[0] !== 'product_line') return null;
+    if (this.state.pivotBreadcrumbs.length > 1) return null;
+    if (this.state.aiFilterProductIds.length > 0 || this.state.searchFilterTerm || this.controller.isGlobalSearchActive()) return null;
+    const buckets = this.controller.getCurrentBuckets().filter((b: any) => !b.isUnknown);
+    if (buckets.length < 2 || !buckets.some((b: any) => b.objectIds.length > 1)) return null;
+    const byId = new Map(this.controller.getAllProducts().map(p => [String(p.id), p]));
+    const entries = buckets.map((bucket: any) => {
+      const products = bucket.objectIds.map((id: string) => byId.get(id)).filter(Boolean) as Product[];
+      const withImage = products.filter(p => p.primaryImage?.storage_id);
+      return {
+        label: String(bucket.label),
+        count: bucket.objectIds.length,
+        imageUrls: [...new Set(withImage.slice(0, 4).map(p => p.fullImageUrl))],
+      };
+    });
+    return { entries, total: entries.reduce((sum, item) => sum + item.count, 0) };
+  }
+
+  private handleSeriesSelect = (label: string) => {
+    this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false });
+    this.controller.drillDownPivot(label);
+    this.syncPivotUI();
+  };
 
   /**
    * Browser back = one step back in the trail. Exactly ONE owner per
