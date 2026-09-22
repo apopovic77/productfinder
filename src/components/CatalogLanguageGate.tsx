@@ -22,6 +22,25 @@ function languageName(locale: string): string {
   }
 }
 
+/**
+ * Sprache waehlen heisst: von vorne beginnen (owner 2026-09-22). Wer aus dem
+ * Vollmodus ueber "Catalog" auf die Startseite zurueckgeht, soll danach
+ * wieder die gefuehrte Auswahl bekommen — nicht erneut den ganzen Katalog.
+ * Die Flow-Variante wird beim Bootstrap gelesen (main.tsx), deshalb ist das
+ * Zuruecksetzen ein Seitenaufruf und kein Zustandswechsel.
+ */
+function selectLanguage(locale: string): void {
+  const url = new URL(window.location.href);
+  if (url.searchParams.has('flow')) {
+    url.searchParams.delete('flow');
+    url.searchParams.set('lang', locale);
+    for (const key of ['brand', 'sport', 'category']) url.searchParams.delete(key);
+    window.location.assign(`${url.pathname}${url.search}`);
+    return;
+  }
+  writeCatalogUrl({ lang: locale }, 'push');
+}
+
 export const CatalogLanguageGate: React.FC<Props> = ({ children }) => {
   const [languages, setLanguages] = useState<ContentLanguageFacet[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -122,7 +141,7 @@ export const CatalogLanguageGate: React.FC<Props> = ({ children }) => {
                 className="pf-catalog-language"
                 key={language.locale}
                 disabled={!language.available}
-                onClick={() => writeCatalogUrl({ lang: language.locale }, 'push')}
+                onClick={() => selectLanguage(language.locale)}
                 title={`${Math.round(language.category_coverage * 100)}% categories · ${Math.round(language.product_coverage * 100)}% products`}
               >
                 {languageName(language.locale)}

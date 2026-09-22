@@ -12,7 +12,7 @@ import { PivotDimensionAnalyzer, type PivotAnalysisResult, type PivotDimensionDe
 import type { Orientation } from '../layout/PivotLayouter';
 import type { PivotGroup } from '../layout/PivotGroup';
 import type { CatalogEntrySelection } from '../config/CatalogEntryConfig';
-import { CATALOG_ENTRY_CONFIG, resolveHeroVariant } from '../config/CatalogEntryConfig';
+import { resolveHeroVariant } from '../config/CatalogEntryConfig';
 import { filterCatalogProducts, getCatalogCategory, stampCatalogCategory, findCatalogCategoryByLabel, catalogCategoryOrder, CATALOG_CATEGORY_ATTRIBUTE } from '../utils/catalogEntry';
 import { resolveAgentSelectionProducts } from '../lib/realtime/AgentSelectionProjection';
 
@@ -1332,13 +1332,6 @@ export class ProductFinderController {
       return products;
     }
     const sportId = selection.sportId;
-    // Ein Bereich ohne zweite Ebene (Merchandise) hat keine Katalog-
-    // Kategorien — stempeln wuerde hier jedes Produkt verwerfen
-    // (owner 2026-09-22, seit Einstieg und Finder denselben Baum lesen).
-    if ((CATALOG_ENTRY_CONFIG.categoriesBySport[sportId] ?? []).length === 0) {
-      this.layoutService.setGroupingResolver(null);
-      return products;
-    }
     const kept = stampCatalogCategory(products, sportId);
     this.layoutService.setCatalogCategoryOrder(catalogCategoryOrder(sportId));
     this.layoutService.setGroupingResolver(focus => {

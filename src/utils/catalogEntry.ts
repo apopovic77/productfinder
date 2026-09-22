@@ -57,18 +57,6 @@ export function matchesCatalogEntrySelection(
   const sport = getCatalogSport(selection.sportId);
   if (!sport?.enabled) return false;
 
-  // Ein Baum fuer beides (owner 2026-09-22): Die Knoten des Shop-Baums
-  // tragen ihre Zugehoerigkeit selbst und zwar absolut — der Knoten
-  // "MX > Helme" prueft Sport UND Typ. Wo ein Knoten vorliegt, entscheidet
-  // er allein; die Felder darunter sind der alte Weg fuer Konfigurationen
-  // ohne Baum (und fuer die Tests, die sie setzen).
-  if (selection.categoryId !== null) {
-    const node = getCatalogCategory(selection.sportId, selection.categoryId);
-    if (node?.match) return node.match(product as Product);
-  } else if (sport.match) {
-    return sport.match(product as Product);
-  }
-
   // ANY(sport): MX+MTB belongs to both worlds; this is deliberately not an
   // exclusive assignment.
   const sports = productSports(product);
@@ -111,12 +99,9 @@ export function resolveCatalogCategory(
   product: CatalogProduct,
   sportId: string,
 ): CatalogCategoryConfig | undefined {
-  const entries = CATALOG_ENTRY_CONFIG.categoriesBySport[sportId] ?? [];
-  const byNode = entries.find(entry => entry.match?.(product as Product));
-  if (byNode) return byNode;
   const category = productCategory(product);
   const targetGroup = productTargetGroup(product);
-  return entries.find(
+  return CATALOG_ENTRY_CONFIG.categoriesBySport[sportId]?.find(
     entry => entry.categories.includes(category) && entry.targetGroup === targetGroup,
   );
 }

@@ -5,14 +5,13 @@ import {
   getCatalogCategoryBanner,
   getCatalogSportBanner,
   getLocalizedLabel,
-  resolveLegacyEntry,
   type CatalogEntrySelection,
   type CatalogLocale,
 } from '../config/CatalogEntryConfig';
 import { STORAGE_API_BASE } from '../config/apiConfig';
 import { fetchProducts } from '../data/ProductRepository';
 import type { Product } from '../types/Product';
-import { countCatalogCategoryProducts, filterCatalogProducts, getCatalogCategory, getCatalogSport, matchesCatalogEntrySelection } from '../utils/catalogEntry';
+import { countCatalogCategoryProducts, filterCatalogProducts, getCatalogCategory, getCatalogSport } from '../utils/catalogEntry';
 import { readCatalogQuery, writeCatalogUrl } from '../utils/catalogEntryUrl';
 import './CatalogEntry.css';
 
@@ -89,23 +88,6 @@ const messages: Record<string, Record<string, string>> = {
   },
 };
 
-/**
- * Knoten ohne kuratiertes Motiv (Frauen, Ersatzteile, Motorrad-Stiefel …)
- * zeigen Produktbilder statt einer leeren schwarzen Flaeche — dieselbe
- * Darstellung wie die Serien-Stufe (owner 2026-09-22).
- */
-function previewImages(products: readonly Product[], selection: CatalogEntrySelection, count: number): string[] {
-  const images: string[] = [];
-  for (const product of products) {
-    if (!matchesCatalogEntrySelection(product, selection)) continue;
-    if (!product.primaryImage?.storage_id) continue;
-    const url = product.fullImageUrl;
-    if (!images.includes(url)) images.push(url);
-    if (images.length >= count) break;
-  }
-  return images;
-}
-
 export const CatalogNavigationGate: React.FC<Props> = ({
   brand,
   locale,
@@ -139,15 +121,7 @@ export const CatalogNavigationGate: React.FC<Props> = ({
   const sport = query.sport ? getCatalogSport(query.sport) : undefined;
   const category = sport && query.category ? getCatalogCategory(sport.id, query.category) : undefined;
 
-  // Alte Adressen aus der Zeit der zwei Baeume weiterleiten, statt sie
-  // stumm auf die Sport-Seite zurueckzuwerfen (owner 2026-09-22).
   useEffect(() => {
-    const legacy = resolveLegacyEntry(query.sport, query.category);
-    if (legacy) writeCatalogUrl({ sport: legacy.sport, category: legacy.category }, 'replace');
-  }, [query.sport, query.category]);
-
-  useEffect(() => {
-    if (query.sport && resolveLegacyEntry(query.sport, query.category)) return;
     if (query.sport && !sport?.enabled) {
       writeCatalogUrl({ sport: null, category: null }, 'replace');
       return;
@@ -274,12 +248,6 @@ export const CatalogNavigationGate: React.FC<Props> = ({
                   style={bannerUrl ? { backgroundImage: `url(${bannerUrl})`, backgroundPosition: banner?.position ?? 'center' } : undefined}
                 >
                   {item.comingSoon && <span className="pf-catalog-coming-soon">{text.comingSoon}</span>}
-                  {!bannerUrl && hasLoadedProducts && (
-                    <span className="pf-catalog-tile-images" aria-hidden="true">
-                      {previewImages(products, { sportId: item.id, categoryId: null }, 3)
-                        .map(url => <img key={url} src={url} alt="" loading="lazy" />)}
-                    </span>
-                  )}
                   <span className="pf-catalog-sport-name">{getLocalizedLabel(item.labels, locale)}</span>
                 </button>
               );
@@ -302,9 +270,7 @@ export const CatalogNavigationGate: React.FC<Props> = ({
     );
   }
 
-  const sportCategories = CATALOG_ENTRY_CONFIG.categoriesBySport[sport.id] ?? [];
-  // Ein Bereich ohne zweite Ebene (Merchandise) hat nichts zu waehlen.
-  if (!categoryGate || sportCategories.length === 0 || (skipCategoryGate && !category)) {
+  if (!categoryGate || (skipCategoryGate && !category)) {
     return <>{children({
       selection: { sportId: sport.id, categoryId: null },
       sportLabel: getLocalizedLabel(sport.labels, locale),
@@ -347,22 +313,14 @@ export const CatalogNavigationGate: React.FC<Props> = ({
               return (
                 <button
                   type="button"
-                  className={`pf-catalog-category-banner ${bannerUrl ? '' : 'pf-catalog-series-banner'}`}
+                  className="pf-catalog-category-banner"
                   key={item.id}
                   disabled={count === 0}
                   onClick={() => writeCatalogUrl({ category: item.id })}
                   style={bannerUrl ? { backgroundImage: `url(${bannerUrl})`, backgroundPosition: catBanner?.position ?? 'center 35%' } : undefined}
                 >
-                  <span className="pf-catalog-series-text">
-                    <span className="pf-catalog-category-name">{getLocalizedLabel(item.labels, locale)}</span>
-                    <span className="pf-catalog-category-count">{count > 0 ? `${count} ${text.products}` : text.unavailable}</span>
-                  </span>
-                  {!bannerUrl && (
-                    <span className="pf-catalog-series-images" aria-hidden="true">
-                      {previewImages(products, { sportId: sport.id, categoryId: item.id }, 4)
-                        .map(url => <img key={url} src={url} alt="" loading="lazy" />)}
-                    </span>
-                  )}
+                  <span className="pf-catalog-category-name">{getLocalizedLabel(item.labels, locale)}</span>
+                  <span className="pf-catalog-category-count">{count > 0 ? `${count} ${text.products}` : text.unavailable}</span>
                 </button>
               );
             })}

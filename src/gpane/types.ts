@@ -202,31 +202,6 @@ export interface PropertyOverride {
  * Used in Taxonomy mode — the user navigates a fixed tree
  * instead of GPANE auto-scoring dimensions.
  */
-/**
- * Darstellungs-Angaben fuer die gefuehrten Einstiegs-Stufen (Banner,
- * Gruppierung, Sprachen). Die Engine liest sie nicht — sie stehen hier,
- * damit gefuehrter Einstieg und voller Finder EINEN Baum lesen
- * (owner 2026-09-22: "es gibt diesen taxonomischen Baum, warum wird
- * dieser nicht verwendet").
- */
-export interface TaxonomyEntryMedia {
-  mode: 'logo' | 'image' | 'video';
-  url?: string;
-  storageId?: number;
-  position?: string;
-  fit?: 'cover' | 'contain';
-}
-
-export interface TaxonomyEntryMeta {
-  /** Zusaetzliche Sprachen; `label` am Knoten ist die deutsche Fassung. */
-  labels?: Record<string, string>;
-  banner?: TaxonomyEntryMedia;
-  bannersByBrand?: Record<string, TaxonomyEntryMedia>;
-  /** Gruppierung im Finder unterhalb dieses Knotens. */
-  grouping?: string[];
-  comingSoon?: boolean;
-}
-
 export interface TaxonomyNode {
   /** Display label */
   label: string;
@@ -239,9 +214,6 @@ export interface TaxonomyNode {
 
   /** Child nodes (next level when user clicks this node) */
   children?: TaxonomyNode[];
-
-  /** Nur fuer die Einstiegs-Stufen; von der Engine ignoriert. */
-  entry?: TaxonomyEntryMeta;
 }
 
 export interface HierarchyDefinition {

@@ -1,83 +1,68 @@
 import { describe, expect, it } from 'vitest';
 import { CATALOG_ENTRY_CONFIG, getCatalogSportBanner } from '../config/CatalogEntryConfig';
-import { Product, ProductAttribute } from '../types/Product';
-import { countCatalogCategoryProducts, matchesCatalogEntrySelection, resolveCatalogCategory } from './catalogEntry';
+import { Product } from '../types/Product';
+import { countCatalogCategoryProducts, matchesCatalogEntrySelection } from './catalogEntry';
 
-/**
- * Seit 2026-09-22 lesen gefuehrter Einstieg und voller Finder denselben
- * Baum (oneal.eu: MTB · MX · Motorrad · Frauen · Kinder · Merchandise).
- * Die Knoten pruefen Attribute, nicht mehr ERP-Kategorienamen — deshalb
- * setzen die Testprodukte sport, product_type, category_primary und
- * target_group wie die API sie liefert.
- */
-function product(fields: Record<string, string>, name = 'Testprodukt'): Product {
-  const attributes: Record<string, ProductAttribute> = {};
-  for (const [key, value] of Object.entries(fields)) {
-    attributes[key] = new ProductAttribute({ key, label: key, type: 'enum', value, sourcePath: 'test' });
-  }
+function product(category: string, targetGroup: string, sports: string[]): Product {
   return new Product({
-    id: `${name}:${Object.values(fields).join('+')}`,
-    name,
-    category: [fields.category_primary ?? ''],
-    attributes,
-    raw: { category: fields.category_primary, properties: fields },
+    id: `${category}:${targetGroup}:${sports.join('+')}`,
+    name: category,
+    category: [category],
+    raw: {
+      category,
+      properties: {
+        sport: sports,
+        target_group: targetGroup,
+      },
+    },
   });
 }
 
-const mxHelmet = { sport: 'MX', product_type: 'Helm', category_primary: 'Helmets MX', target_group: 'Erwachsene' };
-const mxGlove = { sport: 'MX', product_type: 'Handschuh', category_primary: 'Gloves', target_group: 'Erwachsene' };
-
-describe('Einstieg liest den Shop-Baum', () => {
-  it('zeigt auf erster Ebene die sechs Shop-Bereiche', () => {
-    expect(CATALOG_ENTRY_CONFIG.sports.map(sport => sport.id))
-      .toEqual(['mtb', 'mx', 'motorrad', 'frauen', 'kinder', 'merchandise']);
+describe('catalog entry mapping', () => {
+  it('keeps all 16 MOTO categories in one unique config list', () => {
+    const categories = CATALOG_ENTRY_CONFIG.categoriesBySport.moto;
+    expect(categories).toHaveLength(16);
+    expect(new Set(categories.map(category => category.id)).size).toBe(16);
   });
 
-  it('nennt die zweite Ebene wie der Shop', () => {
-    expect(CATALOG_ENTRY_CONFIG.categoriesBySport.mx.map(entry => entry.id))
-      .toEqual(['helme', 'brillen', 'kleidung', 'protektoren', 'stiefel', 'accessories', 'ersatzteile']);
+  it('uses ANY(sport), so MX+MTB products remain part of MOTO', () => {
+    const sharedHelmet = product('Helmets MX', 'Erwachsene', ['MX', 'MTB']);
+    expect(matchesCatalogEntrySelection(sharedHelmet, {
+      sportId: 'moto',
+      categoryId: 'mx-helmets',
+    })).toBe(true);
   });
 
-  it('ordnet einen MX-Helm dem Knoten MX > Helme zu', () => {
-    expect(matchesCatalogEntrySelection(product(mxHelmet), { sportId: 'mx', categoryId: 'helme' })).toBe(true);
-    expect(matchesCatalogEntrySelection(product(mxGlove), { sportId: 'mx', categoryId: 'helme' })).toBe(false);
+  it('separates adult and youth tiles with the target group', () => {
+    const adult = product('Gloves', 'Erwachsene', ['MX']);
+    const youth = product('Gloves', 'Jugendliche', ['MX']);
+    expect(matchesCatalogEntrySelection(adult, { sportId: 'moto', categoryId: 'gloves' })).toBe(true);
+    expect(matchesCatalogEntrySelection(youth, { sportId: 'moto', categoryId: 'gloves' })).toBe(false);
+    expect(matchesCatalogEntrySelection(youth, { sportId: 'moto', categoryId: 'youth-gloves' })).toBe(true);
   });
 
-  it('haelt MX+MTB-Produkte in beiden Welten (ANY-Sport)', () => {
-    const shared = product({ ...mxHelmet, sport: 'MX, MTB' });
-    expect(matchesCatalogEntrySelection(shared, { sportId: 'mx', categoryId: 'helme' })).toBe(true);
-  });
-
-  it('fuehrt Jugendliche unter Kinder statt unter MX', () => {
-    const youth = product({ ...mxGlove, target_group: 'Jugendliche' });
-    expect(matchesCatalogEntrySelection(youth, { sportId: 'mx', categoryId: 'kleidung' })).toBe(false);
-    expect(matchesCatalogEntrySelection(youth, { sportId: 'kinder', categoryId: 'kinder-mx' })).toBe(true);
-  });
-
-  it('zaehlt ueber alle Produkttypen eines Knotens', () => {
+  it('counts every source category in a composite tile with the same matcher', () => {
     const products = [
-      product({ sport: 'MX', product_type: 'Jersey', category_primary: 'Jerseys Offroad', target_group: 'Erwachsene' }),
-      product({ sport: 'MX', product_type: 'Hose', category_primary: 'Pants MX', target_group: 'Erwachsene' }),
-      product({ sport: 'MX', product_type: 'Hose', category_primary: 'Pants MX', target_group: 'Jugendliche' }),
-      product(mxHelmet),
+      product('Jerseys Offroad', 'Erwachsene', ['MX']),
+      product('Pants MX', 'Erwachsene', ['MX', 'MTB']),
+      product('Pants MX', 'Jugendliche', ['MX']),
+      product('Jerseys Offroad', 'Erwachsene', ['MTB']),
     ];
-    expect(countCatalogCategoryProducts(products, 'mx', 'kleidung')).toBe(2);
-    expect(countCatalogCategoryProducts(products, 'kinder', 'kinder-mx')).toBe(1);
+    expect(countCatalogCategoryProducts(products, 'moto', 'mx-gear')).toBe(2);
+    expect(countCatalogCategoryProducts(products, 'moto', 'youth-gear')).toBe(1);
   });
 
-  it('benennt die Pivot-Spalte nach dem Knoten des Produkts', () => {
-    expect(resolveCatalogCategory(product(mxHelmet), 'mx')?.id).toBe('helme');
-    expect(resolveCatalogCategory(product(mxGlove), 'mx')?.id).toBe('kleidung');
-  });
+  it('resolves sport artwork from the selected brand with a generic fallback', () => {
+    const moto = CATALOG_ENTRY_CONFIG.sports.find(sport => sport.id === 'moto');
+    const mtb = CATALOG_ENTRY_CONFIG.sports.find(sport => sport.id === 'mtb');
+    expect(moto).toBeDefined();
+    expect(mtb).toBeDefined();
 
-  it('nimmt Marken-Motive, behaelt aber den allgemeinen Fallback', () => {
-    const mx = CATALOG_ENTRY_CONFIG.sports.find(sport => sport.id === 'mx')!;
-    const mtb = CATALOG_ENTRY_CONFIG.sports.find(sport => sport.id === 'mtb')!;
-    expect(getCatalogSportBanner(mx, 'Kini Red Bull')?.storageId).toBe(30976);
-    expect(getCatalogSportBanner(mtb, 'Kini Red Bull')?.storageId).toBe(31537);
-    expect(getCatalogSportBanner(mx, 'ONE Industries')?.storageId).toBe(31795);
-    expect(getCatalogSportBanner(mtb, 'ONE Industries')?.storageId).toBe(31802);
-    expect(getCatalogSportBanner(mx, 'Unknown brand')).toBe(mx.banner);
-    expect(getCatalogSportBanner(mtb, null)).toBe(mtb.banner);
+    expect(getCatalogSportBanner(moto!, 'Kini Red Bull')?.storageId).toBe(30976);
+    expect(getCatalogSportBanner(mtb!, 'Kini Red Bull')?.storageId).toBe(31537);
+    expect(getCatalogSportBanner(moto!, 'ONE Industries')?.storageId).toBe(31795);
+    expect(getCatalogSportBanner(mtb!, 'ONE Industries')?.storageId).toBe(31802);
+    expect(getCatalogSportBanner(moto!, 'Unknown brand')).toBe(moto!.banner);
+    expect(getCatalogSportBanner(mtb!, null)).toBe(mtb!.banner);
   });
 });

@@ -7,8 +7,7 @@
  */
 
 import type { Product } from '../types/Product';
-import type { TaxonomyEntryMeta, TaxonomyNode } from './types';
-import { GEAR, HELMETS, LINE_FIRST, PROTECTION, TYPE_COLOUR } from '../config/groupingPresets';
+import type { TaxonomyNode } from './types';
 import { getProductValue } from './types';
 
 // ============================================================================
@@ -65,10 +64,10 @@ function isMerchandise(product: Product): boolean {
 }
 
 /**
- * Was im Shop unter Merchandise steht: Merchandise selbst plus Freizeit-
- * und Casual-Ware. MTB und MX schliessen das aus, sonst haengen Kappen,
- * Hoodies und Neckwarmer in zwei Aesten, erscheinen aber unter MX in
- * keiner Unterkategorie (2026-09-22).
+ * Was im Shop unter Merchandise steht: Merchandise selbst plus Freizeit- und
+ * Casual-Ware. MTB und MX schliessen das aus, sonst haengen Kappen, Hoodies
+ * und Neckwarmer in zwei Aesten und sind unter MX in keiner Unterkategorie
+ * erreichbar (2026-09-22).
  */
 function isLeisure(product: Product): boolean {
   return isMerchandise(product) || hasCategory(product, 'Casual Wear', 'Leisure');
@@ -118,7 +117,7 @@ function protektorChildren(sportFilter: (p: Product) => boolean): TaxonomyNode[]
 // O'Neal Taxonomy Tree
 // ============================================================================
 
-const TAXONOMY_TREE: TaxonomyNode[] = [
+export const ONEAL_TAXONOMY: TaxonomyNode[] = [
   // ---- MTB ----
   {
     label: 'MTB',
@@ -128,6 +127,9 @@ const TAXONOMY_TREE: TaxonomyNode[] = [
       {
         label: 'Helme',
         slug: 'helme',
+        // Ein Teil der Artikel hat in LIUS keinen Produkttyp, andere keine
+        // Kategorie — deshalb zaehlt jeweils EINES von beiden, sonst fehlen
+        // Artikel, die der Shop zeigt (2026-09-22).
         match: p => hasSport(p, 'MTB') && isAdult(p) && isNotSpare(p)
           && (hasType(p, 'Helm') || hasCategory(p, 'Helmets MTB', 'Helme MTB')),
         children: [
@@ -181,7 +183,7 @@ const TAXONOMY_TREE: TaxonomyNode[] = [
       {
         label: 'Accessories',
         slug: 'accessories',
-        match: p => hasSport(p, 'MTB') && isAdult(p) && isNotSpare(p)
+        match: p => hasSport(p, 'MTB') && isAdult(p) && isNotSpare(p) && !isLeisure(p)
           && (hasType(p, 'Accessoire') || hasType(p, 'Transport')),
       },
     ],
@@ -196,9 +198,6 @@ const TAXONOMY_TREE: TaxonomyNode[] = [
       {
         label: 'Helme',
         slug: 'helme',
-        // Ein Teil der Artikel hat keinen Produkttyp und einige keine
-        // Kategorie gepflegt (LIUS) — deshalb reicht EINES von beiden, sonst
-        // fehlt der Helm im Katalog, den der Shop zeigt (2026-09-22).
         match: p => hasSport(p, 'MX') && isAdult(p) && isNotSpare(p) && !isMotorrad(p)
           && (hasCategory(p, 'Helmets MX') || hasType(p, 'Helm')),
         children: [
@@ -241,7 +240,7 @@ const TAXONOMY_TREE: TaxonomyNode[] = [
       {
         label: 'Accessories',
         slug: 'accessories',
-        match: p => hasSport(p, 'MX') && isAdult(p) && isNotSpare(p)
+        match: p => hasSport(p, 'MX') && isAdult(p) && isNotSpare(p) && !isLeisure(p)
           && (hasType(p, 'Accessoire') || hasType(p, 'Transport') || hasType(p, 'Griff')),
       },
       {
@@ -287,7 +286,8 @@ const TAXONOMY_TREE: TaxonomyNode[] = [
       {
         label: 'Accessories',
         slug: 'accessories',
-        match: p => isMotorrad(p) && (hasType(p, 'Accessoire') || hasType(p, 'Transport')),
+        match: p => isMotorrad(p) && isNotSpare(p)
+          && (hasType(p, 'Accessoire') || hasType(p, 'Transport')),
       },
       {
         label: 'Ersatzteile',
@@ -358,93 +358,3 @@ const TAXONOMY_TREE: TaxonomyNode[] = [
     match: p => isLeisure(p),
   },
 ];
-
-// ============================================================================
-// Einstiegs-Metadaten (Banner, Gruppierung, Sprache)
-// ============================================================================
-
-/**
- * Der gefuehrte Einstieg und der volle Finder lesen denselben Baum
- * (owner 2026-09-22). Die Knoten selbst bleiben reine Navigation; was nur
- * die Banner-Stufen brauchen — Bild, Gruppierung, englische Beschriftung —
- * haengt hier am Pfad. Die Bild-Nummern sind die kuratierten Motive aus der
- * frueheren Kategorie-Konfiguration; Knoten ohne Motiv zeigen stattdessen
- * Produktbilder.
- */
-const ENTRY_META: Record<string, TaxonomyEntryMeta> = {
-  mtb: {
-    labels: { en: 'MTB' },
-    banner: { mode: 'image', storageId: 15344 },
-    bannersByBrand: {
-      "O'Neal": { mode: 'image', storageId: 15344 },
-      'Kini Red Bull': { mode: 'image', storageId: 31537, position: 'center 42%' },
-      'ONE Industries': { mode: 'image', storageId: 31802, position: 'center 44%' },
-    },
-  },
-  'mtb/helme': { labels: { en: 'Helmets' }, grouping: HELMETS, banner: { mode: 'image', storageId: 15962 }, bannersByBrand: { 'Kini Red Bull': { mode: 'image', storageId: 31461, position: 'center 40%' } } },
-  'mtb/brillen': { labels: { en: 'Goggles' }, grouping: LINE_FIRST, banner: { mode: 'image', storageId: 14971 } },
-  'mtb/kleidung': { labels: { en: 'Apparel' }, grouping: GEAR, banner: { mode: 'image', storageId: 17053 } },
-  'mtb/protektoren': { labels: { en: 'Protectors' }, grouping: PROTECTION, banner: { mode: 'image', storageId: 15316 } },
-  'mtb/schuhe': { labels: { en: 'Shoes' }, grouping: LINE_FIRST, banner: { mode: 'image', storageId: 15811 } },
-  'mtb/accessories': { labels: { en: 'Accessories' }, grouping: TYPE_COLOUR, banner: { mode: 'image', storageId: 15480 } },
-
-  mx: {
-    labels: { en: 'MX' },
-    banner: { mode: 'image', storageId: 17577 },
-    bannersByBrand: {
-      "O'Neal": { mode: 'image', storageId: 17577 },
-      'Kini Red Bull': { mode: 'image', storageId: 30976, position: 'center 45%' },
-      'ONE Industries': { mode: 'image', storageId: 31795, position: 'center 42%' },
-    },
-  },
-  'mx/helme': { labels: { en: 'Helmets' }, grouping: HELMETS, banner: { mode: 'image', storageId: 10435 }, bannersByBrand: { 'Kini Red Bull': { mode: 'image', storageId: 30827, position: 'center 42%' }, 'ONE Industries': { mode: 'image', storageId: 31910, position: 'center 30%' } } },
-  'mx/brillen': { labels: { en: 'Goggles' }, grouping: LINE_FIRST, banner: { mode: 'image', storageId: 9970 }, bannersByBrand: { 'Kini Red Bull': { mode: 'image', storageId: 31474, position: 'center 45%' } } },
-  'mx/kleidung': { labels: { en: 'Apparel' }, grouping: GEAR, banner: { mode: 'image', storageId: 17772 }, bannersByBrand: { 'Kini Red Bull': { mode: 'image', storageId: 31136, position: 'center 62%' }, 'ONE Industries': { mode: 'image', storageId: 31968, position: 'center' } } },
-  'mx/protektoren': { labels: { en: 'Protectors' }, grouping: PROTECTION, banner: { mode: 'image', storageId: 10916 }, bannersByBrand: { 'Kini Red Bull': { mode: 'image', storageId: 31318, position: 'center 45%' } } },
-  'mx/stiefel': { labels: { en: 'Boots' }, grouping: LINE_FIRST, banner: { mode: 'image', storageId: 11767 } },
-  'mx/accessories': { labels: { en: 'Accessories' }, grouping: TYPE_COLOUR, banner: { mode: 'image', storageId: 15480 }, bannersByBrand: { 'Kini Red Bull': { mode: 'image', storageId: 30538, position: 'center 30%' } } },
-  'mx/ersatzteile': { labels: { en: 'Spare Parts' }, grouping: TYPE_COLOUR },
-
-  motorrad: { labels: { en: 'Street' }, banner: { mode: 'image', storageId: 18556 } },
-  'motorrad/helme': { labels: { en: 'Helmets' }, grouping: HELMETS, banner: { mode: 'image', storageId: 18556 }, bannersByBrand: { 'Kini Red Bull': { mode: 'image', storageId: 30609, position: 'center 50%' } } },
-  'motorrad/kleidung': { labels: { en: 'Apparel' }, grouping: GEAR, banner: { mode: 'image', storageId: 18695 } },
-  'motorrad/stiefel': { labels: { en: 'Boots' }, grouping: LINE_FIRST },
-  'motorrad/protektoren': { labels: { en: 'Protectors' }, grouping: PROTECTION },
-  'motorrad/accessories': { labels: { en: 'Accessories' }, grouping: TYPE_COLOUR },
-  'motorrad/ersatzteile': { labels: { en: 'Spare Parts' }, grouping: TYPE_COLOUR },
-
-  frauen: { labels: { en: 'Women' } },
-  'frauen/frauen-mx': { labels: { en: 'Women MX' }, grouping: GEAR },
-  'frauen/frauen-mtb': { labels: { en: 'Women MTB' }, grouping: GEAR },
-
-  kinder: { labels: { en: 'Kids' }, banner: { mode: 'image', storageId: 17684 } },
-  'kinder/kinder-mx': { labels: { en: 'Kids MX' }, grouping: GEAR, banner: { mode: 'image', storageId: 17967 } },
-  'kinder/kinder-mtb': { labels: { en: 'Kids MTB' }, grouping: GEAR, banner: { mode: 'image', storageId: 14432 } },
-
-  merchandise: { labels: { en: 'Merchandise' }, grouping: TYPE_COLOUR, banner: { mode: 'image', storageId: 15480 } },
-};
-
-function withEntryMeta(nodes: TaxonomyNode[], prefix = ''): TaxonomyNode[] {
-  return nodes.map(node => {
-    const path = prefix ? `${prefix}/${node.slug}` : node.slug;
-    return {
-      ...node,
-      entry: ENTRY_META[path],
-      children: node.children ? withEntryMeta(node.children, path) : undefined,
-    };
-  });
-}
-
-export const ONEAL_TAXONOMY: TaxonomyNode[] = withEntryMeta(TAXONOMY_TREE);
-
-/** Knoten ueber seinen Pfad finden ("mx", "mx/helme"). */
-export function findTaxonomyNode(path: readonly string[]): TaxonomyNode | undefined {
-  let nodes: TaxonomyNode[] | undefined = ONEAL_TAXONOMY;
-  let found: TaxonomyNode | undefined;
-  for (const slug of path) {
-    found = nodes?.find(node => node.slug === slug);
-    if (!found) return undefined;
-    nodes = found.children;
-  }
-  return found;
-}
