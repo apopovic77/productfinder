@@ -1235,6 +1235,11 @@ export class ProductFinderController {
     return this.layoutService.isHeroRootOverview() && (this.canvas?.clientWidth ?? 0) >= 768;
   }
 
+  /** true = Hero-Reihe wurde per Klick aus der Übersicht derselben Ebene geöffnet. */
+  isHeroPresentation(): boolean {
+    return this.layoutService.isHeroPresentation();
+  }
+
   /** Card closed: the hero row flows back into the overview grid. */
   exitHeroPresentation(): void {
     if (!this.layoutService.isHeroPresentation()) return;

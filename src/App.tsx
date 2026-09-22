@@ -1300,6 +1300,23 @@ export default class App extends React.Component<Props, State> {
     this.controller.setPivotOrientation(orientation);
   };
 
+  /**
+   * Zurück zur vorigen Übersicht (owner 2026-09-22, media 125867): Pfeil links
+   * auf dem ersten Hero-Produkt und Esc. Kam man per Klick aus der Übersicht
+   * derselben Ebene in die Hero-Reihe, geht es dorthin zurück; sonst eine
+   * Ebene hoch wie beim Brotkrumen.
+   */
+  private heroBack = () => {
+    if (this.controller.isHeroPresentation()) {
+      this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false });
+      this.controller.exitHeroPresentation();
+      this.syncPivotUI();
+      return;
+    }
+    const crumbs = this.state.pivotBreadcrumbs.length;
+    if (crumbs > 1) this.handleBreadcrumbClick(crumbs - 2);
+  };
+
   private handleBreadcrumbClick = (index: number) => {
     const { pivotBreadcrumbs } = this.state;
     if (index < 0 || index >= pivotBreadcrumbs.length) return;
@@ -2399,6 +2416,27 @@ export default class App extends React.Component<Props, State> {
   };
 
   private handleKeyDown = (e: KeyboardEvent) => {
+    // Esc in der Hero-Ansicht (owner 2026-09-22): erst eine offene Karte
+    // schließen (das beendet auch die Hero-Präsentation), sonst zurück zur
+    // vorigen Übersicht. Andere Dialoge regeln Esc selbst — dann nichts tun.
+    if (e.key === 'Escape') {
+      const tag = (e.target as HTMLElement)?.tagName;
+      const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+      const otherOverlay = this.state.isQuickSearchOpen || this.state.cartPanelOpen
+        || this.state.b2bLoginOpen || this.state.b2bMenuOpen || this.state.mobilePivotOpen;
+      if (!typing && !otherOverlay) {
+        if (this.state.selectedProduct) {
+          e.preventDefault();
+          this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false });
+          return;
+        }
+        if (this.state.isPivotHeroMode && !this.controller.isHeroRootOverview()) {
+          e.preventDefault();
+          this.heroBack();
+          return;
+        }
+      }
+    }
     // Don't handle if modal is open or typing in input
     if (this.state.selectedProduct || (e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'SELECT') {
       return;
@@ -3368,8 +3406,15 @@ export default class App extends React.Component<Props, State> {
             && !this.controller.isHeroRootOverview()
             && (this.state.heroPosition?.count ?? this.controller.getDisplayOrder().length) > 1 && (
             <>
-              <button type="button" className="pf-hero-arrow pf-hero-arrow-prev" aria-label="Vorheriges Produkt"
-                onClick={() => { this.controller.stepHeroProduct(-1); this.setState({ heroPosition: this.controller.getHeroPosition() }, this.syncHeroCardToFocus); }}>‹</button>
+              {/* Auf dem ersten Produkt führt „‹“ zurück zur vorigen Übersicht
+                  statt ins Leere (owner 2026-09-22, media 125867). */}
+              <button type="button" className="pf-hero-arrow pf-hero-arrow-prev"
+                aria-label={(this.state.heroPosition?.index ?? 0) === 0 ? 'Zurück zur Übersicht' : 'Vorheriges Produkt'}
+                title={(this.state.heroPosition?.index ?? 0) === 0 ? 'Zurück zur Übersicht' : undefined}
+                onClick={() => {
+                  if ((this.state.heroPosition?.index ?? this.controller.getHeroPosition()?.index ?? 0) === 0) { this.heroBack(); return; }
+                  this.controller.stepHeroProduct(-1); this.setState({ heroPosition: this.controller.getHeroPosition() }, this.syncHeroCardToFocus);
+                }}>‹</button>
               <button type="button" className="pf-hero-arrow pf-hero-arrow-next" aria-label="Nächstes Produkt"
                 onClick={() => { this.controller.stepHeroProduct(1); this.setState({ heroPosition: this.controller.getHeroPosition() }, this.syncHeroCardToFocus); }}>›</button>
               {/* "01 / 04" — position within the hero row, desktop only; the
