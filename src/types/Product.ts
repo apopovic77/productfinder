@@ -3,6 +3,7 @@ import { ProductAttribute } from '../domain/ProductAttribute';
 import { globalImageQueue } from '../utils/GlobalImageQueue';
 import type { PrimitiveAttributeValue } from '../domain/ProductAttribute';
 import { buildHighResUrl, buildThumbnailUrl } from '../utils/MediaUrlBuilder';
+import { comingSoonImageUrl } from '../utils/comingSoonImage';
 export { ProductAttribute } from '../domain/ProductAttribute';
 export type { PrimitiveAttributeValue } from '../domain/ProductAttribute';
 export { ProductValue } from '../domain/ProductValue';
@@ -228,7 +229,7 @@ export class Product {
 
   get imageUrl(): string {
     const media = this.primaryImage;
-    if (!media?.src) return 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="256" height="256"%3E%3Crect fill="%23e0e0e0" width="256" height="256"/%3E%3Ctext x="128" y="128" text-anchor="middle" fill="%23999" font-size="14"%3ENo Image%3C/text%3E%3C/svg%3E';
+    if (!media?.src) return comingSoonImageUrl(256);
 
     // Prefer Storage API for optimized images
     if (media.storage_id) {
@@ -239,9 +240,17 @@ export class Product {
     return media.src;
   }
 
+  /**
+   * Noch kein Produktfoto: der Finder zeigt das Coming-Soon-Ersatzbild
+   * (Owner 2026-09-26). Gilt fuer Produkte ohne ein einziges Bild.
+   */
+  get isComingSoon(): boolean {
+    return !this.primaryImage?.src;
+  }
+
   get fullImageUrl(): string {
     const media = this.primaryImage;
-    if (!media?.src) return 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="800" height="800"%3E%3Crect fill="%23e0e0e0" width="800" height="800"/%3E%3Ctext x="400" y="400" text-anchor="middle" fill="%23999" font-size="24"%3ENo Image%3C/text%3E%3C/svg%3E';
+    if (!media?.src) return comingSoonImageUrl(800);
 
     // Prefer Storage API for the canonical high-resolution WebP preset.
     if (media.storage_id) {

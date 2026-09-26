@@ -8,7 +8,7 @@ import {
 import { Product, type ProductData, ProductAttribute, type PrimitiveAttributeValue, type AttributeType } from '../types/Product';
 import { ACTIVE_PIVOT_PROFILE } from '../config/pivot';
 import { ONEAL_API_BASE, ONEAL_API_KEY } from '../config/apiConfig';
-import { CATALOG_ENTRY_CONFIG, resolveRelevantOnly } from '../config/CatalogEntryConfig';
+import { CATALOG_ENTRY_CONFIG, resolveCatalogScope, resolveRelevantOnly } from '../config/CatalogEntryConfig';
 
 const API_BASE = ONEAL_API_BASE;
 const API_KEY = ONEAL_API_KEY;
@@ -779,6 +779,12 @@ export function buildProductsRequestUrl(query: Query): string {
   if (query.order) params.set('order', query.order);
   if (query.limit !== undefined) params.set('limit', String(query.limit));
   if (query.offset !== undefined) params.set('offset', String(query.offset));
+  if (resolveCatalogScope() === 'workbook') {
+    // Workbook-Kollektion: die Auswahl trifft der Abgleich, Produkte ohne Bild
+    // bleiben drin (Coming Soon) — keine Jahres-/Relevanz-Schaetzung.
+    params.set('workbook', 'true');
+    return `${API_BASE}/products?${params.toString()}`;
+  }
   params.set('has_image', 'true');
   const collectionYear = query.collection_year === undefined ? CATALOG_ENTRY_CONFIG.year : query.collection_year;
   if (collectionYear != null) params.set('collection_year', String(collectionYear));
@@ -787,7 +793,10 @@ export function buildProductsRequestUrl(query: Query): string {
 }
 
 async function fetchProductsFromApi(query: Query): Promise<Product[]> {
-  const collectionYear = query.collection_year === undefined ? CATALOG_ENTRY_CONFIG.year : query.collection_year;
+  const workbook = resolveCatalogScope() === 'workbook';
+  const collectionYear = workbook
+    ? undefined
+    : query.collection_year === undefined ? CATALOG_ENTRY_CONFIG.year : query.collection_year;
 
   const response = await productsApi.listProductsV1ProductsGet({
     brand: query.brand,
@@ -801,14 +810,17 @@ async function fetchProductsFromApi(query: Query): Promise<Product[]> {
     offset: query.offset,
     // Server-side filter (SDK 1.1.0 / issue #254) — replaces the old client
     // filter, so count/paging from the API are accurate.
-    hasImage: true,
+    hasImage: workbook ? undefined : true,
     // Kollektionsfilter "Jahr J + Weiterlaeufer" (SDK 1.2.1) — Default aus
     // CATALOG_ENTRY_CONFIG.year, null schaltet ab.
     collectionYear: collectionYear,
   }, {
     // relevant_only kennt die SDK 1.2.1 noch nicht — axios haengt options.params
     // als Query an (Regen via GitHub-Agent nachziehen).
-    params: (query.relevant_only ?? resolveRelevantOnly()) ? { relevant_only: 'true' } : undefined,
+    // workbook kennt die SDK 1.4.0 ebenfalls noch nicht.
+    params: workbook
+      ? { workbook: 'true' }
+      : (query.relevant_only ?? resolveRelevantOnly()) ? { relevant_only: 'true' } : undefined,
   });
 
   const results = (response.data as any).results || [];
@@ -826,7 +838,7 @@ export function fetchProducts(query: Query = {}): Promise<Product[]> {
   // here: only CanvasRenderer knows which products are visible (issue #1066).
   if (!isFullCatalogQuery(query)) return fetchProductsFromApi(query);
 
-  const cacheKey = `${query.brand ?? '__all__'}|${query.collection_year === undefined ? CATALOG_ENTRY_CONFIG.year : query.collection_year}|${query.relevant_only ?? resolveRelevantOnly()}`;
+  const cacheKey = `${resolveCatalogScope()}|${query.brand ?? '__all__'}|${query.collection_year === undefined ? CATALOG_ENTRY_CONFIG.year : query.collection_year}|${query.relevant_only ?? resolveRelevantOnly()}`;
   if (!fullCatalogPromises.has(cacheKey)) {
     fullCatalogPromises.set(cacheKey, fetchProductsFromApi(query).catch(error => {
       fullCatalogPromises.delete(cacheKey);

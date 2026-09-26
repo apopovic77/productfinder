@@ -1017,6 +1017,12 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       {/* Price & Availability - Compact */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
         <div className="pom-price" style={{ fontSize: '16px' }}>{priceText}</div>
+        {/* Noch kein Produktfoto (Owner 2026-09-26): Tag statt stiller Luecke. */}
+        {product.isComingSoon && (
+          <div title="Das Produktfoto folgt" style={{ fontSize: '11px', fontWeight: 800, letterSpacing: '0.08em', padding: '4px 9px', borderRadius: '999px', background: '#e63312', color: '#fff' }}>
+            COMING SOON
+          </div>
+        )}
         {/* HEK nur zeigen, wenn es wirklich einen Preis gibt — sonst stand dort nur
             ein Strich (owner 2026-09-16, media 125394). */}
         {dealer && !dealer.unknown && dealer.dealerPrice !== null && dealer.dealerPrice !== undefined && (

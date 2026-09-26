@@ -184,8 +184,33 @@ export const BRAND_BANNERS: Record<string, CatalogLandingMedia> = {
   'Kini Red Bull': { mode: 'image', storageId: 31318, fit: 'cover', position: 'center 30%' },
 };
 
+/**
+ * Katalogumfang (Owner 2026-09-25/26):
+ *  - 'default'  : Kollektion 2027 + Weiterlaeufer, nur relevante Produkte mit
+ *                 Bild (bisheriger Stand, geschaetzt ueber Modelljahr/Marker)
+ *  - 'workbook' : genau O'Neals Workbook fuer die Kollektion 2028 — dieselbe
+ *                 Auswahl wie Fabians Excel-Liste, jede Nacht aus LIUS
+ *                 abgeglichen (`?workbook=true` der API). Produkte ohne Foto
+ *                 erscheinen mit dem Tag COMING SOON.
+ * Auswahl per URL `?catalog=2028`; beim Boot gelesen und in Links mitgefuehrt.
+ */
+export type CatalogScope = 'default' | 'workbook';
+
+let bootCatalogScope: CatalogScope | null = null;
+
+export function resolveCatalogScope(href?: string): CatalogScope {
+  if (!href && bootCatalogScope) return bootCatalogScope;
+  let scope: CatalogScope = 'default';
+  try {
+    const value = new URL(href ?? window.location.href).searchParams.get('catalog');
+    if (value === '2028' || value === 'workbook') scope = 'workbook';
+  } catch { /* SSR/tests ohne window */ }
+  if (!href) bootCatalogScope = scope;
+  return scope;
+}
+
 export const CATALOG_ENTRY_CONFIG: CatalogEntryConfig = {
-  year: 2027,
+  year: resolveCatalogScope() === 'workbook' ? 2028 : 2027,
   // Alex' finale Medienwahl bleibt ein einzelner Config-Wechsel. Solange kein
   // freigegebenes GSG-Asset vorliegt, rendert die Landing das typografische
   // Gravity-Sports-Group-Logo und benötigt weder Platzhalterdatei noch URL.

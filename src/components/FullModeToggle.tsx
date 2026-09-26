@@ -16,6 +16,9 @@ export function fullModeHref(full: boolean): string {
   const next = new URL(current.pathname, current.origin);
   const lang = current.searchParams.get('lang');
   if (lang) next.searchParams.set('lang', lang);
+  // Katalogumfang (?catalog=2028) bleibt beim Wechsel erhalten.
+  const catalog = current.searchParams.get('catalog');
+  if (catalog) next.searchParams.set('catalog', catalog);
   if (full) next.searchParams.set('flow', 'direct');
   return `${next.pathname}${next.search}`;
 }
