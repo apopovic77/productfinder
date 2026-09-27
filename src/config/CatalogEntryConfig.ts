@@ -192,7 +192,9 @@ export const BRAND_BANNERS: Record<string, CatalogLandingMedia> = {
  *                 Auswahl wie Fabians Excel-Liste, jede Nacht aus LIUS
  *                 abgeglichen (`?workbook=true` der API). Produkte ohne Foto
  *                 erscheinen mit dem Tag COMING SOON.
- * Auswahl per URL `?catalog=2028`; beim Boot gelesen und in Links mitgefuehrt.
+ * Seit 2026-09-27 ist 'workbook' der Standard (Owner: "der Productfinder soll
+ * mit der 2028 laufen"); der fruehere Stand bleibt ueber `?catalog=2027`
+ * erreichbar. Beim Boot gelesen und in Links mitgefuehrt.
  */
 export type CatalogScope = 'default' | 'workbook';
 
@@ -200,10 +202,10 @@ let bootCatalogScope: CatalogScope | null = null;
 
 export function resolveCatalogScope(href?: string): CatalogScope {
   if (!href && bootCatalogScope) return bootCatalogScope;
-  let scope: CatalogScope = 'default';
+  let scope: CatalogScope = 'workbook';
   try {
     const value = new URL(href ?? window.location.href).searchParams.get('catalog');
-    if (value === '2028' || value === 'workbook') scope = 'workbook';
+    if (value === '2027' || value === 'default') scope = 'default';
   } catch { /* SSR/tests ohne window */ }
   if (!href) bootCatalogScope = scope;
   return scope;
@@ -232,7 +234,11 @@ export const CATALOG_ENTRY_CONFIG: CatalogEntryConfig = {
       id: 'mtb',
       labels: label('MTB'),
       sportValues: ['MTB'],
-      enabled: true,
+      // Owner 2026-09-27: MTB im gefuehrten Einstieg gesperrt, Kachel bleibt
+      // sichtbar mit "Coming Soon". Die Workbook-Kollektion 2028 enthaelt keine
+      // reinen Fahrrad-Artikel (lngA_ArtikelKundenArt 2).
+      enabled: false,
+      comingSoon: true,
       banner: { mode: 'image', storageId: 15344 },
       bannersByBrand: {
         "O'Neal": { mode: 'image', storageId: 15344 },

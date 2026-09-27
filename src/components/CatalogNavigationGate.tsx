@@ -42,7 +42,7 @@ const messages: Record<string, Record<string, string>> = {
   de: {
     chooseSport: 'Wähle deinen Sport',
     chooseCategory: 'Wähle deine Produktkategorie',
-    comingSoon: 'Demnächst',
+    comingSoon: 'Coming Soon',
     products: 'Produkte',
     unavailable: 'Nicht verfügbar',
     loading: 'Kategorien werden geladen…',
@@ -51,7 +51,7 @@ const messages: Record<string, Record<string, string>> = {
   en: {
     chooseSport: 'Choose your sport',
     chooseCategory: 'Choose your product category',
-    comingSoon: 'Coming soon',
+    comingSoon: 'Coming Soon',
     products: 'products',
     unavailable: 'Unavailable',
     loading: 'Loading categories…',
@@ -62,7 +62,7 @@ const messages: Record<string, Record<string, string>> = {
   fr: {
     chooseSport: 'Choisis ton sport',
     chooseCategory: 'Choisis ta catégorie de produits',
-    comingSoon: 'Bientôt disponible',
+    comingSoon: 'Coming Soon',
     products: 'produits',
     unavailable: 'Indisponible',
     loading: 'Chargement des catégories…',
@@ -71,7 +71,7 @@ const messages: Record<string, Record<string, string>> = {
   it: {
     chooseSport: 'Scegli il tuo sport',
     chooseCategory: 'Scegli la tua categoria di prodotti',
-    comingSoon: 'Prossimamente',
+    comingSoon: 'Coming Soon',
     products: 'prodotti',
     unavailable: 'Non disponibile',
     loading: 'Caricamento delle categorie…',
@@ -80,7 +80,7 @@ const messages: Record<string, Record<string, string>> = {
   es: {
     chooseSport: 'Elige tu deporte',
     chooseCategory: 'Elige tu categoría de productos',
-    comingSoon: 'Próximamente',
+    comingSoon: 'Coming Soon',
     products: 'productos',
     unavailable: 'No disponible',
     loading: 'Cargando categorías…',
@@ -181,6 +181,10 @@ export const CatalogNavigationGate: React.FC<Props> = ({
   // the products is skipped').
   useEffect(() => {
     if (!smartGates || !hasLoadedProducts || query.sport) return;
+    // Eine angekuendigte Sportart (Coming Soon) soll man sehen — sonst
+    // sprang der Einstieg bei nur einer freien Sportart ueber die Seite und
+    // die gesperrte MTB-Kachel blieb unsichtbar (Owner 2026-09-27).
+    if (CATALOG_ENTRY_CONFIG.sports.some(item => item.comingSoon)) return;
     const withProducts = CATALOG_ENTRY_CONFIG.sports
       .filter(item => item.enabled && (sportCounts.get(item.id) ?? 0) > 0);
     if (withProducts.length === 1) {
@@ -241,7 +245,7 @@ export const CatalogNavigationGate: React.FC<Props> = ({
               return (
                 <button
                   type="button"
-                  className={`pf-catalog-sport-card ${bannerUrl ? 'has-banner' : ''}`}
+                  className={`pf-catalog-sport-card ${bannerUrl ? 'has-banner' : ''} ${item.comingSoon ? 'is-coming-soon' : ''}`}
                   key={item.id}
                   disabled={!item.enabled || (smartGates && hasLoadedProducts && (sportCounts.get(item.id) ?? 0) === 0)}
                   onClick={() => writeCatalogUrl({ sport: item.id, category: null })}

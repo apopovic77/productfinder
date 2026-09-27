@@ -401,3 +401,36 @@ body.pf-finder-active .pf-full-mode-floating:not(.pf-series-gate-toggle) { displ
   .pf-full-mode-floating { top: 10px; right: 10px; padding: 7px 10px; font-size: 10px; }
   .pf-catalog-page { padding-top: 62px; }
 }
+
+/* Angekuendigte Sportart (MTB, Owner 2026-09-27): derselbe rote Tag wie auf
+   den Produkten ohne Foto. Der Grau-Filter der gesperrten Kachel wuerde den
+   Tag mitfaerben — deshalb graut hier nur eine Ebene ueber dem Bild aus, der
+   Tag liegt darueber. */
+.pf-catalog-sport-card.is-coming-soon:disabled { filter: none; cursor: default; }
+.pf-catalog-sport-card.is-coming-soon::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: grayscale(0.9);
+  -webkit-backdrop-filter: grayscale(0.9);
+  pointer-events: none;
+}
+.pf-catalog-sport-card.is-coming-soon > .pf-catalog-sport-name { color: rgba(255, 255, 255, 0.45); }
+.pf-catalog-sport-card.is-coming-soon > .pf-catalog-coming-soon {
+  position: absolute;
+  z-index: 3;
+  top: 50%;
+  left: 50%;
+  right: auto;
+  transform: translate(-50%, -50%);
+  padding: 12px 22px;
+  border: 0;
+  border-radius: 999px;
+  background: #e63312;
+  color: #fff;
+  font-size: clamp(13px, 1.6vw, 18px);
+  letter-spacing: 0.14em;
+  white-space: nowrap;
+}
