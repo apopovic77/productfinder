@@ -196,6 +196,22 @@ export const BRAND_BANNERS: Record<string, CatalogLandingMedia> = {
  * mit der 2028 laufen"); der fruehere Stand bleibt ueber `?catalog=2027`
  * erreichbar. Beim Boot gelesen und in Links mitgefuehrt.
  */
+/**
+ * Sprachmodell zum Vergleichen (Owner 2026-09-27): `?voicemodel=2.1` startet
+ * den Sprachberater mit gpt-realtime-2.1, ohne Parameter bleibt das
+ * Standardmodell des BFF. gpt-realtime-2.1 spricht zuerst (~0,5 s) und sucht
+ * danach (~2,3 s); gpt-realtime sucht sofort (~0,4 s) und spricht erst mit dem
+ * Ergebnis.
+ */
+export function resolveVoiceModel(href?: string): 'gpt-realtime' | 'gpt-realtime-2.1' | undefined {
+  try {
+    const value = new URL(href ?? window.location.href).searchParams.get('voicemodel');
+    if (value === '2.1' || value === 'gpt-realtime-2.1') return 'gpt-realtime-2.1';
+    if (value === '1' || value === 'gpt-realtime') return 'gpt-realtime';
+  } catch { /* SSR/tests ohne window */ }
+  return undefined;
+}
+
 export type CatalogScope = 'default' | 'workbook';
 
 let bootCatalogScope: CatalogScope | null = null;

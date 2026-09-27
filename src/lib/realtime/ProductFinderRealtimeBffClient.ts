@@ -480,6 +480,7 @@ export class ProductFinderRealtimeBffClient implements ProductFinderRealtimeServ
       language: context.language,
       collection_year: context.collection_year,
       entry_selection: context.entry_selection,
+      ...(context.model ? { model: context.model } : {}),
     };
     const response = await this.fetchImpl(this.sessionEndpoint, {
       method: 'POST',

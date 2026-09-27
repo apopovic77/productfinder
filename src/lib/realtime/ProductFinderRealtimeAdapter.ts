@@ -16,6 +16,8 @@ export interface ProductFinderEntryContext {
   brand_open?: true;
   language: string;
   collection_year: number;
+  /** Modellvergleich (Owner 2026-09-27): nur aus der BFF-Freigabeliste. */
+  model?: 'gpt-realtime' | 'gpt-realtime-2.1';
   entry_selection: Readonly<{
     sport_id: string;
     category_id: string | null;

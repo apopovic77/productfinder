@@ -69,7 +69,7 @@ import { fetchFacets, fetchProductById } from './data/ProductRepository';
 import { ProductFinderRealtimeSurface } from './components/ProductFinderRealtimeSurface';
 import { SeriesSelectionGate, type SeriesGateEntry } from './components/SeriesSelectionGate';
 import { FullModeIcon, fullModeHref, fullModeLabel, isFullFinderMode } from './components/FullModeToggle';
-import { resolveCatalogFlow } from './config/CatalogEntryConfig';
+import { resolveCatalogFlow, resolveVoiceModel } from './config/CatalogEntryConfig';
 import {
   buildProductFinderCartContext,
   resolveProductPriceEur,
@@ -3966,6 +3966,7 @@ export default class App extends React.Component<Props, State> {
               brand_open: resolveBrandOpenMintFlag(this.props.brand),
               language: this.props.locale,
               collection_year: this.props.catalogYear,
+              model: resolveVoiceModel(),
               entry_selection: this.props.entrySelection
                 ? {
                     sport_id: this.props.entrySelection.sportId,

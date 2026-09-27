@@ -20,6 +20,30 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 describe('ProductFinderRealtimeBffClient', () => {
+  it('sends a chosen comparison model and omits the field otherwise', async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({
+      client_secret: { value: 'ek_test' },
+      model: 'gpt-realtime-2.1',
+      session_id: 'session-1',
+      tools: ['find_products', 'refine_search'],
+      push_to_talk: true,
+      turn_detection: null,
+    }));
+    const client = new ProductFinderRealtimeBffClient({
+      sessionEndpoint: '/v1/realtime/session',
+      toolEndpoint: '/v1/realtime/tool',
+      fetchImpl,
+    });
+
+    await client.mintSession({ ...context, model: 'gpt-realtime-2.1' });
+    const [, chosen] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(String(chosen.body)).model).toBe('gpt-realtime-2.1');
+
+    await client.mintSession(context);
+    const [, standard] = fetchImpl.mock.calls[1] as unknown as [string, RequestInit];
+    expect(JSON.parse(String(standard.body))).not.toHaveProperty('model');
+  });
+
   it('mints through the BFF without browser credentials and normalizes the response', async () => {
     const fetchImpl = vi.fn(async () => jsonResponse({
       client_secret: { value: 'ek_test' },
