@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import type { Product } from '../types/Product';
@@ -733,6 +733,36 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   // Geometrie-Ziel des Morphs — von animate UND initial geteilt.
   // Expanded: buendig mit der Unterkante, nur die oberen Ecken rund
   // (owner 2026-08-24).
+  // Zweizeiliger Titel schob "Close" unter die Kartenkante (owner 2026-09-28,
+  // media 128374). Die Karte darf nicht scrollen — die Badges haengen aussen
+  // daneben —, also wird der Titel stufenweise kleiner, bis alles passt.
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const heroModelRef = useRef<HTMLDivElement | null>(null);
+  useLayoutEffect(() => {
+    const panel = panelRef.current;
+    const model = heroModelRef.current;
+    if (!panel || !model || !heroDock || expanded || heroSheet) {
+      if (model) model.style.fontSize = '';
+      if (panel) panel.style.overflowY = '';
+      return;
+    }
+    const fits = () => panel.scrollHeight <= panel.clientHeight + 1;
+    const fit = () => {
+      panel.style.overflowY = '';
+      model.style.fontSize = '';
+      for (const size of [56, 46, 38, 32, 26]) {
+        model.style.fontSize = `${size}px`;
+        if (fits()) break;
+      }
+      // Sehr niedriges Fenster: lieber scrollen (Badges werden dann
+      // abgeschnitten) als einen unerreichbaren Close-Button.
+      if (!fits()) panel.style.overflowY = 'auto';
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  });
+
   const morphTarget = {
     bottom: expanded ? 0 : (heroSheet || isMobilePortrait ? 8 : 88),
     borderBottomLeftRadius: expanded ? 0 : 18,
@@ -751,6 +781,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
 
   return (
     <motion.div
+      ref={panelRef}
       className={`pom-info-panel pom-panel-standalone ${heroDock ? 'pom-hero-dock' : ''} ${heroSheet && !expanded ? 'pom-hero-sheet' : ''} ${showExpandedContent ? 'pom-expanded' : ''}`}
       style={{
         position: 'fixed',
@@ -915,7 +946,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       {heroDock ? (
         <h2 className="pom-title pom-title-hero" style={{ margin: '0 0 4px', textTransform: 'uppercase', lineHeight: '1' }}>
           {heroTitle.series && <div className="pom-hero-series">{heroTitle.series}</div>}
-          <div className="pom-hero-model">{heroTitle.model}</div>
+          <div className="pom-hero-model" ref={heroModelRef}>{heroTitle.model}</div>
           {heroTitle.colour && (
             <div className="pom-hero-colour">
               {heroTitle.colour.split('/').map((c, i, arr) => (
@@ -1230,11 +1261,37 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         return (
           <div className="pom-expanded-extra">
             {descText && (
-              <div className="pom-expanded-desc">
-                {descText.split(/<br\s*\/?>/i).map((line: string) => line.replace(/^\s*-\s*/, '').trim()).filter(Boolean).map((line: string, i: number) => (
-                  <div key={i} dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(line) }} />
-                ))}
-              </div>
+              (() => {
+                // LIUS-Langtexte sind Aufzaehlungen mit <br> — als Liste lesbar,
+                // Normzeilen (EN1621-2 Level 2 …) als eigene Zeile mit Etiketten
+                // (owner 2026-09-28, media 128375).
+                const lines = descText.split(/<br\s*\/?>|\n/i)
+                  .map((line: string) => line.replace(/^\s*[-•·*]\s*/, '').trim())
+                  .filter(Boolean);
+                const isNorm = (line: string) => /^(EN|ECE|ISO|DIN|DOT|CPSC|ASTM|CE)\s?[\d./-]/i.test(line.replace(/<[^>]+>/g, ''));
+                const norms = lines.filter(isNorm);
+                const points = lines.filter((line: string) => !isNorm(line));
+                return (
+                  <div className="pom-expanded-desc">
+                    {points.length === 1 ? (
+                      <p dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(points[0]) }} />
+                    ) : points.length > 1 && (
+                      <ul className="pom-desc-list">
+                        {points.map((line: string, i: number) => (
+                          <li key={i} dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(line) }} />
+                        ))}
+                      </ul>
+                    )}
+                    {norms.length > 0 && (
+                      <div className="pom-desc-norms">
+                        {norms.map((line: string, i: number) => (
+                          <span key={i} className="pom-desc-norm" dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(line) }} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()
             )}
             {props.length > 0 && (
               <div className="pom-expanded-props">

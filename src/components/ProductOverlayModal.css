@@ -618,6 +618,12 @@
 .pom-expanded .pom-hero-model { font-size: 44px; }
 .pom-expanded-extra { margin: 6px 0 10px; }
 .pom-expanded-desc { font-size: 13.5px; line-height: 1.65; color: rgba(255, 255, 255, 0.82); }
+.pom-expanded-desc p { margin: 0; }
+.pom-desc-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+.pom-desc-list li { position: relative; padding-left: 18px; line-height: 1.5; }
+.pom-desc-list li::before { content: ''; position: absolute; left: 2px; top: 0.6em; width: 6px; height: 6px; border-radius: 50%; background: #ff5a1f; }
+.pom-desc-norms { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.pom-desc-norm { font-size: 11.5px; font-weight: 600; letter-spacing: 0.02em; padding: 4px 9px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.06); color: rgba(255, 255, 255, 0.9) !important; white-space: nowrap; }
 .pom-expanded-desc a { color: #ff5a1f; }
 .pom-expanded-props {
   display: grid;
