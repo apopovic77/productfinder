@@ -214,6 +214,13 @@ export interface TaxonomyNode {
 
   /** Child nodes (next level when user clicks this node) */
   children?: TaxonomyNode[];
+
+  /**
+   * Vorgeschriebene Gruppierung unterhalb dieses Knotens (Blatt → GPANE),
+   * gilt auch fuer Nachfahren ohne eigene Angabe. Ohne sie waehlt das
+   * Scoring — unter "Helme" war das "Preis" statt der Serie.
+   */
+  grouping?: string[];
 }
 
 export interface HierarchyDefinition {

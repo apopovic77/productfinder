@@ -673,6 +673,7 @@ function mapProduct(p: ApiProduct): Product | null {
     name: p.name ?? '',
     brand: p.brand,
     category: categories,
+    erpCategory: ((p as any).category as string | undefined) ?? undefined,
     season: p.season,
     price: (() => {
       // Handle v2 API format (price_from/price_to numbers)

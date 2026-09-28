@@ -954,6 +954,9 @@ export class CanvasRenderer<T> {
    * Show the part that distinguishes: "STREAM".
    */
   private headerDisplayLabel(label: string): string {
+    // "N/A" ist Technik-Sprache; fuer Haendler ist das der Rest (owner
+    // 2026-09-28, media 128367). Nur Anzeige — Drill-Werte bleiben "N/A".
+    if (label === 'N/A') return 'Weitere';
     let t = label;
     const parent = this.headerParentLabel;
     if (parent && t.toLowerCase().startsWith(parent.toLowerCase() + ' ')) t = t.slice(parent.length).trim();

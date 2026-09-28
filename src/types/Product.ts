@@ -123,6 +123,8 @@ export type ProductData = {
   name: string;
   brand?: string;
   category?: string[];
+  /** Roh-Kategorie aus dem ERP inkl. Z-Kategorien (Ersatzteile, Merchandise). */
+  erpCategory?: string;
   season?: number;
   price?: Price;
   media?: MediaItem[];
@@ -155,6 +157,7 @@ export class Product {
   public readonly name: string;
   public readonly brand?: string;
   public readonly category: string[];
+  public readonly erpCategory?: string;
   public readonly season?: number;
   public readonly price?: Price;
   public readonly media?: MediaItem[];
@@ -182,6 +185,7 @@ export class Product {
     this.name = data.name;
     this.brand = data.brand;
     this.category = data.category ?? [];
+    this.erpCategory = data.erpCategory;
     this.season = data.season;
     this.price = data.price;
     this.media = data.media;

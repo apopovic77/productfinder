@@ -74,7 +74,22 @@ export class GPANEEngine {
   }
 
   private _effectiveGroupingPath(): string[] {
-    return this._groupingResolver?.(this._focusStack) ?? this._groupingPath;
+    return this._groupingResolver?.(this._focusStack) ?? this._taxonomyGroupingPath() ?? this._groupingPath;
+  }
+
+  /**
+   * Gruppierung aus dem Taxonomie-Baum (Voll-Modus hat keine Katalog-
+   * Kategorie, die sie vorgibt). Die Taxonomie-Ebenen belegen die ersten
+   * Tiefen des Fokus-Stacks, die Vorgabe beginnt dahinter.
+   */
+  private _taxonomyGroupingPath(): string[] | null {
+    for (let i = this._taxonomyPath.length - 1; i >= 0; i--) {
+      const grouping = this._taxonomyPath[i].grouping;
+      if (grouping?.length) {
+        return [...Array(this._taxonomyPath.length).fill('__taxonomy__'), ...grouping];
+      }
+    }
+    return null;
   }
 
   setGroupingPath(keys: string[]): void {

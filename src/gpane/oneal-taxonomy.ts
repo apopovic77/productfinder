@@ -10,6 +10,9 @@ import type { Product } from '../types/Product';
 import type { TaxonomyNode } from './types';
 import { getProductValue } from './types';
 
+/** Wie im gefuehrten Einstieg (CatalogEntryConfig): Serie > Design > Farbe. */
+const SERIES_FIRST = ['product_line', 'design_group', 'color_base', 'color_name'];
+
 // ============================================================================
 // Helpers
 // ============================================================================
@@ -26,6 +29,16 @@ function hasType(product: Product, type: string): boolean {
 
 function hasBodyPart(product: Product, part: string): boolean {
   return getProductValue(product, 'body_part') === part;
+}
+
+/**
+ * ERP-Kategorie inklusive Z-Kategorien. Das Attribut category_primary laesst
+ * Z-Kategorien bewusst weg (keine Spalte "Z-Spare Parts" im Pivot) — die
+ * Ersatzteil- und Merchandise-Pruefungen brauchen aber genau die, sonst
+ * haengen Visiere und Shields unter "Helme" in "N/A" (owner 2026-09-28).
+ */
+function erpCategory(product: Product): string | undefined {
+  return product.erpCategory ?? (getProductValue(product, 'category_primary') as string | undefined);
 }
 
 function hasCategory(product: Product, ...cats: string[]): boolean {
@@ -49,17 +62,17 @@ function isWomen(product: Product): boolean {
 }
 
 function isNotSpare(product: Product): boolean {
-  const cat = getProductValue(product, 'category_primary') as string | undefined;
+  const cat = erpCategory(product);
   return !cat?.startsWith('Z-');
 }
 
 function isSpare(product: Product): boolean {
-  const cat = getProductValue(product, 'category_primary') as string | undefined;
+  const cat = erpCategory(product);
   return !!cat?.startsWith('Z-Spare');
 }
 
 function isMerchandise(product: Product): boolean {
-  const cat = getProductValue(product, 'category_primary') as string | undefined;
+  const cat = erpCategory(product);
   return cat === 'Z-Merchandise' || cat === 'Merchandise-Displays';
 }
 
@@ -81,35 +94,41 @@ function isMotorrad(product: Product): boolean {
 // Protektor-Subkategorien (shared across sports)
 // ============================================================================
 
+type ProtectorZone = 'Oberkörper' | 'Beine' | 'Arme' | 'Kopf';
+
+/**
+ * Koerperzone eines Protektors. body_part fehlt bei den meisten Protektoren
+ * (2028: 30 von 50), deshalb ergaenzt der Name — sonst standen 21 von 33
+ * MX-Protektoren unter "Weitere" und Protektor-Jacken (Typ "Jacke") in
+ * keiner Spalte (owner 2026-09-28).
+ */
+function protectorZone(product: Product): ProtectorZone | null {
+  const part = getProductValue(product, 'body_part');
+  if (part === 'Oberkörper' || part === 'Beine' || part === 'Arme' || part === 'Kopf') return part;
+  const name = product.name?.toLowerCase() || '';
+  if (/neck/.test(name)) return 'Kopf';
+  if (/elbow/.test(name)) return 'Arme';
+  if (/knee|crash pant|crash short|\bshort\b/.test(name)) return 'Beine';
+  if (/chest|back|kidney|jacket|shirt|sleeve|airbag|vest/.test(name)) return 'Oberkörper';
+  return null;
+}
+
+function isProtector(product: Product): boolean {
+  return hasType(product, 'Protektor') || hasCategory(product, 'Protection');
+}
+
 function protektorChildren(sportFilter: (p: Product) => boolean): TaxonomyNode[] {
+  const zone = (z: ProtectorZone | null) => (p: Product) =>
+    sportFilter(p) && isNotSpare(p) && isProtector(p) && protectorZone(p) === z;
+  // Protektoren haben in LIUS weder Serie noch (bei 14 von 36) ein Design —
+  // Serie/Design ergaebe Einzelspalten plus "N/A". Die Marke ist immer da.
+  const grouping = ['brand', 'design_group', 'color_base', 'color_name'];
   return [
-    {
-      label: 'Oberkörper',
-      slug: 'oberkoerper',
-      match: p => sportFilter(p) && hasType(p, 'Protektor') && hasBodyPart(p, 'Oberkörper'),
-    },
-    {
-      label: 'Knie',
-      slug: 'knie',
-      match: p => sportFilter(p) && hasType(p, 'Protektor') && hasBodyPart(p, 'Beine'),
-    },
-    {
-      label: 'Ellenbogen',
-      slug: 'ellenbogen',
-      match: p => sportFilter(p) && hasType(p, 'Protektor') && hasBodyPart(p, 'Arme'),
-    },
-    {
-      label: 'Nackenschutz',
-      slug: 'nacken',
-      match: p => sportFilter(p) && hasType(p, 'Protektor') && hasBodyPart(p, 'Kopf'),
-    },
-    {
-      label: 'Weitere',
-      slug: 'weitere',
-      match: p => sportFilter(p) && hasType(p, 'Protektor')
-        && !hasBodyPart(p, 'Oberkörper') && !hasBodyPart(p, 'Beine')
-        && !hasBodyPart(p, 'Arme') && !hasBodyPart(p, 'Kopf'),
-    },
+    { label: 'Oberkörper', slug: 'oberkoerper', grouping, match: zone('Oberkörper') },
+    { label: 'Knie & Beine', slug: 'knie', grouping, match: zone('Beine') },
+    { label: 'Ellenbogen', slug: 'ellenbogen', grouping, match: zone('Arme') },
+    { label: 'Nackenschutz', slug: 'nacken', grouping, match: zone('Kopf') },
+    { label: 'Weitere', slug: 'weitere', grouping, match: zone(null) },
   ];
 }
 
@@ -126,6 +145,7 @@ export const ONEAL_TAXONOMY: TaxonomyNode[] = [
     children: [
       {
         label: 'Helme',
+        grouping: SERIES_FIRST,
         slug: 'helme',
         // Ein Teil der Artikel hat in LIUS keinen Produkttyp, andere keine
         // Kategorie — deshalb zaehlt jeweils EINES von beiden, sonst fehlen
@@ -147,6 +167,7 @@ export const ONEAL_TAXONOMY: TaxonomyNode[] = [
       },
       {
         label: 'Brillen',
+        grouping: SERIES_FIRST,
         slug: 'brillen',
         match: p => hasSport(p, 'MTB') && isAdult(p) && isNotSpare(p) && hasType(p, 'Brille'),
       },
@@ -177,6 +198,7 @@ export const ONEAL_TAXONOMY: TaxonomyNode[] = [
       },
       {
         label: 'Schuhe',
+        grouping: SERIES_FIRST,
         slug: 'schuhe',
         match: p => hasSport(p, 'MTB') && isAdult(p) && isNotSpare(p) && hasType(p, 'Schuh'),
       },
@@ -193,19 +215,21 @@ export const ONEAL_TAXONOMY: TaxonomyNode[] = [
   {
     label: 'MX',
     slug: 'mx',
-    match: p => hasSport(p, 'MX') && isAdult(p) && isNotSpare(p) && !isLeisure(p) && !isMotorrad(p),
+    // Ohne isNotSpare: sonst waere "Ersatzteile" unten nie erreichbar.
+    match: p => hasSport(p, 'MX') && isAdult(p) && !isLeisure(p) && !isMotorrad(p),
     children: [
       {
         label: 'Helme',
+        grouping: SERIES_FIRST,
         slug: 'helme',
         match: p => hasSport(p, 'MX') && isAdult(p) && isNotSpare(p) && !isMotorrad(p)
           && (hasCategory(p, 'Helmets MX') || hasType(p, 'Helm')),
-        children: [
-          { label: 'Sport', slug: 'sport', match: p => hasSport(p, 'MX') && isAdult(p) && hasType(p, 'Helm') && hasCategory(p, 'Helmets MX') },
-        ],
+        // Kein Unterknoten: ein einzelnes "Sport" war eine Leerstufe (owner
+        // 2026-09-28). Blatt → Serien-Gruppierung wie im gefuehrten Einstieg.
       },
       {
         label: 'Brillen',
+        grouping: SERIES_FIRST,
         slug: 'brillen',
         match: p => hasSport(p, 'MX') && isAdult(p) && isNotSpare(p) && hasType(p, 'Brille'),
       },
@@ -234,6 +258,7 @@ export const ONEAL_TAXONOMY: TaxonomyNode[] = [
       },
       {
         label: 'Stiefel',
+        grouping: SERIES_FIRST,
         slug: 'stiefel',
         match: p => hasSport(p, 'MX') && isAdult(p) && isNotSpare(p) && hasType(p, 'Stiefel') && !isMotorrad(p),
       },
@@ -259,6 +284,7 @@ export const ONEAL_TAXONOMY: TaxonomyNode[] = [
     children: [
       {
         label: 'Helme',
+        grouping: SERIES_FIRST,
         slug: 'helme',
         match: p => isMotorrad(p) && isNotSpare(p)
           && (hasType(p, 'Helm') || hasCategory(p, 'Helmets Street', 'Helmets Adventure')),
@@ -275,6 +301,7 @@ export const ONEAL_TAXONOMY: TaxonomyNode[] = [
       },
       {
         label: 'Stiefel',
+        grouping: SERIES_FIRST,
         slug: 'stiefel',
         match: p => isMotorrad(p) && isNotSpare(p) && hasType(p, 'Stiefel'),
       },

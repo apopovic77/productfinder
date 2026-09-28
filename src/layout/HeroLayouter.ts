@@ -250,11 +250,13 @@ export class HeroLayouter<T> implements ILayouter<T> {
     const groups = new Map<string, LayoutNode<T>[]>();
     if (this.posterBuckets.length >= 2) {
       // Gruppen = Engine-Buckets (Bucket-Reihenfolge, Rest -> WEITERE)
-      for (const bucket of this.posterBuckets) groups.set(bucket.label, []);
+      // "N/A" (Produkte ohne Wert) ist fuer Haendler keine Gruppe — Rest.
+      const labelOf = (label: string) => (label === 'N/A' ? 'WEITERE' : label);
+      for (const bucket of this.posterBuckets) groups.set(labelOf(bucket.label), []);
       for (const node of nodes) {
         const id = String((node.data as any)?.id ?? '');
         const bucket = this.posterBuckets.find(item => item.ids.has(id));
-        const key = bucket ? bucket.label : 'WEITERE';
+        const key = bucket ? labelOf(bucket.label) : 'WEITERE';
         const list = groups.get(key);
         if (list) list.push(node); else groups.set(key, [node]);
       }
@@ -272,6 +274,13 @@ export class HeroLayouter<T> implements ILayouter<T> {
         const list = groups.get(key);
         if (list) list.push(node); else groups.set(key, [node]);
       }
+    }
+    // Die Restgruppe entstand dort, wo das erste Produkt ohne Wert lag —
+    // mitten zwischen den Modellen (owner 2026-09-28, media 128369). Ans Ende.
+    const rest = groups.get('WEITERE');
+    if (rest) {
+      groups.delete('WEITERE');
+      groups.set('WEITERE', rest);
     }
 
     // Zellgroesse iterativ verkleinern bis die Blöcke die Seite fuellen,
