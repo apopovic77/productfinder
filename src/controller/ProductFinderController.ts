@@ -211,7 +211,10 @@ export class ProductFinderController {
    */
   private onPivotChanged(): void {
     if (this.canvas) {
+      const vt = this.viewportService.getTransform();
+      const cameraBefore = vt ? { s: vt.scale, x: vt.offset.x, y: vt.offset.y } : null;
       this.handleResize();
+      if (cameraBefore) this.rebaseCameraMove(cameraBefore);
       if (this.renderer) {
         const isHero = this.layoutService.isPivotHeroMode();
         this.renderer.isHeroMode = isHero;
@@ -224,6 +227,41 @@ export class ProductFinderController {
       }
     }
     this.notifyListeners();
+  }
+
+  /**
+   * Ebenenwechsel: Kamera und Produkte liefen mit zwei Uhren — die Kamera
+   * naehert sich mit 15 % pro Frame (~1,2 s), die Produkte in 0,5 s. Die
+   * Ueberlagerung liess die Produkte am Bildschirm eine U-Kurve fahren
+   * (runter, dann ueber eine Sekunde wieder hoch; owner 2026-09-29, media
+   * 128440/128441). Deshalb springt die Kamera sofort aufs Ziel, und jedes
+   * Produkt startet an seiner bisherigen BILDSCHIRM-Position, umgerechnet
+   * ins neue Kamerabild. Danach bewegt nur noch eine Animation — gerade Linie.
+   */
+  private rebaseCameraMove(before: { s: number; x: number; y: number }): void {
+    const vt = this.viewportService.getTransform();
+    if (!vt || before.s <= 0) return;
+    vt.settleTarget();
+    const s1 = vt.getTargetScale();
+    const o1 = vt.getTargetOffset();
+    if (s1 <= 0) return;
+    const moved = Math.abs(s1 - before.s) > 1e-3 || Math.abs(o1.x - before.x) > 0.5 || Math.abs(o1.y - before.y) > 0.5;
+    if (!moved) return;
+    const rebase = (prop: { value: number | null; targetValue: number | null; setImmediate(v: number): void }, map: (v: number) => number) => {
+      const current = prop.value;
+      const target = prop.targetValue;
+      if (current === null || target === null || !Number.isFinite(current)) return;
+      prop.setImmediate(map(current));
+      prop.targetValue = target;
+    };
+    const k = before.s / s1;
+    for (const node of this.layoutService.getEngine().all()) {
+      rebase(node.posX as any, v => (v * before.s + before.x - o1.x) / s1);
+      rebase(node.posY as any, v => (v * before.s + before.y - o1.y) / s1);
+      rebase(node.width as any, v => v * k);
+      rebase(node.height as any, v => v * k);
+    }
+    vt.setImmediate(s1, o1.x, o1.y);
   }
 
   // Data Management

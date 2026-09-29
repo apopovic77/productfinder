@@ -156,6 +156,22 @@ export class ViewportTransform {
     return this.targetScale;
   }
 
+  /**
+   * Rubber-Banding sofort zu Ende rechnen: Skala hart klemmen, Offset direkt
+   * auf die Grenze statt ueber viele Frames hinzufedern. So kennt ein
+   * Ebenenwechsel das ENDGUELTIGE Kameraziel (ProductFinderController).
+   */
+  settleTarget(): void {
+    if (!this.enableRubberBanding) return;
+    const springBack = this.rubberBandSpringBack;
+    this.rubberBandSpringBack = 1;
+    try {
+      this.applyRubberBanding();
+    } finally {
+      this.rubberBandSpringBack = springBack;
+    }
+  }
+
   getTargetOffset(): { x: number; y: number } {
     return { x: this.targetOffset.x, y: this.targetOffset.y };
   }
