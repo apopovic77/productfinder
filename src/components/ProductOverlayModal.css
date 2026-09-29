@@ -724,3 +724,26 @@
 }
 .pom-info-panel.pom-expanded > * { animation: pomContentFade 0.3s ease both; }
 .pom-expanded-hero { animation: pomContentFade 0.35s ease both; }
+
+/* ---- Zoombares Produktbild im Detail-Dialog ---- */
+.pf-zoom-box { position: relative; overflow: hidden; cursor: zoom-in; touch-action: none; display: flex; align-items: center; justify-content: center; }
+.pf-zoom-box.is-zoomed { cursor: grab; }
+.pf-zoom-box.is-zoomed:active { cursor: grabbing; }
+.pf-zoom-box img { width: 100%; height: 100%; object-fit: contain; transform-origin: 50% 50%; user-select: none; will-change: transform; }
+.pom-expanded-hero-img.pf-zoom-box { padding: 18px; }
+
+/* ---- Menge je Groesse (grosser Dialog) ---- */
+.pom-size-qty { margin: 4px 0 10px; }
+.pom-size-qty-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255, 255, 255, 0.55) !important; margin-bottom: 8px; }
+.pom-size-qty-clear { background: none; border: 0; color: #ff5a1f !important; font-size: 11px; letter-spacing: 0; text-transform: none; cursor: pointer; padding: 0; }
+.pom-size-qty-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+.pom-size-qty-cell { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 8px 6px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(255, 255, 255, 0.04); }
+.pom-size-qty-cell.has-qty { border-color: #ff5a1f; background: rgba(255, 90, 31, 0.12); }
+.pom-size-qty-label { font-size: 13px; font-weight: 700; color: #fff !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.pom-size-qty-stepper { display: flex; align-items: center; gap: 4px; max-width: 100%; }
+.pom-info-panel .pom-size-qty-stepper button { box-sizing: border-box; flex: 0 0 24px; width: 24px; min-width: 0; height: 24px; padding: 0; margin: 0; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.2); background: transparent; color: #fff; font-size: 15px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.pom-size-qty-stepper button:disabled { opacity: 0.3; cursor: default; }
+.pom-info-panel .pom-size-qty-stepper input { box-sizing: border-box; padding: 0; min-width: 0; flex: 0 0 34px; width: 34px; height: 24px; text-align: center; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(0, 0, 0, 0.25); color: #fff; font-size: 13px; font-weight: 700; }
+.pom-size-qty-stock { font-size: 10px; font-weight: 600; }
+.pom-size-qty-stock.ok { color: #10b981 !important; }
+.pom-size-qty-stock.none { color: #f59e0b !important; }

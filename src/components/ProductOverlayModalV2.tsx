@@ -6,6 +6,7 @@ import { soundService } from '../services/SoundService';
 import { sanitizeInlineHtml, extractYouTubeIds } from '../utils/richText';
 import { useImageQueue } from '../hooks/useImageQueue';
 import { fetchProductById } from '../data/ProductRepository';
+import { ZoomableImage } from './ZoomableImage';
 import './ProductOverlayModal.css';
 import { STORAGE_API_BASE } from '../config/apiConfig';
 import { getVariantBaseColor, getVariantSize } from '../utils/variantImageHelpers';
@@ -599,8 +600,61 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     return media[0]?.src;
   };
 
+  // Groesser Dialog: Mengen je Groesse direkt ueber "Add to Cart" (owner
+  // 2026-09-29, media 128484). Leer = bisheriges Verhalten (gewaehlte Groesse, 1 Stk.).
+  const [sizeQty, setSizeQty] = useState<Record<string, number>>({});
+  useEffect(() => { setSizeQty({}); }, [product.id, selectedColor]);
+  const sizeQtyTotal = Object.values(sizeQty).reduce((a, b) => a + b, 0);
+  // "XS" und "XS (53/54)" sind dieselbe Groesse — Varianten tragen beide
+  // Schreibweisen; der Warenkorb rechnet ohnehin mit der Kurzform.
+  const qtySizes = useMemo(() => {
+    const seen = new Set<string>();
+    return availableSizes.filter(size => {
+      const key = size.replace(/\s*\(.*\)\s*$/, '').trim();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [availableSizes]);
+  const stockForSize = (size: string): number | null => {
+    const key = size.replace(/\s*\(.*\)\s*$/, '').trim();
+    let total: number | null = null;
+    for (const v of variants as any[]) {
+      if (getColor(v) !== selectedColor) continue;
+      if (String(getSize(v) || '').replace(/\s*\(.*\)\s*$/, '').trim() !== key) continue;
+      if (typeof v.stock_available === 'number') total = (total ?? 0) + Math.max(0, v.stock_available);
+    }
+    return total;
+  };
+  const bumpSizeQty = (size: string, delta: number) =>
+    setSizeQty(prev => {
+      const next = Math.max(0, Math.min(999, (prev[size] || 0) + delta));
+      const copy = { ...prev };
+      if (next === 0) delete copy[size]; else copy[size] = next;
+      return copy;
+    });
+
   const handleAddToCart = () => {
     soundService.tick();
+    if (onBuy && showExpandedContent && sizeQtyTotal > 0) {
+      for (const [size, quantity] of Object.entries(sizeQty)) {
+        if (quantity <= 0) continue;
+        // Eine Warenkorbzeile je Farbe: der Schluessel haengt an der Variante,
+        // die Groesse lebt in der Matrix der Zeile.
+        onBuy({
+          product,
+          variant: activeVariant,
+          priceText,
+          imageUrl: getCartImageUrl(),
+          variantLabel: variantLabel || undefined,
+          size,
+          quantity,
+          availableSizes: availableSizes.length ? availableSizes : undefined,
+        });
+      }
+      setSizeQty({});
+      return;
+    }
     if (onBuy) {
       onBuy({
         product,
@@ -895,7 +949,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                 allowFullScreen
               />
             ) : (
-              <img className="pom-expanded-hero-img" src={heroSrc} alt={product.name} />
+              <ZoomableImage className="pom-expanded-hero-img" src={heroSrc} alt={product.name} />
             )}
             <div className="pom-expanded-hero-thumbs">
               {stageVideoIds.map(id => (
@@ -1307,11 +1361,54 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         );
       })()}
 
+      {showExpandedContent && qtySizes.length > 0 && (
+        <div className="pom-size-qty" aria-label="Menge je Größe">
+          <div className="pom-size-qty-head">
+            <span>Menge je Größe</span>
+            {sizeQtyTotal > 0 && (
+              <button type="button" className="pom-size-qty-clear" onClick={() => setSizeQty({})}>zurücksetzen</button>
+            )}
+          </div>
+          <div className="pom-size-qty-grid">
+            {qtySizes.map(size => {
+              const qty = sizeQty[size] || 0;
+              const stock = stockForSize(size);
+              return (
+                <div key={size} className={`pom-size-qty-cell ${qty > 0 ? 'has-qty' : ''}`}>
+                  <span className="pom-size-qty-label" title={size}>{size.replace(/\s*\(.*\)\s*$/, '')}</span>
+                  <div className="pom-size-qty-stepper">
+                    <button type="button" onClick={() => bumpSizeQty(size, -1)} disabled={qty === 0} aria-label={`${size} weniger`}>−</button>
+                    <input
+                      inputMode="numeric"
+                      value={qty || ''}
+                      placeholder="0"
+                      aria-label={`Menge ${size}`}
+                      onChange={e => {
+                        const n = parseInt(e.target.value.replace(/\D/g, ''), 10);
+                        setSizeQty(prev => {
+                          const copy = { ...prev };
+                          if (!n) delete copy[size]; else copy[size] = Math.min(999, n);
+                          return copy;
+                        });
+                      }}
+                    />
+                    <button type="button" onClick={() => bumpSizeQty(size, 1)} aria-label={`${size} mehr`}>+</button>
+                  </div>
+                  {stock !== null && (
+                    <span className={`pom-size-qty-stock ${stock > 0 ? 'ok' : 'none'}`}>{stock > 0 ? `${stock} Lager` : 'kein Lager'}</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Buttons - hidden on mobile portrait (moved to top right) */}
       {(!isMobilePortrait || heroSheet) && (
         <div className="pom-actions" style={{ gap: '6px' }}>
           <button className="pom-button pom-button-primary" onClick={handleAddToCart} style={{ fontSize: '11px', padding: '8px 12px' }}>
-            Add to Cart
+            {showExpandedContent && sizeQtyTotal > 0 ? `Add to Cart · ${sizeQtyTotal} Stk.` : 'Add to Cart'}
           </button>
           {(onShowDetails || onCollapse) && (
             <button className="pom-button" onClick={expanded ? onCollapse : onShowDetails} style={{ fontSize: '11px', padding: '8px 12px' }}>
