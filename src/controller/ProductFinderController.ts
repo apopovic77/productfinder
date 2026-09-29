@@ -801,8 +801,12 @@ export class ProductFinderController {
 
     // Overview grid -> hero presentation: switch the layouter so all nodes
     // animate sideways into the hero row, THEN centre the clicked one.
-    if (this.layoutService.isPivotHeroMode()
-        && this.layoutService.isHeroRootOverview()) {
+    // Wie beim Ebenenwechsel: Kamera und Produkte teilen sich eine Uhr,
+    // sonst schiesst das Produkt ueber seine Endgroesse und schrumpft
+    // zurueck (owner 2026-09-29, media 128482/128483).
+    const enteringHero = this.layoutService.isPivotHeroMode() && this.layoutService.isHeroRootOverview();
+    const cameraBefore = enteringHero ? { s: viewport.scale, x: viewport.offset.x, y: viewport.offset.y } : null;
+    if (enteringHero) {
       this.layoutService.setHeroPresentation(true);
       this._heroEntryKey = null;
       this.handleResize();
@@ -904,6 +908,7 @@ export class ProductFinderController {
       const t = viewport.getTargetOffset();
       viewport.setPosition(t.x - dockShift, t.y, clampedScale);
     }
+    if (cameraBefore) this.rebaseCameraMove(cameraBefore);
   }
 
   // Hit Testing
