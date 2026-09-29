@@ -201,6 +201,14 @@ export function CartView({
           positions={items.length}
           pieces={grandTotal}
           dealerTotal={b2b.dealerTotal}
+          lines={items.map(item => ({
+            id: item.id,
+            name: item.productName,
+            color: item.color,
+            imageUrl: item.productImageUrl,
+            sizes: item.sizes,
+            unitPrice: b2b.unitPrices[item.id]?.unknown ? null : (b2b.unitPrices[item.id]?.unit ?? null),
+          }))}
           notOrderable={b2b.notOrderable ?? []}
           submitting={!!orderSubmitting}
           error={orderError ?? null}
