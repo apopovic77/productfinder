@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { fetchFacets } from '../data/ProductRepository';
-import { BRAND_BANNERS } from '../config/CatalogEntryConfig';
+import { fetchFacets, fetchProducts } from '../data/ProductRepository';
+import { BRAND_BANNERS, resolveCatalogScope } from '../config/CatalogEntryConfig';
 import { STORAGE_API_BASE } from '../config/apiConfig';
 import { buildBrandUrl, resolveBrandEntry, type BrandFacet } from '../utils/brandSelection';
 import './BrandSelectionGate.css';
@@ -117,16 +117,29 @@ export const BrandSelectionGate: React.FC<Props> = ({ children, locale = 'en', e
     setIsLoading(true);
     setError(null);
 
-    fetchFacets()
-      .then(data => {
+    // /facets zaehlt alle Produkte mit Bild ueber alle Jahrgaenge (O'Neal
+    // 3.993). Im Katalog 2028 zaehlt, was der Finder danach zeigt — sonst
+    // versprach die Kachel zehnmal mehr als drin ist (owner 2026-09-30).
+    const workbook = resolveCatalogScope() === 'workbook';
+    Promise.all([fetchFacets(), workbook ? fetchProducts({ limit: 10000 }) : Promise.resolve(null)])
+      .then(([data, catalog]) => {
         if (cancelled) return;
-        const availableBrands = Array.isArray(data?.brands)
+        let availableBrands = Array.isArray(data?.brands)
           ? data.brands.filter((brand: unknown): brand is BrandFacet => {
               const candidate = brand as Partial<BrandFacet>;
               return typeof candidate.name === 'string'
                 && typeof candidate.count_with_image === 'number';
             })
           : [];
+        if (catalog) {
+          const counts = new Map<string, number>();
+          for (const product of catalog) {
+            if (product.brand) counts.set(product.brand, (counts.get(product.brand) ?? 0) + 1);
+          }
+          availableBrands = availableBrands
+            .map(brand => ({ ...brand, count_with_image: counts.get(brand.name) ?? 0 }))
+            .filter(brand => brand.count_with_image > 0);
+        }
         setBrands(availableBrands);
         applyLocation(availableBrands);
         if (availableBrands.length === 0) setError(text.empty);
