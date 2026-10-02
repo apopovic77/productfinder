@@ -192,9 +192,10 @@ export const BRAND_BANNERS: Record<string, CatalogLandingMedia> = {
  *                 Auswahl wie Fabians Excel-Liste, jede Nacht aus LIUS
  *                 abgeglichen (`?workbook=true` der API). Produkte ohne Foto
  *                 erscheinen mit dem Tag COMING SOON.
- * Seit 2026-09-27 ist 'workbook' der Standard (Owner: "der Productfinder soll
- * mit der 2028 laufen"); der fruehere Stand bleibt ueber `?catalog=2027`
- * erreichbar. Beim Boot gelesen und in Links mitgefuehrt.
+ * Seit 2026-10-02 laeuft der Finder NUR mit dem Katalog 2028 (Owner: "die
+ * App soll nur mit Katalog 2028 laufen"). Den frueheren Schalter
+ * `?catalog=2027` gibt es nicht mehr; ein alter Link mit `catalog=...`
+ * landet ebenfalls im Katalog 2028.
  */
 /**
  * Sprachmodell zum Vergleichen (Owner 2026-09-27): `?voicemodel=2.1` startet
@@ -214,17 +215,8 @@ export function resolveVoiceModel(href?: string): 'gpt-realtime' | 'gpt-realtime
 
 export type CatalogScope = 'default' | 'workbook';
 
-let bootCatalogScope: CatalogScope | null = null;
-
-export function resolveCatalogScope(href?: string): CatalogScope {
-  if (!href && bootCatalogScope) return bootCatalogScope;
-  let scope: CatalogScope = 'workbook';
-  try {
-    const value = new URL(href ?? window.location.href).searchParams.get('catalog');
-    if (value === '2027' || value === 'default') scope = 'default';
-  } catch { /* SSR/tests ohne window */ }
-  if (!href) bootCatalogScope = scope;
-  return scope;
+export function resolveCatalogScope(_href?: string): CatalogScope {
+  return 'workbook';
 }
 
 export const CATALOG_ENTRY_CONFIG: CatalogEntryConfig = {

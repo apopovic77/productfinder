@@ -119,15 +119,15 @@ export const CatalogLanguageGate: React.FC<Props> = ({ children }) => {
       )}
       <div className="pf-catalog-landing-shade" />
       <div className="pf-catalog-landing-content">
-        {/* Offizielles Gravity-Sports-Group-Logo statt Schriftzug (Sonja Goldmann,
-            2026-09-14). Quelle: Gravity_Sports_Group_Logo_POS.ai, für den dunklen
-            Grund auf Weiß umgesetzt; Red-Bull-Farben bleiben unverändert. */}
+        {/* Gravity-Sports-Group-Logo 2026 (Sonja Goldmann, 2026-10-01). Quelle:
+            GSG-Mediaportal, „Gravity Sports Group Logo 2026 POS 2 RGB NEG.pdf“,
+            die helle Fassung für den dunklen Grund. */}
         <img
           className="pf-catalog-wordmark-logo"
-          src="/gsg-logo-white.png"
+          src="/gsg-logo-2026-white.png"
           alt="Gravity Sports Group"
-          width={4992}
-          height={1377}
+          width={5042}
+          height={1123}
         />
         <div className="pf-catalog-landing-copy">
           <h1>Catalog {CATALOG_ENTRY_CONFIG.year}</h1>
