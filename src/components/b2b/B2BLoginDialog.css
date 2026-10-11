@@ -1,6 +1,6 @@
-/* Händler-Login-Dialog — über Produkt-Sheet (10000) und Menü (10010). */
+/* Händler-Login-Dialog — über Produkt-Sheet (10000), Menü (10010) und Bestellübersicht (SlidePanel 10500, deren Auswahllisten bis 10700). */
 .pf-b2b-dialog-backdrop {
-  position: fixed; inset: 0; z-index: 10020;
+  position: fixed; inset: 0; z-index: 10800;
   display: flex; align-items: center; justify-content: center;
   padding: 16px;
   background: rgba(0, 0, 0, 0.62);
