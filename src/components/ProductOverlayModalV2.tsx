@@ -817,8 +817,35 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     return () => window.removeEventListener('resize', fit);
   });
 
+  // Die zugeklappte Karte steht auf der Mitte der Buehne, nicht am unteren
+  // Rand (owner 2026-10-13, media 130459: Helm mittig, Karte hing unten
+  // rechts). Buehne = zwischen Kopfzeile und Fensterunterkante, also wie der
+  // Hero selbst. Die Hoehe wechselt mit der Variante (mehr Groessen-Zeilen),
+  // deshalb misst ein ResizeObserver mit; 88 px bleibt die Untergrenze fuer
+  // niedrige Fenster. Der Anker bleibt unten rechts, damit das Aufklappen
+  // wie bisher aus derselben Ecke morpht.
+  const [dockBottom, setDockBottom] = useState(88);
+  useLayoutEffect(() => {
+    const panel = panelRef.current;
+    if (!panel || !heroDock || heroSheet || isMobilePortrait || expanded) return;
+    const place = () => {
+      const header = document.querySelector('.pf-header');
+      const stageTop = header ? header.getBoundingClientRect().bottom : 0;
+      const free = window.innerHeight - stageTop - panel.offsetHeight;
+      setDockBottom(Math.max(88, Math.round(free / 2)));
+    };
+    place();
+    const observer = new ResizeObserver(place);
+    observer.observe(panel);
+    window.addEventListener('resize', place);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', place);
+    };
+  }, [heroDock, heroSheet, isMobilePortrait, expanded]);
+
   const morphTarget = {
-    bottom: expanded ? 0 : (heroSheet || isMobilePortrait ? 8 : 88),
+    bottom: expanded ? 0 : (heroSheet || isMobilePortrait ? 8 : dockBottom),
     borderBottomLeftRadius: expanded ? 0 : 18,
     borderBottomRightRadius: expanded ? 0 : 18,
     borderTopLeftRadius: 18,
