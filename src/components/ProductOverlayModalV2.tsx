@@ -817,22 +817,39 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     return () => window.removeEventListener('resize', fit);
   });
 
-  // Die zugeklappte Karte steht auf der Mitte der Buehne, nicht am unteren
-  // Rand (owner 2026-10-13, media 130459: Helm mittig, Karte hing unten
-  // rechts). Buehne = zwischen Kopfzeile und Fensterunterkante, also wie der
-  // Hero selbst. Die Hoehe wechselt mit der Variante (mehr Groessen-Zeilen),
-  // deshalb misst ein ResizeObserver mit; 88 px bleibt die Untergrenze fuer
-  // niedrige Fenster. Der Anker bleibt unten rechts, damit das Aufklappen
-  // wie bisher aus derselben Ecke morpht.
-  const [dockBottom, setDockBottom] = useState(88);
+  // Lage und Groesse der zugeklappten Karte (owner 2026-10-13, media 130459):
+  // - Hoehe: optische Mitte statt geometrischer. Vom freien Raum der Buehne
+  //   (Kopfzeile bis Unterkante) liegen 40 % ueber und 60 % unter der Karte,
+  //   so steht sie auf Hoehe des Helms. Mittig wirkte sie "zu weit unten".
+  // - Groesse: auf hohen Bildschirmen waechst sie gleichmaessig mit (scale,
+  //   beide Seiten), bis sie 62 % der Buehnenhoehe einnimmt, hoechstens 1,3x.
+  //   Die Breite bleibt im Layout 340 px (heroDockShift rechnet damit); das
+  //   Wachstum nach links gleicht x aus, damit die rechte Kante stehen bleibt.
+  // 88 px Abstand nach unten bleibt die Untergrenze. Die Hoehe wechselt mit
+  // der Variante, deshalb misst ein ResizeObserver mit. Der Anker bleibt
+  // unten rechts, damit das Aufklappen aus derselben Ecke morpht.
+  const DOCK_WIDTH = 340;
+  const [dock, setDock] = useState({ bottom: 88, scale: 1 });
   useLayoutEffect(() => {
     const panel = panelRef.current;
     if (!panel || !heroDock || heroSheet || isMobilePortrait || expanded) return;
     const place = () => {
       const header = document.querySelector('.pf-header');
       const stageTop = header ? header.getBoundingClientRect().bottom : 0;
-      const free = window.innerHeight - stageTop - panel.offsetHeight;
-      setDockBottom(Math.max(88, Math.round(free / 2)));
+      const stageHeight = window.innerHeight - stageTop;
+      const height = panel.offsetHeight;
+      if (!height) return;
+      const scale = Math.min(1.3, Math.max(1, (stageHeight * 0.62) / height));
+      const visual = height * scale;
+      const top = stageTop + Math.max(0, stageHeight - visual) * 0.4;
+      const visualBottom = window.innerHeight - top - visual;
+      // scale wirkt um die Mitte der Hoehe: die sichtbare Unterkante liegt um
+      // die halbe Differenz tiefer als die des Layouts.
+      const bottom = Math.max(88, visualBottom) + (visual - height) / 2;
+      setDock(prev => {
+        const next = { bottom: Math.round(bottom), scale: Math.round(scale * 1000) / 1000 };
+        return prev.bottom === next.bottom && prev.scale === next.scale ? prev : next;
+      });
     };
     place();
     const observer = new ResizeObserver(place);
@@ -843,16 +860,19 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       window.removeEventListener('resize', place);
     };
   }, [heroDock, heroSheet, isMobilePortrait, expanded]);
+  const dockScale = heroDock && !heroSheet && !isMobilePortrait && !expanded ? dock.scale : 1;
 
   const morphTarget = {
-    bottom: expanded ? 0 : (heroSheet || isMobilePortrait ? 8 : dockBottom),
+    bottom: expanded ? 0 : (heroSheet || isMobilePortrait ? 8 : dock.bottom),
+    scale: dockScale,
+    x: -DOCK_WIDTH * (dockScale - 1),
     borderBottomLeftRadius: expanded ? 0 : 18,
     borderBottomRightRadius: expanded ? 0 : 18,
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
     width: heroSheet || isMobilePortrait
       ? undefined
-      : (expanded ? Math.min(1040, window.innerWidth - 248) : 340),
+      : (expanded ? Math.min(1040, window.innerWidth - 248) : DOCK_WIDTH),
     maxHeight: heroSheet || isMobilePortrait
       ? (expanded ? Math.round(window.innerHeight * 0.9) - 16 : Math.round(window.innerHeight * 0.5))
       : (expanded ? Math.round(window.innerHeight * 0.86) : window.innerHeight - 150),
