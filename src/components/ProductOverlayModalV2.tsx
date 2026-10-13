@@ -817,53 +817,44 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     return () => window.removeEventListener('resize', fit);
   });
 
-  // Lage und Groesse der zugeklappten Karte (owner 2026-10-13, media 130459):
-  // - Hoehe: optische Mitte statt geometrischer. Vom freien Raum der Buehne
-  //   (Kopfzeile bis Unterkante) liegen 40 % ueber und 60 % unter der Karte,
-  //   so steht sie auf Hoehe des Helms. Mittig wirkte sie "zu weit unten".
-  // - Groesse: auf hohen Bildschirmen waechst sie gleichmaessig mit (scale,
-  //   beide Seiten), bis sie 62 % der Buehnenhoehe einnimmt, hoechstens 1,3x.
-  //   Die Breite bleibt im Layout 340 px (heroDockShift rechnet damit); das
-  //   Wachstum nach links gleicht x aus, damit die rechte Kante stehen bleibt.
-  // 88 px Abstand nach unten bleibt die Untergrenze. Die Hoehe wechselt mit
-  // der Variante, deshalb misst ein ResizeObserver mit. Der Anker bleibt
-  // unten rechts, damit das Aufklappen aus derselben Ecke morpht.
+  // Lage und Groesse der zugeklappten Karte (owner 2026-10-13, media 130459).
+  // Alles folgt allein aus der Fenstergroesse und steht deshalb schon beim
+  // ersten Rendern fest: keine Messung, kein Nachkorrigieren, kein Wandern.
+  // - Feste Hoehe (640 px): Lage haengt nicht mehr vom Inhalt ab, der erst
+  //   nachlaedt. Die Knoepfe sitzen per margin-top:auto unten; reicht der
+  //   Platz nicht, verkleinert die Titel-Anpassung oben die Schrift.
+  // - Optische Mitte: vom freien Raum der Buehne (Kopfzeile bis Unterkante)
+  //   liegen 40 % ueber und 60 % unter der Karte, mindestens 88 px unten.
+  // - Hohe Bildschirme: die Karte waechst gleichmaessig (scale), bis sie 62 %
+  //   der Buehnenhoehe einnimmt, hoechstens 1,3x. Das Layout rechnet weiter
+  //   mit 340 px (heroDockShift); x gleicht das Wachstum nach links aus.
+  // Der Anker bleibt unten rechts, das Aufklappen morpht aus derselben Ecke.
   const DOCK_WIDTH = 340;
-  const [dock, setDock] = useState({ bottom: 88, scale: 1 });
-  useLayoutEffect(() => {
-    const panel = panelRef.current;
-    if (!panel || !heroDock || heroSheet || isMobilePortrait || expanded) return;
-    const place = () => {
-      const header = document.querySelector('.pf-header');
-      const stageTop = header ? header.getBoundingClientRect().bottom : 0;
-      const stageHeight = window.innerHeight - stageTop;
-      const height = panel.offsetHeight;
-      if (!height) return;
-      const scale = Math.min(1.3, Math.max(1, (stageHeight * 0.62) / height));
-      const visual = height * scale;
-      const top = stageTop + Math.max(0, stageHeight - visual) * 0.4;
-      const visualBottom = window.innerHeight - top - visual;
-      // scale wirkt um die Mitte der Hoehe: die sichtbare Unterkante liegt um
-      // die halbe Differenz tiefer als die des Layouts.
-      const bottom = Math.max(88, visualBottom) + (visual - height) / 2;
-      setDock(prev => {
-        const next = { bottom: Math.round(bottom), scale: Math.round(scale * 1000) / 1000 };
-        return prev.bottom === next.bottom && prev.scale === next.scale ? prev : next;
-      });
-    };
-    place();
-    const observer = new ResizeObserver(place);
-    observer.observe(panel);
-    window.addEventListener('resize', place);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('resize', place);
-    };
-  }, [heroDock, heroSheet, isMobilePortrait, expanded]);
-  const dockScale = heroDock && !heroSheet && !isMobilePortrait && !expanded ? dock.scale : 1;
+  const DOCK_HEIGHT = 640;
+  const [, setViewportTick] = useState(0);
+  useEffect(() => {
+    const onResize = () => setViewportTick(t => t + 1);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  const dockActive = heroDock && !heroSheet && !isMobilePortrait && !expanded;
+  const dockGeometry = (() => {
+    const header = document.querySelector('.pf-header');
+    const stageTop = header ? header.getBoundingClientRect().bottom : 49;
+    const stageHeight = window.innerHeight - stageTop;
+    const scale = Math.min(1.3, Math.max(1, (stageHeight * 0.62) / DOCK_HEIGHT));
+    const height = Math.min(DOCK_HEIGHT, (stageHeight - 88 - 24) / scale);
+    const visual = height * scale;
+    const visualBottom = Math.max(88, (stageHeight - visual) * 0.6);
+    // scale wirkt um die Mitte der Hoehe: die sichtbare Unterkante liegt um
+    // die halbe Differenz tiefer als die des Layouts.
+    const bottom = visualBottom + (visual - height) / 2;
+    return { bottom: Math.round(bottom), height: Math.round(height), scale: Math.round(scale * 1000) / 1000 };
+  })();
+  const dockScale = dockActive ? dockGeometry.scale : 1;
 
   const morphTarget = {
-    bottom: expanded ? 0 : (heroSheet || isMobilePortrait ? 8 : dock.bottom),
+    bottom: expanded ? 0 : (heroSheet || isMobilePortrait ? 8 : heroDock ? dockGeometry.bottom : 88),
     scale: dockScale,
     x: -DOCK_WIDTH * (dockScale - 1),
     borderBottomLeftRadius: expanded ? 0 : 18,
@@ -875,7 +866,10 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       : (expanded ? Math.min(1040, window.innerWidth - 248) : DOCK_WIDTH),
     maxHeight: heroSheet || isMobilePortrait
       ? (expanded ? Math.round(window.innerHeight * 0.9) - 16 : Math.round(window.innerHeight * 0.5))
-      : (expanded ? Math.round(window.innerHeight * 0.86) : window.innerHeight - 150),
+      : (expanded ? Math.round(window.innerHeight * 0.86) : heroDock ? dockGeometry.height : window.innerHeight - 150),
+    height: heroSheet || isMobilePortrait
+      ? undefined
+      : (expanded ? Math.round(window.innerHeight * 0.86) : heroDock ? dockGeometry.height : undefined),
     rotateY: !isMobilePortrait && !expanded ? -7 : 0,
     transformPerspective: 1400,
   };
