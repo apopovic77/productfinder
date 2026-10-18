@@ -31,6 +31,8 @@ type Props = {
   heroDock?: boolean;
   /** Swipe left/right ON the sheet steps to the neighbouring product. */
   onStepProduct?: (direction: -1 | 1) => void;
+  /** Position im Produktwechsel (Handy-Karte: „‹ 2 / 7 ›“ in der Kopfzeile). */
+  stepPosition?: { index: number; count: number };
   /** Colour sibling chosen in the card — App re-selects it on the canvas. */
   onSiblingSelect?: (productId: string | number) => boolean;
   /** Expanded state: the SAME card grows into the detail view (true morph). */
@@ -70,7 +72,7 @@ interface ParsedFeature {
  * Product Overlay Modal V2 - HALF WIDTH VERSION (240px)
  * Same design as V1, but with compact half-width layout
  */
-export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady, onShowDetails, expanded = false, onCollapse, locale, onSiblingSelect, onStepProduct, dealerPrices, dealerActive = false, dealerPricesPending = false }) => {
+export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady, onShowDetails, expanded = false, onCollapse, locale, onSiblingSelect, onStepProduct, stepPosition, dealerPrices, dealerActive = false, dealerPricesPending = false }) => {
   const isMobilePortrait = window.innerWidth <= 768 && window.innerHeight > window.innerWidth;
   // Phone: the dark hero card as a full-width bottom sheet (owner 2026-08-23,
   // "die Karte auch im Desktop-Style"). Same markup as the desktop dock,
@@ -337,6 +339,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   selectedImageIndexRef.current = selectedImageIndex;
   const manualHoldUntilRef = useRef(0);
   const sheetSwipeRef = useRef<{ x: number; y: number } | null>(null);
+  const photoSwipeRef = useRef<{ x: number; y: number } | null>(null);
   // The cycle keeps its own position: the variant-sync effect below may
   // snap the highlight back, and cycling from the snapped-back index would
   // pick the same image forever.
@@ -349,6 +352,9 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   }, [product.id]);
 
   useEffect(() => {
+    // Handy: kein Weiterblaettern von selbst (owner 2026-10-18, media 131110) —
+    // das wechselnde Foto wirkte wie ein anderes Hauptbild. Dort wischt man.
+    if (heroSheet && !expanded) return;
     if (!onImageSelect || !isHiResReady || allImages.length < 2) return;
     const timer = setInterval(() => {
       if (Date.now() < manualHoldUntilRef.current) return;
@@ -365,13 +371,27 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       }
     }, 4000);
     return () => clearInterval(timer);
-  }, [product.id, allImages, onImageSelect, isHiResReady]);
+  }, [product.id, allImages, onImageSelect, isHiResReady, heroSheet, expanded]);
 
   // Thumbnail URL builder — width only, NO height: with trim=true the server
   // crops to (non-square) trim bounds first; forcing width+height would
   // distort the image into a square (issue #249). Aspect fit happens in CSS.
   const buildThumbUrl = (storageId: number) =>
     `${STORAGE_API_URL}/storage/media/${storageId}?width=130&format=webp&quality=80&trim=true`;
+
+  // Ein Foto bewusst waehlen (Thumbnail, Punkt oder Wischen): Auto-Wechsel
+  // pausiert, die Buehne zeigt das gewaehlte Bild.
+  const selectImage = (idx: number) => {
+    manualHoldUntilRef.current = Date.now() + 12000;
+    cyclePosRef.current = idx;
+    autoSelectedRef.current = -1;
+    setSelectedImageIndex(idx);
+    const sid = allImages[idx]?.storageId;
+    if (onImageSelect && sid) {
+      const cachedThumb = loadedThumbnails.get(buildThumbUrl(sid));
+      onImageSelect(sid, cachedThumb || undefined);
+    }
+  };
 
   // Extract thumbnail URLs for ImageLoadQueue
   const thumbnailUrls = useMemo(() => {
@@ -392,17 +412,18 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   // Update selected image when variant changes (V1 API only — V2 variants
   // carry storage.id instead, but auto-jumping on V2 would fight the
   // canvas-synced initial index set in the thumbnail-load effect above).
+  // Nur bei einem echten Variantenwechsel springen: vorher lief der Effekt
+  // bei JEDER Bildwahl und setzte Punkt, Wischen und Thumbnail sofort auf das
+  // Variantenbild zurueck (2026-10-18).
+  const syncedVariantImageRef = useRef<number | null>(null);
   useEffect(() => {
-    if (activeVariant?.image_storage_id) {
-      // Don't fight the gallery auto-cycle: a selection it just made is
-      // intentional, not a variant change to correct.
-      if (selectedImageIndex === autoSelectedRef.current) return;
-      const imgIndex = allImages.findIndex(img => img.storageId === activeVariant.image_storage_id);
-      if (imgIndex !== -1 && imgIndex !== selectedImageIndex) {
-        setSelectedImageIndex(imgIndex);
-      }
-    }
-  }, [activeVariant?.image_storage_id, allImages, selectedImageIndex]);
+    const sid = activeVariant?.image_storage_id ?? null;
+    if (sid === syncedVariantImageRef.current) return;
+    if (sid == null || allImages.length === 0) return;
+    syncedVariantImageRef.current = sid;
+    const imgIndex = allImages.findIndex(img => img.storageId === sid);
+    if (imgIndex !== -1) setSelectedImageIndex(imgIndex);
+  }, [activeVariant?.image_storage_id, allImages]);
 
   // Notify parent when variant changes (but NOT when viewing a sibling product)
   const activeVariantId = activeVariant?.sku || activeVariant?.name || '';
@@ -1037,6 +1058,61 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         return isMobilePortrait ? stage : createPortal(stage, document.body);
       })()}
 
+      {/* Handy-Karte (owner 2026-10-18, media 131110): oben die Fotopunkte
+          direkt unter dem Bild, darunter der Produktwechsel mit Position. Die
+          Pfeile auf dem Foto lasen sich als Bild-Pfeile. */}
+      {heroSheet && !expanded && allImages.length > 1 && (
+        <div className="pom-sheet-dots" role="tablist" aria-label="Fotos">
+          {allImages.map((img, idx) => (
+            <button
+              key={img.storageId ?? idx}
+              type="button"
+              role="tab"
+              aria-selected={idx === selectedImageIndex}
+              aria-label={`Foto ${idx + 1} von ${allImages.length}`}
+              className={idx === selectedImageIndex ? 'active' : ''}
+              onClick={() => selectImage(idx)}
+            />
+          ))}
+        </div>
+      )}
+      {heroSheet && !expanded && onStepProduct && stepPosition && stepPosition.count > 1 && (
+        <div className="pom-sheet-nav">
+          <button type="button" aria-label="Vorheriges Produkt" disabled={stepPosition.index <= 0} onClick={() => onStepProduct(-1)}>‹</button>
+          <span>Produkt {stepPosition.index + 1} / {stepPosition.count}</span>
+          <button type="button" aria-label="Nächstes Produkt" disabled={stepPosition.index >= stepPosition.count - 1} onClick={() => onStepProduct(1)}>›</button>
+        </div>
+      )}
+      {/* Wischflaeche ueber dem Foto: links/rechts wechselt das Foto. Beginnt
+          an der Buehne (unter Kopfzeile und Brotkrumen), endet unter der Karte;
+          nichts wird nachgemessen. */}
+      {heroSheet && !expanded && allImages.length > 1 && createPortal(
+        <div
+          className="pom-sheet-photo-swipe"
+          style={{ top: `${document.querySelector('.pf-stage')?.getBoundingClientRect().top ?? 0}px` }}
+          // Portal-Events laufen in React zur Karte hoch; dort hiesse dieselbe
+          // Geste „naechstes Produkt“.
+          onTouchStart={(e) => {
+            e.stopPropagation();
+            if (e.touches.length !== 1) { photoSwipeRef.current = null; return; }
+            photoSwipeRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+          }}
+          onTouchEnd={(e) => {
+            e.stopPropagation();
+            const start = photoSwipeRef.current;
+            photoSwipeRef.current = null;
+            if (!start) return;
+            const t = e.changedTouches[0];
+            const dx = t.clientX - start.x;
+            const dy = t.clientY - start.y;
+            if (Math.abs(dx) < 40 || Math.abs(dy) > Math.abs(dx)) return;
+            const n = allImages.length;
+            selectImage(((selectedImageIndex + (dx < 0 ? 1 : -1)) % n + n) % n);
+          }}
+        />,
+        document.body,
+      )}
+
       {/* Title - V4 Style: First word thin, rest bold */}
       {heroDock ? (
         <h2 className="pom-title pom-title-hero" style={{ margin: '0 0 4px', textTransform: 'uppercase', lineHeight: '1' }}>
@@ -1089,16 +1165,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
             return (
               <button
                 key={idx}
-                onClick={() => {
-                  manualHoldUntilRef.current = Date.now() + 12000;
-                  cyclePosRef.current = idx;
-                  autoSelectedRef.current = -1;
-                  setSelectedImageIndex(idx);
-                  if (onImageSelect && allImages[idx]?.storageId) {
-                    const cachedThumb = loadedThumbnails.get(buildThumbUrl(allImages[idx].storageId!));
-                    onImageSelect(allImages[idx].storageId, cachedThumb || undefined);
-                  }
-                }}
+                onClick={() => selectImage(idx)}
                 style={{
                   display: 'block',
                   width: '45px',
@@ -1209,6 +1276,9 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
           options.push({ id: sib.id, color_name: sib.color_name });
         }
         if (options.length === 0) return null;
+        // Handy-Karte: eine einzige Farbe steht schon im Titel — die Zeile
+        // kostete den Platz, der „Add to Cart“ unter den Rand schob.
+        if (heroSheet && !expanded && options.length === 1) return null;
 
         return (
           <div style={{ flex: '0 1 auto', minWidth: 0 }}>

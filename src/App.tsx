@@ -380,6 +380,32 @@ export default class App extends React.Component<Props, State> {
   }
 
   /** Phone layout: the footer is a collapsed bottom bar there and stays. */
+  /** Hero-Reihe oder Geschwister-Folge — dieselbe Logik wie die Buehnen-Pfeile. */
+  private cardStepsInHero(): boolean {
+    return this.state.isPivotHeroMode && !this.controller.isHeroRootOverview();
+  }
+
+  /** Position fuer „‹ 2 / 7 ›“ in der Handy-Karte (owner 2026-10-18). */
+  private cardStepPosition(): { index: number; count: number } | undefined {
+    if (this.cardStepsInHero()) {
+      const hp = this.state.heroPosition ?? this.controller.getHeroPosition();
+      return hp ? { index: hp.index, count: hp.count } : undefined;
+    }
+    const count = this.state.modalSequence.length;
+    return count > 1 ? { index: this.state.selectedIndex, count } : undefined;
+  }
+
+  private stepCardProduct = (dir: -1 | 1) => {
+    if (this.cardStepsInHero()) {
+      this.controller.stepHeroProduct(dir);
+      this.setState({ heroPosition: this.controller.getHeroPosition() }, this.syncHeroCardToFocus);
+      return;
+    }
+    const next = this.state.selectedIndex + dir;
+    if (next < 0 || next >= this.state.modalSequence.length) return;
+    this.showRelativeProduct(dir);
+  };
+
   private isMobileLayout(): boolean {
     return typeof window !== 'undefined' && window.innerWidth < 768;
   }
@@ -3886,7 +3912,8 @@ export default class App extends React.Component<Props, State> {
                 onImageSelect={this.handleDialogImageSelect}
                 isHiResReady={this.isHiResReady}
                 onShowDetails={() => this.setState({ shouldShowV4Dialog: true })}
-                onStepProduct={(dir) => { this.controller.stepHeroProduct(dir); this.setState({ heroPosition: this.controller.getHeroPosition() }, this.syncHeroCardToFocus); }}
+                onStepProduct={this.stepCardProduct}
+                stepPosition={this.cardStepPosition()}
                 onSiblingSelect={(pid) => {
                   const target = this.controller.getDisplayOrder().find(pr => String(pr.id) === String(pid));
                   if (!target) return false;

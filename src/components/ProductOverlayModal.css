@@ -561,8 +561,10 @@
   /* Two-column grid — the sheet must never scroll (owner 2026-08-23,
      120527: the right half was empty grey while ADD TO CART sat below the
      fold). Row-wise auto flow pairs the stacked blocks side by side. */
+  /* Einspaltig (owner 2026-10-18, media 131110): zweispaltig blieb links
+     unter dem Namen eine leere Flaeche, rechts quetschten sich die Fotos. */
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 4px 14px;
   align-content: start;
   overflow: hidden;
@@ -608,8 +610,75 @@
 .pom-hero-sheet .pom-hero-badge { flex: 1 1 0; padding: 8px 6px; }
 .pom-hero-sheet .pom-button-primary { font-size: 13px; padding: 12px; }
 
-/* Sheet: keep the thumb strip clear of the floating close button. */
-.pom-hero-sheet .pom-thumb-strip { padding-right: 44px; margin-top: 0 !important; }
+/* Sheet: keine Thumbnail-Leiste — Fotos per Wischen ueber dem Bild, Punkte
+   oben in der Karte (owner 2026-10-18). */
+.pom-hero-sheet .pom-thumb-strip { display: none !important; }
+.pom-sheet-dots {
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+  margin: -6px 34px 2px;
+}
+.pom-sheet-dots button {
+  width: 22px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pom-sheet-dots button::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+.pom-sheet-dots button.active::before { background: #ff6b00; transform: scale(1.25); }
+.pom-sheet-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-right: 34px;
+  margin-bottom: 4px;
+}
+.pom-sheet-nav span {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+  font-variant-numeric: tabular-nums;
+}
+.pom-sheet-nav button {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 22px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0 3px;
+  cursor: pointer;
+}
+.pom-sheet-nav button:disabled { opacity: 0.3; cursor: default; }
+/* Unsichtbare Wischflaeche ueber dem Foto, unter der Karte (z 10000). */
+.pom-sheet-photo-swipe {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+  touch-action: pan-y;
+}
 
 /* ---- Expanded state: the same dark card, grown to detail size ---- */
 .pom-info-panel.pom-hero-dock.pom-expanded {
@@ -747,3 +816,6 @@
 .pom-size-qty-stock { font-size: 10px; font-weight: 600; }
 .pom-size-qty-stock.ok { color: #10b981 !important; }
 .pom-size-qty-stock.none { color: #f59e0b !important; }
+/* Antippen soll keinen Fokusring hinterlassen; Tastatur behaelt ihn. */
+.pom-sheet-dots button:focus:not(:focus-visible),
+.pom-sheet-nav button:focus:not(:focus-visible) { outline: none; }
