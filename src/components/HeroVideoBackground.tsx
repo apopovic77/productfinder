@@ -3,6 +3,7 @@ import './HeroVideoBackground.css';
 import { STORAGE_API_BASE } from '../config/apiConfig';
 import { searchLifestyleMedia, LIFESTYLE_MIN_SIMILARITY } from '../services/ProductMediaService';
 import { focalBackgroundPosition, type BannerFocal } from '../utils/bannerFocal';
+import { DIALOG_MORPH_EASE, DIALOG_MORPH_SECONDS, expandedDialogGeometry, usesHalfScreenDialog } from '../utils/expandedDialog';
 
 // Storage API URL from environment
 const STORAGE_API_URL = STORAGE_API_BASE;
@@ -54,7 +55,7 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
   // auf breiten Bildschirmen schneidet cover aber nur oben/unten, die
   // Verschiebung wirkte nicht, und der Fahrer sass hinter dem Dialog
   // (owner 2026-10-20, media 131623).
-  const [dialogInset, setDialogInset] = useState(0);
+  const [dialogInset, setDialogInset] = useState(() => (usesHalfScreenDialog() ? expandedDialogGeometry().width : 0));
   const [viewport, setViewport] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
   const [bgResolved, setBgResolved] = useState(!imageQuery);
 
@@ -98,23 +99,18 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
     };
   }, [imageQuery]);
 
-  // Linke Kante des aufgeklappten Dialogs messen. Er faehrt animiert ein,
-  // daher die ersten zwei Sekunden mehrfach, danach bei Groessenaenderung.
+  // Freie Flaeche links vom aufgeklappten Dialog: dieselbe Geometrie wie der
+  // Dialog selbst (utils/expandedDialog), ab dem ersten Bild an ihrem Platz.
+  // Vorher wurde die Dialogkante waehrend seiner Animation nachgemessen, das
+  // Bild sprang hinterher (owner 2026-10-20, media 131626).
   useEffect(() => {
-    const measure = () => {
+    const update = () => {
       setViewport({ w: window.innerWidth, h: window.innerHeight });
-      const panel = document.querySelector('.pom-panel-standalone.pom-expanded');
-      const left = panel ? panel.getBoundingClientRect().left : 0;
-      // Nur wenn links genug Platz bleibt; am Handy liegt der Dialog darueber.
-      setDialogInset(left > 240 ? Math.max(0, window.innerWidth - left) : 0);
+      setDialogInset(usesHalfScreenDialog() ? expandedDialogGeometry().width : 0);
     };
-    measure();
-    const timers = [150, 400, 800, 1400, 2200].map(ms => window.setTimeout(measure, ms));
-    window.addEventListener('resize', measure);
-    return () => {
-      timers.forEach(window.clearTimeout);
-      window.removeEventListener('resize', measure);
-    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
   }, []);
   const freeWidth = Math.max(1, viewport.w - dialogInset);
   const bgPosition = bgFocal
@@ -198,6 +194,8 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
             backgroundImage: `url(${bgImageUrl})`,
             backgroundPosition: bgPosition,
             right: dialogInset,
+            // Im Takt des Dialogs einblenden statt mit eigener 1-s-Blende
+            transition: `opacity ${DIALOG_MORPH_SECONDS}s cubic-bezier(${DIALOG_MORPH_EASE.join(',')})`,
             opacity: isLoaded && !isClosing ? backdropOpacity : 0,
           }}
         />

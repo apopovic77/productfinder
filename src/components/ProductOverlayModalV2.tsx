@@ -10,6 +10,7 @@ import { ZoomableImage } from './ZoomableImage';
 import './ProductOverlayModal.css';
 import { STORAGE_API_BASE } from '../config/apiConfig';
 import { getVariantBaseColor, getVariantSize } from '../utils/variantImageHelpers';
+import { DIALOG_MORPH_EASE, DIALOG_MORPH_SECONDS, expandedDialogGeometry } from '../utils/expandedDialog';
 
 // Storage API URL from environment
 const STORAGE_API_URL = STORAGE_API_BASE;
@@ -888,17 +889,12 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     return { bottom: Math.round(bottom), height: Math.round(height), scale: Math.round(scale * 1000) / 1000 };
   })();
   const dockScale = dockActive ? dockGeometry.scale : 1;
-  // Aufgeklappt (Desktop) fuellt der Dialog die rechte Bildschirmhaelfte
-  // unter der Kopfleiste. Links bleibt die Haelfte fuer das Stimmungsbild,
+  // Aufgeklappt (Desktop) fuellt der Dialog die rechte Bildschirmhaelfte in
+  // voller Hoehe, auch ueber der Kopfleiste. Links bleibt die Haelfte fuer das Stimmungsbild,
   // dessen Motiv vorher hinter dem schwebenden Dialog verschwand (owner
   // 2026-10-20, media 131623/131625). Unter 1500 px reicht die Haelfte nicht
   // fuer Bildspalte und Text, dann mindestens 760 px.
-  const expandedGeometry = (() => {
-    const header = document.querySelector('.pf-header');
-    const top = header ? Math.round(header.getBoundingClientRect().bottom) : 49;
-    const width = Math.min(window.innerWidth, Math.max(760, Math.round(window.innerWidth / 2)));
-    return { width, height: window.innerHeight - top, stageWidth: Math.min(492, Math.round(width * 0.46)) };
-  })();
+  const expandedGeometry = expandedDialogGeometry();
   const halfScreen = expanded && !(heroSheet || isMobilePortrait);
 
   const morphTarget = {
@@ -962,8 +958,8 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       initial={{ ...morphTarget, opacity: 0 }}
       exit={{ opacity: 0 }}
       transition={{
-        duration: 0.45,
-        ease: [0.4, 0, 0.2, 1],
+        duration: DIALOG_MORPH_SECONDS,
+        ease: DIALOG_MORPH_EASE,
         opacity: { duration: 0.3 },
       }}
       onClick={(e) => e.stopPropagation()}
@@ -1021,13 +1017,12 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         // Fixed to the viewport: the stage must NOT scroll with the info
         // column (owner 2026-08-24 — two separate blocks). The dialog
         // geometry is deterministic (anchored bottom-right).
-        const expW = Math.min(1040, window.innerWidth - 248);
         const stageStyle: React.CSSProperties = isMobilePortrait ? {} : {
           position: 'fixed',
-          left: `${window.innerWidth - 208 - expW + 20}px`,
-          top: 'calc(14vh + 20px)',
+          left: `${window.innerWidth - expandedGeometry.width + 20}px`,
+          top: '20px',
           bottom: '20px',
-          width: '492px',
+          width: `${expandedGeometry.stageWidth}px`,
         };
         const stage = (
           <div className="pom-expanded-hero" style={{ ...stageStyle, zIndex: 10002 }}>
