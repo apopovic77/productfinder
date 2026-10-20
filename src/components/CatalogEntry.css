@@ -214,7 +214,7 @@
   position: relative;
   width: 100%;
   min-height: 72px;
-  aspect-ratio: 15.55 / 1;
+  aspect-ratio: 7 / 1;
   padding: 0 clamp(20px, 4vw, 46px);
   border: 1px solid rgba(255, 255, 255, 0.12);
   display: flex;
