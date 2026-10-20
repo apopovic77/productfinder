@@ -48,7 +48,7 @@
   background: rgba(255, 255, 255, 0.055);
   backdrop-filter: blur(16px);
   cursor: pointer;
-  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease;
+  transition: transform 180ms ease, border-color 180ms ease, background-color 180ms ease, box-shadow 180ms ease;
 }
 .pf-brand-card.has-banner {
   background-size: cover;
@@ -73,8 +73,15 @@
 .pf-brand-card:focus-visible {
   transform: translateY(-4px);
   border-color: rgba(230, 51, 18, 0.9);
-  background: rgba(230, 51, 18, 0.12);
+  background-color: rgba(230, 51, 18, 0.12);
   outline: none;
+}
+/* Bildkacheln: kein roter Rahmen und kein Farbschleier, sondern nur Anheben
+   und Schatten (owner 2026-10-20, 131550). */
+.pf-brand-card.has-banner:hover,
+.pf-brand-card.has-banner:focus-visible {
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.55);
 }
 .pf-brand-card-name { font-size: clamp(25px, 3vw, 38px); font-weight: 900; text-transform: uppercase; }
 .pf-brand-card-count { margin-top: 8px; color: rgba(255, 255, 255, 0.55); font-size: 14px; }
