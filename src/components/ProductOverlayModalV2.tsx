@@ -647,6 +647,21 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     }
     return total;
   };
+  // Das Badge oben meint die gewaehlte Groesse. Ohne Groessenangabe las es
+  // sich wie "das Produkt ist nicht da", obwohl L/XL/2XL auf Lager waren
+  // (owner 2026-10-20, media 131620). Deshalb Groesse nennen und, wenn sie
+  // fehlt, wie viele Groessen der Farbe lieferbar sind.
+  const selectedSizeShort = String(selectedSize || '').replace(/\s*\(.*\)\s*$/, '').trim();
+  const sizesInStock = qtySizes.filter(size => (stockForSize(size) ?? 0) > 0).length;
+  const stockBadgeText = (() => {
+    if (!stockLabel) return null;
+    if (stockAvailable !== null && stockAvailable > 0) {
+      return `${selectedSizeShort ? `${selectedSizeShort}: ` : ''}Auf Lager · ${stockAvailable}`;
+    }
+    if (qtySizes.length > 1 && sizesInStock === 0) return 'Keine Größe auf Lager';
+    const hint = qtySizes.length > 1 && sizesInStock > 0 ? ` · ${sizesInStock} von ${qtySizes.length} Größen lieferbar` : '';
+    return `${selectedSizeShort ? `${selectedSizeShort}: ` : ''}Nicht auf Lager${hint}`;
+  })();
   const bumpSizeQty = (size: string, delta: number) =>
     setSizeQty(prev => {
       const next = Math.max(0, Math.min(999, (prev[size] || 0) + delta));
@@ -1241,7 +1256,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
               padding: '4px 8px', background: 'rgba(255,255,255,0.15)', borderRadius: '6px',
             }}
           >
-            {stockLabel}{stockAvailable !== null && stockAvailable > 0 ? ` · ${stockAvailable}` : ''}
+            {stockBadgeText}
           </div>
         )}
         {/* Bestellbarkeit ueber den B2B-Shop kennt nur Veloconnect — erst nach Login. */}
