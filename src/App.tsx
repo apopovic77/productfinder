@@ -2354,9 +2354,26 @@ export default class App extends React.Component<Props, State> {
       }
       this.openProductDetails(product);
     } else {
-      // Clicked on empty space - deselect product
-      this.setState({ selectedProduct: null, selectedVariant: null, shouldShowV4Dialog: false });
+      this.navigateBack();
     }
+  };
+
+  /**
+   * Zurueck, gemeinsam fuer Klick ins Leere und Backspace (owner 2026-10-20,
+   * media 131624): erst eine offene Karte schliessen, sonst eine Ebene hoch
+   * wie der Brotkrumen bzw. aus der Hero-Reihe zur Uebersicht, auf der
+   * obersten Ebene zur Kategorie-Auswahl.
+   */
+  private navigateBack = () => {
+    if (this.state.selectedProduct) {
+      this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false });
+      return;
+    }
+    if (this.controller.isHeroPresentation() || this.state.pivotBreadcrumbs.length > 1) {
+      this.heroBack();
+      return;
+    }
+    this.props.onRequestCategorySelection();
   };
 
   private handleCanvasMouseMove = (e: MouseEvent) => {
@@ -2488,6 +2505,19 @@ export default class App extends React.Component<Props, State> {
           return;
         }
       }
+    }
+    // Backspace ohne Fokus in einem Eingabefeld = zurueck, wie Klick ins Leere.
+    if (e.key === 'Backspace') {
+      const el = e.target as HTMLElement | null;
+      const typing = !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA'
+        || el.tagName === 'SELECT' || el.isContentEditable);
+      const otherOverlay = this.state.isQuickSearchOpen || this.state.cartPanelOpen
+        || this.state.b2bLoginOpen || this.state.b2bMenuOpen || this.state.mobilePivotOpen;
+      if (!typing && !otherOverlay) {
+        e.preventDefault();
+        this.navigateBack();
+      }
+      return;
     }
     // Pfeil links/rechts in der Hero-Reihe wie die Pfeil-Buttons, auch bei
     // offener Karte (owner 2026-10-20, media 131615). Vorher brach der Handler
