@@ -9,6 +9,13 @@ import {
   type CatalogLocale,
 } from '../config/CatalogEntryConfig';
 import { STORAGE_API_BASE } from '../config/apiConfig';
+import {
+  CATEGORY_BANNER_ASPECT_DESKTOP,
+  CATEGORY_BANNER_ASPECT_MOBILE,
+  fetchBannerFocals,
+  focalBackgroundPosition,
+  type BannerFocal,
+} from '../utils/bannerFocal';
 import { fetchProducts } from '../data/ProductRepository';
 import type { Product } from '../types/Product';
 import { countCatalogCategoryProducts, filterCatalogProducts, getCatalogCategory, getCatalogSport } from '../utils/catalogEntry';
@@ -105,7 +112,32 @@ export const CatalogNavigationGate: React.FC<Props> = ({
   const [hasLoadedProducts, setHasLoadedProducts] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  // Focal Points der Kategorie-Banner aus dem Storage (PUT /focal, Post 5521).
+  // Ohne Punkt gilt die Position aus CatalogEntryConfig.
+  const [bannerFocals, setBannerFocals] = useState<Map<number, BannerFocal>>(new Map());
+  const [isMobileLayout, setIsMobileLayout] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches,
+  );
   const text = messages[locale] ?? messages.en;
+
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 768px)');
+    const update = () => setIsMobileLayout(query.matches);
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const storageIds = Object.values(CATALOG_ENTRY_CONFIG.categoriesBySport)
+      .flat()
+      .map(item => getCatalogCategoryBanner(item, brand)?.storageId)
+      .filter((id): id is number => typeof id === 'number');
+    fetchBannerFocals(storageIds).then(focals => {
+      if (!cancelled) setBannerFocals(focals);
+    });
+    return () => { cancelled = true; };
+  }, [brand]);
 
   useEffect(() => {
     const onLocationChange = () => setLocationVersion(version => version + 1);
@@ -314,6 +346,10 @@ export const CatalogNavigationGate: React.FC<Props> = ({
               const bannerUrl = catBanner?.url ?? (catBanner?.storageId
                 ? `${STORAGE_API_BASE}/storage/media/${catBanner.storageId}?format=webp&width=1600`
                 : undefined);
+              const focal = catBanner?.storageId ? bannerFocals.get(catBanner.storageId) : undefined;
+              const bannerPosition = focal
+                ? focalBackgroundPosition(focal, isMobileLayout ? CATEGORY_BANNER_ASPECT_MOBILE : CATEGORY_BANNER_ASPECT_DESKTOP)
+                : catBanner?.position ?? 'center 35%';
               return (
                 <button
                   type="button"
@@ -321,7 +357,7 @@ export const CatalogNavigationGate: React.FC<Props> = ({
                   key={item.id}
                   disabled={count === 0}
                   onClick={() => writeCatalogUrl({ category: item.id })}
-                  style={bannerUrl ? { backgroundImage: `url(${bannerUrl})`, backgroundPosition: catBanner?.position ?? 'center 35%' } : undefined}
+                  style={bannerUrl ? { backgroundImage: `url(${bannerUrl})`, backgroundPosition: bannerPosition } : undefined}
                 >
                   <span className="pf-catalog-category-name">{getLocalizedLabel(item.labels, locale)}</span>
                   <span className="pf-catalog-category-count">{count > 0 ? `${count} ${text.products}` : text.unavailable}</span>
