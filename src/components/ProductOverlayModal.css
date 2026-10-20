@@ -820,3 +820,17 @@
 /* Antippen soll keinen Fokusring hinterlassen; Tastatur behaelt ihn. */
 .pom-sheet-dots button:focus:not(:focus-visible),
 .pom-sheet-nav button:focus:not(:focus-visible) { outline: none; }
+
+/* Detaildialog als Schublade (Desktop, rechte Haelfte, owner 2026-10-20,
+   Video 131627): faehrt in 0.45 s von rechts ein, im Takt des Stimmungsbilds.
+   translate statt transform, weil Framer transform inline setzt; fill
+   backwards, damit danach wieder Framers Werte gelten. */
+@keyframes pomDrawerIn {
+  from { translate: 64px 0; opacity: 0; }
+  to { translate: 0 0; opacity: 1; }
+}
+.pom-info-panel.pom-drawer { animation: pomDrawerIn 0.45s cubic-bezier(0.4, 0, 0.2, 1) backwards; }
+/* Inhalt der Schublade kommt mit ihr, nicht zeitversetzt */
+.pom-info-panel.pom-drawer.pom-expanded > * { animation: none; }
+.pom-drawer-stage { animation: pomDrawerIn 0.45s cubic-bezier(0.4, 0, 0.2, 1) backwards; }
+@keyframes pomStageOut { to { opacity: 0; } }

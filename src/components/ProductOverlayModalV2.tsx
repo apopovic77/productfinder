@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useIsPresent } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import type { Product } from '../types/Product';
 import { soundService } from '../services/SoundService';
@@ -158,12 +158,21 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   // (padding-left 536, Stage-Portal) blendet erst NACH dem Morph ein. Sonst
   // reflowt der Titel in eine Ein-Zeichen-Spalte und die Stage steht schon
   // im Viewport, waehrend die Box noch schmal ist.
+  // Desktop (rechte Haelfte): kein Wachsen, der Dialog steht sofort in
+  // seiner Endgroesse und faehrt als Schublade von rechts ein. Der Inhalt
+  // kann dann ohne Warten erscheinen, statt 470 ms eine leere Box zu zeigen
+  // (owner 2026-10-20, Video 131627).
+  const drawerExpand = expanded && !heroSheet && !isMobilePortrait;
   const [morphSettled, setMorphSettled] = useState(false);
   useEffect(() => {
     if (!expanded) { setMorphSettled(false); return; }
+    if (drawerExpand) { setMorphSettled(true); return; }
     const t = window.setTimeout(() => setMorphSettled(true), 470);
     return () => window.clearTimeout(t);
-  }, [expanded]);
+  }, [expanded, drawerExpand]);
+  // Beim Schliessen laeuft die Exit-Blende des Panels; die Bildspalte liegt
+  // als Portal ausserhalb und blendet ueber isPresent mit aus.
+  const isPresent = useIsPresent();
   const showExpandedContent = expanded && morphSettled;
 
   // Reset all state when product changes
@@ -922,7 +931,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   return (
     <motion.div
       ref={panelRef}
-      className={`pom-info-panel pom-panel-standalone ${heroDock ? 'pom-hero-dock' : ''} ${heroSheet && !expanded ? 'pom-hero-sheet' : ''} ${showExpandedContent ? 'pom-expanded' : ''}`}
+      className={`pom-info-panel pom-panel-standalone ${heroDock ? 'pom-hero-dock' : ''} ${heroSheet && !expanded ? 'pom-hero-sheet' : ''} ${showExpandedContent ? 'pom-expanded' : ''} ${drawerExpand ? 'pom-drawer' : ''}`}
       style={{
         position: 'fixed',
         // ANCHOR NEVER MOVES (fluid morph, owner 2026-08-24): the dock card
@@ -957,7 +966,12 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       // auf 340px zusammen (owner 2026-08-25, media 120605).
       initial={{ ...morphTarget, opacity: 0 }}
       exit={{ opacity: 0 }}
-      transition={{
+      transition={drawerExpand ? {
+        // Schublade: Geometrie springt, das Einfahren macht die CSS-Klasse
+        // pom-drawer (translate + opacity, im Takt des Stimmungsbilds).
+        duration: 0,
+        opacity: { duration: DIALOG_MORPH_SECONDS, ease: DIALOG_MORPH_EASE },
+      } : {
         duration: DIALOG_MORPH_SECONDS,
         ease: DIALOG_MORPH_EASE,
         opacity: { duration: 0.3 },
@@ -1025,7 +1039,14 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
           width: `${expandedGeometry.stageWidth}px`,
         };
         const stage = (
-          <div className="pom-expanded-hero" style={{ ...stageStyle, zIndex: 10002 }}>
+          <div
+            className={`pom-expanded-hero ${drawerExpand ? 'pom-drawer-stage' : ''}`}
+            style={{
+              ...stageStyle,
+              zIndex: 10002,
+              animation: isPresent ? undefined : `pomStageOut ${DIALOG_MORPH_SECONDS}s cubic-bezier(${DIALOG_MORPH_EASE.join(',')}) forwards`,
+            }}
+          >
             {stageVideoId ? (
               <iframe
                 className="pom-expanded-hero-video"

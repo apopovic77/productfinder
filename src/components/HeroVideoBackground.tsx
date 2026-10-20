@@ -16,6 +16,13 @@ interface HeroVideoBackgroundProps {
   /** Opacity of the optional lifestyle backdrop; zero keeps the product canvas visible. */
   backdropOpacity?: number;
   onClose: () => void;
+  /**
+   * Sichtbar und klickbar. Die Komponente wird schon mit der Produktkarte
+   * unsichtbar eingehaengt, damit Suche und Bild fertig geladen sind, wenn der
+   * Detaildialog aufgeht; dann blenden Bild und Dialog im selben Takt ein
+   * (owner 2026-10-20, Video 131627).
+   */
+  active?: boolean;
   children?: React.ReactNode;
 }
 
@@ -29,6 +36,7 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
   imageQuery,
   backdropOpacity = 1,
   onClose,
+  active = true,
   children
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -171,6 +179,7 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
   // ESC key to close
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (!active) return;
       if (e.key === 'Escape') {
         handleClose();
       }
@@ -178,12 +187,20 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [onClose, active]);
+
+  const fade = `opacity ${DIALOG_MORPH_SECONDS}s cubic-bezier(${DIALOG_MORPH_EASE.join(',')})`;
 
   return (
     <div
       className="hero-video-background"
-      style={{ cursor: 'pointer' }}
+      style={{
+        cursor: 'pointer',
+        opacity: active ? 1 : 0,
+        pointerEvents: active ? 'auto' : 'none',
+        transition: fade,
+      }}
+      aria-hidden={!active}
       onClick={onClose}
     >
       {/* Product-related backdrop image (Ken-Burns), sport video as fallback */}
@@ -195,11 +212,11 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
             backgroundPosition: bgPosition,
             right: dialogInset,
             // Im Takt des Dialogs einblenden statt mit eigener 1-s-Blende
-            transition: `opacity ${DIALOG_MORPH_SECONDS}s cubic-bezier(${DIALOG_MORPH_EASE.join(',')})`,
+            transition: fade,
             opacity: isLoaded && !isClosing ? backdropOpacity : 0,
           }}
         />
-      ) : bgResolved ? (
+      ) : bgResolved && active ? (
         <video
           ref={videoRef}
           className={`hero-video ${isLoaded && !isClosing ? 'loaded' : ''}`}
@@ -217,7 +234,7 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
         className="hero-video-overlay"
         style={{
           opacity: overlayOpacity * backdropOpacity,
-          transition: 'opacity 1s ease-in-out'
+          transition: fade
         }}
       />
 

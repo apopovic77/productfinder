@@ -25,7 +25,8 @@ import { ProductAnnotations } from './components/ProductAnnotations';
 import { ProductOverlayModalV2 as ProductOverlayModal } from './components/ProductOverlayModalV2';
 import { ProductOverlayModalV4 } from './components/ProductOverlayModalV4';
 import { HeroVideoBackground } from './components/HeroVideoBackground';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
+import { DIALOG_MORPH_EASE, DIALOG_MORPH_SECONDS } from './utils/expandedDialog';
 import { fetchAnnotations } from './services/StorageAnnotationService';
 import { DeveloperOverlay, type DeveloperSettings } from './components/DeveloperOverlay';
 import { CustomSelect } from './components/CustomSelect';
@@ -3941,20 +3942,33 @@ export default class App extends React.Component<Props, State> {
               .filter(Boolean)
               .join(' ');
 
-            return (
-              // V4 Dialog: shown only after tapping the already previewed product again.
-              <>
-                {this.state.shouldShowV4Dialog && (
-                  <HeroVideoBackground
-                    storageId={videoStorageId}
-                    imageQuery={heroImageQuery}
-                    backdropOpacity={1}
-                    onClose={() => this.setState({ shouldShowV4Dialog: false })}
-                  >
-                    {null}
-                  </HeroVideoBackground>
-                )}
+            // Stimmungsbild schon mit der Karte unsichtbar einhaengen: Suche und
+            // Bild sind fertig, wenn "Mehr Details" aufgeht, und beide blenden
+            // im selben Takt ein. Als eigenes, verschluesseltes Kind von
+            // AnimatePresence blendet es beim Schliessen aus statt hart zu
+            // verschwinden (owner 2026-10-20, Video 131627).
+            return [
+              <motion.div
+                key="pf-hero-bg"
+                // Eigene Ebene: beim Ausblenden (opacity < 1) entsteht ein
+                // Stapelkontext; ohne z-index fiele das Bild unter Canvas und
+                // Kopfleiste. Klicks gehen nur bei aktivem Hintergrund durch.
+                style={{ position: 'fixed', inset: 0, zIndex: 9999, pointerEvents: 'none' }}
+                initial={{ opacity: 1 }}
+                exit={{ opacity: 0, transition: { duration: DIALOG_MORPH_SECONDS, ease: DIALOG_MORPH_EASE } }}
+              >
+                <HeroVideoBackground
+                  storageId={videoStorageId}
+                  imageQuery={heroImageQuery}
+                  backdropOpacity={1}
+                  active={this.state.shouldShowV4Dialog}
+                  onClose={() => this.setState({ shouldShowV4Dialog: false })}
+                >
+                  {null}
+                </HeroVideoBackground>
+              </motion.div>,
               <ProductOverlayModal
+                key="pf-product-dialog"
                 product={selectedProduct}
                 heroDock={this.usesHeroDock() || this.isMobileLayout()}
                 expanded={this.state.shouldShowV4Dialog}
@@ -3978,9 +3992,8 @@ export default class App extends React.Component<Props, State> {
                 dealerPrices={this.state.b2bSession ? this.state.b2bPrices : undefined}
                 dealerActive={!!this.state.b2bSession}
                 dealerPricesPending={this.state.b2bPricesPending}
-              />
-            </>
-            );
+              />,
+            ];
           })()}
         </AnimatePresence>
 
