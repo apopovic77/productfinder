@@ -395,6 +395,17 @@ export default class App extends React.Component<Props, State> {
     return count > 1 ? { index: this.state.selectedIndex, count } : undefined;
   }
 
+  /** Ein Schritt in der Hero-Reihe, gemeinsam fuer Pfeil-Buttons und Tastatur.
+   *  Auf dem ersten Produkt fuehrt "zurueck" zur vorigen Uebersicht. */
+  private stepHeroRow = (dir: -1 | 1) => {
+    if (dir < 0 && (this.state.heroPosition?.index ?? this.controller.getHeroPosition()?.index ?? 0) === 0) {
+      this.heroBack();
+      return;
+    }
+    this.controller.stepHeroProduct(dir);
+    this.setState({ heroPosition: this.controller.getHeroPosition() }, this.syncHeroCardToFocus);
+  };
+
   private stepCardProduct = (dir: -1 | 1) => {
     if (this.cardStepsInHero()) {
       this.controller.stepHeroProduct(dir);
@@ -2478,6 +2489,22 @@ export default class App extends React.Component<Props, State> {
         }
       }
     }
+    // Pfeil links/rechts in der Hero-Reihe wie die Pfeil-Buttons, auch bei
+    // offener Karte (owner 2026-10-20, media 131615). Vorher brach der Handler
+    // bei offener Karte ab und bewegte sonst nur den alten Raster-Fokus.
+    if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && this.state.isPivotHeroMode
+      && !this.controller.isHeroRootOverview()) {
+      const tag = (e.target as HTMLElement)?.tagName;
+      const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+      const otherOverlay = this.state.isQuickSearchOpen || this.state.cartPanelOpen
+        || this.state.b2bLoginOpen || this.state.b2bMenuOpen || this.state.mobilePivotOpen
+        || this.state.shouldShowV4Dialog;
+      if (!typing && !otherOverlay && (this.state.heroPosition?.count ?? this.controller.getDisplayOrder().length) > 1) {
+        e.preventDefault();
+        this.stepHeroRow(e.key === 'ArrowRight' ? 1 : -1);
+        return;
+      }
+    }
     // Don't handle if modal is open or typing in input
     if (this.state.selectedProduct || (e.target as HTMLElement).tagName === 'INPUT' || (e.target as HTMLElement).tagName === 'SELECT') {
       return;
@@ -3482,12 +3509,9 @@ export default class App extends React.Component<Props, State> {
               <button type="button" className="pf-hero-arrow pf-hero-arrow-prev"
                 aria-label={(this.state.heroPosition?.index ?? 0) === 0 ? 'Zurück zur Übersicht' : 'Vorheriges Produkt'}
                 title={(this.state.heroPosition?.index ?? 0) === 0 ? 'Zurück zur Übersicht' : undefined}
-                onClick={() => {
-                  if ((this.state.heroPosition?.index ?? this.controller.getHeroPosition()?.index ?? 0) === 0) { this.heroBack(); return; }
-                  this.controller.stepHeroProduct(-1); this.setState({ heroPosition: this.controller.getHeroPosition() }, this.syncHeroCardToFocus);
-                }}>‹</button>
+                onClick={() => this.stepHeroRow(-1)}>‹</button>
               <button type="button" className="pf-hero-arrow pf-hero-arrow-next" aria-label="Nächstes Produkt"
-                onClick={() => { this.controller.stepHeroProduct(1); this.setState({ heroPosition: this.controller.getHeroPosition() }, this.syncHeroCardToFocus); }}>›</button>
+                onClick={() => this.stepHeroRow(1)}>›</button>
               {/* "01 / 04" — position within the hero row, desktop only; the
                   phone has no room below the product for it. */}
               {!this.isMobileLayout() && this.state.heroPosition && (
