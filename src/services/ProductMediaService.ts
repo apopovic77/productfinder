@@ -18,6 +18,7 @@ export interface LifestyleMediaHit {
   };
   dim?: { w: number; h: number };
   product_numbers?: string[];
+  brand?: string;
 }
 
 interface SemanticSearchResponse {

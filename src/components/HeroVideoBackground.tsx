@@ -13,6 +13,11 @@ interface HeroVideoBackgroundProps {
   storageId: number;
   /** Semantic query for a product-related backdrop (top lifestyle hit). */
   imageQuery?: string;
+  /** Marke des Produkts: Treffer dieser Marke haben Vorrang (Kini zeigt Kini). */
+  imageBrand?: string;
+  /** Streut zwischen den besten Treffern, damit nicht jedes Produkt einer
+   *  Kategorie dasselbe Bild bekommt (z. B. die Produkt-id). */
+  imageSeed?: number;
   /** Opacity of the optional lifestyle backdrop; zero keeps the product canvas visible. */
   backdropOpacity?: number;
   onClose: () => void;
@@ -34,6 +39,8 @@ interface HeroVideoBackgroundProps {
 export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
   storageId,
   imageQuery,
+  imageBrand,
+  imageSeed = 0,
   backdropOpacity = 1,
   onClose,
   active = true,
@@ -77,10 +84,18 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
       return;
     }
     setBgResolved(false);
-    searchLifestyleMedia(imageQuery, 1)
+    searchLifestyleMedia(imageQuery, 8)
       .then((hits) => {
         if (cancelled) return;
-        const hit = hits[0];
+        // Vorher immer Treffer 1 einer Anfrage ohne Marke und Produkttyp:
+        // ueberall dasselbe O'Neal-Foto, auch bei Kini (owner 2026-10-20,
+        // media 131629). Jetzt Marke zuerst, dann unter den besten drei je
+        // Produkt gestreut.
+        const good = hits.filter(h => h.similarity >= LIFESTYLE_MIN_SIMILARITY);
+        const brandKey = (imageBrand ?? '').toLowerCase();
+        const sameBrand = brandKey ? good.filter(h => (h.brand ?? '').toLowerCase() === brandKey) : [];
+        const pool = (sameBrand.length > 0 ? sameBrand : good).slice(0, 3);
+        const hit = pool.length > 0 ? pool[Math.abs(imageSeed) % pool.length] : undefined;
         if (hit && hit.similarity >= LIFESTYLE_MIN_SIMILARITY) {
           setBgImageUrl(`${STORAGE_API_URL}/storage/media/${hit.storage_id}?width=1920&format=webp&quality=82`);
           fetch(`${STORAGE_API_URL}/storage/media/${hit.storage_id}/focal`)
@@ -105,7 +120,7 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [imageQuery]);
+  }, [imageQuery, imageBrand, imageSeed]);
 
   // Freie Flaeche links vom aufgeklappten Dialog: dieselbe Geometrie wie der
   // Dialog selbst (utils/expandedDialog), ab dem ersten Bild an ihrem Platz.

@@ -27,6 +27,7 @@ import { ProductOverlayModalV4 } from './components/ProductOverlayModalV4';
 import { HeroVideoBackground } from './components/HeroVideoBackground';
 import { AnimatePresence, motion } from 'framer-motion';
 import { DIALOG_MORPH_EASE, DIALOG_MORPH_SECONDS } from './utils/expandedDialog';
+import { getProductValue } from './gpane/types';
 import { fetchAnnotations } from './services/StorageAnnotationService';
 import { DeveloperOverlay, type DeveloperSettings } from './components/DeveloperOverlay';
 import { CustomSelect } from './components/CustomSelect';
@@ -3937,8 +3938,14 @@ export default class App extends React.Component<Props, State> {
 
             // Product-related backdrop query (taxonomy terms match the German
             // AI image descriptions); the sport video stays as fallback only
+            // Marke und Produkttyp in die Suche: ohne sie lautete die Anfrage
+            // fast immer nur "MX Action Lifestyle" (derived_taxonomy ist leer)
+            // und lieferte ueberall dasselbe O'Neal-Foto (owner 2026-10-20,
+            // media 131629).
             const heroFamily = (selectedProduct as any).derived_taxonomy?.product_family;
-            const heroImageQuery = [isMotocross ? 'MX' : 'MTB', heroFamily, 'Action Lifestyle']
+            const heroBrand = selectedProduct.brand ?? String(getProductValue(selectedProduct, 'brand') ?? '');
+            const heroType = getProductValue(selectedProduct, 'product_type');
+            const heroImageQuery = [isMotocross ? 'MX' : 'MTB', heroBrand, heroType ?? heroFamily, 'Action Lifestyle']
               .filter(Boolean)
               .join(' ');
 
@@ -3960,6 +3967,8 @@ export default class App extends React.Component<Props, State> {
                 <HeroVideoBackground
                   storageId={videoStorageId}
                   imageQuery={heroImageQuery}
+                  imageBrand={heroBrand || undefined}
+                  imageSeed={Number(selectedProduct.id) || 0}
                   backdropOpacity={1}
                   active={this.state.shouldShowV4Dialog}
                   onClose={() => this.setState({ shouldShowV4Dialog: false })}
