@@ -888,24 +888,37 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     return { bottom: Math.round(bottom), height: Math.round(height), scale: Math.round(scale * 1000) / 1000 };
   })();
   const dockScale = dockActive ? dockGeometry.scale : 1;
+  // Aufgeklappt (Desktop) fuellt der Dialog die rechte Bildschirmhaelfte
+  // unter der Kopfleiste. Links bleibt die Haelfte fuer das Stimmungsbild,
+  // dessen Motiv vorher hinter dem schwebenden Dialog verschwand (owner
+  // 2026-10-20, media 131623/131625). Unter 1500 px reicht die Haelfte nicht
+  // fuer Bildspalte und Text, dann mindestens 760 px.
+  const expandedGeometry = (() => {
+    const header = document.querySelector('.pf-header');
+    const top = header ? Math.round(header.getBoundingClientRect().bottom) : 49;
+    const width = Math.min(window.innerWidth, Math.max(760, Math.round(window.innerWidth / 2)));
+    return { width, height: window.innerHeight - top, stageWidth: Math.min(492, Math.round(width * 0.46)) };
+  })();
+  const halfScreen = expanded && !(heroSheet || isMobilePortrait);
 
   const morphTarget = {
     bottom: expanded ? 0 : (heroSheet || isMobilePortrait ? 8 : heroDock ? dockGeometry.bottom : 88),
+    right: heroSheet || isMobilePortrait ? 8 : halfScreen ? 0 : 208,
     scale: dockScale,
     x: -DOCK_WIDTH * (dockScale - 1),
     borderBottomLeftRadius: expanded ? 0 : 18,
     borderBottomRightRadius: expanded ? 0 : 18,
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
+    borderTopLeftRadius: halfScreen ? 0 : 18,
+    borderTopRightRadius: halfScreen ? 0 : 18,
     width: heroSheet || isMobilePortrait
       ? undefined
-      : (expanded ? Math.min(1040, window.innerWidth - 248) : DOCK_WIDTH),
+      : (expanded ? expandedGeometry.width : DOCK_WIDTH),
     maxHeight: heroSheet || isMobilePortrait
       ? (expanded ? Math.round(window.innerHeight * 0.9) - 16 : Math.round(window.innerHeight * 0.5))
-      : (expanded ? Math.round(window.innerHeight * 0.86) : heroDock ? dockGeometry.height : window.innerHeight - 150),
+      : (expanded ? expandedGeometry.height : heroDock ? dockGeometry.height : window.innerHeight - 150),
     height: heroSheet || isMobilePortrait
       ? undefined
-      : (expanded ? Math.round(window.innerHeight * 0.86) : heroDock ? dockGeometry.height : undefined),
+      : (expanded ? expandedGeometry.height : heroDock ? dockGeometry.height : undefined),
     rotateY: !isMobilePortrait && !expanded ? -7 : 0,
     transformPerspective: 1400,
   };
@@ -921,7 +934,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         // that same corner — up and to the left. The sheet keeps its
         // bottom strip anchors and grows upward.
         left: heroSheet || isMobilePortrait ? '8px' : 'auto',
-        right: heroSheet || isMobilePortrait ? '8px' : '208px',
+        // right wird animiert (morphTarget): aufgeklappt buendig am Rand.
         top: 'auto',
         transform: undefined,
         boxSizing: 'border-box',
@@ -936,7 +949,8 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         // bei wenig Text niedrig, und das Bildfeld ragte oben heraus (owner
         // 2026-09-22, media 125880/125881). Bewusst im festen Stil, nicht im
         // animierten morphTarget: dort kam minHeight beim Aufklappen als 0 an.
-        minHeight: !(heroSheet || isMobilePortrait) && expanded ? Math.round(window.innerHeight * 0.86) : undefined,
+        minHeight: halfScreen ? expandedGeometry.height : undefined,
+        ...(halfScreen ? { ['--pom-stage-w' as string]: `${expandedGeometry.stageWidth}px` } : {}),
       }}
       animate={{
         opacity: 1,

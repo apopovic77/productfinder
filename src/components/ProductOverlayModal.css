@@ -715,13 +715,14 @@
 .pom-expanded .pom-hero-badges { display: none; }
 
 /* ---- Expanded hero stage: left presentation column ---- */
-.pom-info-panel.pom-expanded { padding-left: 536px; position: relative; min-height: 460px; }
+/* --pom-stage-w setzt der Dialog je nach Breite (rechte Bildschirmhaelfte). */
+.pom-info-panel.pom-expanded { padding-left: calc(var(--pom-stage-w, 492px) + 44px); position: relative; min-height: 460px; }
 .pom-expanded-hero {
   position: absolute;
   left: 20px;
   top: 20px;
   bottom: 20px;
-  width: 492px;
+  width: var(--pom-stage-w, 492px);
   background: linear-gradient(160deg, #ffffff, #eef1f4);
   border-radius: 16px;
   display: flex;
