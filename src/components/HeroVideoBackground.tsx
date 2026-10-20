@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import './HeroVideoBackground.css';
 import { STORAGE_API_BASE } from '../config/apiConfig';
 import { searchLifestyleMedia, LIFESTYLE_MIN_SIMILARITY } from '../services/ProductMediaService';
+import { focalBackgroundPosition, type BannerFocal } from '../utils/bannerFocal';
 
 // Storage API URL from environment
 const STORAGE_API_URL = STORAGE_API_BASE;
@@ -47,13 +48,21 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
   // AI-cost-free, cached server-side). Helmeted riders usually yield no
   // face -> keep the 78% heuristic; a real focal steers the crop so the
   // subject stays visible in the strip left of the detail dialog.
-  const [bgPosition, setBgPosition] = useState<string | null>(null);
+  const [bgFocal, setBgFocal] = useState<BannerFocal | null>(null);
+  // Das Hintergrundbild fuellt nur die Flaeche links vom Detaildialog. Vorher
+  // lag es unter dem ganzen Bildschirm und wurde per "78% center" verschoben;
+  // auf breiten Bildschirmen schneidet cover aber nur oben/unten, die
+  // Verschiebung wirkte nicht, und der Fahrer sass hinter dem Dialog
+  // (owner 2026-10-20, media 131623).
+  const [dialogInset, setDialogInset] = useState(0);
+  const [viewport, setViewport] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
   const [bgResolved, setBgResolved] = useState(!imageQuery);
 
   useEffect(() => {
     let cancelled = false;
     setIsLoaded(false);
     setBgImageUrl(null);
+    setBgFocal(null);
     if (!imageQuery) {
       setBgResolved(true);
       return;
@@ -69,14 +78,13 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
             .then(r => (r.ok ? r.json() : null))
             .then(focal => {
               if (cancelled || !focal?.focal_point) return;
-              const fx = focal.focal_point.x_pct;
-              const fy = focal.focal_point.y_pct;
-              // Shift the crop so the subject lands in the left strip:
-              // position p aligns image-p% with container-p%; +28 pushes
-              // the focal left of centre (50 -> 78 = the old heuristic).
-              const px = Math.max(0, Math.min(100, fx + 28));
-              const py = Math.max(0, Math.min(100, fy));
-              setBgPosition(`${px.toFixed(0)}% ${py.toFixed(0)}%`);
+              const width = focal.image_width;
+              const height = focal.image_height;
+              setBgFocal({
+                xPct: focal.focal_point.x_pct,
+                yPct: focal.focal_point.y_pct,
+                imageAspect: width && height ? width / height : 1.5,
+              });
             })
             .catch(() => {});
         }
@@ -89,6 +97,29 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
       cancelled = true;
     };
   }, [imageQuery]);
+
+  // Linke Kante des aufgeklappten Dialogs messen. Er faehrt animiert ein,
+  // daher die ersten zwei Sekunden mehrfach, danach bei Groessenaenderung.
+  useEffect(() => {
+    const measure = () => {
+      setViewport({ w: window.innerWidth, h: window.innerHeight });
+      const panel = document.querySelector('.pom-panel-standalone.pom-expanded');
+      const left = panel ? panel.getBoundingClientRect().left : 0;
+      // Nur wenn links genug Platz bleibt; am Handy liegt der Dialog darueber.
+      setDialogInset(left > 240 ? Math.max(0, window.innerWidth - left) : 0);
+    };
+    measure();
+    const timers = [150, 400, 800, 1400, 2200].map(ms => window.setTimeout(measure, ms));
+    window.addEventListener('resize', measure);
+    return () => {
+      timers.forEach(window.clearTimeout);
+      window.removeEventListener('resize', measure);
+    };
+  }, []);
+  const freeWidth = Math.max(1, viewport.w - dialogInset);
+  const bgPosition = bgFocal
+    ? focalBackgroundPosition(bgFocal, freeWidth / Math.max(1, viewport.h))
+    : 'center';
 
   // Preload the backdrop image so the 1s fade-in starts fully decoded
   useEffect(() => {
@@ -165,7 +196,8 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
           className={`hero-bg-image ${isLoaded && !isClosing ? 'loaded' : ''}`}
           style={{
             backgroundImage: `url(${bgImageUrl})`,
-            ...(bgPosition ? { backgroundPosition: bgPosition } : {}),
+            backgroundPosition: bgPosition,
+            right: dialogInset,
             opacity: isLoaded && !isClosing ? backdropOpacity : 0,
           }}
         />
