@@ -1240,6 +1240,11 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         });
         const bgStyle = bgPick && bgPick.id === String(product.id) ? bgPick.style : (ranked[0] ?? DEFAULT_STAGE_BACKGROUND);
         const stageBgUrl = stageBackground ?? stageBackgroundUrl(bgStyle, product.id, undefined, bgStyles);
+        // Am Boden stehen nur Teile, die auch real am Boden stehen (Hose,
+        // Stiefel); Jersey, Jacke, Helm, Brille schweben mittig (owner
+        // 2026-10-21, media 131889)
+        const floorSlot = outfitSlotFrom(attrVal('product_type'), attrVal('body_part'), product.name || '');
+        const standsOnFloor = floorSlot === 'pants' || floorSlot === 'boot';
         const stageThumbBg = stageBgUrl ? `url(${stageBgUrl.replace('width=1200', 'width=300')})` : '';
         const stage = (
           <div
@@ -1274,8 +1279,8 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
               />
             ) : (
               <>
-                {stageBgUrl && <span className="pom-stage-shadow" aria-hidden="true" />}
-                <ZoomableImage className={`pom-expanded-hero-img ${stageBgUrl ? 'pom-grounded' : ''}`} src={heroSrc} alt={product.name} />
+                {stageBgUrl && standsOnFloor && <span className="pom-stage-shadow" aria-hidden="true" />}
+                <ZoomableImage className={`pom-expanded-hero-img ${stageBgUrl ? (standsOnFloor ? 'pom-grounded' : 'pom-floating') : ''}`} src={heroSrc} alt={product.name} />
               </>
             )}
             {allImages.length > 1 && !stageVideoId && (

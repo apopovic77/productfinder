@@ -1129,3 +1129,11 @@
 .pom-restock.open { border-color: #3fbf6f !important; }
 .pom-restock.fulfilled { border-color: #3fbf6f !important; background: rgba(63, 191, 111, 0.12) !important; }
 .pom-restock:focus:not(:focus-visible) { outline: none; }
+/* Schwebend (Jersey, Jacke, Helm ...): mittig mit etwas Rand, weicher Schatten */
+@media (min-width: 769px) {
+  .pom-stage-flow .pom-stage-main .pom-floating.pf-zoom-box {
+    position: absolute; left: 10%; right: 10%; top: 12%; bottom: 14%;
+    width: auto; height: auto; padding: 0;
+  }
+  .pom-stage-flow .pom-stage-main .pom-floating img { filter: drop-shadow(0 24px 30px rgba(0, 0, 0, 0.35)); }
+}
