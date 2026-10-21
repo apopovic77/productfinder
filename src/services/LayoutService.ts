@@ -1,5 +1,6 @@
 import type { Product } from '../types/Product';
-import { resolveCategoryPresentation } from '../config/CatalogEntryConfig';
+import { BRAND_BANNERS, CATALOG_ENTRY_CONFIG, resolveCatalogFlow, resolveCategoryPresentation } from '../config/CatalogEntryConfig';
+import type { TaxonomyNode } from '../gpane/types';
 import { ProductLayoutAccessors } from '../layout/Accessors';
 import { WeightScalePolicy } from '../layout/ScalePolicy';
 import { SimpleLayouter, type SimpleLayoutConfig } from '../layout/SimpleLayouter';
@@ -11,6 +12,26 @@ import { LayoutEngine } from '../layout/LayoutEngine';
 import { Vector2 } from 'arkturian-typescript-utils/dist/types/Vector2';
 import { GpanePivotService, type GroupDimension, type PriceBucketConfig } from '../gpane/GpanePivotService';
 import { ONEAL_TAXONOMY } from '../gpane';
+
+/**
+ * Einstiegsbaum des Finders (owner 2026-10-21, media 131712):
+ *  - Gesperrte Sportarten (MTB "Coming Soon") fehlen. Die Kollektion 2028
+ *    hat kein eigenes MTB-Sortiment; was dort erschien, waren Moto-Artikel,
+ *    die in LIUS auch fuer Fahrrad gelten (Sport MX+MTB).
+ *  - Im Vollmodus ("Alle Produkte", alle Marken) kommen zuerst die Marken,
+ *    darunter der Sport-Baum. Leere Knoten blendet die Engine aus.
+ */
+function catalogTaxonomy(): TaxonomyNode[] {
+  const locked = new Set(CATALOG_ENTRY_CONFIG.sports.filter(s => !s.enabled).map(s => s.id));
+  const sports = ONEAL_TAXONOMY.filter(node => !locked.has(node.slug));
+  if (resolveCatalogFlow().gates.length > 0) return sports;
+  return Object.keys(BRAND_BANNERS).map(brand => ({
+    label: brand,
+    slug: brand.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+    match: (p: Product) => p.brand === brand,
+    children: sports,
+  }));
+}
 // Legacy import kept for type compatibility
 import type { PriceBucketMode } from '../types/pivot';
 import { HeroLayouter } from '../layout/HeroLayouter';
@@ -123,7 +144,7 @@ export class LayoutService {
         strictOrder: false,
       }],
       domain: 'oneal',
-      taxonomy: ONEAL_TAXONOMY,
+      taxonomy: catalogTaxonomy(),
       heroThreshold: 15,
     });
 
