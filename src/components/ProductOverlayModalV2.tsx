@@ -1131,11 +1131,31 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         // Bildspalte im Dialog, scrollt mit ihm: Hauptbild oben, die weiteren
         // Bilder darunter zwei pro Zeile nach unten (owner 2026-10-21, media
         // 131812). Vorher fest am Bildschirm mit seitlich scrollender Leiste.
+        // Links und rechts scrollen getrennt (owner 2026-10-21): die Bildspalte
+        // klebt oben im Dialog (sticky) und scrollt in sich; rechts scrollt der
+        // Dialog. Negative Raender nehmen ihr den Platz im Spaltenfluss, sodass
+        // rechts der Inhalt wie bisher oben beginnt.
+        const stageHeight = expandedGeometry.height - 20;
         const stageStyle: React.CSSProperties = isMobilePortrait ? {} : {
-          position: 'absolute',
-          left: '20px',
+          position: 'sticky',
           top: '20px',
+          // Nur senkrecht kleben: mit left aus der CSS haelt sticky die Spalte
+          // im Inhaltsbereich rechts fest
+          left: 'auto',
+          bottom: 'auto',
+          order: -2,
+          flex: '0 0 auto',
+          alignSelf: 'flex-start',
           width: `${expandedGeometry.stageWidth}px`,
+          height: `${stageHeight}px`,
+          marginLeft: `-${expandedGeometry.stageWidth + 24}px`,
+          // Der Dialog hat aufgeklappt oben keinen Innenrand (sticky bleibt im
+          // Inhaltsbereich): die Spalte steht 20 px unter der Kante, rechts
+          // beginnt der Text nach ihren 34 px Restplatz plus Spaltenabstand.
+          marginTop: '20px',
+          marginBottom: `-${stageHeight + 4}px`,
+          overflowY: 'auto',
+          overscrollBehavior: 'contain',
         };
         const stage = (
           <div

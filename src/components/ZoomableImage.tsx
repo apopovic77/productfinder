@@ -14,6 +14,8 @@ const RESET: View = { scale: 1, x: 0, y: 0 };
 export function ZoomableImage({ src, alt, className }: { src: string; alt: string; className?: string }) {
   const boxRef = useRef<HTMLDivElement | null>(null);
   const [view, setView] = useState<View>(RESET);
+  const viewRef = useRef(view);
+  viewRef.current = view;
   const drag = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
 
   useEffect(() => { setView(RESET); }, [src]);
@@ -33,6 +35,10 @@ export function ZoomableImage({ src, alt, className }: { src: string; alt: strin
     const box = boxRef.current;
     if (!box) return;
     const onWheel = (e: WheelEvent) => {
+      // Ungezoomt scrollt das Rad die Bildspalte; Zoom mit Strg/Pinch
+      // (Trackpad meldet Pinch als ctrlKey) oder per Doppelklick. Sonst
+      // liess sich links kaum scrollen (owner 2026-10-21).
+      if (!e.ctrlKey && viewRef.current.scale <= 1.001) return;
       e.preventDefault();
       const r = box.getBoundingClientRect();
       const cx = e.clientX - r.left - r.width / 2;

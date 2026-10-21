@@ -1017,3 +1017,10 @@
 .pom-tab-icon { display: flex; }
 .pom-tab:focus:not(:focus-visible) { outline: none; }
 .pom-tab-panel { padding-top: 18px; }
+@media (min-width: 769px) {
+  /* Bildspalte scrollt in sich (sticky), unten kein Zusatzrand mehr noetig */
+  .pom-expanded-hero.pom-stage-flow { border-bottom: 0; padding-bottom: 14px; scrollbar-width: thin; }
+}
+@media (min-width: 769px) {
+  .pom-info-panel.pom-expanded { padding-top: 0; }
+}
