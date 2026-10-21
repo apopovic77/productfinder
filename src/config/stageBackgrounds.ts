@@ -131,15 +131,20 @@ export function rankStageBackgrounds(styles: StageBackgroundStyle[], h: Backgrou
   const street = /adventure|street|sierra|touring|enduro jacket|rain|regen/.test(text);
   const mtbOnly = sport.includes('MTB') && !sport.includes('MX');
   const dirtWear = /stiefel|schuh|boot|hose|pant|jersey|handschuh|glove/.test(type);
+  // Helme: Strasse/Adventure auf Asphalt/Beton, MX in den Dreck in der Natur
+  // (owner 2026-10-21); dafuer gilt fuer Helme die Massstab-Regel nicht
+  const helmet = /helm/.test(type);
   const score = (st: StageBackgroundStyle): number => {
     const t = STYLE_TRAITS[st.id];
     if (!t || st.storageIds.length === 0) return -99;
     // Massstab: zu kleine Produkte nie in realistische Szenen
     const realistic = st.scene ? st.scene === 'realistic' : (t.env === 'offroad' || t.env === 'nature' || t.env === 'urban');
     const visible = st.visibleHeightCm ?? DEFAULT_VISIBLE_CM[t.env];
-    if (realistic && h.heightCm && visible && h.heightCm / visible < MIN_SCENE_FRACTION) return -50;
+    if (!helmet && realistic && h.heightCm && visible && h.heightCm / visible < MIN_SCENE_FRACTION) return -50;
     let s = 0;
-    if (street) s += { studio: 3, urban: 3, nature: 1, brand: 1, offroad: -3 }[t.env];
+    if (helmet && street) s += { urban: 6, studio: 3, brand: 1, nature: 0, offroad: -4 }[t.env] + (st.id === 'BG02' ? 1 : 0);
+    else if (helmet) s += { offroad: 6, nature: 2, brand: 1, studio: 0, urban: -2 }[t.env] + (st.id === 'BG04' || st.id === 'BG10' ? 1 : 0);
+    else if (street) s += { studio: 3, urban: 3, nature: 1, brand: 1, offroad: -3 }[t.env];
     else if (mtbOnly) s += { nature: 4, offroad: 1, studio: 1, urban: 0, brand: 0 }[t.env];
     else if (dirtWear) s += { offroad: 4, brand: 1, studio: 1, nature: 1, urban: 0 }[t.env];
     else s += { studio: 2, brand: 2, offroad: 2, urban: 1, nature: 0 }[t.env];
