@@ -601,7 +601,17 @@ export class LayoutService {
   /** Von aussen gesetzt, solange ein KI-Filter (Smart Search) aktiv ist. */
   private outfitEnabled = false;
   private outfitLayouter: OutfitLayouter<Product> | null = null;
-  setOutfitEnabled(on: boolean): void { this.outfitEnabled = on; }
+  setOutfitEnabled(on: boolean): void {
+    if (on !== this.outfitEnabled) this.outfitLayouter?.resetSelection();
+    this.outfitEnabled = on;
+  }
+
+  /** Klick in der Outfit-Ansicht: Alternative an die Figur nehmen. */
+  wearOutfitAlternative(nodeId: string, product: Product): boolean {
+    if (!this.outfitLayouter || this.layouter !== this.outfitLayouter) return false;
+    if (!this.outfitLayouter.isAlternative(nodeId)) return false;
+    return this.outfitLayouter.wear(product, product.id);
+  }
 
   private outfitSlot = (p: Product) => {
     const v = (k: string) => { const x = getProductValue(p, k); return Array.isArray(x) ? x.join(',') : x == null ? '' : String(x); };

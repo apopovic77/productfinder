@@ -1204,6 +1204,21 @@ export class ProductFinderController {
     }
   }
 
+  isOutfitActive(): boolean {
+    return this.layoutService.isOutfitActive();
+  }
+
+  /**
+   * Klick auf eine Alternative neben der Figur: sie wird getragen, das Outfit
+   * stellt sich um. true, wenn der Klick damit erledigt ist.
+   */
+  wearOutfitAlternative(product: Product): boolean {
+    const nodeId = this._lastHitNodeId;
+    if (!nodeId || !this.layoutService.wearOutfitAlternative(nodeId, product)) return false;
+    this.handleResize();
+    return true;
+  }
+
   isGlobalSearchActive(): boolean {
     return this.globalSearchActive;
   }
@@ -1217,6 +1232,9 @@ export class ProductFinderController {
     const entryCategory = this.preConfig.entrySelection?.categoryId
       ? getCatalogCategory(this.preConfig.entrySelection.sportId, this.preConfig.entrySelection.categoryId)
       : undefined;
+    // Smart-Search-Ergebnis: Ausruestung an der Figur (Issue #2547); dieser
+    // Weg kommt aus applyAgentProducts, nicht aus setAiFilterProductIds
+    this.layoutService.setOutfitEnabled(!!(matches && matches.length));
     if (matches && matches.length) {
       this.globalSearchActive = true;
       this.products = matches;

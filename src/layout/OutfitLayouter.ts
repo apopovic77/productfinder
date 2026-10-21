@@ -66,7 +66,7 @@ export type OutfitConfig<T> = {
 
 export class OutfitLayouter<T> {
   /** Ueberschriften je Figur (Weltkoordinaten), wie die Poster-Header */
-  public figureHeaders: Array<{ x: number; y: number; text: string; raw: string; maxWidth?: number }> = [];
+  public figureHeaders: Array<{ x: number; y: number; text: string; raw: string; maxWidth?: number; static?: boolean }> = [];
 
   constructor(private config: OutfitConfig<T>) {}
 
@@ -75,87 +75,138 @@ export class OutfitLayouter<T> {
     return new Set(items.map(slotOf).filter(Boolean)).size;
   }
 
+  /**
+   * Getragene Auswahl je Slot (Produkt-id). Weitere Treffer desselben Slots
+   * stehen als Alternativen neben der Figur; ein Klick tauscht sie ein
+   * (owner 2026-10-21, media 131893: "Oberteil aendern, Outfit aendert sich").
+   */
+  private worn = new Map<OutfitSlot, string>();
+  private alternativeIds = new Set<string>();
+
+  /** Knoten ist eine Alternative neben der Figur (nicht getragen). */
+  isAlternative(nodeId: string): boolean {
+    return this.alternativeIds.has(nodeId);
+  }
+
+  /** Produkt an die Figur nehmen; gibt false zurueck, wenn es nicht passt. */
+  wear(item: T, id: string): boolean {
+    const slot = this.config.slotOf(item);
+    if (!slot) return false;
+    this.worn.set(slot, id);
+    // Jersey und Jacke teilen sich den Oberkoerper
+    if (slot === 'jersey') this.worn.delete('jacket');
+    if (slot === 'jacket') this.worn.delete('jersey');
+    return true;
+  }
+
+  resetSelection(): void {
+    this.worn.clear();
+  }
+
   compute(nodes: LayoutNode<T>[], view: { width: number; height: number }): void {
-    // Figuren: je Schluessel, darin je Slot die Produkte; mehrere Produkte im
-    // selben Slot ergeben weitere Figuren desselben Schluessels.
-    const figures: Array<{ key: string; slots: Map<OutfitSlot, LayoutNode<T>> }> = [];
+    const idOf = (n: LayoutNode<T>) => n.id.replace(/@@mirror$/, '');
+    const bySlot = new Map<OutfitSlot, LayoutNode<T>[]>();
     const loose: LayoutNode<T>[] = [];
-    // Eigene Figur je Schluessel (Marke) nur, wenn jede fuer sich eine
-    // Ausruestung ergibt (>= 3 Koerperstellen); sonst eine gemeinsame Figur
-    const slotsByKey = new Map<string, Set<OutfitSlot>>();
     for (const node of nodes) {
-      const slot = this.config.slotOf(node.data);
-      if (!slot) continue;
-      const k = this.config.figureOf(node.data);
-      if (!slotsByKey.has(k)) slotsByKey.set(k, new Set());
-      slotsByKey.get(k)!.add(slot);
-    }
-    const splitByKey = slotsByKey.size > 1 && [...slotsByKey.values()].every(s => s.size >= 3);
-    const singleKey = slotsByKey.size === 1 ? [...slotsByKey.keys()][0] : 'Ausrüstung';
-    for (const node of nodes) {
+      if (node.id.endsWith('@@mirror')) continue;
       const slot = this.config.slotOf(node.data);
       if (!slot) { loose.push(node); continue; }
-      // Spiegelkopien stehen fuer die andere Seite, nicht als eigenes Teil
-      if (node.id.endsWith('@@mirror')) continue;
-      const key = splitByKey ? this.config.figureOf(node.data) : singleKey;
-      let fig = figures.find(f => f.key === key && !f.slots.has(slot));
-      if (!fig) { fig = { key, slots: new Map() }; figures.push(fig); }
-      fig.slots.set(slot, node);
+      if (!bySlot.has(slot)) bySlot.set(slot, []);
+      bySlot.get(slot)!.push(node);
     }
+    // Getragen: gewaehltes Produkt, sonst das erste je Slot; Jersey vor Jacke
+    const wornNodes = new Map<OutfitSlot, LayoutNode<T>>();
+    for (const [slot, list] of bySlot) {
+      const pick = list.find(n => idOf(n) === this.worn.get(slot)) ?? list[0];
+      wornNodes.set(slot, pick);
+    }
+    if (wornNodes.has('jersey') && wornNodes.has('jacket')) {
+      if (this.worn.has('jacket')) wornNodes.delete('jersey'); else wornNodes.delete('jacket');
+    }
+    const wornIds = new Set([...wornNodes.values()].map(n => n.id));
+    const alternatives = [...bySlot.values()].flat().filter(n => !wornIds.has(n.id));
+    this.alternativeIds = new Set(alternatives.map(n => n.id));
 
-    const count = Math.max(1, figures.length);
     const headerH = 46;
     const pad = 40;
-    // Figurhoehe: so gross wie die Seite erlaubt, Breite einer Figur ~ 0,5 x Hoehe
+    const altCol = alternatives.length ? 0.2 : 0;
     const usableH = Math.max(200, view.height - pad * 2 - headerH);
-    const byWidth = (view.width - pad * 2) / count / 0.55;
+    const byWidth = (view.width - pad * 2) / (0.55 + altCol * 2 * 1.1);
     const figH = Math.max(220, Math.min(usableH, byWidth));
     const pxPerCm = figH / FIGURE_CM;
-    const figW = figH * 0.55;
-    const totalW = count * figW;
-    const startX = Math.max(pad, (view.width - totalW) / 2);
+    const axisX = view.width / 2;
     const top = Math.max(pad, (view.height - figH - headerH) / 2) + headerH;
     const groundY = top + figH;
 
-    this.figureHeaders = [];
-    figures.forEach((fig, i) => {
-      const axisX = startX + figW * (i + 0.5);
-      const first = fig.slots.values().next().value as LayoutNode<T> | undefined;
-      const youth = first ? this.config.isYouth(first.data) : false;
-      this.figureHeaders.push({ x: axisX - figW / 2 + 12, y: top - 14, text: fig.key.toUpperCase(), raw: fig.key, maxWidth: figW });
-      for (const [slot, node] of fig.slots) {
-        const spec = OUTFIT_SLOTS[slot];
-        const k = youth ? spec.youth : 1;
-        // reale Hoehe des Produkts; ein Bild mit Rand bekommt die Box um den
-        // Rand groesser, damit das Produkt selbst die richtige Hoehe hat
-        const pad = Math.max(1, Math.min(2, this.config.contentScaleY?.(node.data) ?? 1));
-        const h = spec.h * k * pxPerCm * pad;
-        const aspect = this.config.imageAspect?.(node.data) || 0;
-        // Einzelteil oder Paar: Stiefel/Knie von vorn als Paar breit (B/H > 0,8)
-        const single = (slot === 'glove') || ((slot === 'boot' || slot === 'knee' || slot === 'elbow') && aspect > 0 && aspect < 0.8);
-        const sideX = slot === 'glove' ? spec.x : slot === 'boot' ? 0.06 : slot === 'knee' ? 0.06 : spec.x;
-        const w = h * (single ? Math.min(spec.maxAspect, 0.9) : spec.maxAspect);
-        const cy = groundY - spec.anchorY * figH;
-        const place = (n: LayoutNode<T>, cx: number, visible: boolean) => {
-          n.posX.targetValue = cx - w / 2;
-          n.posY.targetValue = cy - h / 2;
-          n.width.targetValue = w;
-          n.height.targetValue = h;
-          n.scale.targetValue = 1;
-          n.opacity.targetValue = visible ? 1 : 0;
-        };
-        const mirror = nodes.find(m => m.id === `${node.id}@@mirror`);
-        if (single && sideX) {
-          // Original rechts (Betrachter links ist die rechte Koerperseite),
-          // gespiegelte Kopie auf der anderen Seite
-          place(node, axisX - sideX * figH, true);
-          if (mirror) place(mirror, axisX + sideX * figH, true);
-        } else {
-          place(node, axisX + (single ? spec.x : 0) * figH, true);
-          if (mirror) place(mirror, axisX, false);
-        }
+    const first = [...wornNodes.values()][0];
+    const youth = first ? this.config.isYouth(first.data) : false;
+    this.figureHeaders = [{ x: axisX - figH * 0.27, y: top - 14, text: 'AUSRÜSTUNG', raw: '', maxWidth: figH * 0.55, static: true }];
+
+    for (const [slot, node] of wornNodes) {
+      const spec = OUTFIT_SLOTS[slot];
+      const k = youth ? spec.youth : 1;
+      // reale Hoehe des Produkts; ein Bild mit Rand bekommt die Box um den
+      // Rand groesser, damit das Produkt selbst die richtige Hoehe hat
+      const padY = Math.max(1, Math.min(2, this.config.contentScaleY?.(node.data) ?? 1));
+      const h = spec.h * k * pxPerCm * padY;
+      const aspect = this.config.imageAspect?.(node.data) || 0;
+      // Einzelteil oder Paar: Stiefel/Knie von vorn als Paar breit (B/H > 0,8)
+      const single = (slot === 'glove') || ((slot === 'boot' || slot === 'knee' || slot === 'elbow') && aspect > 0 && aspect < 0.8);
+      const sideX = slot === 'glove' ? spec.x : slot === 'boot' ? 0.06 : slot === 'knee' ? 0.06 : spec.x;
+      const w = h * (single ? Math.min(spec.maxAspect, 0.9) : spec.maxAspect);
+      const cy = groundY - spec.anchorY * figH;
+      const place = (n: LayoutNode<T>, cx: number, visible: boolean) => {
+        n.posX.targetValue = cx - w / 2;
+        n.posY.targetValue = cy - h / 2;
+        n.width.targetValue = w;
+        n.height.targetValue = h;
+        n.scale.targetValue = 1;
+        n.opacity.targetValue = visible ? 1 : 0;
+      };
+      const mirror = nodes.find(m => m.id === `${node.id}@@mirror`);
+      if (single && sideX) {
+        // Original rechts (Betrachter links ist die rechte Koerperseite),
+        // gespiegelte Kopie auf der anderen Seite
+        place(node, axisX - sideX * figH, true);
+        if (mirror) place(mirror, axisX + sideX * figH, true);
+      } else {
+        place(node, axisX + (single ? spec.x : 0) * figH, true);
+        if (mirror) place(mirror, axisX, false);
       }
+    }
+
+    // Alternativen: Oberkoerper links, Beine/Fuesse/Haende rechts, auf Hoehe
+    // ihres Slots; mehrere je Seite stapeln sich nach aussen
+    const tile = figH * 0.16;
+    const upper: OutfitSlot[] = ['helmet', 'goggle', 'jersey', 'jacket', 'chest', 'back_shirt', 'neckbrace'];
+    const used = { left: [] as number[], right: [] as number[] };
+    const sorted = [...alternatives].sort((a, b) => {
+      const sa = OUTFIT_SLOTS[this.config.slotOf(a.data)!].anchorY;
+      const sb = OUTFIT_SLOTS[this.config.slotOf(b.data)!].anchorY;
+      return sb - sa;
     });
+    for (const node of sorted) {
+      const slot = this.config.slotOf(node.data)!;
+      const side = upper.includes(slot) ? 'left' : 'right';
+      const spec = OUTFIT_SLOTS[slot];
+      let cy = groundY - spec.anchorY * figH;
+      // nicht ueberlappen: unter die vorige Kachel derselben Seite ruecken
+      const prev = used[side][used[side].length - 1];
+      if (prev !== undefined && cy < prev + tile + 10) cy = prev + tile + 10;
+      used[side].push(cy);
+      const cx = side === 'left' ? axisX - figH * 0.45 : axisX + figH * 0.45;
+      node.posX.targetValue = cx - tile / 2;
+      node.posY.targetValue = cy - tile / 2;
+      node.width.targetValue = tile;
+      node.height.targetValue = tile;
+      node.scale.targetValue = 1;
+      node.opacity.targetValue = 0.85;
+      const mirror = nodes.find(m => m.id === `${node.id}@@mirror`);
+      if (mirror) { mirror.posX.targetValue = cx - tile / 2; mirror.posY.targetValue = cy - tile / 2; mirror.width.targetValue = tile; mirror.height.targetValue = tile; mirror.opacity.targetValue = 0; }
+    }
+    if (alternatives.length) {
+      this.figureHeaders.push({ x: axisX - figH * 0.45 - tile / 2, y: top - 14, text: 'ALTERNATIVEN', raw: '', maxWidth: tile * 2, static: true });
+    }
 
     // Was an keine Figur gehoert (Kappen, Taschen ...), klein in einer Reihe darunter
     const looseH = Math.min(120, figH * 0.18);

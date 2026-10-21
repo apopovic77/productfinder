@@ -2369,6 +2369,11 @@ export default class App extends React.Component<Props, State> {
 
     // Otherwise check for product click
     const product = this.controller.hitTest(x, y);
+    if (product && this.controller.isOutfitActive()) {
+      // Outfit: Alternative anklicken = anziehen; getragenes Teil = Karte
+      if (!this.controller.wearOutfitAlternative(product)) this.openProductDetails(product);
+      return;
+    }
     if (product) {
       // Grouped-View: Produkt-Klick = Filter auf seine Gruppe (Pivot-Action,
       // media 120646) — erst wenn die Ebene nicht weiter splittet, oeffnet
