@@ -1137,3 +1137,8 @@
   }
   .pom-stage-flow .pom-stage-main .pom-floating img { filter: drop-shadow(0 24px 30px rgba(0, 0, 0, 0.35)); }
 }
+/* Benachrichtigen kompakt direkt neben Add to Cart (owner 2026-10-21, media 131892) */
+.pom-expanded .pom-actions { flex-wrap: nowrap; align-items: stretch !important; }
+.pom-expanded .pom-actions .pom-restock { width: auto !important; flex: 0 0 auto; padding: 4px 14px !important; gap: 8px; }
+.pom-expanded .pom-actions .pom-restock strong { font-size: 11.5px; }
+.pom-expanded .pom-actions .pom-restock small { font-size: 10.5px; }

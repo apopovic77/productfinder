@@ -446,5 +446,33 @@
   "bedeutung": "Teile abnehmbar oder nachrüstbar",
   "file": "modular.svg",
   "accent": true
+ },
+ {
+  "nr": 65,
+  "key": "neck_support",
+  "bedeutung": "Nackenstütze, Neckbrace stützt Hals und Nacken",
+  "file": "neck_support.svg",
+  "accent": true
+ },
+ {
+  "nr": 66,
+  "key": "size_adjust",
+  "bedeutung": "Größenverstellung, Neckbrace in der Größe verstellbar",
+  "file": "size_adjust.svg",
+  "accent": true
+ },
+ {
+  "nr": 67,
+  "key": "quick_release",
+  "bedeutung": "Schnellverschluss, Neckbrace mit einer Hand öffnen",
+  "file": "quick_release.svg",
+  "accent": true
+ },
+ {
+  "nr": 68,
+  "key": "rib_protection",
+  "bedeutung": "Rippenschutz, Brustpanzer schützt die Rippen seitlich",
+  "file": "rib_protection.svg",
+  "accent": true
  }
 ]
