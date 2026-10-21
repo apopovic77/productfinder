@@ -2312,6 +2312,11 @@ body {
 .pf-header-actions { gap: 4px; }
 .pf-header-select-group + .pf-header-select-group { margin-left: 2px; }
 .pf-header-ai-btn { margin-left: 8px; }
+/* Sprechen neben Smart Search: gleiche Groesse, aber zurueckhaltend, damit
+   die zwei Funktionen nicht wie ein Knopf aussehen (owner 2026-10-21). */
+.pf-header-speak-btn { margin-left: 6px; background: transparent; border: 1px solid rgba(255, 255, 255, 0.35); }
+.pf-header-speak-btn:hover { background: rgba(255, 255, 255, 0.12); }
+.pf-header-actions > .pf-header-btn.pf-header-speak-btn.active { background: #c6f542; border-color: #c6f542; color: #111; }
 
 .pf-hero-arrow:disabled {
   opacity: 0.25;

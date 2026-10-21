@@ -2660,8 +2660,25 @@ export default class App extends React.Component<Props, State> {
   };
 
   private clearAiFilter = () => {
-    this.controller.clearAiFilterProductIds();
-    this.setState({ aiFilterProductIds: [], aiLastResultCount: null });
+    this.controller.setGlobalSearchProducts(null);
+    this.setState({ aiFilterProductIds: [], aiLastResultCount: null }, () => this.syncPivotUI());
+  };
+
+  /**
+   * Smart-Search-Treffer ueber den GANZEN Katalog der Marke, wie die
+   * Freitextsuche und der Sprachberater: Der Agent sucht in allen
+   * Kategorien ("blaue Ausruestung" = Helm, Jersey, Hose ...), der Abgleich
+   * nur gegen die offene Kategorie meldete "IDs passen nicht" (owner
+   * 2026-10-21, media 131708). Reihenfolge wie vom Agenten geliefert.
+   */
+  private applyAiResult = (productIds: string[]): string[] => {
+    const byId = new Map(this.controller.getCatalogAllProducts().map(p => [String(p.id), p]));
+    const products = productIds.map(id => byId.get(String(id))).filter((p): p is Product => Boolean(p));
+    if (!products.length) return [];
+    this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false, searchFilterTerm: null });
+    this.controller.applyAgentProducts(products);
+    this.syncPivotUI();
+    return products.map(p => String(p.id));
   };
 
   private handleQuickSearchAutoPosition = (position: { x: number; y: number }) => {
@@ -2691,13 +2708,11 @@ export default class App extends React.Component<Props, State> {
         });
         return;
       }
-      this.controller.setAiFilterProductIds(productIds);
-      const matchedProducts = this.controller.getFilteredProducts();
-      const matchedIds = matchedProducts.map(p => p.id);
+      const matchedIds = this.applyAiResult(productIds);
       if (!matchedIds.length) {
         this.setState({
           quickSearchLoading: false,
-          quickSearchError: 'Die KI hat IDs geliefert, aber sie passen nicht zu geladenen Produkten.',
+          quickSearchError: 'Die gefundenen Produkte sind nicht im aktuellen Katalog. Bitte anders formulieren.',
         });
         return;
       }
@@ -2739,9 +2754,7 @@ export default class App extends React.Component<Props, State> {
         });
         return;
       }
-      this.controller.setAiFilterProductIds(productIds);
-      const matchedProducts = this.controller.getFilteredProducts();
-      const matchedIds = matchedProducts.map(p => p.id);
+      const matchedIds = this.applyAiResult(productIds);
 
       if (!matchedIds.length) {
         this.setState({
@@ -2846,9 +2859,6 @@ export default class App extends React.Component<Props, State> {
         position={this.state.quickSearchPosition ?? undefined}
         onAutoPosition={this.handleQuickSearchAutoPosition}
         onDrag={this.handleQuickSearchDrag}
-          onStartVoice={this.props.realtimeDemoAvailable
-            ? () => this.setState({ isQuickSearchOpen: false, quickSearchError: null, realtimeShortcutEnabled: true })
-            : undefined}
         />
         {aiFilterProductIds.length > 0 && (
           <div className="quicksearch-indicator">
@@ -3196,10 +3206,8 @@ export default class App extends React.Component<Props, State> {
                 <span className="pf-header-dealer-label">{this.state.b2bSession ? `Kunde ${this.state.b2bSession.customerNumber}${this.state.b2bSession.customerClass ? ` · ${this.state.b2bSession.customerClass}` : ''}` : 'Händler-Login'}</span>
               )}
             </button>
-            {/* Sprachberater: kein eigener Header-Button mehr (owner 2026-09-14,
-                media 125063: „nur Ask AI") — Start über „Sprechen" in der
-                Ask-AI-Palette, Ctrl+Shift+V oder ?voice=1. Am Handy bleibt das
-                Personen-Icon, dort gibt es keinen Ask-AI-Button im Header. */}
+            {/* Am Handy startet das Personen-Icon den Sprachberater, am
+                Desktop der Knopf "Sprechen" neben Smart Search. */}
             {this.isMobileLayout() && (
               <button
                 type="button"
@@ -3213,14 +3221,29 @@ export default class App extends React.Component<Props, State> {
             )}
             {!this.isMobileLayout() && (
               <>
+                {/* Smart Search (tippen) und Sprechen (Sprachberater) getrennt
+                    (owner 2026-10-21, media 131707): ein "Ask AI" mit beidem
+                    vermischte zwei Funktionen. */}
                 <button
                   type="button"
-                  className={`pf-header-btn pf-header-ai-btn ${this.state.realtimeShortcutEnabled ? 'active' : ''}`}
+                  className="pf-header-btn pf-header-ai-btn"
                   onClick={() => this.setState({ isQuickSearchOpen: true })}
-                  title="Ask AI — tippen oder sprechen"
+                  title="Smart Search — beschreiben, was du suchst (F3)"
                 >
-                  Ask AI
+                  Smart Search
                 </button>
+                {this.props.realtimeDemoAvailable && (
+                  <button
+                    type="button"
+                    className={`pf-header-btn pf-header-ai-btn pf-header-speak-btn ${this.state.realtimeShortcutEnabled ? 'active' : ''}`}
+                    onClick={() => this.setState(prev => ({ realtimeShortcutEnabled: !prev.realtimeShortcutEnabled }))}
+                    title={this.state.realtimeShortcutEnabled ? 'Sprachberater beenden' : 'Sprachberater starten — mit der KI sprechen'}
+                    aria-pressed={this.state.realtimeShortcutEnabled}
+                  >
+                    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 17v5"/></svg>
+                    Sprechen
+                  </button>
+                )}
                 <button
                   type="button"
                   className={`pf-header-btn pf-header-cart-btn ${cartItems.length ? 'has-items' : ''}`}
@@ -3672,13 +3695,13 @@ export default class App extends React.Component<Props, State> {
               type="button"
               className="pf-ai-search-btn"
               onClick={() => this.setState({ isQuickSearchOpen: true })}
-              title="KI-Produktsuche (F3)"
+              title="Smart Search (F3)"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="11" cy="11" r="8"></circle>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
               </svg>
-              Ask AI
+              Smart Search
             </button>
             {this.state.aiFilterProductIds.length > 0 && (
               <button type="button" className="pf-ai-clear-btn" onClick={this.clearAiFilter} title="Filter zurücksetzen">
@@ -3693,10 +3716,10 @@ export default class App extends React.Component<Props, State> {
                     type="button"
                     className="pf-ai-history-item"
                     onClick={() => {
-                      this.controller.setAiFilterProductIds(entry.productIds);
+                      const ids = this.applyAiResult(entry.productIds);
                       this.setState({
-                        aiFilterProductIds: entry.productIds,
-                        aiLastResultCount: entry.resultCount,
+                        aiFilterProductIds: ids,
+                        aiLastResultCount: ids.length,
                       });
                     }}
                     title={`${entry.resultCount} Treffer`}

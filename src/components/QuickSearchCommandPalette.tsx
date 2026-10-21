@@ -13,8 +13,6 @@ type QuickSearchCommandPaletteProps = {
   position?: { x: number; y: number };
   onAutoPosition?: (position: { x: number; y: number }) => void;
   onDrag?: (position: { x: number; y: number }) => void;
-  /** Startet den Sprachberater (Realtime) — ersetzt den eigenen Header-Button (owner 2026-09-14, media 125063). */
-  onStartVoice?: () => void;
 };
 
 export function QuickSearchCommandPalette({
@@ -29,7 +27,6 @@ export function QuickSearchCommandPalette({
   position,
   onAutoPosition,
   onDrag,
-  onStartVoice,
 }: QuickSearchCommandPaletteProps): React.ReactElement | null {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
@@ -125,7 +122,7 @@ export function QuickSearchCommandPalette({
             onPointerCancel={endDrag}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h2>AI Product Search</h2>
+              <h2>Smart Search</h2>
               <button type="button" className="quicksearch-close" onClick={onClose} aria-label="Close">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -133,7 +130,7 @@ export function QuickSearchCommandPalette({
                 </svg>
               </button>
             </div>
-            <p>Beschreibe was du suchst — die KI filtert passende Produkte.</p>
+            <p>Beschreibe, was du suchst. Die KI sucht im ganzen Katalog.</p>
           </header>
           <div className="quicksearch-body">
             <label htmlFor="quicksearch-input" className="quicksearch-label">
@@ -143,7 +140,7 @@ export function QuickSearchCommandPalette({
               id="quicksearch-input"
               ref={inputRef}
               className="quicksearch-input"
-              placeholder="z.B. alle Kinder-Knieprotektoren für Downhill"
+              placeholder="z.B. eine blaue Ausrüstung oder Knieprotektoren für Kinder"
               value={prompt}
               onChange={event => onPromptChange(event.target.value)}
               onKeyDown={handleKeyDown}
@@ -158,12 +155,6 @@ export function QuickSearchCommandPalette({
             ) : null}
           </div>
           <footer className="quicksearch-footer">
-            {onStartVoice && (
-              <button type="button" className="quicksearch-secondary quicksearch-voice" onClick={onStartVoice} disabled={isLoading} title="Sprachberater starten — mit der KI sprechen statt tippen">
-                <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 17v5"/></svg>
-                Sprechen
-              </button>
-            )}
             <button type="button" className="quicksearch-secondary" onClick={onClose} disabled={isLoading}>
               Abbrechen
             </button>
