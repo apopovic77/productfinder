@@ -695,9 +695,6 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   const stockLabel = stockAvailable === null
     ? null
     : stockAvailable > 0 ? 'Auf Lager' : 'Nicht auf Lager';
-  const stockColor = stockAvailable === null
-    ? 'rgba(255,255,255,0.65)'
-    : stockAvailable > 0 ? '#10b981' : '#f59e0b';
   const stockTitle = stockAvailable === null
     ? 'Für diese Variante liegt kein Bestand vor'
     : `${stockAvailable > 0 ? stockAvailable : 0} Stück verfügbar (Lager ${activeVariant?.stock_on_hand ?? '–'}, reserviert ${activeVariant?.stock_reserved ?? '–'}, Stand letzte Nacht)`;
@@ -799,16 +796,26 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     return total;
   }, [cartLines, selectedColor]);
   const cartSummary = Object.entries(cartSizes).filter(([, qty]) => qty > 0);
+  // Kurz und eindeutig: ganzes Produkt, nicht nur die gewaehlte Groesse; die
+  // Groessen selbst zeigen gruen/durchgestrichen (owner 2026-10-21, media 131901)
   const stockBadgeText = (() => {
     if (!stockLabel) return null;
-    if (stockAvailable !== null && stockAvailable > 0) {
-      return `${selectedSizeShort ? `${selectedSizeShort}: ` : ''}Auf Lager · ${stockAvailable}`;
+    if (qtySizes.length > 1) {
+      if (sizesInStock === 0) {
+        const restock = formatRestock(dealer?.expectedDeliveryDate);
+        return restock ? `Nicht lieferbar · ab ${restock}` : 'Nicht lieferbar';
+      }
+      if (sizesInStock >= qtySizes.length) return 'Alle Größen lieferbar';
+      return `${sizesInStock} von ${qtySizes.length} Größen lieferbar`;
     }
-    if (qtySizes.length > 1 && sizesInStock === 0) return 'Keine Größe auf Lager';
-    const hint = qtySizes.length > 1 && sizesInStock > 0 ? ` · ${sizesInStock} von ${qtySizes.length} Größen lieferbar` : '';
-    const restock = formatRestock(dealer?.expectedDeliveryDate);
-    return `${selectedSizeShort ? `${selectedSizeShort}: ` : ''}Nicht auf Lager${restock ? ` · wieder ab ${restock}` : hint}`;
+    return stockAvailable !== null && stockAvailable > 0 ? `Lieferbar · ${stockAvailable}` : 'Nicht lieferbar';
   })();
+  // gruen = alles lieferbar, gelb = teilweise, rot = nichts
+  const stockBadgeColor = stockAvailable === null && qtySizes.length <= 1
+    ? 'rgba(255,255,255,0.65)'
+    : qtySizes.length > 1
+      ? (sizesInStock === 0 ? '#ef6b5b' : sizesInStock >= qtySizes.length ? '#3fbf6f' : '#f5b041')
+      : (stockAvailable ?? 0) > 0 ? '#3fbf6f' : '#ef6b5b';
   const bumpSizeQty = (size: string, delta: number) =>
     setSizeQty(prev => {
       const next = Math.max(0, Math.min(999, (prev[size] || 0) + delta));
@@ -1545,10 +1552,14 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
           <div
             title={stockTitle}
             style={{
-              fontSize: '10px', fontWeight: 600, color: stockColor,
-              padding: '4px 8px', background: 'rgba(255,255,255,0.15)', borderRadius: '6px',
+              fontSize: '11px', fontWeight: 700, color: stockBadgeColor, whiteSpace: 'nowrap',
+              padding: '4px 9px', borderRadius: '999px',
+              background: `color-mix(in srgb, ${stockBadgeColor} 16%, transparent)`,
+              border: `1px solid color-mix(in srgb, ${stockBadgeColor} 45%, transparent)`,
+              display: 'inline-flex', alignItems: 'center', gap: 6,
             }}
           >
+            <span aria-hidden="true" style={{ width: 7, height: 7, borderRadius: 4, background: stockBadgeColor }} />
             {stockBadgeText}
           </div>
         )}
@@ -1724,16 +1735,24 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
           <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
             {availableSizes.map(size => {
               const isActive = size === selectedSize;
+              // Lieferbarkeit auf einen Blick (owner 2026-10-21, media 131901):
+              // lieferbare Groessen gruen umrandet, nicht lieferbare gedimmt und
+              // durchgestrichen; unbekannter Bestand bleibt neutral
+              const stock = stockForSize(size);
+              const out = stock !== null && stock <= 0;
+              const inStock = stock !== null && stock > 0;
               return (
                 <button
                   key={size}
                   type="button"
                   onClick={() => setSelectedSize(size)}
+                  title={stock === null ? size : inStock ? `${size}: ${stock} lieferbar` : `${size}: nicht lieferbar`}
                   style={{
                     padding: '5px 10px', fontSize: '11px', borderRadius: '6px',
-                    border: isActive ? '2px solid #ff6b00' : '1px solid rgba(255,255,255,0.25)',
-                    background: isActive ? 'rgba(255,107,0,0.18)' : 'rgba(255,255,255,0.08)',
-                    color: isActive ? '#fff' : 'rgba(255,255,255,0.85)',
+                    border: isActive ? '2px solid #ff6b00' : inStock ? '1px solid rgba(63,191,111,0.7)' : '1px solid rgba(255,255,255,0.18)',
+                    background: isActive ? 'rgba(255,107,0,0.18)' : inStock ? 'rgba(63,191,111,0.12)' : 'rgba(255,255,255,0.04)',
+                    color: isActive ? '#fff' : out ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.9)',
+                    textDecoration: out ? 'line-through' : 'none',
                     fontWeight: isActive ? 600 : 400,
                     cursor: isActive ? 'default' : 'pointer',
                     transition: 'all 0.15s ease',
