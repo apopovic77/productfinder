@@ -16,6 +16,7 @@ import { DIALOG_MORPH_EASE, DIALOG_MORPH_SECONDS, expandedDialogGeometry } from 
 const STORAGE_API_URL = STORAGE_API_BASE;
 import { DEFAULT_STAGE_BACKGROUND, STAGE_BACKGROUND_BASE, STAGE_BACKGROUND_STYLES, fetchStageBackgrounds, rankStageBackgrounds, stageBackgroundUrl, type StageBackgroundStyle } from '../config/stageBackgrounds';
 import { CATALOG_PRODUCTS_BASE, CATALOG_PRODUCTS_KEY } from '../config/apiConfig';
+import { OUTFIT_SLOTS, outfitSlotFrom } from '../layout/OutfitLayouter';
 
 /**
  * Merkmal-Icons (58 SVGs von Higgsfield, owner 2026-10-21): inline, damit
@@ -1230,6 +1231,12 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
           sport: attrVal('sport'),
           text: [product.name, attrVal('product_line'), attrVal('category_primary'), attrVal('presentation_category')].join(' '),
           colorName: rawProduct.color_name || attrVal('color_name'),
+          heightCm: (() => {
+            const fromCatalog = Number(rawProduct.dimensions?.height_cm ?? attrVal('height_cm'));
+            if (fromCatalog > 0) return fromCatalog;
+            const slot = outfitSlotFrom(attrVal('product_type'), attrVal('body_part'), product.name || '');
+            return slot ? OUTFIT_SLOTS[slot].h : undefined;
+          })(),
         });
         const bgStyle = bgPick && bgPick.id === String(product.id) ? bgPick.style : (ranked[0] ?? DEFAULT_STAGE_BACKGROUND);
         const stageBgUrl = stageBackground ?? stageBackgroundUrl(bgStyle, product.id, undefined, bgStyles);
@@ -1825,7 +1832,13 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
           .filter(Boolean);
         const isNorm = (line: string) => /^(EN|ECE|ISO|DIN|DOT|CPSC|ASTM|CE)\s?[\d./-]/i.test(line.replace(/<[^>]+>/g, ''));
         const norms = lines.filter(isNorm);
-        const points = lines.filter((line: string) => !isNorm(line));
+        // Kuratierte Merkmalskarten (hoechstens 6, OnealProductKatalog Post
+        // #5548); Saetze mit Karte stehen unten nicht noch einmal mit Haken
+        const cardFeatures: any[] = Array.isArray(raw.features) ? raw.features.filter((f: any) => f.text).slice(0, 6) : [];
+        const plain = (t: string) => t.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+        const cardTexts = cardFeatures.map((f: any) => plain(String(f.text)));
+        const covered = (line: string) => { const l = plain(line); return l.length > 12 && cardTexts.some(t => t.includes(l) || l.includes(t)); };
+        const points = lines.filter((line: string) => !isNorm(line) && !covered(line));
         // Tabs statt aufklappbarer Bereiche: nebeneinander aufgeklappt wirkte es
         // schief (owner 2026-10-21, media 131817). Die Inhalte werden hier
         // gesammelt und unten als Reiter mit einer Flaeche gezeigt.
@@ -1851,7 +1864,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                     aus dem Langtext (Entwurf media 131843) */}
                 {Array.isArray(raw.features) && raw.features.some((f: any) => f.text) && (
                   <div className="pom-feature-cards">
-                    {raw.features.filter((f: any) => f.text).slice(0, 4).map((f: any) => (
+                    {cardFeatures.map((f: any) => (
                       <div key={f.key} className="pom-feature-card">
                         <FeatureIcon iconKey={f.key} />
                         <div>

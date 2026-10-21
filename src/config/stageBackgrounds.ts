@@ -100,7 +100,17 @@ export type BackgroundProductHints = {
   /** Name, Linie, Kategorie: daraus Street/Adventure */
   text?: string;
   colorName?: string;
+  /** reale Hoehe des Produkts in cm (Katalog height_cm, sonst Richtwert je Typ) */
+  heightCm?: number;
 };
+
+/**
+ * Realistische Szenen (Offroad, Natur, Industrie) zeigen einen Ausschnitt von
+ * etwa dieser Hoehe; ein deutlich kleineres Produkt wirkt dort riesig (ein
+ * Handschuh so gross wie ein Motorrad). Darunter: Studio oder abstrakt
+ * (Issue #2551, owner 2026-10-21).
+ */
+export const MIN_REALISTIC_HEIGHT_CM = 35;
 
 const WARM = /red|orange|yellow|neon|gold|sand|brown|rot|gelb/i;
 const COOL = /blue|teal|petrol|navy|green|olive|purple|blau|gr(ü|ue)n/i;
@@ -114,9 +124,12 @@ export function rankStageBackgrounds(styles: StageBackgroundStyle[], h: Backgrou
   const street = /adventure|street|sierra|touring|enduro jacket|rain|regen/.test(text);
   const mtbOnly = sport.includes('MTB') && !sport.includes('MX');
   const dirtWear = /stiefel|schuh|boot|hose|pant|jersey|handschuh|glove/.test(type);
+  const small = h.heightCm != null && h.heightCm < MIN_REALISTIC_HEIGHT_CM;
   const score = (st: StageBackgroundStyle): number => {
     const t = STYLE_TRAITS[st.id];
     if (!t || st.storageIds.length === 0) return -99;
+    // Massstab: kleine Produkte nie in realistische Szenen
+    if (small && (t.env === 'offroad' || t.env === 'nature' || t.env === 'urban')) return -50;
     let s = 0;
     if (street) s += { studio: 3, urban: 3, nature: 1, brand: 1, offroad: -3 }[t.env];
     else if (mtbOnly) s += { nature: 4, offroad: 1, studio: 1, urban: 0, brand: 0 }[t.env];
