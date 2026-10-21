@@ -279,7 +279,8 @@ export const CATALOG_ENTRY_CONFIG: CatalogEntryConfig = {
         banner: { mode: 'image', storageId: 15480 },
         bannersByBrand: { "O'Neal": { mode: 'image', storageId: 35396, position: 'center 50%' }, 'Kini Red Bull': { mode: 'image', storageId: 30538, position: 'center 30%' } },
         labels: label('ACCESSORIES & LEISURE'),
-        categories: ['Leisure Accessories', 'Casual Wear', 'Bags / Backpacks', 'Grips'],
+        // Z-Merchandise: Race Tents, Aufkleber (owner 2026-10-21, media 131721)
+        categories: ['Leisure Accessories', 'Casual Wear', 'Bags / Backpacks', 'Grips', 'Z-Merchandise', 'Merchandise-Displays'],
         targetGroup: 'Erwachsene',
         grouping: TYPE_COLOUR,
       },
