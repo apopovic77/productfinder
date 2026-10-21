@@ -1004,6 +1004,15 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       // Framer beim Layout-Wert (width:auto = breit) und morpht sichtbar
       // auf 340px zusammen (owner 2026-08-25, media 120605).
       initial={{ ...morphTarget, rotateY: !isMobilePortrait && !expanded ? -7 : 0, opacity: 0 }}
+      // Steht die Karte gerade, ohne Perspektive: mit perspective() bleibt der
+      // Transform 3D, Chrome rastert die Karte in Layoutgroesse und skaliert
+      // das Bitmap um dockScale hoch, der Text wirkt unscharf (owner
+      // 2026-10-21, media 131791).
+      transformTemplate={(latest, generated) => (
+        parseFloat(String(latest.rotateY ?? 0)) === 0
+          ? generated.replace(/perspective\([^)]*\)\s*/g, '').trim() || 'none'
+          : generated
+      )}
       exit={{ opacity: 0 }}
       transition={drawerExpand ? {
         // Schublade: Geometrie springt, das Einfahren macht die CSS-Klasse

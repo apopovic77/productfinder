@@ -1460,7 +1460,12 @@ export class CanvasRenderer<T> {
       this.drawHeroBackdropWord(nodes);
     }
 
-    for (const n of nodes) {
+    // Uebersicht: das vergroesserte Hover-Produkt zuletzt zeichnen, damit es
+    // ueber seinen Nachbarn im Stapel liegt.
+    const hoveredLast = this.isRootOverview && this.hoveredItem
+      ? [...nodes.filter(n => n.data !== this.hoveredItem), ...nodes.filter(n => n.data === this.hoveredItem)]
+      : nodes;
+    for (const n of hoveredLast) {
       if (this.productsOnGpu) break; // images come from the GPU layer
       const baseX = n.posX.value ?? 0;
       const heroOffset = n.heroOffsetX.value ?? 0;

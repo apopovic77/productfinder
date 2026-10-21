@@ -16,6 +16,9 @@ import { resolveHeroVariant } from '../config/CatalogEntryConfig';
 import { filterCatalogProducts, getCatalogCategory, stampCatalogCategory, findCatalogCategoryByLabel, catalogCategoryOrder, CATALOG_CATEGORY_ATTRIBUTE } from '../utils/catalogEntry';
 import { resolveAgentSelectionProducts } from '../lib/realtime/AgentSelectionProjection';
 
+/** Vergroesserung des Produkts unter der Maus in der Uebersicht. */
+const HOVER_SCALE = 1.08;
+
 export type ControllerState = {
   loading: boolean;
   error: string | null;
@@ -983,6 +986,13 @@ export class ProductFinderController {
     }
     if (!candidates.length) return null;
     if (candidates.length === 1) return candidates[0].node.data;
+    // Das vergroesserte Hover-Produkt liegt obenauf: zuerst pruefen, sonst
+    // springt der Hover beim Ueberfahren zwischen Nachbarn hin und her.
+    const hovered = this.renderer?.hoveredItem;
+    if (hovered) {
+      const idx = candidates.findIndex(c => c.node.data === hovered);
+      if (idx > 0) candidates.unshift(...candidates.splice(idx, 1));
+    }
 
     // Ueberlappende Rects (Poster-Stapel): oberster Kandidat mit OPAKEM
     // Pixel am Klickpunkt gewinnt; ohne verwertbares Sampling gilt die
@@ -1001,7 +1011,22 @@ export class ProductFinderController {
     if (this.renderer) {
       this.renderer.hoveredItem = product;
     }
+    // Uebersicht (Gruppen- und flache Sicht): das Produkt unter der Maus
+    // waechst leicht, animiert ueber den Knoten-Scale (owner 2026-10-21,
+    // media 131790).
+    const nodes = this.layoutService.getEngine().all();
+    const prev = this._hoverScaledId ? nodes.find(n => n.data.id === this._hoverScaledId) : undefined;
+    if (prev && prev.data !== product) prev.scale.targetValue = 1;
+    this._hoverScaledId = null;
+    if (product && this.isHeroRootOverview()) {
+      const node = nodes.find(n => n.data === product);
+      if (node) {
+        node.scale.targetValue = HOVER_SCALE;
+        this._hoverScaledId = product.id;
+      }
+    }
   }
+  private _hoverScaledId: string | null = null;
 
   setFocusedProduct(product: Product | null): void {
     if (this.renderer) {
@@ -1448,7 +1473,8 @@ export class ProductFinderController {
       const w = header.maxWidth ?? 220;
       if (worldX >= header.x && worldX <= header.x + w && worldY >= header.y - 24 && worldY <= header.y + 8) {
         const raw = (header as any).raw ?? header.text;
-        if (raw === 'WEITERE') return false;
+        // Titel der flachen Uebersicht ist die Ebene selbst, keine Gruppe zum Drillen.
+        if (raw === 'WEITERE' || (header as any).static) return false;
         this.drillDownPivot(raw);
         return true;
       }

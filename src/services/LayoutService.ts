@@ -540,7 +540,34 @@ export class LayoutService {
   private effectiveHeroActive(): boolean {
     if (this.viewOverride === 'grouped') return true;
     if (this.viewOverride === 'pivot') return false;
-    return this.drillDownService.isHeroModeActive();
+    const hero = this.drillDownService.isHeroModeActive();
+    // Braucht die Gruppenuebersicht mehr als eine Seite, sind die
+    // Pivot-Spalten uebersichtlicher (owner 2026-10-21).
+    if (hero && !this._heroPresentation && this.posterOverview && this.groupsWorthwhile() && !this.posterFitsPage()) {
+      return false;
+    }
+    return hero;
+  }
+
+  private lastViewport = { width: 0, height: 0 };
+  private posterProbe: HeroLayouter<Product> | null = null;
+  private posterFitCache: { key: string; fits: boolean } | null = null;
+
+  /** Passt die Gruppenuebersicht der Ebene ohne Scrollen auf den Desktop? */
+  private posterFitsPage(): boolean {
+    const view = this.lastViewport.width > 0 || typeof window === 'undefined'
+      ? this.lastViewport
+      : { width: window.innerWidth, height: window.innerHeight - 48 };
+    if (view.width < 768 || view.height <= 0) return true;
+    const nodes = this.engine.all();
+    const buckets = this.drillDownService.getCurrentBuckets().filter(bucket => !bucket.isUnknown);
+    const key = `${view.width}x${view.height}|${nodes.length}|${buckets.map(b => `${b.label}:${b.objectIds?.length ?? 0}`).join(',')}`;
+    if (this.posterFitCache?.key === key) return this.posterFitCache.fits;
+    this.posterProbe ??= this.createHeroLayouter();
+    const fits = this.posterProbe.posterFits(nodes, view,
+      buckets.map(bucket => ({ label: bucket.label, ids: new Set(bucket.objectIds) })));
+    this.posterFitCache = { key, fits };
+    return fits;
   }
 
   getCurrentBuckets() {
@@ -548,6 +575,7 @@ export class LayoutService {
   }
 
   layout(width: number, height: number): void {
+    this.lastViewport = { width, height };
     if (this.mode === 'pivot') {
       const heroActive = this.effectiveHeroActive();
       if (heroActive) {
@@ -561,6 +589,7 @@ export class LayoutService {
           this.heroLayouter.overviewMode = this.isHeroRootOverview();
           this.heroLayouter.posterMode = this.posterOverview;
           this.heroLayouter.flatOverview = !this.groupsWorthwhile();
+          this.heroLayouter.flatTitle = this.drillDownService.getBreadcrumbs().slice(1).pop() ?? '';
           // Gruppen der Poster-View = Engine-Buckets der Ebene, damit der
           // Gruppen-Klick eine echte Pivot-Action ist (media 120646).
           this.heroLayouter.posterBuckets = this.drillDownService.getCurrentBuckets()

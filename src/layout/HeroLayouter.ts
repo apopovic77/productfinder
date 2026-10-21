@@ -31,7 +31,7 @@ export class HeroLayouter<T> implements ILayouter<T> {
    */
   public posterMode = false;
   /** Typo-Header pro Modell-Block, gezeichnet vom CanvasRenderer (world coords). */
-  public posterHeaders: Array<{ x: number; y: number; text: string; raw: string; maxWidth?: number }> = [];
+  public posterHeaders: Array<{ x: number; y: number; text: string; raw: string; maxWidth?: number; static?: boolean }> = [];
 
   /**
    * Gruppen der Poster-View = Engine-Buckets der Ebene (LayoutService).
@@ -39,8 +39,10 @@ export class HeroLayouter<T> implements ILayouter<T> {
    * das Bucket-Label). Leer -> Fallback auf Attribut-Kandidaten.
    */
   public posterBuckets: Array<{ label: string; ids: Set<string> }> = [];
-  /** Keine Gruppe mit mehr als einem Produkt: alle Produkte in einem Stapel ohne Ueberschrift. */
+  /** Keine Gruppe mit mehr als einem Produkt: alle Produkte in einem Stapel. */
   public flatOverview = false;
+  /** Ueberschrift der flachen Uebersicht: Name der Ebene, wie in der Gruppensicht (owner 2026-10-21, EX-SRS). */
+  public flatTitle = '';
 
   constructor(private config: HeroLayoutConfig<T>) {}
 
@@ -238,7 +240,27 @@ export class HeroLayouter<T> implements ILayouter<T> {
    * redundante Form (A1-Plakat-Prinzip). Draw-Order = Array-Order, also
    * liegt innerhalb eines Stapels das rechte Produkt oben.
    */
-  private computePosterGrid(nodes: LayoutNode<T>[], view: { width: number; height: number }): void {
+  /**
+   * Passt die Gruppenuebersicht ohne Scrollen auf die Seite? Rechnet das
+   * Plakat durch, ohne Knoten zu verschieben.
+   */
+  posterFits(
+    nodes: LayoutNode<T>[],
+    view: { width: number; height: number },
+    buckets: Array<{ label: string; ids: Set<string> }>,
+  ): boolean {
+    const saved = { buckets: this.posterBuckets, flat: this.flatOverview };
+    this.posterBuckets = buckets;
+    this.flatOverview = false;
+    try {
+      return this.computePosterGrid(nodes, view, true);
+    } finally {
+      this.posterBuckets = saved.buckets;
+      this.flatOverview = saved.flat;
+    }
+  }
+
+  private computePosterGrid(nodes: LayoutNode<T>[], view: { width: number; height: number }, measureOnly = false): boolean {
     const pad = 48;
     const headerH = 46;
     const shelfGapX = 56;
@@ -275,7 +297,7 @@ export class HeroLayouter<T> implements ILayouter<T> {
     };
     const groups = new Map<string, LayoutNode<T>[]>();
     if (this.flatOverview) {
-      groups.set('', [...nodes]);
+      groups.set(this.flatTitle, [...nodes]);
     } else if (this.posterBuckets.length >= 2) {
       // Gruppen = Engine-Buckets (Bucket-Reihenfolge, Rest -> WEITERE)
       // "N/A" (Produkte ohne Wert) ist fuer Haendler keine Gruppe — Rest.
@@ -369,6 +391,8 @@ export class HeroLayouter<T> implements ILayouter<T> {
       cellH -= 16;
       plan = layoutOnce(cellH);
     }
+    const fits = plan.totalH <= view.height - pad * 2;
+    if (measureOnly) return fits;
 
     this.posterHeaders = [];
     const startY = Math.max(24, (view.height - plan.totalH) / 2);
@@ -380,7 +404,7 @@ export class HeroLayouter<T> implements ILayouter<T> {
       let x = Math.max(pad, (view.width - rowW) / 2);
       for (const shelf of row) {
         if (shelf.showHeader) {
-          this.posterHeaders.push({ x, y: y + headerH - 14, text: shelf.key.toUpperCase(), raw: shelf.key, maxWidth: shelf.shelfW + shelfGapX * 0.5 });
+          this.posterHeaders.push({ x, y: y + headerH - 14, text: shelf.key.toUpperCase(), raw: shelf.key, maxWidth: shelf.shelfW + shelfGapX * 0.5, static: this.flatOverview });
         }
         let offset = 0;
         for (let i = 0; i < shelf.nodes.length; i++) {
@@ -402,6 +426,7 @@ export class HeroLayouter<T> implements ILayouter<T> {
       }
     });
     this.config.onLayout?.(nodes);
+    return fits;
   }
 
   /**
