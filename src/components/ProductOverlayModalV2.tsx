@@ -46,7 +46,7 @@ type Props = {
    * Händlerpreise/Verfügbarkeit je Varianten-SKU aus Veloconnect (owner
    * 2026-09-11) — nur gesetzt, wenn ein Händler angemeldet ist.
    */
-  dealerPrices?: Record<string, { dealerPrice: number | null; rrp: number | null; currency: string; availabilityCode: string | null; availableQuantity: number | null; unknown: boolean }>;
+  dealerPrices?: Record<string, { dealerPrice: number | null; rrp: number | null; currency: string; availabilityCode: string | null; availableQuantity: number | null; expectedDeliveryDate?: string | null; unknown: boolean }>;
   /** Haendler angemeldet — nur dann gibt es eine belastbare Verfuegbarkeit. */
   dealerActive?: boolean;
   /** Haendlerpreise werden gerade geladen. */
@@ -616,6 +616,16 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   const variantLabel = [selectedColor, selectedSize].filter(Boolean).join(' / ');
   // Händlerpreis + Veloconnect-Verfügbarkeit (nur angemeldet)
   const dealer = dealerPrices && activeVariant?.sku ? dealerPrices[activeVariant.sku] : undefined;
+  // Liefertermin aus dem B2B-Shop (Sonja Goldmann 2026-10-21: "wann ist es
+  // wieder verfuegbar"). Ein Termin in der Vergangenheit sagt nichts mehr.
+  const formatRestock = (iso?: string | null): string | null => {
+    if (!iso) return null;
+    const d = new Date(`${iso}T00:00:00`);
+    if (Number.isNaN(d.getTime())) return null;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    if (d < today) return null;
+    return d.toLocaleDateString('de-AT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
   const dealerForSize = (size: string) => {
     if (!dealerPrices) return undefined;
     const v = variants.find((x: any) => getColor(x) === selectedColor && getSize(x) === size);
@@ -695,7 +705,8 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     }
     if (qtySizes.length > 1 && sizesInStock === 0) return 'Keine Größe auf Lager';
     const hint = qtySizes.length > 1 && sizesInStock > 0 ? ` · ${sizesInStock} von ${qtySizes.length} Größen lieferbar` : '';
-    return `${selectedSizeShort ? `${selectedSizeShort}: ` : ''}Nicht auf Lager${hint}`;
+    const restock = formatRestock(dealer?.expectedDeliveryDate);
+    return `${selectedSizeShort ? `${selectedSizeShort}: ` : ''}Nicht auf Lager${restock ? ` · wieder ab ${restock}` : hint}`;
   })();
   const bumpSizeQty = (size: string, delta: number) =>
     setSizeQty(prev => {
@@ -1295,7 +1306,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         )}
         {dealer && availabilityDot(dealer.availabilityCode, dealer.unknown) && (
           <div title={dealer.availableQuantity !== null ? `Verfügbar: ${dealer.availableQuantity}` : 'Verfügbarkeit laut B2B-Shop'} style={{ fontSize: '10px', fontWeight: 600, color: availabilityDot(dealer.availabilityCode, dealer.unknown) as string, padding: '4px 8px', background: 'rgba(255,255,255,0.2)', borderRadius: '6px' }}>
-            {dealer.unknown ? 'derzeit nicht über den Shop bestellbar' : /^(available|instock|in_stock|lieferbar)$/i.test(dealer.availabilityCode || '') ? 'Lieferbar' : /expect/i.test(dealer.availabilityCode || '') ? 'Nachlieferung erwartet' : (dealer.availabilityCode || '')}
+            {dealer.unknown ? 'derzeit nicht über den Shop bestellbar' : /^(available|instock|in_stock|lieferbar)$/i.test(dealer.availabilityCode || '') ? 'Lieferbar' : /expect/i.test(dealer.availabilityCode || '') ? (formatRestock(dealer.expectedDeliveryDate) ? `Wieder lieferbar ab ${formatRestock(dealer.expectedDeliveryDate)}` : 'Nachlieferung erwartet') : (dealer.availabilityCode || '')}
           </div>
         )}
         {/* Kein lokales „In Stock" mehr (owner 2026-09-16): das Feld is_available

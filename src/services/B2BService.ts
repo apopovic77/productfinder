@@ -25,6 +25,8 @@ export interface B2BPrice {
   currency: string;
   availabilityCode: string | null;
   availableQuantity: number | null;
+  /** Liefertermin laut B2B-Shop bei "expecting_delivery" (ISO-Datum). */
+  expectedDeliveryDate: string | null;
   unknown: boolean;
 }
 
@@ -239,6 +241,7 @@ export async function b2bFetchPrices(session: B2BSession, skus: string[]): Promi
         currency: p?.currency || 'EUR',
         availabilityCode: p?.availability_code ?? null,
         availableQuantity: toNumber(p?.available_quantity),
+        expectedDeliveryDate: typeof p?.expected_delivery_date === 'string' ? p.expected_delivery_date : null,
         unknown: Boolean(p?.unknown),
       };
     }
