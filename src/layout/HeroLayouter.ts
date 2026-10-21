@@ -243,12 +243,7 @@ export class HeroLayouter<T> implements ILayouter<T> {
     const headerH = 46;
     const shelfGapX = 56;
     const shelfGapY = 44;
-    // Sichtbarer Anteil je ueberlapptem Produkt: Farbvarianten desselben
-    // Designs teilen die Silhouette und duerfen stark ueberlappen; verschiedene
-    // Produkte (z. B. Gruppen nach Preis) zeigen fast ganz (owner 2026-10-21,
-    // Protektoren nach Preis, media 131772/131773).
-    const advanceSame = 0.36;
-    const advanceOther = 0.78;
+    const advance = 0.36; // sichtbarer Anteil je ueberlapptem Produkt
     const cellAspect = 0.9;
     // Breite Produkte (Brustpanzer mit Schulterschalen, Helme von der Seite)
     // stiessen in der 0.9-Box seitlich an und wirkten neben schmalen
@@ -266,14 +261,11 @@ export class HeroLayouter<T> implements ILayouter<T> {
       const v = data?.attributes?.[key]?.value ?? data?.raw?.properties?.[key];
       return typeof v === 'string' && v.trim() ? v.trim() : '';
     };
-    const advanceAfter = (prev: LayoutNode<T>, next: LayoutNode<T>): number => {
-      const a = attr(prev, 'design_group');
-      return a && a === attr(next, 'design_group') ? advanceSame : advanceOther;
-    };
-    // Abstand in Einheiten der Grundbreite; das breitere der beiden Produkte
-    // bestimmt, wie weit das naechste ruecken muss.
+    // Gleichmaessige Ueberlappung fuer alle Produkte; die unterschiedliche
+    // Ueberlappung nach Design wirkte oft seltsam (owner 2026-10-21).
+    // Das breitere der beiden Produkte bestimmt, wie weit das naechste rueckt.
     const step = (prev: LayoutNode<T>, next: LayoutNode<T>): number =>
-      advanceAfter(prev, next) * Math.max(widthFactor(prev), widthFactor(next));
+      advance * Math.max(widthFactor(prev), widthFactor(next));
     const stackUnits = (list: LayoutNode<T>[]): number => {
       let units = list.length ? widthFactor(list[0]) : 1;
       for (let i = 1; i < list.length; i++) {
