@@ -250,6 +250,16 @@ export class HeroLayouter<T> implements ILayouter<T> {
     const advanceSame = 0.36;
     const advanceOther = 0.78;
     const cellAspect = 0.9;
+    // Breite Produkte (Brustpanzer mit Schulterschalen, Helme von der Seite)
+    // stiessen in der 0.9-Box seitlich an und wirkten neben schmalen
+    // Nachbarn kleiner (owner 2026-10-21, Kinder › Protektoren › SPLIT).
+    // Bis 1.2 bekommen sie eine breitere Box und damit volle Hoehe.
+    const maxCellAspect = 1.2;
+    const widthFactor = (node: LayoutNode<T>): number => {
+      const img = (node.data as any)?.image;
+      const r = img && img.naturalWidth && img.naturalHeight ? img.naturalWidth / img.naturalHeight : 0;
+      return Number.isFinite(r) && r > cellAspect ? Math.min(r, maxCellAspect) / cellAspect : 1;
+    };
 
     const attr = (node: LayoutNode<T>, key: string): string => {
       const data: any = node.data;
@@ -260,9 +270,15 @@ export class HeroLayouter<T> implements ILayouter<T> {
       const a = attr(prev, 'design_group');
       return a && a === attr(next, 'design_group') ? advanceSame : advanceOther;
     };
+    // Abstand in Einheiten der Grundbreite; das breitere der beiden Produkte
+    // bestimmt, wie weit das naechste ruecken muss.
+    const step = (prev: LayoutNode<T>, next: LayoutNode<T>): number =>
+      advanceAfter(prev, next) * Math.max(widthFactor(prev), widthFactor(next));
     const stackUnits = (list: LayoutNode<T>[]): number => {
-      let units = 1;
-      for (let i = 1; i < list.length; i++) units += advanceAfter(list[i - 1], list[i]);
+      let units = list.length ? widthFactor(list[0]) : 1;
+      for (let i = 1; i < list.length; i++) {
+        units += step(list[i - 1], list[i]) + widthFactor(list[i]) - widthFactor(list[i - 1]);
+      }
       return units;
     };
     const groups = new Map<string, LayoutNode<T>[]>();
@@ -320,11 +336,7 @@ export class HeroLayouter<T> implements ILayouter<T> {
         let start = 0;
         while (start < list.length) {
           let end = start + 1;
-          let units = 1;
-          while (end < list.length && units + advanceAfter(list[end - 1], list[end]) <= maxUnits) {
-            units += advanceAfter(list[end - 1], list[end]);
-            end++;
-          }
+          while (end < list.length && stackUnits(list.slice(start, end + 1)) <= maxUnits) end++;
           shelves.push({ key, nodes: list.slice(start, end), showHeader: start === 0 && key !== '' });
           start = end;
         }
@@ -381,10 +393,10 @@ export class HeroLayouter<T> implements ILayouter<T> {
         let offset = 0;
         for (let i = 0; i < shelf.nodes.length; i++) {
           const node = shelf.nodes[i];
-          if (i > 0) offset += advanceAfter(shelf.nodes[i - 1], node);
+          if (i > 0) offset += step(shelf.nodes[i - 1], node);
           node.posX.targetValue = x + offset * plan.w;
           node.posY.targetValue = y + topSpace;
-          node.width.targetValue = plan.w;
+          node.width.targetValue = plan.w * widthFactor(node);
           node.height.targetValue = cellH;
           node.scale.targetValue = 1;
           node.opacity.targetValue = 1;
