@@ -590,11 +590,14 @@ export class ProductFinderController {
 
   setAiFilterProductIds(ids: string[]): void {
     this.filterService.setIncludeIds(ids);
+    // Smart-Search-Ergebnis: Ausruestung an der Figur zeigen (Issue #2547)
+    this.layoutService.setOutfitEnabled(ids.length > 0);
     this.reloadPivotWithCurrentFilter();
   }
 
   clearAiFilterProductIds(): void {
     this.filterService.clearIncludeIds();
+    this.layoutService.setOutfitEnabled(false);
     this.reloadPivotWithCurrentFilter();
   }
 

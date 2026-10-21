@@ -1,6 +1,6 @@
 import type { Product } from '../types/Product';
 import { BRAND_BANNERS, CATALOG_ENTRY_CONFIG, resolveCatalogFlow, resolveCategoryPresentation } from '../config/CatalogEntryConfig';
-import { type TaxonomyNode, MULTI_VALUE_KEYS } from '../gpane/types';
+import { type TaxonomyNode, MULTI_VALUE_KEYS, getProductValue } from '../gpane/types';
 import { ProductLayoutAccessors } from '../layout/Accessors';
 import { WeightScalePolicy } from '../layout/ScalePolicy';
 import { SimpleLayouter, type SimpleLayoutConfig } from '../layout/SimpleLayouter';
@@ -62,6 +62,7 @@ import { PosterLayouter, type PosterRowDefinition } from '../layout/PosterLayout
 import type { PosterLayoutConfig } from '../layout/PosterLayouter';
 import { LaneLayouter } from '../layout/LaneLayouter';
 import type { LayoutNode } from '../layout/LayoutNode';
+import { OutfitLayouter, outfitSlotFrom, OUTFIT_SLOTS } from '../layout/OutfitLayouter';
 import { CANVAS_PADDING_CONFIG } from '../config/CanvasPaddingConfig';
 import { AVAILABILITY_LABELS } from '../data/ProductRepository';
 
@@ -79,7 +80,7 @@ const createOrderMap = (items: readonly string[] = []): Map<string, number> =>
 export class LayoutService {
   private mode: LayoutMode = 'pivot'; // Start with pivot layout!
   private engine: LayoutEngine<Product>;
-  private layouter: SimpleLayouter<Product> | PivotLayouter<Product> | HeroLayouter<Product> | PosterLayouter<Product> | LaneLayouter<Product>;
+  private layouter: SimpleLayouter<Product> | PivotLayouter<Product> | HeroLayouter<Product> | PosterLayouter<Product> | LaneLayouter<Product> | OutfitLayouter<Product>;
   private heroLayouter: HeroLayouter<Product> | null = null;
   private access = new ProductLayoutAccessors();
   private scalePolicy = new WeightScalePolicy();
@@ -595,8 +596,42 @@ export class LayoutService {
     return this.drillDownService.getCurrentBuckets();
   }
 
+  // --- Outfit-Ansicht (Issue #2547) ---------------------------------------
+  /** Von aussen gesetzt, solange ein KI-Filter (Smart Search) aktiv ist. */
+  private outfitEnabled = false;
+  private outfitLayouter: OutfitLayouter<Product> | null = null;
+  setOutfitEnabled(on: boolean): void { this.outfitEnabled = on; }
+
+  private outfitSlot = (p: Product) => {
+    const v = (k: string) => { const x = getProductValue(p, k); return Array.isArray(x) ? x.join(',') : x == null ? '' : String(x); };
+    return outfitSlotFrom(v('product_type'), v('body_part'), p.name || '');
+  };
+
+  /** Outfit statt Gruppen: KI-Ergebnis mit mindestens drei Koerperstellen. */
+  isOutfitActive(): boolean {
+    if (!this.outfitEnabled || this._heroPresentation) return false;
+    return OutfitLayouter.distinctSlots(this.engine.all().map(n => n.data), this.outfitSlot) >= 3;
+  }
+
   layout(width: number, height: number): void {
     this.lastViewport = { width, height };
+    if ((this.mode === 'pivot' || this.mode === 'lanes') && this.isOutfitActive()) {
+      this.outfitLayouter ??= new OutfitLayouter<Product>({
+        slotOf: this.outfitSlot,
+        // eine Figur je Marke (O'Neal, Kini Red Bull ...)
+        figureOf: p => p.brand || String(getProductValue(p, 'brand') ?? ''),
+        isYouth: p => String(getProductValue(p, 'target_group') ?? '').toLowerCase().includes('jugend'),
+      });
+      if (this.layouter !== this.outfitLayouter) {
+        this.layouter = this.outfitLayouter;
+        this.engine.setLayouter(this.layouter);
+        this.applyAnimationDuration();
+      }
+      this.displayOrderIds = [];
+      this.nodeToGroup.clear();
+      this.engine.layout({ width, height });
+      return;
+    }
     if (this.mode === 'pivot') {
       const heroActive = this.effectiveHeroActive();
       if (heroActive) {
@@ -859,6 +894,7 @@ export class LayoutService {
     // Pivot-Sicht (z.B. Breadcrumb-Dropdown) laeuft sein compute() nicht
     // mehr — ohne diesen Guard malte der Renderer die stehengebliebenen
     // Poster-Header ueber das Histogramm (owner 2026-08-25, media 120644).
+    if (this.outfitLayouter && this.layouter === this.outfitLayouter) return this.outfitLayouter.figureHeaders;
     if (this.layouter !== this.heroLayouter) return [];
     return this.heroLayouter?.posterMode ? (this.heroLayouter.posterHeaders ?? []) : [];
   }
@@ -1027,6 +1063,10 @@ export class LayoutService {
       }
       let at = 0;
       this.engine.sync(items, () => ids[at++]);
+    } else if (usePivot && this.outfitEnabled) {
+      // Outfit: hintere Ebenen zuerst zeichnen (Jersey unter Hose, Helm vorn)
+      const z = (p: Product) => { const slot = this.outfitSlot(p); return slot ? OUTFIT_SLOTS[slot].z : -1; };
+      this.engine.sync([...filtered].sort((a, b) => z(a) - z(b)), p => p.id);
     } else {
       this.engine.sync(filtered, p => p.id);
     }
