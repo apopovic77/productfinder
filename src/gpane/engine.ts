@@ -635,6 +635,21 @@ export class GPANEEngine {
       this._config
     );
 
+    // Zurueck auf eine Ebene, die gruppiert war: dieselbe Gruppierung wieder,
+    // bevor die Hero-Pruefung entscheidet. Sonst kippte die Ebene nach dem
+    // Hochgehen in die Hero-Reihe, weil sich die Bewertung ohne aktive
+    // Dimension anders rechnet als beim Hineingehen (owner 2026-10-21,
+    // B-22 -> PAINT -> zurueck, media 131764-131766).
+    const restored = dimensionKey
+      ? this._scoredDimensions.find(d => d.key === dimensionKey && this.splitsProducts(d.key, products))
+      : null;
+    if (restored) {
+      this._heroMode = false;
+      this._activeDimension = restored;
+      this._buckets = buildBuckets(products, restored, this._config);
+      return;
+    }
+
     // Check if hero mode should win over pivoting
     if (this._shouldUseHeroMode(products)) {
       this._activeDimension = null;
@@ -644,15 +659,7 @@ export class GPANEEngine {
     }
     this._heroMode = false;
 
-    // Try to restore the requested dimension
-    const restored = dimensionKey
-      ? this._scoredDimensions.find(d => d.key === dimensionKey)
-      : null;
-
-    if (restored) {
-      this._activeDimension = restored;
-      this._buckets = buildBuckets(products, restored, this._config);
-    } else if (this._scoredDimensions.length > 0) {
+    if (this._scoredDimensions.length > 0) {
       const viable = this._scoredDimensions.filter(d => d.entropy > 0 && d.cardinality > 1 && !isNeverAutoPicked(d.key) && this.splitsProducts(d.key, products));
       this._activeDimension = this._prescribedDimension(products) || viable[0] || null;
       this._buckets = this._activeDimension ? buildBuckets(products, this._activeDimension, this._config) : [];
