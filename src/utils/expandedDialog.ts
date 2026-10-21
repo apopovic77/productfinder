@@ -40,6 +40,7 @@ export function expandedDialogGeometry(
   const width = Math.min(viewportWidth - baseMarginX * 2, Math.max(760, Math.round((viewportWidth - baseMarginX * 2) * 0.75)));
   const marginX = Math.round((viewportWidth - width) / 2);
   const marginY = Math.max(16, Math.min(EXPANDED_MARGIN, Math.floor((viewportHeight - 480) / 2)));
-  const height = viewportHeight - marginY * 2;
+  // Unten buendig am Bildschirmrand, Rand nur oben (owner 2026-10-21)
+  const height = viewportHeight - marginY;
   return { width, height, marginX, marginY, stageWidth: Math.min(760, Math.round(width * 0.46)) };
 }

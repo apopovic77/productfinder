@@ -994,12 +994,13 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   const halfScreen = expanded && !(heroSheet || isMobilePortrait);
 
   const morphTarget = {
-    bottom: halfScreen ? expandedGeometry.marginY : expanded ? 0 : (heroSheet || isMobilePortrait ? 8 : heroDock ? dockGeometry.bottom : 88),
+    bottom: halfScreen ? 0 : expanded ? 0 : (heroSheet || isMobilePortrait ? 8 : heroDock ? dockGeometry.bottom : 88),
     right: heroSheet || isMobilePortrait ? 8 : halfScreen ? expandedGeometry.marginX : 208,
     scale: dockScale,
     x: -DOCK_WIDTH * (dockScale - 1),
-    borderBottomLeftRadius: expanded && !halfScreen ? 0 : 18,
-    borderBottomRightRadius: expanded && !halfScreen ? 0 : 18,
+    // Aufgeklappt sitzt der Dialog unten am Rand: unten keine Rundung
+    borderBottomLeftRadius: expanded ? 0 : 18,
+    borderBottomRightRadius: expanded ? 0 : 18,
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
     width: heroSheet || isMobilePortrait
