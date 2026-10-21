@@ -986,13 +986,6 @@ export class ProductFinderController {
     }
     if (!candidates.length) return null;
     if (candidates.length === 1) return candidates[0].node.data;
-    // Das vergroesserte Hover-Produkt liegt obenauf: zuerst pruefen, sonst
-    // springt der Hover beim Ueberfahren zwischen Nachbarn hin und her.
-    const hovered = this.renderer?.hoveredItem;
-    if (hovered) {
-      const idx = candidates.findIndex(c => c.node.data === hovered);
-      if (idx > 0) candidates.unshift(...candidates.splice(idx, 1));
-    }
 
     // Ueberlappende Rects (Poster-Stapel): oberster Kandidat mit OPAKEM
     // Pixel am Klickpunkt gewinnt; ohne verwertbares Sampling gilt die
@@ -1012,8 +1005,8 @@ export class ProductFinderController {
       this.renderer.hoveredItem = product;
     }
     // Uebersicht (Gruppen- und flache Sicht): das Produkt unter der Maus
-    // waechst leicht, animiert ueber den Knoten-Scale (owner 2026-10-21,
-    // media 131790).
+    // waechst leicht, animiert ueber den Knoten-Scale, und bleibt dabei an
+    // seiner Stelle im Stapel (owner 2026-10-21, media 131790).
     const nodes = this.layoutService.getEngine().all();
     const prev = this._hoverScaledId ? nodes.find(n => n.data.id === this._hoverScaledId) : undefined;
     if (prev && prev.data !== product) prev.scale.targetValue = 1;
