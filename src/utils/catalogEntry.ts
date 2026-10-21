@@ -1,6 +1,7 @@
 import { ProductAttribute, type Product } from '../types/Product';
 import {
   CATALOG_ENTRY_CONFIG,
+  CATEGORY_OVERRIDES,
   type CatalogCategoryConfig,
   type CatalogEntrySelection,
   type CatalogSportConfig,
@@ -24,6 +25,9 @@ function productSports(product: CatalogProduct): string[] {
 }
 
 function productCategory(product: CatalogProduct): string {
+  const name = String((product.raw as { name?: unknown } | undefined)?.name ?? '');
+  const override = name ? CATEGORY_OVERRIDES.find(entry => entry.name.test(name)) : undefined;
+  if (override) return override.category;
   const rawCategory = product.raw?.category;
   if (typeof rawCategory === 'string' && rawCategory.trim()) return rawCategory.trim();
   const attributeCategory = product.attributes.category_primary?.value;

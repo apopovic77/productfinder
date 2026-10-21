@@ -19,10 +19,10 @@ function product(category: string, targetGroup: string, sports: string[]): Produ
 }
 
 describe('catalog entry mapping', () => {
-  it('keeps all 16 MOTO categories in one unique config list', () => {
+  it('keeps all 17 MOTO categories in one unique config list', () => {
     const categories = CATALOG_ENTRY_CONFIG.categoriesBySport.moto;
-    expect(categories).toHaveLength(16);
-    expect(new Set(categories.map(category => category.id)).size).toBe(16);
+    expect(categories).toHaveLength(17);
+    expect(new Set(categories.map(category => category.id)).size).toBe(17);
   });
 
   it('uses ANY(sport), so MX+MTB products remain part of MOTO', () => {

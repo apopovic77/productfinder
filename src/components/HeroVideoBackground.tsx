@@ -18,6 +18,11 @@ interface HeroVideoBackgroundProps {
   /** Streut zwischen den besten Treffern, damit nicht jedes Produkt einer
    *  Kategorie dasselbe Bild bekommt (z. B. die Produkt-id). */
   imageSeed?: number;
+  /**
+   * Kategorie-Banner als Bild links vom Detaildialog (Sonja Goldmann
+   * 2026-10-21). Gesetzt hat es Vorrang vor der Bildsuche.
+   */
+  bannerStorageId?: number;
   /** Opacity of the optional lifestyle backdrop; zero keeps the product canvas visible. */
   backdropOpacity?: number;
   onClose: () => void;
@@ -41,6 +46,7 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
   imageQuery,
   imageBrand,
   imageSeed = 0,
+  bannerStorageId,
   backdropOpacity = 1,
   onClose,
   active = true,
@@ -72,13 +78,36 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
   // (owner 2026-10-20, media 131623).
   const [dialogInset, setDialogInset] = useState(() => (usesHalfScreenDialog() ? expandedDialogGeometry().width : 0));
   const [viewport, setViewport] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
-  const [bgResolved, setBgResolved] = useState(!imageQuery);
+  const [bgResolved, setBgResolved] = useState(!imageQuery && !bannerStorageId);
 
   useEffect(() => {
     let cancelled = false;
     setIsLoaded(false);
     setBgImageUrl(null);
     setBgFocal(null);
+    const showImage = (storageId: number) => {
+      setBgImageUrl(`${STORAGE_API_URL}/storage/media/${storageId}?width=1920&format=webp&quality=82`);
+      fetch(`${STORAGE_API_URL}/storage/media/${storageId}/focal`)
+        .then(r => (r.ok ? r.json() : null))
+        .then(focal => {
+          if (cancelled || !focal?.focal_point) return;
+          const width = focal.image_width;
+          const height = focal.image_height;
+          setBgFocal({
+            xPct: focal.focal_point.x_pct,
+            yPct: focal.focal_point.y_pct,
+            imageAspect: width && height ? width / height : 1.5,
+          });
+        })
+        .catch(() => {});
+    };
+    if (bannerStorageId) {
+      showImage(bannerStorageId);
+      setBgResolved(true);
+      return () => {
+        cancelled = true;
+      };
+    }
     if (!imageQuery) {
       setBgResolved(true);
       return;
@@ -97,20 +126,7 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
         const pool = (sameBrand.length > 0 ? sameBrand : good).slice(0, 3);
         const hit = pool.length > 0 ? pool[Math.abs(imageSeed) % pool.length] : undefined;
         if (hit && hit.similarity >= LIFESTYLE_MIN_SIMILARITY) {
-          setBgImageUrl(`${STORAGE_API_URL}/storage/media/${hit.storage_id}?width=1920&format=webp&quality=82`);
-          fetch(`${STORAGE_API_URL}/storage/media/${hit.storage_id}/focal`)
-            .then(r => (r.ok ? r.json() : null))
-            .then(focal => {
-              if (cancelled || !focal?.focal_point) return;
-              const width = focal.image_width;
-              const height = focal.image_height;
-              setBgFocal({
-                xPct: focal.focal_point.x_pct,
-                yPct: focal.focal_point.y_pct,
-                imageAspect: width && height ? width / height : 1.5,
-              });
-            })
-            .catch(() => {});
+          showImage(hit.storage_id);
         }
         setBgResolved(true);
       })
@@ -120,7 +136,7 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [imageQuery, imageBrand, imageSeed]);
+  }, [imageQuery, imageBrand, imageSeed, bannerStorageId]);
 
   // Freie Flaeche links vom aufgeklappten Dialog: dieselbe Geometrie wie der
   // Dialog selbst (utils/expandedDialog), ab dem ersten Bild an ihrem Platz.

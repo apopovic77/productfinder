@@ -25,6 +25,7 @@ import { ProductAnnotations } from './components/ProductAnnotations';
 import { ProductOverlayModalV2 as ProductOverlayModal } from './components/ProductOverlayModalV2';
 import { ProductOverlayModalV4 } from './components/ProductOverlayModalV4';
 import { HeroVideoBackground } from './components/HeroVideoBackground';
+import { resolveCatalogCategory } from './utils/catalogEntry';
 import { AnimatePresence, motion } from 'framer-motion';
 import { DIALOG_MORPH_EASE, DIALOG_MORPH_SECONDS } from './utils/expandedDialog';
 import { getProductValue } from './gpane/types';
@@ -3971,6 +3972,12 @@ export default class App extends React.Component<Props, State> {
             const heroImageQuery = [isMotocross ? 'MX' : 'MTB', heroBrand, heroType ?? heroFamily, 'Action Lifestyle']
               .filter(Boolean)
               .join(' ');
+            // Bild links vom Detaildialog = Banner der Kategorie, zuerst das
+            // der Marke (Sonja Goldmann 2026-10-21). Ohne Banner bleibt die
+            // Bildsuche.
+            const heroCategory = resolveCatalogCategory(selectedProduct, this.props.entrySelection?.sportId ?? 'moto');
+            const heroBanner = (heroBrand && heroCategory?.bannersByBrand?.[heroBrand]) || heroCategory?.banner;
+            const heroBannerId = heroBanner?.mode === 'image' ? heroBanner.storageId : undefined;
 
             // Stimmungsbild schon mit der Karte unsichtbar einhaengen: Suche und
             // Bild sind fertig, wenn "Mehr Details" aufgeht, und beide blenden
@@ -3992,6 +3999,7 @@ export default class App extends React.Component<Props, State> {
                   imageQuery={heroImageQuery}
                   imageBrand={heroBrand || undefined}
                   imageSeed={Number(selectedProduct.id) || 0}
+                  bannerStorageId={heroBannerId}
                   backdropOpacity={1}
                   active={this.state.shouldShowV4Dialog}
                   onClose={() => this.setState({ shouldShowV4Dialog: false })}

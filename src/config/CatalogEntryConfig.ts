@@ -219,6 +219,17 @@ export function resolveCatalogScope(_href?: string): CatalogScope {
   return 'workbook';
 }
 
+/**
+ * Produkte, die O'Neal in einer anderen Katalog-Kategorie fuehrt als LIUS
+ * (Sonja Goldmann 2026-10-21). Der Name entscheidet, der Wert ersetzt die
+ * LIUS-Kategorie ueberall im Finder.
+ */
+export const CATEGORY_OVERRIDES: Array<{ name: RegExp; category: string }> = [
+  { name: /^3SRS Adventure Boot\b/i, category: 'Boots Adventure' },
+  { name: /^CYCLONE Soft Shell Jacket\b/i, category: 'Rain Wear' },
+  { name: /^EXT Enduro Pants\b/i, category: 'ADV Pants' },
+];
+
 export const CATALOG_ENTRY_CONFIG: CatalogEntryConfig = {
   year: resolveCatalogScope() === 'workbook' ? 2028 : 2027,
   // Alex' finale Medienwahl bleibt ein einzelner Config-Wechsel. Solange kein
@@ -268,6 +279,8 @@ export const CATALOG_ENTRY_CONFIG: CatalogEntryConfig = {
       { id: 'protection', banner: { mode: 'image', storageId: 10916 }, bannersByBrand: { "O'Neal": { mode: 'image', storageId: 35389, position: 'center 41%' }, 'Kini Red Bull': { mode: 'image', storageId: 31318, position: 'center 45%' } }, labels: label('PROTECTION'), categories: ['Protection MX', 'Protection MTB'], targetGroup: 'Erwachsene', grouping: PROTECTION },
       { id: 'street-adventure-helmets', banner: { mode: 'image', storageId: 18556 }, bannersByBrand: { 'Kini Red Bull': { mode: 'image', storageId: 30609, position: 'center 50%' } }, labels: label('STREET/ADVENTURE HELMETS'), categories: ['Helmets Street'], targetGroup: 'Erwachsene', grouping: HELMETS },
       { id: 'street-adventure-jackets-pants', banner: { mode: 'image', storageId: 18695 }, labels: label('STREET/ADVENTURE JACKETS & PANTS'), categories: ['Jackets', 'ADV Pants'], targetGroup: 'Erwachsene', grouping: TYPE_COLOUR },
+      // Sonja Goldmann 2026-10-21: eigene Kategorie fuer Adventure-Stiefel
+      { id: 'street-adventure-boots', banner: { mode: 'image', storageId: 11767 }, labels: label('STREET/ADVENTURE BOOTS'), categories: ['Boots Adventure'], targetGroup: 'Erwachsene', grouping: LINE_FIRST },
       { id: 'youth-helmets', banner: { mode: 'image', storageId: 17684 }, bannersByBrand: { "O'Neal": { mode: 'image', storageId: 35390, position: 'center 42%' } }, labels: label('YOUTH HELMETS'), categories: ['Helmets MX'], targetGroup: 'Jugendliche', grouping: HELMETS },
       { id: 'youth-gear', banner: { mode: 'image', storageId: 17967 }, bannersByBrand: { "O'Neal": { mode: 'image', storageId: 35391, position: 'center 35%' } }, labels: label('YOUTH GEAR'), categories: ['Jerseys Offroad', 'Pants MX'], targetGroup: 'Jugendliche', grouping: GEAR },
       { id: 'youth-goggles', banner: { mode: 'image', storageId: 17698 }, bannersByBrand: { "O'Neal": { mode: 'image', storageId: 35392, position: 'center 50%' } }, labels: label('YOUTH GOGGLES'), categories: ['Goggles'], targetGroup: 'Jugendliche', grouping: LINE_FIRST },
