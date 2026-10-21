@@ -1024,3 +1024,68 @@
 @media (min-width: 769px) {
   .pom-info-panel.pom-expanded { padding-top: 0; }
 }
+
+/* ---- Buehne 2.0 (Entwurf media 131843, owner 2026-10-21): grosses Bild mit
+   Hintergrund-Stil, Vorschau-Spalte rechts daneben, Merkmale darunter. ---- */
+@media (min-width: 769px) {
+  .pom-expanded-hero.pom-stage-flow {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 132px;
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: 12px;
+    background: #141416 !important;
+    padding: 12px;
+    overflow: hidden;
+  }
+  .pom-stage-flow .pom-stage-main {
+    position: relative;
+    grid-column: 1; grid-row: 1;
+    min-height: 0;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #fff center / cover no-repeat;
+  }
+  .pom-stage-flow .pom-stage-main .pom-expanded-hero-img,
+  .pom-stage-flow .pom-stage-main .pom-expanded-hero-img.pf-zoom-box,
+  .pom-stage-flow .pom-stage-main .pom-expanded-hero-video {
+    width: 100%; height: 100%; background: transparent; border-radius: 0; padding: 28px;
+  }
+  .pom-stage-flow .pom-expanded-hero-thumbs {
+    grid-column: 2; grid-row: 1;
+    display: flex; flex-direction: column; gap: 10px;
+    margin: 0; overflow-y: auto; overflow-x: hidden; min-height: 0;
+    scrollbar-width: thin;
+  }
+  .pom-stage-flow .pom-expanded-thumb {
+    flex: 0 0 auto; width: 100%; height: auto; aspect-ratio: 3 / 4;
+    background-color: #1f1f22; padding: 6px; border-radius: 12px;
+    border: 2px solid transparent;
+  }
+  .pom-stage-flow .pom-expanded-thumb.active { border-color: #ff5a1f; }
+  /* Pfeile und Zoom-freundliche Bedienung auf dem Hauptbild */
+  .pom-stage-arrow {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    width: 40px; height: 40px; border-radius: 50%; border: 0;
+    background: rgba(20, 20, 22, 0.65); color: #fff; font-size: 26px; line-height: 1;
+    display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 2;
+  }
+  .pom-stage-arrow.prev { left: 14px; }
+  .pom-stage-arrow.next { right: 14px; }
+  .pom-stage-arrow:hover { background: rgba(255, 90, 31, 0.85); }
+  .pom-stage-arrow:focus:not(:focus-visible) { outline: none; }
+  /* Hintergrund-Wahl: kleine Vorschaupunkte unten links */
+  .pom-stage-bgpick { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 6px; z-index: 2; padding: 5px; border-radius: 999px; background: rgba(20, 20, 22, 0.55); }
+  .pom-stage-bgdot { width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.35); background: #fff center / cover; cursor: pointer; padding: 0; }
+  .pom-stage-bgdot.active { border-color: #ff5a1f; }
+  .pom-stage-bgdot:focus:not(:focus-visible) { outline: none; }
+  /* Merkmale unter dem Bild */
+  .pom-stage-features { grid-column: 1 / -1; grid-row: 2; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 6px 4px 2px; }
+}
+.pom-stage-feature { display: flex; flex-direction: column; gap: 4px; color: #fff; }
+.pom-stage-feature strong { font-size: 13px; font-weight: 700; color: #fff !important; }
+.pom-stage-feature span:not(.pom-feature-ico) { font-size: 11.5px; color: rgba(255, 255, 255, 0.55) !important; }
+.pom-feature-ico { display: inline-flex; width: 40px; height: 40px; color: #fff; --icon-accent: #E8632B; }
+.pom-feature-ico svg { width: 100%; height: 100%; }
+.pom-feature-ico-empty { width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid rgba(255, 255, 255, 0.3); }
+.pom-stage-flow .pom-stage-main .pf-zoom-box, .pom-stage-flow .pom-stage-main .pom-expanded-hero-img { background-color: transparent !important; }
+.pom-stage-flow .pom-expanded-thumb { background-size: contain, cover; background-position: center, center; background-repeat: no-repeat, no-repeat; }

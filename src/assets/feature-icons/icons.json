@@ -1,0 +1,408 @@
+[
+ {
+  "nr": 1,
+  "key": "breathable",
+  "bedeutung": "atmungsaktiv, Feuchtigkeitstransport",
+  "file": "breathable.svg",
+  "accent": false
+ },
+ {
+  "nr": 2,
+  "key": "fit",
+  "bedeutung": "ergonomische, vorgeformte Passform",
+  "file": "fit.svg",
+  "accent": false
+ },
+ {
+  "nr": 3,
+  "key": "ventilation",
+  "bedeutung": "Belüftung, Luftkanäle",
+  "file": "ventilation.svg",
+  "accent": false
+ },
+ {
+  "nr": 4,
+  "key": "stretch",
+  "bedeutung": "Stretch, Bewegungsfreiheit",
+  "file": "stretch.svg",
+  "accent": false
+ },
+ {
+  "nr": 5,
+  "key": "lightweight",
+  "bedeutung": "Leichtgewicht",
+  "file": "lightweight.svg",
+  "accent": false
+ },
+ {
+  "nr": 6,
+  "key": "durable",
+  "bedeutung": "robust, verstärkte Nähte",
+  "file": "durable.svg",
+  "accent": true
+ },
+ {
+  "nr": 7,
+  "key": "graphics",
+  "bedeutung": "lichtechte, sublimierte Grafiken",
+  "file": "graphics.svg",
+  "accent": true
+ },
+ {
+  "nr": 8,
+  "key": "mesh",
+  "bedeutung": "Mesh-Einsätze",
+  "file": "mesh.svg",
+  "accent": false
+ },
+ {
+  "nr": 9,
+  "key": "grip",
+  "bedeutung": "Silikon-Grip, rutschfest",
+  "file": "grip.svg",
+  "accent": false
+ },
+ {
+  "nr": 10,
+  "key": "outfit_combo",
+  "bedeutung": "kombinierbar zum Outfit",
+  "file": "outfit_combo.svg",
+  "accent": false
+ },
+ {
+  "nr": 11,
+  "key": "finish",
+  "bedeutung": "Oberfläche matt/glänzend",
+  "file": "finish.svg",
+  "accent": false
+ },
+ {
+  "nr": 12,
+  "key": "women",
+  "bedeutung": "Damen-Schnitt",
+  "file": "women.svg",
+  "accent": false
+ },
+ {
+  "nr": 13,
+  "key": "recycled",
+  "bedeutung": "recyceltes Material",
+  "file": "recycled.svg",
+  "accent": false
+ },
+ {
+  "nr": 14,
+  "key": "sold_as_pair",
+  "bedeutung": "als Paar verkauft",
+  "file": "sold_as_pair.svg",
+  "accent": false
+ },
+ {
+  "nr": 15,
+  "key": "riding_use",
+  "bedeutung": "Einsatzbereich Gelände/Trail",
+  "file": "riding_use.svg",
+  "accent": false
+ },
+ {
+  "nr": 16,
+  "key": "cuffless",
+  "bedeutung": "bündchenlos, kragenlos",
+  "file": "cuffless.svg",
+  "accent": false
+ },
+ {
+  "nr": 17,
+  "key": "ratchet_waist",
+  "bedeutung": "Hosenbund mit Ratschenverschluss",
+  "file": "ratchet_waist.svg",
+  "accent": false
+ },
+ {
+  "nr": 18,
+  "key": "knee_brace",
+  "bedeutung": "Akkordeon-Knie, Knieorthesen-tauglich",
+  "file": "knee_brace.svg",
+  "accent": false
+ },
+ {
+  "nr": 19,
+  "key": "heat_guard",
+  "bedeutung": "Hitzeschutz an den Knien",
+  "file": "heat_guard.svg",
+  "accent": true
+ },
+ {
+  "nr": 20,
+  "key": "hip_pads",
+  "bedeutung": "Hüftpolster, Protektor-Einschub",
+  "file": "hip_pads.svg",
+  "accent": false
+ },
+ {
+  "nr": 21,
+  "key": "zip_pocket",
+  "bedeutung": "Tasche mit Reißverschluss",
+  "file": "zip_pocket.svg",
+  "accent": false
+ },
+ {
+  "nr": 22,
+  "key": "extended_back",
+  "bedeutung": "verlängerter Rücken",
+  "file": "extended_back.svg",
+  "accent": false
+ },
+ {
+  "nr": 23,
+  "key": "shell",
+  "bedeutung": "Helm-Außenschale",
+  "file": "shell.svg",
+  "accent": false
+ },
+ {
+  "nr": 24,
+  "key": "multi_shell",
+  "bedeutung": "zwei Schalen, zwei EPS-Lagen",
+  "file": "multi_shell.svg",
+  "accent": false
+ },
+ {
+  "nr": 25,
+  "key": "removable_liner",
+  "bedeutung": "herausnehmbares, waschbares Innenfutter",
+  "file": "removable_liner.svg",
+  "accent": true
+ },
+ {
+  "nr": 26,
+  "key": "chin_strap",
+  "bedeutung": "Kinnriemen-Verschluss",
+  "file": "chin_strap.svg",
+  "accent": false
+ },
+ {
+  "nr": 27,
+  "key": "goggle_channel",
+  "bedeutung": "Brillenbandführung am Helm",
+  "file": "goggle_channel.svg",
+  "accent": false
+ },
+ {
+  "nr": 28,
+  "key": "peak",
+  "bedeutung": "verstellbarer Helmschirm",
+  "file": "peak.svg",
+  "accent": true
+ },
+ {
+  "nr": 29,
+  "key": "breakaway",
+  "bedeutung": "Sollbruch-Schraube am Schirm",
+  "file": "breakaway.svg",
+  "accent": true
+ },
+ {
+  "nr": 30,
+  "key": "emergency_pads",
+  "bedeutung": "Notfall-Wangenpolster",
+  "file": "emergency_pads.svg",
+  "accent": true
+ },
+ {
+  "nr": 31,
+  "key": "bluetooth",
+  "bedeutung": "Kommunikationssystem vorbereitet",
+  "file": "bluetooth.svg",
+  "accent": true
+ },
+ {
+  "nr": 32,
+  "key": "visor",
+  "bedeutung": "Visier und Sonnenblende",
+  "file": "visor.svg",
+  "accent": false
+ },
+ {
+  "nr": 33,
+  "key": "hydration",
+  "bedeutung": "Trinkschlauchführung",
+  "file": "hydration.svg",
+  "accent": true
+ },
+ {
+  "nr": 34,
+  "key": "nose_guard",
+  "bedeutung": "Nasenschutz",
+  "file": "nose_guard.svg",
+  "accent": true
+ },
+ {
+  "nr": 35,
+  "key": "rotational",
+  "bedeutung": "Rotationsschutz-System",
+  "file": "rotational.svg",
+  "accent": false
+ },
+ {
+  "nr": 36,
+  "key": "sensor_ready",
+  "bedeutung": "Sicherheitssensor vorbereitet",
+  "file": "sensor_ready.svg",
+  "accent": true
+ },
+ {
+  "nr": 37,
+  "key": "camera_mount",
+  "bedeutung": "Kamera-Halterung",
+  "file": "camera_mount.svg",
+  "accent": false
+ },
+ {
+  "nr": 38,
+  "key": "lens_clarity",
+  "bedeutung": "3D-Linse, klare Sicht",
+  "file": "lens_clarity.svg",
+  "accent": false
+ },
+ {
+  "nr": 39,
+  "key": "uv",
+  "bedeutung": "100 % UV-Schutz",
+  "file": "uv.svg",
+  "accent": false
+ },
+ {
+  "nr": 40,
+  "key": "anti_fog",
+  "bedeutung": "Antibeschlag",
+  "file": "anti_fog.svg",
+  "accent": true
+ },
+ {
+  "nr": 41,
+  "key": "scratch",
+  "bedeutung": "kratzfest",
+  "file": "scratch.svg",
+  "accent": false
+ },
+ {
+  "nr": 42,
+  "key": "tear_off",
+  "bedeutung": "Abreißvisiere",
+  "file": "tear_off.svg",
+  "accent": false
+ },
+ {
+  "nr": 43,
+  "key": "field_of_view",
+  "bedeutung": "großes Sichtfeld",
+  "file": "field_of_view.svg",
+  "accent": false
+ },
+ {
+  "nr": 44,
+  "key": "foam",
+  "bedeutung": "mehrlagiger Schaumstoff",
+  "file": "foam.svg",
+  "accent": false
+ },
+ {
+  "nr": 45,
+  "key": "strap",
+  "bedeutung": "Brillenband mit Silikonstreifen",
+  "file": "strap.svg",
+  "accent": true
+ },
+ {
+  "nr": 46,
+  "key": "lens_swap",
+  "bedeutung": "Wechselglas",
+  "file": "lens_swap.svg",
+  "accent": false
+ },
+ {
+  "nr": 47,
+  "key": "anti_glare",
+  "bedeutung": "Anti-Reflex",
+  "file": "anti_glare.svg",
+  "accent": true
+ },
+ {
+  "nr": 48,
+  "key": "bag",
+  "bedeutung": "Aufbewahrungsbeutel inklusive",
+  "file": "bag.svg",
+  "accent": false
+ },
+ {
+  "nr": 49,
+  "key": "palm",
+  "bedeutung": "verstärkte Handfläche",
+  "file": "palm.svg",
+  "accent": false
+ },
+ {
+  "nr": 50,
+  "key": "closure_velcro",
+  "bedeutung": "Klettverschluss am Handgelenk",
+  "file": "closure_velcro.svg",
+  "accent": true
+ },
+ {
+  "nr": 51,
+  "key": "touchscreen",
+  "bedeutung": "Touchscreen-fähig",
+  "file": "touchscreen.svg",
+  "accent": true
+ },
+ {
+  "nr": 52,
+  "key": "seamless_tips",
+  "bedeutung": "nahtlose Fingerspitzen",
+  "file": "seamless_tips.svg",
+  "accent": true
+ },
+ {
+  "nr": 53,
+  "key": "buckles",
+  "bedeutung": "Schnallen-Verschluss am Stiefel",
+  "file": "buckles.svg",
+  "accent": false
+ },
+ {
+  "nr": 54,
+  "key": "sole",
+  "bedeutung": "Profilsohle, Halt auf der Fußraste",
+  "file": "sole.svg",
+  "accent": false
+ },
+ {
+  "nr": 55,
+  "key": "shin_toe",
+  "bedeutung": "Schienbein-, Zehen- und Knöchelschutz",
+  "file": "shin_toe.svg",
+  "accent": false
+ },
+ {
+  "nr": 56,
+  "key": "footbed",
+  "bedeutung": "herausnehmbares Fußbett",
+  "file": "footbed.svg",
+  "accent": true
+ },
+ {
+  "nr": 57,
+  "key": "gaiter",
+  "bedeutung": "Schutz gegen Wasser und Schmutz",
+  "file": "gaiter.svg",
+  "accent": false
+ },
+ {
+  "nr": 58,
+  "key": "elbow_pad",
+  "bedeutung": "Ellbogenpolster",
+  "file": "elbow_pad.svg",
+  "accent": false
+ }
+]

@@ -14,6 +14,30 @@ import { DIALOG_MORPH_EASE, DIALOG_MORPH_SECONDS, expandedDialogGeometry } from 
 
 // Storage API URL from environment
 const STORAGE_API_URL = STORAGE_API_BASE;
+import { DEFAULT_STAGE_BACKGROUND, STAGE_BACKGROUND_BASE, STAGE_BACKGROUND_STYLES, stageBackgroundUrl } from '../config/stageBackgrounds';
+
+/**
+ * Merkmal-Icons (58 SVGs von Higgsfield, owner 2026-10-21): inline, damit
+ * fill=currentColor und der Akzent (--icon-accent) wirken. Die Dateien liegen
+ * im Repo und stammen aus der eigenen Lieferung (nur Pfade, kein Skript).
+ */
+// Bei Bedarf geladen (je ~10 KB), nicht im Hauptpaket
+const FEATURE_ICON_LOADERS = import.meta.glob('../assets/feature-icons/*.svg', { query: '?raw', import: 'default' }) as Record<string, () => Promise<string>>;
+const FEATURE_ICON_CACHE = new Map<string, string>();
+function FeatureIcon({ iconKey }: { iconKey: string }) {
+  const [svg, setSvg] = useState<string | undefined>(() => FEATURE_ICON_CACHE.get(iconKey));
+  useEffect(() => {
+    if (FEATURE_ICON_CACHE.has(iconKey)) { setSvg(FEATURE_ICON_CACHE.get(iconKey)); return; }
+    const load = FEATURE_ICON_LOADERS[`../assets/feature-icons/${iconKey}.svg`];
+    if (!load) return;
+    let alive = true;
+    load().then(text => { FEATURE_ICON_CACHE.set(iconKey, text); if (alive) setSvg(text); }).catch(() => {});
+    return () => { alive = false; };
+  }, [iconKey]);
+  return svg
+    ? <span className="pom-feature-ico" aria-hidden="true" dangerouslySetInnerHTML={{ __html: svg }} />
+    : <span className="pom-feature-ico pom-feature-ico-empty" aria-hidden="true" />;
+}
 
 /** Grundtoene fuer O'Neal-Farbnamen (erste Farbe eines Namens wie "black/neon yellow"). */
 const COLOR_TONES: Array<[RegExp, string]> = [
@@ -64,6 +88,8 @@ type Props = {
    * Liste stand nur die eigene Farbe da (owner 2026-10-21, media 131797).
    */
   colorOptions?: Array<{ id: string | number; colorName: string; storageId?: number }>;
+  /** Hintergrundbild der Buehne im grossen Dialog (Hintergrund-Matrix) */
+  stageBackground?: string;
   /** Expanded state: the SAME card grows into the detail view (true morph). */
   expanded?: boolean;
   onCollapse?: () => void;
@@ -107,7 +133,7 @@ interface ParsedFeature {
  * Product Overlay Modal V2 - HALF WIDTH VERSION (240px)
  * Same design as V1, but with compact half-width layout
  */
-export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady, onShowDetails, expanded = false, onCollapse, locale, onSiblingSelect, colorOptions, onStepProduct, stepPosition, dealerPrices, dealerActive = false, dealerPricesPending = false, cartLines = [] }) => {
+export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady, onShowDetails, expanded = false, onCollapse, locale, onSiblingSelect, colorOptions, stageBackground, onStepProduct, stepPosition, dealerPrices, dealerActive = false, dealerPricesPending = false, cartLines = [] }) => {
   const isMobilePortrait = window.innerWidth <= 768 && window.innerHeight > window.innerWidth;
   // Phone: the dark hero card as a full-width bottom sheet (owner 2026-08-23,
   // "die Karte auch im Desktop-Style"). Same markup as the desktop dock,
@@ -121,6 +147,14 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   const [isSiblingView, setIsSiblingView] = useState(false);
   /** Aufgeklappter Bereich im grossen Dialog (Produktdetails / Technische Daten). */
   const [openSection, setOpenSection] = useState<'details' | 'tech' | null>(null);
+  /** Gewaehlter Hintergrundstil der Buehne, im Browser gemerkt */
+  const [bgStyle, setBgStyle] = useState<string>(() => {
+    try { return localStorage.getItem('pf-stage-bg') || DEFAULT_STAGE_BACKGROUND; } catch { return DEFAULT_STAGE_BACKGROUND; }
+  });
+  const chooseBgStyle = (id: string) => {
+    setBgStyle(id);
+    try { localStorage.setItem('pf-stage-bg', id); } catch { /* ohne Speicher nur fuer diese Sitzung */ }
+  };
   /** Kurze Bestaetigung am Knopf nach dem Hinzufuegen. */
   const [justAdded, setJustAdded] = useState(false);
 
@@ -1166,6 +1200,24 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
           overflowY: 'auto',
           overscrollBehavior: 'contain',
         };
+        const pickStageImage = (idx: number) => {
+          const img = allImages[idx];
+          setStageVideoId(null);
+          manualHoldUntilRef.current = Date.now() + 12000;
+          cyclePosRef.current = idx;
+          autoSelectedRef.current = -1;
+          setSelectedImageIndex(idx);
+          if (onImageSelect && img?.storageId) {
+            const cachedThumb = loadedThumbnails.get(buildThumbUrl(img.storageId));
+            onImageSelect(img.storageId, cachedThumb || undefined);
+          }
+        };
+        // Merkmale mit Icon unter dem Bild (Entwurf media 131843), sobald der
+        // Katalog sie liefert (features: [{key, title, subtitle}])
+        const stageFeatures: Array<{ key: string; title: string; subtitle?: string }> =
+          Array.isArray(rawProduct.features) ? rawProduct.features.slice(0, 4) : [];
+        const stageBgUrl = stageBackground ?? stageBackgroundUrl(bgStyle, product.id);
+        const stageThumbBg = stageBgUrl ? `url(${stageBgUrl.replace('width=1200', 'width=300')})` : '';
         const stage = (
           <div
             className={`pom-expanded-hero ${isMobilePortrait ? '' : 'pom-stage-flow'} ${drawerIntro ? 'pom-drawer-stage' : ''} ${drawerExpand && drawerIntroDone ? 'pom-intro-done' : ''}`}
@@ -1175,6 +1227,20 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
               animation: isPresent ? undefined : `pomStageOut ${DIALOG_MORPH_SECONDS}s cubic-bezier(${DIALOG_MORPH_EASE.join(',')}) forwards`,
             }}
           >
+            <div
+              className="pom-stage-main"
+              // Hintergrundbild hinter dem freigestellten Produkt (Hintergrund-
+              // Matrix BG01-BG11, owner 2026-10-21); ohne Bild die weisse Karte
+              style={stageBgUrl ? { backgroundImage: `url(${stageBgUrl})` } : undefined}
+            >
+            <div className="pom-stage-bgpick" role="group" aria-label="Hintergrund">
+              {STAGE_BACKGROUND_STYLES.map(st => (
+                <button key={st.id} type="button" title={st.label}
+                  className={`pom-stage-bgdot ${bgStyle === st.id ? 'active' : ''}`}
+                  style={st.storageIds[0] ? { backgroundImage: `url(${STAGE_BACKGROUND_BASE}/storage/media/${st.storageIds[0]}?width=60&format=webp&quality=60)` } : undefined}
+                  onClick={() => chooseBgStyle(st.id)} />
+              ))}
+            </div>
             {stageVideoId ? (
               <iframe
                 className="pom-expanded-hero-video"
@@ -1186,6 +1252,15 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
             ) : (
               <ZoomableImage className="pom-expanded-hero-img" src={heroSrc} alt={product.name} />
             )}
+            {allImages.length > 1 && !stageVideoId && (
+              <>
+                <button type="button" className="pom-stage-arrow prev" aria-label="Vorheriges Bild"
+                  onClick={() => pickStageImage((selectedImageIndex - 1 + allImages.length) % allImages.length)}>‹</button>
+                <button type="button" className="pom-stage-arrow next" aria-label="Nächstes Bild"
+                  onClick={() => pickStageImage((selectedImageIndex + 1) % allImages.length)}>›</button>
+              </>
+            )}
+            </div>
             <div className="pom-expanded-hero-thumbs">
               {stageVideoIds.map(id => (
                 <button
@@ -1211,19 +1286,10 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                     key={idx}
                     type="button"
                     className={`pom-expanded-thumb ${isActive ? 'active' : ''}`}
-                    // Kleines Vorschaubild als Platzhalter, bis die grosse Fassung da ist
-                    style={img.storageId ? { backgroundImage: `url(${buildThumbUrl(img.storageId)})` } : undefined}
-                    onClick={() => {
-                      setStageVideoId(null);
-                      manualHoldUntilRef.current = Date.now() + 12000;
-                      cyclePosRef.current = idx;
-                      autoSelectedRef.current = -1;
-                      setSelectedImageIndex(idx);
-                      if (onImageSelect && img.storageId) {
-                        const cachedThumb = loadedThumbnails.get(buildThumbUrl(img.storageId));
-                        onImageSelect(img.storageId, cachedThumb || undefined);
-                      }
-                    }}
+                    // Kleines Vorschaubild als Platzhalter, bis die grosse Fassung
+                    // da ist; darunter der Buehnen-Hintergrund wie im Entwurf
+                    style={{ backgroundImage: [img.storageId ? `url(${buildThumbUrl(img.storageId)})` : '', stageThumbBg].filter(Boolean).join(', ') || undefined }}
+                    onClick={() => pickStageImage(idx)}
                   >
                     <img
                       src={thumbnailUrl}
@@ -1231,12 +1297,23 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                       // Platzhalter weg, sobald das grosse Bild da ist: bei
                       // freigestellten Bildern schien er sonst verschoben durch
                       // (owner 2026-10-21, media 131831)
-                      onLoad={e => { const btn = e.currentTarget.parentElement; if (btn) btn.style.backgroundImage = 'none'; }}
+                      onLoad={e => { const btn = e.currentTarget.parentElement; if (btn) btn.style.backgroundImage = stageThumbBg || 'none'; }}
                     />
                   </button>
                 );
               })}
             </div>
+            {stageFeatures.length > 0 && (
+              <div className="pom-stage-features">
+                {stageFeatures.map(f => (
+                  <div key={f.key} className="pom-stage-feature">
+                    <FeatureIcon iconKey={f.key} />
+                    <strong>{f.title}</strong>
+                    {f.subtitle && <span>{f.subtitle}</span>}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         );
         // Portal: position:fixed inside the dialog is captured by its
