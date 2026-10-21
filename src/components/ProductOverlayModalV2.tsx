@@ -97,6 +97,8 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   const [fullProduct, setFullProduct] = useState<Product | null>(null);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [isSiblingView, setIsSiblingView] = useState(false);
+  /** Aufgeklappter Bereich im grossen Dialog (Produktdetails / Technische Daten). */
+  const [openSection, setOpenSection] = useState<'details' | 'tech' | null>(null);
 
   // Always fetch full product details when modal opens
   // List API doesn't include variants with images array
@@ -1212,6 +1214,12 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       )}
 
       {/* Title - V4 Style: First word thin, rest bold */}
+      {showExpandedContent && (
+        <div className="pom-x-eyebrow">
+          {[product.brand || rawProduct.brand, rawProduct.product_line || (product as any).attributes?.product_line?.value || rawProduct.properties?.product_line]
+            .filter(Boolean).join(' / ')}
+        </div>
+      )}
       {heroDock ? (
         <h2 className="pom-title pom-title-hero" style={{ margin: '0 0 4px', textTransform: 'uppercase', lineHeight: '1' }}>
           {heroTitle.series && <div className="pom-hero-series">{heroTitle.series}</div>}
@@ -1306,7 +1314,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       )}
 
       {/* Price & Availability - Compact */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+      <div className="pom-price-row" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
         <div className="pom-price" style={{ fontSize: '16px' }}>{priceText}</div>
         {/* Noch kein Produktfoto (Owner 2026-09-26): Tag statt stiller Luecke. */}
         {product.isComingSoon && (
@@ -1359,7 +1367,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       {/* Farbe und Groesse nebeneinander (owner 2026-09-16, media 125393): gestapelt
           wurde die Karte so hoch, dass „Add to Cart" aus dem Bild rutschte. Bei zu
           wenig Breite bricht die Zeile von selbst wieder um. */}
-      <div style={{ display: 'flex', gap: '12px 20px', flexWrap: 'wrap', alignItems: 'flex-start', marginBottom: '12px' }}>
+      <div className="pom-variant-row" style={{ display: 'flex', gap: '12px 20px', flexWrap: 'wrap', alignItems: 'flex-start', marginBottom: '12px' }}>
       {/* Color — rectangles (selectable, switches to sibling product) */}
       {(() => {
         const activeRaw = (activeProduct as any)?.raw || {};
@@ -1385,7 +1393,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         return (
           <div style={{ flex: '0 1 auto', minWidth: 0 }}>
             <div style={{ fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.8, marginBottom: '6px' }}>
-              Color: <span style={{ opacity: 1 }}>{currentColor}</span>
+              {showExpandedContent ? 'Farbe' : 'Color'}: <span style={{ opacity: 1 }}>{currentColor}</span>
             </div>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               {options.map((opt) => {
@@ -1428,6 +1436,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                       cursor: isActive ? 'default' : 'pointer',
                       transition: 'all 0.15s ease',
                     }}
+                    className={thumb ? 'pom-color-thumb' : undefined}
                     title={opt.color_name}
                     aria-label={opt.color_name}
                   >
@@ -1444,7 +1453,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
 
       {/* Sizes — selectable chips; the chosen size goes into the cart via
           activeVariant (owner 2026-08-23: plain text left no way to pick). */}
-      {availableSizes.length > 0 && (
+      {availableSizes.length > 0 && !(showExpandedContent && qtySizes.length > 0) && (
         <div className="pom-size-block" style={{ flex: '0 1 auto', minWidth: 0 }}>
           <div style={{ fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.8, marginBottom: '6px' }}>
             Size: <span style={{ opacity: 1 }}>{selectedSize || availableSizes[0]}</span>
@@ -1537,60 +1546,90 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
           these (owner 2026-08-24 — true morph, no second dialog). */}
       {showExpandedContent && (() => {
         const descText = expandedDescText || (activeVariant as any)?.description_long || '';
-        const props: Array<[string, string]> = [];
         const raw: any = (product as any).raw || {};
         const attrs: any = (product as any).attributes || {};
         const attr = (k: string) => attrs[k]?.value ?? raw?.properties?.[k];
-        if (attr('sport')) props.push(['Sport', String(Array.isArray(attr('sport')) ? attr('sport').join(', ') : attr('sport'))]);
-        if (attr('target_group')) props.push(['Zielgruppe', String(attr('target_group'))]);
-        if (attr('product_line')) props.push(['Produktlinie', String(attr('product_line'))]);
-        if (raw?.model_year) props.push(['Jahrgang', String(raw.model_year)]);
-        if ((activeVariant as any)?.material) props.push(['Material', String((activeVariant as any).material)]);
-        for (const b of heroBadges) props.push([b.label, b.value]);
+        const badge = (label: string) => heroBadges.find(b => b.label === label)?.value;
+        // Kennzahlen oben, darunter ein Datenblatt in Zeilen (owner 2026-10-21,
+        // Entwurf media 131801) statt vieler gleich gewichteter Kacheln.
+        const keyFigures: Array<[string, string]> = [];
+        if (badge('Gewicht')) keyFigures.push(['Gewicht', badge('Gewicht')!]);
+        if (raw?.model_year) keyFigures.push(['Modelljahr', String(raw.model_year)]);
+        const sizeRange = badge('Größen') || badge('Größe');
+        if (sizeRange) keyFigures.push(['Größen', sizeRange]);
+        const info: Array<[string, string]> = [];
+        if (attr('sport')) info.push(['Sportart', String(Array.isArray(attr('sport')) ? attr('sport').join(', ') : attr('sport'))]);
+        if (attr('target_group')) info.push(['Zielgruppe', String(attr('target_group'))]);
+        if (attr('product_line')) info.push(['Produktlinie', String(attr('product_line'))]);
+        if (attr('product_type')) info.push(['Produkttyp', String(attr('product_type'))]);
+        if (raw?.color_name) info.push(['Farbe', String(raw.color_name)]);
+        if (sizeRange) info.push(['Größen', sizeRange]);
+        const article: Array<[string, string]> = [];
+        if ((activeVariant as any)?.material) article.push(['Material', String((activeVariant as any).material)]);
+        if (raw?.product_code) article.push(['Artikelnummer', String(raw.product_code)]);
+        if (activeVariant?.sku) article.push(['SKU', String(activeVariant.sku)]);
+        if (activeVariant?.ean) article.push(['EAN', String(activeVariant.ean)]);
+        const lines = descText.split(/<br\s*\/?>|\n/i)
+          .map((line: string) => line.replace(/^\s*[-•·*]\s*/, '').trim())
+          .filter(Boolean);
+        const isNorm = (line: string) => /^(EN|ECE|ISO|DIN|DOT|CPSC|ASTM|CE)\s?[\d./-]/i.test(line.replace(/<[^>]+>/g, ''));
+        const norms = lines.filter(isNorm);
+        const points = lines.filter((line: string) => !isNorm(line));
+        const section = (key: 'details' | 'tech', title: string, subtitle: string, icon: React.ReactNode, body: React.ReactNode) => (
+          <div className={`pom-acc ${openSection === key ? 'open' : ''}`}>
+            <button type="button" className="pom-acc-head" onClick={() => setOpenSection(openSection === key ? null : key)} aria-expanded={openSection === key}>
+              <span className="pom-acc-icon" aria-hidden="true">{icon}</span>
+              <span className="pom-acc-titles">
+                <span className="pom-acc-title">{title}</span>
+                <span className="pom-acc-sub">{subtitle}</span>
+              </span>
+              <span className="pom-acc-chevron" aria-hidden="true">⌄</span>
+            </button>
+            {openSection === key && <div className="pom-acc-body">{body}</div>}
+          </div>
+        );
+        const rows = (heading: string, list: Array<[string, string]>) => list.length > 0 && (
+          <div className="pom-sheet-group">
+            <div className="pom-sheet-heading">{heading}</div>
+            {list.map(([k, v]) => (
+              <div key={k} className="pom-sheet-row"><span>{k}</span><span>{v}</span></div>
+            ))}
+          </div>
+        );
         return (
           <div className="pom-expanded-extra">
-            {descText && (
-              (() => {
-                // LIUS-Langtexte sind Aufzaehlungen mit <br> — als Liste lesbar,
-                // Normzeilen (EN1621-2 Level 2 …) als eigene Zeile mit Etiketten
-                // (owner 2026-09-28, media 128375).
-                const lines = descText.split(/<br\s*\/?>|\n/i)
-                  .map((line: string) => line.replace(/^\s*[-•·*]\s*/, '').trim())
-                  .filter(Boolean);
-                const isNorm = (line: string) => /^(EN|ECE|ISO|DIN|DOT|CPSC|ASTM|CE)\s?[\d./-]/i.test(line.replace(/<[^>]+>/g, ''));
-                const norms = lines.filter(isNorm);
-                const points = lines.filter((line: string) => !isNorm(line));
-                return (
-                  <div className="pom-expanded-desc">
-                    {points.length === 1 ? (
-                      <p dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(points[0]) }} />
-                    ) : points.length > 1 && (
-                      <ul className="pom-desc-list">
-                        {points.map((line: string, i: number) => (
-                          <li key={i} dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(line) }} />
-                        ))}
-                      </ul>
-                    )}
-                    {norms.length > 0 && (
-                      <div className="pom-desc-norms">
-                        {norms.map((line: string, i: number) => (
-                          <span key={i} className="pom-desc-norm" dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(line) }} />
-                        ))}
-                      </div>
-                    )}
+            {points.length + norms.length > 0 && section('details', 'Produktdetails', 'Material, Passform und Besonderheiten',
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h16M4 12h16M4 17h10" /></svg>,
+              <div className="pom-expanded-desc">
+                {points.length > 0 && (
+                  <ul className="pom-desc-cards">
+                    {points.map((line: string, i: number) => (
+                      <li key={i} dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(line) }} />
+                    ))}
+                  </ul>
+                )}
+                {norms.length > 0 && (
+                  <div className="pom-desc-norms">
+                    {norms.map((line: string, i: number) => (
+                      <span key={i} className="pom-desc-norm" dangerouslySetInnerHTML={{ __html: sanitizeInlineHtml(line) }} />
+                    ))}
                   </div>
-                );
-              })()
+                )}
+              </div>,
             )}
-            {props.length > 0 && (
-              <div className="pom-expanded-props">
-                {props.map(([k, v]) => (
-                  <div key={k} className="pom-expanded-prop">
-                    <span className="pom-expanded-prop-label">{k}</span>
-                    <span className="pom-expanded-prop-value">{v}</span>
+            {(keyFigures.length + info.length + article.length) > 0 && section('tech', 'Technische Daten', 'Spezifikationen und Artikeldaten',
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" /><circle cx="16" cy="6" r="2" /><circle cx="10" cy="12" r="2" /><circle cx="18" cy="18" r="2" /></svg>,
+              <div className="pom-sheet">
+                {keyFigures.length > 0 && (
+                  <div className="pom-sheet-figures">
+                    {keyFigures.map(([k, v]) => (
+                      <div key={k} className="pom-sheet-figure"><strong>{v}</strong><span>{k}</span></div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                )}
+                {rows('Produktinformationen', info)}
+                {rows('Artikeldaten', article)}
+              </div>,
             )}
           </div>
         );
@@ -1599,7 +1638,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       {showExpandedContent && qtySizes.length > 0 && (
         <div className="pom-size-qty" aria-label="Menge je Größe">
           <div className="pom-size-qty-head">
-            <span>Menge je Größe</span>
+            <span>{showExpandedContent ? 'Größen & Mengen' : 'Menge je Größe'}</span>
             {sizeQtyTotal > 0 && (
               <button type="button" className="pom-size-qty-clear" onClick={() => setSizeQty({})}>zurücksetzen</button>
             )}
@@ -1630,7 +1669,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                     <button type="button" onClick={() => bumpSizeQty(size, 1)} aria-label={`${size} mehr`}>+</button>
                   </div>
                   {stock !== null && (
-                    <span className={`pom-size-qty-stock ${stock > 0 ? 'ok' : 'none'}`}>{stock > 0 ? `${stock} Lager` : 'kein Lager'}</span>
+                    <span className={`pom-size-qty-stock ${stock > 0 ? 'ok' : 'none'}`}>{stock > 0 ? `${stock} verfügbar` : 'nicht verfügbar'}</span>
                   )}
                 </div>
               );
@@ -1645,19 +1684,22 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
           <button className="pom-button pom-button-primary" onClick={handleAddToCart} style={{ fontSize: '11px', padding: '8px 12px' }}>
             {showExpandedContent && sizeQtyTotal > 0 ? `Add to Cart · ${sizeQtyTotal} Stk.` : 'Add to Cart'}
           </button>
-          {(onShowDetails || onCollapse) && (
+          {(onShowDetails || onCollapse) && !showExpandedContent && (
             <button className="pom-button" onClick={expanded ? onCollapse : onShowDetails} style={{ fontSize: '11px', padding: '8px 12px' }}>
               {expanded ? 'Weniger' : 'Mehr Details'}
             </button>
           )}
-          {productUrl && (
+          {productUrl && !showExpandedContent && (
             <button className="pom-button pom-button-secondary" onClick={handleShowInHP} style={{ fontSize: '11px', padding: '8px 12px' }}>
               Show in HP
             </button>
           )}
-          <button className="pom-button pom-button-secondary" onClick={onClose} style={{ fontSize: '11px', padding: '8px 12px' }}>
-            Close
-          </button>
+          {/* Grosser Dialog: ein Hauptknopf, geschlossen wird oben rechts */}
+          {!showExpandedContent && (
+            <button className="pom-button pom-button-secondary" onClick={onClose} style={{ fontSize: '11px', padding: '8px 12px' }}>
+              Close
+            </button>
+          )}
         </div>
       )}
     </motion.div>

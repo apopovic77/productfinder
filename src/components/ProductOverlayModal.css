@@ -857,3 +857,54 @@
   font-weight: 600;
   color: #ff9a4d;
 }
+
+/* ---- Grosser Detaildialog 2.0 (owner 2026-10-21, Entwurf media 131799-131801):
+   Bestellbereich rechts in klarer Reihenfolge, Details aufklappbar darunter.
+   Die Reihenfolge kommt aus order, die Bloecke bleiben an ihrer Stelle im JSX. */
+.pom-info-panel.pom-expanded { gap: 18px; padding-top: 34px; padding-right: 40px; }
+.pom-expanded .pom-x-eyebrow { order: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255, 255, 255, 0.5) !important; margin-bottom: -10px; }
+.pom-expanded .pom-title { order: 1; }
+.pom-expanded .pom-hero-series { display: none; }
+.pom-expanded .pom-price-row { order: 2; margin-bottom: 0 !important; }
+.pom-expanded .pom-price-row .pom-price { font-size: 30px !important; font-weight: 800; }
+.pom-expanded .pom-variant-row { order: 3; margin-bottom: 0 !important; padding-top: 18px; border-top: 1px solid rgba(255, 255, 255, 0.08); }
+.pom-expanded .pom-size-qty { order: 4; margin: 0; }
+.pom-expanded .pom-actions { order: 5; margin-top: 0; padding-top: 0; }
+.pom-expanded .pom-expanded-extra { order: 6; margin: 4px 0 0; display: flex; flex-direction: column; gap: 10px; }
+.pom-expanded .pom-actions .pom-button-primary { font-size: 14px !important; padding: 14px 18px !important; border-radius: 12px; letter-spacing: 0.08em; }
+.pom-expanded .pom-color-thumb { width: 84px !important; height: 84px !important; border-radius: 12px !important; padding: 6px !important; }
+
+/* Groessen & Mengen: eine Matrix, groessere Felder */
+.pom-expanded .pom-size-qty-head { font-size: 12px; margin-bottom: 10px; }
+.pom-expanded .pom-size-qty-grid { grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
+.pom-expanded .pom-size-qty-cell { padding: 12px 8px; gap: 8px; border-radius: 12px; border-color: rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.05); }
+.pom-expanded .pom-size-qty-label { font-size: 16px; }
+.pom-expanded .pom-size-qty-stock.none { color: rgba(255, 255, 255, 0.45) !important; font-weight: 500; }
+
+/* Aufklappbare Bereiche */
+.pom-acc { border-radius: 14px; background: rgba(255, 255, 255, 0.04); }
+.pom-acc-head { width: 100%; display: flex; align-items: center; gap: 14px; padding: 16px 18px; background: none; border: 0; color: #fff; cursor: pointer; text-align: left; }
+.pom-acc-icon { color: #ff5a1f; display: flex; }
+.pom-acc-titles { flex: 1 1 auto; display: flex; flex-direction: column; gap: 3px; }
+.pom-acc-title { font-size: 16px; font-weight: 700; color: #fff !important; }
+.pom-acc-sub { font-size: 12px; color: rgba(255, 255, 255, 0.5) !important; }
+.pom-acc-chevron { color: #ff5a1f; font-size: 20px; line-height: 1; transition: transform 0.2s ease; }
+.pom-acc.open .pom-acc-chevron { transform: rotate(180deg); }
+.pom-acc-body { padding: 0 18px 18px; }
+.pom-desc-cards { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.pom-desc-cards li { position: relative; padding: 14px 14px 14px 40px; border-radius: 12px; background: rgba(255, 255, 255, 0.05); font-size: 13.5px; line-height: 1.5; color: rgba(255, 255, 255, 0.85) !important; }
+.pom-desc-cards li::before { content: '✓'; position: absolute; left: 14px; top: 13px; width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid #ff5a1f; color: #ff5a1f; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+
+/* Technische Daten als Datenblatt */
+.pom-sheet { display: flex; flex-direction: column; gap: 18px; }
+.pom-sheet-figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+.pom-sheet-figure { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 16px 10px; border-radius: 12px; background: rgba(255, 255, 255, 0.05); }
+.pom-sheet-figure strong { font-size: 26px; font-weight: 800; color: #fff !important; }
+.pom-sheet-figure span { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255, 255, 255, 0.5) !important; }
+.pom-sheet-group { display: flex; flex-direction: column; gap: 2px; }
+.pom-sheet-heading { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(255, 255, 255, 0.7) !important; padding-left: 10px; border-left: 3px solid #ff5a1f; margin-bottom: 8px; }
+.pom-sheet-row { display: flex; justify-content: space-between; gap: 16px; padding: 11px 14px; font-size: 13.5px; }
+.pom-sheet-row:nth-child(even) { background: rgba(255, 255, 255, 0.05); border-radius: 8px; }
+.pom-sheet-row span:first-child { color: rgba(255, 255, 255, 0.55) !important; }
+.pom-sheet-row span:last-child { color: #fff !important; font-weight: 600; text-align: right; }
+.pom-acc-head:focus:not(:focus-visible) { outline: none; }
