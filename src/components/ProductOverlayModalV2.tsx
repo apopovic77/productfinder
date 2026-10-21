@@ -51,6 +51,12 @@ type Props = {
   dealerActive?: boolean;
   /** Haendlerpreise werden gerade geladen. */
   dealerPricesPending?: boolean;
+  /**
+   * Was von diesem Produkt schon im Warenkorb liegt, je Farbe die Menge je
+   * Groesse. Die Karte zeigt es an den Groessen-Chips (owner 2026-10-21,
+   * media 131730: nach "Add to Cart" war nicht zu sehen, was drin ist).
+   */
+  cartLines?: Array<{ color?: string; sizes: Record<string, number> }>;
   onBuy?: (payload: {
     product: Product;
     variant?: any;
@@ -73,7 +79,7 @@ interface ParsedFeature {
  * Product Overlay Modal V2 - HALF WIDTH VERSION (240px)
  * Same design as V1, but with compact half-width layout
  */
-export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady, onShowDetails, expanded = false, onCollapse, locale, onSiblingSelect, onStepProduct, stepPosition, dealerPrices, dealerActive = false, dealerPricesPending = false }) => {
+export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady, onShowDetails, expanded = false, onCollapse, locale, onSiblingSelect, onStepProduct, stepPosition, dealerPrices, dealerActive = false, dealerPricesPending = false, cartLines = [] }) => {
   const isMobilePortrait = window.innerWidth <= 768 && window.innerHeight > window.innerWidth;
   // Phone: the dark hero card as a full-width bottom sheet (owner 2026-08-23,
   // "die Karte auch im Desktop-Style"). Same markup as the desktop dock,
@@ -669,6 +675,19 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   // fehlt, wie viele Groessen der Farbe lieferbar sind.
   const selectedSizeShort = String(selectedSize || '').replace(/\s*\(.*\)\s*$/, '').trim();
   const sizesInStock = qtySizes.filter(size => (stockForSize(size) ?? 0) > 0).length;
+  const shortSize = (size: string) => size.replace(/\s*\(.*\)\s*$/, '').trim();
+  // Warenkorbzeilen sind je Farbe; ohne passende Farbe zaehlt die einzige Zeile.
+  const cartSizes = useMemo(() => {
+    const key = (selectedColor || '').toLowerCase();
+    const lines = cartLines.filter(line => (line.color || '').toLowerCase() === key);
+    const use = lines.length > 0 ? lines : (cartLines.length === 1 && !cartLines[0].color ? cartLines : []);
+    const total: Record<string, number> = {};
+    for (const line of use) {
+      for (const [size, qty] of Object.entries(line.sizes)) total[shortSize(size)] = (total[shortSize(size)] || 0) + qty;
+    }
+    return total;
+  }, [cartLines, selectedColor]);
+  const cartSummary = Object.entries(cartSizes).filter(([, qty]) => qty > 0);
   const stockBadgeText = (() => {
     if (!stockLabel) return null;
     if (stockAvailable !== null && stockAvailable > 0) {
@@ -1405,10 +1424,18 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                 >
                   {(() => { const d = dealerForSize(size); const c = d ? availabilityDot(d.availabilityCode, d.unknown) : null; return c ? <span aria-hidden="true" style={{ display: 'inline-block', width: 7, height: 7, borderRadius: 4, background: c, marginRight: 6, verticalAlign: 'middle' }} /> : null; })()}
                   {size}
+                  {(cartSizes[shortSize(size)] || 0) > 0 && (
+                    <span className="pom-size-cart-qty" title="im Warenkorb">{cartSizes[shortSize(size)]}</span>
+                  )}
                 </button>
               );
             })}
           </div>
+          {cartSummary.length > 0 && (
+            <div className="pom-cart-summary">
+              Im Warenkorb: {cartSummary.map(([size, qty]) => `${size} × ${qty}`).join(', ')}
+            </div>
+          )}
         </div>
       )}
       </div>

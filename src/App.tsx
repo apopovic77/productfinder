@@ -4029,6 +4029,9 @@ export default class App extends React.Component<Props, State> {
                   return true;
                 }}
                 onBuy={this.handleProductBuy}
+                cartLines={this.state.cartItems
+                  .filter(item => String(item.productId) === String(selectedProduct.id))
+                  .map(item => ({ color: item.color, sizes: item.sizes || {} }))}
                 dealerPrices={this.state.b2bSession ? this.state.b2bPrices : undefined}
                 dealerActive={!!this.state.b2bSession}
                 dealerPricesPending={this.state.b2bPricesPending}

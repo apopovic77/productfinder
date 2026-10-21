@@ -834,3 +834,26 @@
 .pom-info-panel.pom-drawer.pom-expanded > * { animation: none; }
 .pom-drawer-stage { animation: pomDrawerIn 0.45s cubic-bezier(0.4, 0, 0.2, 1) backwards; }
 @keyframes pomStageOut { to { opacity: 0; } }
+
+/* Warenkorb-Menge am Groessen-Chip und Zusammenfassung darunter (owner
+   2026-10-21, media 131730). */
+.pom-size-cart-qty {
+  display: inline-block;
+  min-width: 16px;
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: #ff6b00;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  vertical-align: middle;
+}
+.pom-cart-summary {
+  margin-top: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #ff9a4d;
+}
