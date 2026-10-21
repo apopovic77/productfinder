@@ -239,13 +239,27 @@ export class HeroLayouter<T> implements ILayouter<T> {
     const headerH = 46;
     const shelfGapX = 56;
     const shelfGapY = 44;
-    const advance = 0.36; // sichtbarer Anteil je ueberlapptem Produkt
+    // Sichtbarer Anteil je ueberlapptem Produkt: Farbvarianten desselben
+    // Designs teilen die Silhouette und duerfen stark ueberlappen; verschiedene
+    // Produkte (z. B. Gruppen nach Preis) zeigen fast ganz (owner 2026-10-21,
+    // Protektoren nach Preis, media 131772/131773).
+    const advanceSame = 0.36;
+    const advanceOther = 0.78;
     const cellAspect = 0.9;
 
     const attr = (node: LayoutNode<T>, key: string): string => {
       const data: any = node.data;
       const v = data?.attributes?.[key]?.value ?? data?.raw?.properties?.[key];
       return typeof v === 'string' && v.trim() ? v.trim() : '';
+    };
+    const advanceAfter = (prev: LayoutNode<T>, next: LayoutNode<T>): number => {
+      const a = attr(prev, 'design_group');
+      return a && a === attr(next, 'design_group') ? advanceSame : advanceOther;
+    };
+    const stackUnits = (list: LayoutNode<T>[]): number => {
+      let units = 1;
+      for (let i = 1; i < list.length; i++) units += advanceAfter(list[i - 1], list[i]);
+      return units;
     };
     const groups = new Map<string, LayoutNode<T>[]>();
     if (this.posterBuckets.length >= 2) {
@@ -290,11 +304,19 @@ export class HeroLayouter<T> implements ILayouter<T> {
       const w = h * cellAspect;
       // Ueberbreite Gruppen in zeilen-fuellende Teilstapel brechen —
       // Header nur am ersten Teil.
-      const maxPerShelf = Math.max(1, Math.floor(((view.width - pad * 2) / w - 1) / advance) + 1);
+      const maxUnits = Math.max(1, (view.width - pad * 2) / w);
       const shelves: Array<{ key: string; nodes: LayoutNode<T>[]; showHeader: boolean }> = [];
       for (const [key, list] of groups) {
-        for (let i = 0; i < list.length; i += maxPerShelf) {
-          shelves.push({ key, nodes: list.slice(i, i + maxPerShelf), showHeader: i === 0 });
+        let start = 0;
+        while (start < list.length) {
+          let end = start + 1;
+          let units = 1;
+          while (end < list.length && units + advanceAfter(list[end - 1], list[end]) <= maxUnits) {
+            units += advanceAfter(list[end - 1], list[end]);
+            end++;
+          }
+          shelves.push({ key, nodes: list.slice(start, end), showHeader: start === 0 });
+          start = end;
         }
       }
       const rows: Array<Array<{ key: string; nodes: LayoutNode<T>[]; shelfW: number; showHeader: boolean }>> = [[]];
@@ -302,7 +324,7 @@ export class HeroLayouter<T> implements ILayouter<T> {
       for (const shelf of shelves) {
         // Shelfbreite = Stapel ODER Headertext (18px-Versalien ~ 11px/Zeichen)
         // — sonst laufen die Header benachbarter Ein-Produkt-Gruppen ineinander.
-        const stackW = w * (1 + (shelf.nodes.length - 1) * advance);
+        const stackW = w * stackUnits(shelf.nodes);
         const shelfW = shelf.showHeader
           ? Math.max(stackW, Math.min(shelf.key.length * 11, stackW + 160))
           : stackW;
@@ -346,9 +368,11 @@ export class HeroLayouter<T> implements ILayouter<T> {
         if (shelf.showHeader) {
           this.posterHeaders.push({ x, y: y + headerH - 14, text: shelf.key.toUpperCase(), raw: shelf.key, maxWidth: shelf.shelfW + shelfGapX * 0.5 });
         }
+        let offset = 0;
         for (let i = 0; i < shelf.nodes.length; i++) {
           const node = shelf.nodes[i];
-          node.posX.targetValue = x + i * plan.w * advance;
+          if (i > 0) offset += advanceAfter(shelf.nodes[i - 1], node);
+          node.posX.targetValue = x + offset * plan.w;
           node.posY.targetValue = y + topSpace;
           node.width.targetValue = plan.w;
           node.height.targetValue = cellH;
