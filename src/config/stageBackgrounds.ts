@@ -72,3 +72,65 @@ export function fetchStageBackgrounds(productId: string | number, base: string, 
   }
   return registryCache.get(id)!;
 }
+
+// ---------------------------------------------------------------------------
+// Passenden Hintergrund je Produkt waehlen (owner 2026-10-21, media 131866/131867):
+// Stiefel gehoeren in den Dreck, ein Adventure-Helm nicht; ein roter Helm wirkt
+// im warmen/orangen Raum. Je Stil Umgebung und Farbklima, je Produkt Einsatz,
+// Typ und Farbe; die Punkte entscheiden, die Wahl per Punkt bleibt moeglich.
+// ---------------------------------------------------------------------------
+
+type Env = 'studio' | 'offroad' | 'nature' | 'urban' | 'brand';
+type Tone = 'neutral' | 'warm' | 'cool';
+export const STYLE_TRAITS: Record<string, { env: Env; tone: Tone; light?: boolean }> = {
+  BG01: { env: 'studio', tone: 'neutral', light: true },
+  BG02: { env: 'studio', tone: 'neutral' },
+  BG03: { env: 'offroad', tone: 'warm' },
+  BG04: { env: 'offroad', tone: 'warm' },
+  BG05: { env: 'nature', tone: 'cool' },
+  BG06: { env: 'urban', tone: 'neutral' },
+  BG07: { env: 'studio', tone: 'cool' },
+  BG08: { env: 'brand', tone: 'warm' },
+  BG10: { env: 'offroad', tone: 'warm' },
+};
+
+export type BackgroundProductHints = {
+  productType?: string;
+  sport?: string;
+  /** Name, Linie, Kategorie: daraus Street/Adventure */
+  text?: string;
+  colorName?: string;
+};
+
+const WARM = /red|orange|yellow|neon|gold|sand|brown|rot|gelb/i;
+const COOL = /blue|teal|petrol|navy|green|olive|purple|blau|gr(ü|ue)n/i;
+const LIGHT = /white|gray|grey|silver|cream|weiß|weiss|grau/i;
+
+export function rankStageBackgrounds(styles: StageBackgroundStyle[], h: BackgroundProductHints): string[] {
+  const type = (h.productType || '').toLowerCase();
+  const text = (h.text || '').toLowerCase();
+  const sport = (h.sport || '').toUpperCase();
+  const first = (h.colorName || '').split('/')[0];
+  const street = /adventure|street|sierra|touring|enduro jacket|rain|regen/.test(text);
+  const mtbOnly = sport.includes('MTB') && !sport.includes('MX');
+  const dirtWear = /stiefel|schuh|boot|hose|pant|jersey|handschuh|glove/.test(type);
+  const score = (st: StageBackgroundStyle): number => {
+    const t = STYLE_TRAITS[st.id];
+    if (!t || st.storageIds.length === 0) return -99;
+    let s = 0;
+    if (street) s += { studio: 3, urban: 3, nature: 1, brand: 1, offroad: -3 }[t.env];
+    else if (mtbOnly) s += { nature: 4, offroad: 1, studio: 1, urban: 0, brand: 0 }[t.env];
+    else if (dirtWear) s += { offroad: 4, brand: 1, studio: 1, nature: 1, urban: 0 }[t.env];
+    else s += { studio: 2, brand: 2, offroad: 2, urban: 1, nature: 0 }[t.env];
+    if (/brille|goggle/.test(type)) s += t.env === 'studio' ? 2 : 0;
+    if (WARM.test(first)) s += t.tone === 'warm' ? 2 : 0;
+    else if (COOL.test(first)) s += t.tone === 'cool' ? 2 : t.tone === 'neutral' ? 1 : 0;
+    else if (LIGHT.test(first)) s += t.light ? 3 : t.tone === 'neutral' ? 1 : 0;
+    else s += t.light ? -1 : 0; // schwarz: heller Raum nimmt Kontrast
+    return s;
+  };
+  return styles.filter(st => st.storageIds.length > 0)
+    .map(st => ({ id: st.id, s: score(st) }))
+    .sort((a, b) => b.s - a.s)
+    .map(x => x.id);
+}

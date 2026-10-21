@@ -14,7 +14,7 @@ import { DIALOG_MORPH_EASE, DIALOG_MORPH_SECONDS, expandedDialogGeometry } from 
 
 // Storage API URL from environment
 const STORAGE_API_URL = STORAGE_API_BASE;
-import { DEFAULT_STAGE_BACKGROUND, STAGE_BACKGROUND_BASE, STAGE_BACKGROUND_STYLES, fetchStageBackgrounds, stageBackgroundUrl, type StageBackgroundStyle } from '../config/stageBackgrounds';
+import { DEFAULT_STAGE_BACKGROUND, STAGE_BACKGROUND_BASE, STAGE_BACKGROUND_STYLES, fetchStageBackgrounds, rankStageBackgrounds, stageBackgroundUrl, type StageBackgroundStyle } from '../config/stageBackgrounds';
 import { CATALOG_PRODUCTS_BASE, CATALOG_PRODUCTS_KEY } from '../config/apiConfig';
 
 /**
@@ -149,13 +149,9 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   /** Aufgeklappter Bereich im grossen Dialog (Produktdetails / Technische Daten). */
   const [openSection, setOpenSection] = useState<'details' | 'tech' | null>(null);
   /** Gewaehlter Hintergrundstil der Buehne, im Browser gemerkt */
-  const [bgStyle, setBgStyle] = useState<string>(() => {
-    try { return localStorage.getItem('pf-stage-bg') || DEFAULT_STAGE_BACKGROUND; } catch { return DEFAULT_STAGE_BACKGROUND; }
-  });
-  const chooseBgStyle = (id: string) => {
-    setBgStyle(id);
-    try { localStorage.setItem('pf-stage-bg', id); } catch { /* ohne Speicher nur fuer diese Sitzung */ }
-  };
+  // Wahl per Punkt gilt fuer dieses Produkt; sonst waehlt die Rangfolge
+  const [bgPick, setBgPick] = useState<{ id: string; style: string } | null>(null);
+  const chooseBgStyle = (id: string) => setBgPick({ id: String(product.id), style: id });
   // Hintergruende aus der Katalog-Registry, sonst die eingebaute Liste
   const [bgStyles, setBgStyles] = useState<StageBackgroundStyle[]>(STAGE_BACKGROUND_STYLES);
   useEffect(() => {
@@ -1225,7 +1221,15 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         // Katalog sie liefert (features: [{key, title, subtitle}])
         const stageFeatures: Array<{ key: string; title: string; subtitle?: string }> =
           Array.isArray(rawProduct.features) ? rawProduct.features.slice(0, 4) : [];
-        const stageBgUrl = stageBackground ?? stageBackgroundUrl(bgStyles.some(st => st.id === bgStyle) ? bgStyle : DEFAULT_STAGE_BACKGROUND, product.id, undefined, bgStyles);
+        const attrVal = (k: string) => { const v = (product as any).attributes?.[k]?.value ?? rawProduct.properties?.[k]; return Array.isArray(v) ? v.join(',') : v != null ? String(v) : ''; };
+        const ranked = rankStageBackgrounds(bgStyles, {
+          productType: attrVal('product_type'),
+          sport: attrVal('sport'),
+          text: [product.name, attrVal('product_line'), attrVal('category_primary'), attrVal('presentation_category')].join(' '),
+          colorName: rawProduct.color_name || attrVal('color_name'),
+        });
+        const bgStyle = bgPick && bgPick.id === String(product.id) ? bgPick.style : (ranked[0] ?? DEFAULT_STAGE_BACKGROUND);
+        const stageBgUrl = stageBackground ?? stageBackgroundUrl(bgStyle, product.id, undefined, bgStyles);
         const stageThumbBg = stageBgUrl ? `url(${stageBgUrl.replace('width=1200', 'width=300')})` : '';
         const stage = (
           <div
@@ -1259,7 +1263,10 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                 allowFullScreen
               />
             ) : (
-              <ZoomableImage className="pom-expanded-hero-img" src={heroSrc} alt={product.name} />
+              <>
+                {stageBgUrl && <span className="pom-stage-shadow" aria-hidden="true" />}
+                <ZoomableImage className={`pom-expanded-hero-img ${stageBgUrl ? 'pom-grounded' : ''}`} src={heroSrc} alt={product.name} />
+              </>
             )}
             {allImages.length > 1 && !stageVideoId && (
               <>

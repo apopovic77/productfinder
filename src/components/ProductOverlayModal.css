@@ -1094,3 +1094,30 @@
 .pom-feature-card .pom-feature-ico { flex: 0 0 auto; width: 36px; height: 36px; color: #ff5a1f; }
 .pom-feature-card strong { display: block; font-size: 14px; color: #fff !important; margin-bottom: 4px; }
 .pom-feature-card p { margin: 0; font-size: 12.5px; line-height: 1.5; color: rgba(255, 255, 255, 0.7) !important; }
+
+/* Produkt steht auf dem Boden des Motivs, etwas kleiner, mit Kontaktschatten
+   (owner 2026-10-21, media 131866). Freiraum: 10 % seitlich, Boden bei 84 %. */
+@media (min-width: 769px) {
+  .pom-stage-flow .pom-stage-main .pom-grounded.pf-zoom-box {
+    position: absolute; left: 12%; right: 12%; top: 16%; bottom: 16%;
+    width: auto; height: auto; padding: 0;
+  }
+  .pom-stage-flow .pom-stage-main .pom-grounded img { object-position: 50% 100%; filter: drop-shadow(0 18px 18px rgba(0, 0, 0, 0.35)); }
+  .pom-stage-shadow {
+    position: absolute; left: 22%; right: 22%; bottom: calc(16% - 14px); height: 28px;
+    background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0.25) 45%, rgba(0, 0, 0, 0) 72%);
+    pointer-events: none; z-index: 0;
+  }
+}
+
+/* Vorschaubilder: Hintergrund bis an den Rand, gleiche Rundung wie das
+   Hauptbild, Auswahl als innere Linie statt Rahmen (media 131868) */
+@media (min-width: 769px) {
+  .pom-stage-flow .pom-expanded-thumb {
+    padding: 0 !important; border: 0 !important; overflow: hidden; border-radius: 12px;
+    background-origin: border-box; background-clip: border-box;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  }
+  .pom-stage-flow .pom-expanded-thumb img { box-sizing: border-box; padding: 8px; border-radius: 12px; }
+  .pom-stage-flow .pom-expanded-thumb.active { box-shadow: inset 0 0 0 2px #ff5a1f; }
+}
