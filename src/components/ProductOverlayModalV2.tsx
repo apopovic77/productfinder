@@ -1127,13 +1127,19 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                 </button>
               ))}
               {allImages.map((img, idx) => {
-                const thumbnailUrl = img.storageId ? buildThumbUrl(img.storageId) : img.src;
+                // Grosse Kacheln unter dem Hauptbild (owner 2026-10-21, media
+                // 131805): 130 px waeren dort unscharf.
+                const thumbnailUrl = img.storageId
+                  ? `${STORAGE_API_URL}/storage/media/${img.storageId}?width=420&format=webp&quality=82&trim=true`
+                  : img.src;
                 const isActive = idx === selectedImageIndex;
                 return (
                   <button
                     key={idx}
                     type="button"
                     className={`pom-expanded-thumb ${isActive ? 'active' : ''}`}
+                    // Kleines Vorschaubild als Platzhalter, bis die grosse Fassung da ist
+                    style={img.storageId ? { backgroundImage: `url(${buildThumbUrl(img.storageId)})` } : undefined}
                     onClick={() => {
                       setStageVideoId(null);
                       manualHoldUntilRef.current = Date.now() + 12000;
@@ -1648,28 +1654,40 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
               const qty = sizeQty[size] || 0;
               const stock = stockForSize(size);
               return (
-                <div key={size} className={`pom-size-qty-cell ${qty > 0 ? 'has-qty' : ''}`}>
+                <div
+                  key={size}
+                  className={`pom-size-qty-cell ${qty > 0 ? 'has-qty' : ''}`}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${size}: eins mehr`}
+                  // Ruhige Kachel wie im Entwurf (media 131805): Klick = +1,
+                  // Stepper erst, wenn eine Menge gesetzt ist.
+                  onClick={() => bumpSizeQty(size, 1)}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); bumpSizeQty(size, 1); } }}
+                >
                   <span className="pom-size-qty-label" title={size}>{size.replace(/\s*\(.*\)\s*$/, '')}</span>
-                  <div className="pom-size-qty-stepper">
-                    <button type="button" onClick={() => bumpSizeQty(size, -1)} disabled={qty === 0} aria-label={`${size} weniger`}>−</button>
-                    <input
-                      inputMode="numeric"
-                      value={qty || ''}
-                      placeholder="0"
-                      aria-label={`Menge ${size}`}
-                      onChange={e => {
-                        const n = parseInt(e.target.value.replace(/\D/g, ''), 10);
-                        setSizeQty(prev => {
-                          const copy = { ...prev };
-                          if (!n) delete copy[size]; else copy[size] = Math.min(999, n);
-                          return copy;
-                        });
-                      }}
-                    />
-                    <button type="button" onClick={() => bumpSizeQty(size, 1)} aria-label={`${size} mehr`}>+</button>
-                  </div>
                   {stock !== null && (
                     <span className={`pom-size-qty-stock ${stock > 0 ? 'ok' : 'none'}`}>{stock > 0 ? `${stock} verfügbar` : 'nicht verfügbar'}</span>
+                  )}
+                  {qty > 0 && (
+                    <div className="pom-size-qty-stepper" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
+                      <button type="button" onClick={() => bumpSizeQty(size, -1)} aria-label={`${size} weniger`}>−</button>
+                      <input
+                        inputMode="numeric"
+                        value={qty || ''}
+                        placeholder="0"
+                        aria-label={`Menge ${size}`}
+                        onChange={e => {
+                          const n = parseInt(e.target.value.replace(/\D/g, ''), 10);
+                          setSizeQty(prev => {
+                            const copy = { ...prev };
+                            if (!n) delete copy[size]; else copy[size] = Math.min(999, n);
+                            return copy;
+                          });
+                        }}
+                      />
+                      <button type="button" onClick={() => bumpSizeQty(size, 1)} aria-label={`${size} mehr`}>+</button>
+                    </div>
                   )}
                 </div>
               );

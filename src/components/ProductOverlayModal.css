@@ -908,3 +908,52 @@
 .pom-sheet-row span:first-child { color: rgba(255, 255, 255, 0.55) !important; }
 .pom-sheet-row span:last-child { color: #fff !important; font-weight: 600; text-align: right; }
 .pom-acc-head:focus:not(:focus-visible) { outline: none; }
+
+/* Galerie wie im Entwurf (media 131805): Hauptbild auf weisser Karte, darunter
+   grosse Kacheln, zwei nebeneinander, weitere seitlich scrollbar. Nur Desktop. */
+@media (min-width: 769px) {
+  .pom-expanded-hero { background: #dfe2e6 !important; padding: 14px; box-sizing: border-box; gap: 12px; }
+  .pom-expanded-hero-img,
+  .pom-expanded-hero-img.pf-zoom-box { flex: 1 1 62%; background: #fff; border-radius: 14px; padding: 22px; }
+  .pom-expanded-hero-thumbs {
+    flex: 0 0 34%;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: calc(50% - 6px);
+    gap: 12px;
+    padding: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+  }
+  .pom-expanded-thumb {
+    width: auto;
+    height: 100%;
+    min-width: 0;
+    border-radius: 14px;
+    border: 2px solid transparent;
+    background: #fff center / contain no-repeat;
+    background-origin: content-box;
+    padding: 12px;
+    scroll-snap-align: start;
+    transition: border-color 0.15s ease;
+  }
+  .pom-expanded-thumb:hover { border-color: rgba(255, 90, 31, 0.45); }
+  .pom-expanded-thumb.active { border: 2px solid #ff5a1f; }
+}
+
+/* Groessen-Kacheln: ruhig, Groesse und Verfuegbarkeit; Klick = +1 */
+.pom-expanded .pom-size-qty-grid { grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.pom-expanded .pom-size-qty-cell {
+  cursor: pointer; user-select: none;
+  padding: 16px 10px; gap: 6px; border-radius: 14px;
+  border: 2px solid transparent; background: rgba(255, 255, 255, 0.06);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.pom-expanded .pom-size-qty-cell:hover { background: rgba(255, 255, 255, 0.1); }
+.pom-expanded .pom-size-qty-cell:focus:not(:focus-visible) { outline: none; }
+.pom-expanded .pom-size-qty-cell.has-qty { border-color: #ff5a1f; background: rgba(255, 90, 31, 0.12); }
+.pom-expanded .pom-size-qty-label { font-size: 18px; font-weight: 600; }
+.pom-expanded .pom-size-qty-stock { font-size: 12px; font-weight: 500; }
+.pom-expanded .pom-size-qty-stock.ok { color: rgba(255, 255, 255, 0.6) !important; }
+.pom-expanded .pom-size-qty-stepper { margin-top: 4px; }
