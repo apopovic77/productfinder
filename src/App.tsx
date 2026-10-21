@@ -1128,10 +1128,11 @@ export default class App extends React.Component<Props, State> {
       return;
     }
 
-    // Fallback while the large file is still on its way: the thumbnail.
-    if (thumbnailImage) {
-      renderer.selectedVariantHeroImage = thumbnailImage;
-    }
+    // Kein 130-px-Vorschaubild als Zwischenstand: auf ~900 px hochgezogen
+    // wirkte es verzerrt und matschig (owner 2026-10-21, media 131830). Das
+    // bisherige Bild bleibt stehen, bis das grosse da ist, dann blendet der
+    // Renderer ueber.
+    void thumbnailImage;
 
     // Same crop as the thumbnail (trim) — a trimmed 130 px placeholder
     // replaced by an untrimmed 1300 px image made the product visibly

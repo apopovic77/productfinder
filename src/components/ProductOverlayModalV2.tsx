@@ -1225,7 +1225,14 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                       }
                     }}
                   >
-                    <img src={thumbnailUrl} alt="" />
+                    <img
+                      src={thumbnailUrl}
+                      alt=""
+                      // Platzhalter weg, sobald das grosse Bild da ist: bei
+                      // freigestellten Bildern schien er sonst verschoben durch
+                      // (owner 2026-10-21, media 131831)
+                      onLoad={e => { const btn = e.currentTarget.parentElement; if (btn) btn.style.backgroundImage = 'none'; }}
+                    />
                   </button>
                 );
               })}
@@ -1295,8 +1302,16 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       {/* Title - V4 Style: First word thin, rest bold */}
       {showExpandedContent && (
         <div className="pom-x-eyebrow">
-          {[product.brand || rawProduct.brand, rawProduct.product_line || (product as any).attributes?.product_line?.value || rawProduct.properties?.product_line]
-            .filter(Boolean).join(' / ')}
+          {(() => {
+            // Linie ohne doppelte Marke: "O'NEAL ELEMENT" -> "O'NEAL / ELEMENT"
+            // statt "O'NEAL / O'NEAL ELEMENT" (owner 2026-10-21, media 131832)
+            const brand = String(product.brand || rawProduct.brand || '').trim();
+            let line = String(rawProduct.product_line || (product as any).attributes?.product_line?.value || rawProduct.properties?.product_line || '').trim();
+            const norm = (t: string) => t.toUpperCase().replace(/[`´’']/g, "'");
+            if (brand && norm(line).startsWith(norm(brand) + ' ')) line = line.slice(brand.length).trim();
+            if (brand && norm(line) === norm(brand)) line = '';
+            return [brand, line].filter(Boolean).join(' / ');
+          })()}
         </div>
       )}
       {heroDock ? (
