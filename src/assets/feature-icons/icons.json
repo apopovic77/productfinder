@@ -404,5 +404,47 @@
   "bedeutung": "Ellbogenpolster",
   "file": "elbow_pad.svg",
   "accent": false
+ },
+ {
+  "nr": 59,
+  "key": "hard_shell",
+  "bedeutung": "Hartschale, Kunststoffplatten an den Aufprallzonen",
+  "file": "hard_shell.svg",
+  "accent": false
+ },
+ {
+  "nr": 60,
+  "key": "impact_absorb",
+  "bedeutung": "Aufprall-absorbierend, dämpft harte Schläge",
+  "file": "impact_absorb.svg",
+  "accent": true
+ },
+ {
+  "nr": 61,
+  "key": "neckbrace_compat",
+  "bedeutung": "passt mit Nackenstütze",
+  "file": "neckbrace_compat.svg",
+  "accent": false
+ },
+ {
+  "nr": 62,
+  "key": "under_jersey",
+  "bedeutung": "flach, unter oder über dem Jersey tragbar",
+  "file": "under_jersey.svg",
+  "accent": false
+ },
+ {
+  "nr": 63,
+  "key": "adjustable_straps",
+  "bedeutung": "verstellbare Gurte",
+  "file": "adjustable_straps.svg",
+  "accent": true
+ },
+ {
+  "nr": 64,
+  "key": "modular",
+  "bedeutung": "Teile abnehmbar oder nachrüstbar",
+  "file": "modular.svg",
+  "accent": true
  }
 ]
