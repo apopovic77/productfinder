@@ -1232,7 +1232,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
           text: [product.name, attrVal('product_line'), attrVal('category_primary'), attrVal('presentation_category')].join(' '),
           colorName: rawProduct.color_name || attrVal('color_name'),
           heightCm: (() => {
-            const fromCatalog = Number(rawProduct.dimensions?.height_cm ?? attrVal('height_cm'));
+            const fromCatalog = Number(rawProduct.dimensions?.height_cm ?? (attrVal('height_cm') || 0));
             if (fromCatalog > 0) return fromCatalog;
             const slot = outfitSlotFrom(attrVal('product_type'), attrVal('body_part'), product.name || '');
             return slot ? OUTFIT_SLOTS[slot].h : undefined;

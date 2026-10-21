@@ -12,6 +12,10 @@ export type StageBackgroundStyle = {
   storageIds: number[];
   /** Helles Motiv: Produktschatten/-kontrast anders als auf dunklem Grund */
   light?: boolean;
+  /** Szenenart aus der Registry: realistic | studio | abstract */
+  scene?: string;
+  /** sichtbare Hoehe der Szene in cm (nur realistische Szenen) */
+  visibleHeightCm?: number;
 };
 
 export const STAGE_BACKGROUND_STYLES: StageBackgroundStyle[] = [
@@ -47,7 +51,7 @@ export function stageBackgroundUrl(styleId: string, productId: string | number, 
  * seiner Gruppe plus die fuer alle. Ohne Katalog-Anbindung (live mit der
  * alten API) bleibt die Liste oben.
  */
-export type RegistryBackground = { style: string; style_name?: string | null; storage_id: number; media_url: string; light?: boolean };
+export type RegistryBackground = { style: string; style_name?: string | null; storage_id: number; media_url: string; light?: boolean; scene?: string | null; visible_height_cm?: number | null };
 
 const registryCache = new Map<string, Promise<StageBackgroundStyle[] | null>>();
 
@@ -62,7 +66,7 @@ export function fetchStageBackgrounds(productId: string | number, base: string, 
         const names = new Map((data.styles ?? []).map(st => [st.id, st.name]));
         const byStyle = new Map<string, StageBackgroundStyle>();
         for (const bg of data.backgrounds) {
-          const style = byStyle.get(bg.style) ?? { id: bg.style, label: bg.style_name || names.get(bg.style) || bg.style, storageIds: [], light: bg.light };
+          const style = byStyle.get(bg.style) ?? { id: bg.style, label: bg.style_name || names.get(bg.style) || bg.style, storageIds: [], light: bg.light, scene: bg.scene ?? undefined, visibleHeightCm: bg.visible_height_cm ?? undefined };
           style.storageIds.push(bg.storage_id);
           byStyle.set(bg.style, style);
         }
@@ -105,12 +109,15 @@ export type BackgroundProductHints = {
 };
 
 /**
- * Realistische Szenen (Offroad, Natur, Industrie) zeigen einen Ausschnitt von
- * etwa dieser Hoehe; ein deutlich kleineres Produkt wirkt dort riesig (ein
- * Handschuh so gross wie ein Motorrad). Darunter: Studio oder abstrakt
- * (Issue #2551, owner 2026-10-21).
+ * Massstab in realistischen Szenen (Issue #2551, owner 2026-10-21): Das
+ * Produkt muss mindestens diesen Anteil der sichtbaren Szenenhoehe haben,
+ * sonst wirkt es riesig (Handschuh so gross wie ein Motorrad) und bekommt
+ * Studio oder abstrakt. Relativ statt fester cm-Schwelle, damit Youth-Stiefel
+ * (34 cm) nicht anders kippen als Erwachsenen-Stiefel (42 cm).
  */
-export const MIN_REALISTIC_HEIGHT_CM = 35;
+export const MIN_SCENE_FRACTION = 0.22;
+/** Sichtbare Hoehe ohne Registry-Wert */
+const DEFAULT_VISIBLE_CM: Record<string, number> = { offroad: 150, nature: 180, urban: 250 };
 
 const WARM = /red|orange|yellow|neon|gold|sand|brown|rot|gelb/i;
 const COOL = /blue|teal|petrol|navy|green|olive|purple|blau|gr(ü|ue)n/i;
@@ -124,12 +131,13 @@ export function rankStageBackgrounds(styles: StageBackgroundStyle[], h: Backgrou
   const street = /adventure|street|sierra|touring|enduro jacket|rain|regen/.test(text);
   const mtbOnly = sport.includes('MTB') && !sport.includes('MX');
   const dirtWear = /stiefel|schuh|boot|hose|pant|jersey|handschuh|glove/.test(type);
-  const small = h.heightCm != null && h.heightCm < MIN_REALISTIC_HEIGHT_CM;
   const score = (st: StageBackgroundStyle): number => {
     const t = STYLE_TRAITS[st.id];
     if (!t || st.storageIds.length === 0) return -99;
-    // Massstab: kleine Produkte nie in realistische Szenen
-    if (small && (t.env === 'offroad' || t.env === 'nature' || t.env === 'urban')) return -50;
+    // Massstab: zu kleine Produkte nie in realistische Szenen
+    const realistic = st.scene ? st.scene === 'realistic' : (t.env === 'offroad' || t.env === 'nature' || t.env === 'urban');
+    const visible = st.visibleHeightCm ?? DEFAULT_VISIBLE_CM[t.env];
+    if (realistic && h.heightCm && visible && h.heightCm / visible < MIN_SCENE_FRACTION) return -50;
     let s = 0;
     if (street) s += { studio: 3, urban: 3, nature: 1, brand: 1, offroad: -3 }[t.env];
     else if (mtbOnly) s += { nature: 4, offroad: 1, studio: 1, urban: 0, brand: 0 }[t.env];
