@@ -551,34 +551,12 @@ export class CanvasRenderer<T> {
       const screenHeight = h * scale * devicePx;
       const screenSize = Math.max(screenWidth, screenHeight);
 
-      // Determine required LOD tier with HYSTERESIS to prevent flickering
-      // 3 tiers: micro (35px) → low (130px) → high (1300px)
-      let requiredSize: number;
-
-      if (currentSize === LOD_CONFIG.highResolution) {
-        // Currently high: drop to low if below low→high threshold
-        requiredSize = screenSize < LOD_CONFIG.lowToHighDown
-          ? (screenSize < LOD_CONFIG.microToLowDown ? LOD_CONFIG.microResolution : LOD_CONFIG.lowResolution)
-          : LOD_CONFIG.highResolution;
-      } else if (currentSize === LOD_CONFIG.lowResolution) {
-        // Currently low: up to high or down to micro
-        if (screenSize > LOD_CONFIG.lowToHighUp) {
-          requiredSize = LOD_CONFIG.highResolution;
-        } else if (screenSize < LOD_CONFIG.microToLowDown) {
-          requiredSize = LOD_CONFIG.microResolution;
-        } else {
-          requiredSize = LOD_CONFIG.lowResolution;
-        }
-      } else {
-        // Currently micro (or no image): up to low or high
-        if (screenSize > LOD_CONFIG.lowToHighUp) {
-          requiredSize = LOD_CONFIG.highResolution;
-        } else if (screenSize > LOD_CONFIG.microToLowUp) {
-          requiredSize = LOD_CONFIG.lowResolution;
-        } else {
-          requiredSize = LOD_CONFIG.microResolution;
-        }
-      }
+      // Kleinste Stufe, die hoechstens um maxUpscale hochskaliert wird.
+      // Runter erst, wenn die kleinere Stufe mit Reserve reicht (Hysterese
+      // gegen Flackern beim Zoomen).
+      const tiers = [LOD_CONFIG.lowResolution, LOD_CONFIG.midResolution, LOD_CONFIG.highResolution];
+      const wanted = tiers.find(t => t * LOD_CONFIG.maxUpscale >= screenSize) ?? LOD_CONFIG.highResolution;
+      const requiredSize = wanted < currentSize && screenSize > wanted * 0.9 ? currentSize : wanted;
 
       // Check if we need to load a different size
       if (currentSize !== requiredSize) {
@@ -605,6 +583,7 @@ export class CanvasRenderer<T> {
           this.lodImageLoadQueue.cancel(taskId);
 
           const quality = requiredSize === LOD_CONFIG.highResolution ? LOD_CONFIG.highQuality
+            : requiredSize === LOD_CONFIG.midResolution ? LOD_CONFIG.midQuality
             : requiredSize === LOD_CONFIG.lowResolution ? LOD_CONFIG.lowQuality
             : LOD_CONFIG.microQuality;
           const imageUrl = buildMediaUrl({
