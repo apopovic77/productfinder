@@ -31,7 +31,7 @@ export function buildBuckets(
 
   switch (strategy) {
     case 'identity':
-      return identityBuckets(products, key, maxBuckets, override?.normalization);
+      return identityBuckets(products, key, maxBuckets, override?.normalization, override?.customBuckets);
     case 'range_equal_width':
     case 'range_quantile':
     case 'range_logarithmic': {
@@ -70,11 +70,17 @@ export function buildBuckets(
 // Identity Buckets (Categorical)
 // ============================================================================
 
+function rank(label: string, order: string[]): number {
+  const i = order.indexOf(label);
+  return i < 0 ? Number.MAX_SAFE_INTEGER : i;
+}
+
 function identityBuckets(
   products: Product[],
   key: string,
   maxBuckets: number,
-  normalization?: Record<string, string>
+  normalization?: Record<string, string>,
+  order?: string[]
 ): Bucket[] {
   const groups = new Map<string, string[]>();
   const unknown: string[] = [];
@@ -97,7 +103,9 @@ function identityBuckets(
 
   let buckets: Bucket[] = Array.from(groups.entries())
     .map(([label, ids]) => makeBucket(label, ids))
-    .sort((a, b) => b.count - a.count);
+    // Feste Reihenfolge, wenn vorgegeben (Verfuegbarkeit: alle, teilweise,
+    // keine); sonst die groesste Gruppe zuerst.
+    .sort((a, b) => (order ? rank(a.label, order) - rank(b.label, order) : 0) || b.count - a.count);
 
   if (buckets.length > maxBuckets) {
     const keep = buckets.slice(0, maxBuckets - 1);

@@ -62,6 +62,7 @@ import { PosterLayouter, type PosterRowDefinition } from '../layout/PosterLayout
 import type { PosterLayoutConfig } from '../layout/PosterLayouter';
 import { LaneLayouter } from '../layout/LaneLayouter';
 import { CANVAS_PADDING_CONFIG } from '../config/CanvasPaddingConfig';
+import { AVAILABILITY_LABELS } from '../data/ProductRepository';
 
 export type LayoutMode = 'grid' | 'masonry' | 'compact' | 'large' | 'pivot' | 'poster' | 'lanes';
 
@@ -157,6 +158,10 @@ export class LayoutService {
         color_name: { label: 'Farbton', dataType: 'categorical' },
         is_spare: { label: 'Ersatzteil' },
         model_year: { label: 'Jahrgang', dataType: 'numeric_discrete' },
+        // Lieferbarkeit als waehlbare Gruppierung (owner 2026-10-21). Niedrige
+        // Prioritaet: die Engine nimmt sie nicht von selbst, aber sie steht im
+        // Menue, sobald sie die Ebene teilt.
+        availability: { label: 'Verfügbarkeit', dataType: 'categorical', strategy: 'identity', priority: 0.05, customBuckets: [...AVAILABILITY_LABELS] },
       },
       hierarchies: [{
         name: 'Product Hierarchy',

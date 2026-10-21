@@ -10,6 +10,9 @@ import { ACTIVE_PIVOT_PROFILE } from '../config/pivot';
 import { CATALOG_PRODUCTS_BASE, CATALOG_PRODUCTS_KEY, ONEAL_API_BASE, ONEAL_API_KEY } from '../config/apiConfig';
 import { CATALOG_ENTRY_CONFIG, resolveCatalogScope, resolveRelevantOnly } from '../config/CatalogEntryConfig';
 
+/** Gruppen der Pivot-Dimension Verfuegbarkeit, in dieser Reihenfolge. */
+export const AVAILABILITY_LABELS = ['Alle Größen lieferbar', 'Teilweise lieferbar', 'Nicht lieferbar'] as const;
+
 const API_BASE = ONEAL_API_BASE;
 const API_KEY = ONEAL_API_KEY;
 
@@ -433,6 +436,22 @@ function mapProduct(p: ApiProduct): Product | null {
         type: 'enum',
         value: sizeTypeLabels[sizeType] || sizeType,
         sourcePath: 'size_type',
+      }
+    : undefined);
+
+  // Verfuegbarkeit aus dem Lagerbestand je Groesse (owner 2026-10-21): als
+  // Pivot-Dimension, damit man z. B. Helme nach Lieferbarkeit gruppiert.
+  const sizesTotal = typeof apiAny.sizes_total === 'number' ? apiAny.sizes_total : null;
+  const sizesInStock = typeof apiAny.sizes_in_stock === 'number' ? apiAny.sizes_in_stock : null;
+  addAttribute(attributes, sizesTotal && sizesInStock !== null
+    ? {
+        key: 'availability',
+        label: 'Verfügbarkeit',
+        type: 'enum',
+        value: sizesInStock === 0
+          ? AVAILABILITY_LABELS[2]
+          : sizesInStock >= sizesTotal ? AVAILABILITY_LABELS[0] : AVAILABILITY_LABELS[1],
+        sourcePath: 'sizes_in_stock',
       }
     : undefined);
 
