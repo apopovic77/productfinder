@@ -943,7 +943,9 @@
 }
 
 /* Groessen-Kacheln: ruhig, Groesse und Verfuegbarkeit; Klick = +1 */
-.pom-expanded .pom-size-qty-grid { grid-template-columns: repeat(3, 1fr); gap: 12px; }
+/* So viele Kacheln nebeneinander, wie Platz haben (owner 2026-10-21, media
+   131807: drei pro Zeile waren auf breiten Dialogen riesig). */
+.pom-expanded .pom-size-qty-grid { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 10px; }
 .pom-expanded .pom-size-qty-cell {
   cursor: pointer; user-select: none;
   padding: 16px 10px; gap: 6px; border-radius: 14px;
