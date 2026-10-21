@@ -653,7 +653,7 @@ export class GPANEEngine {
       this._activeDimension = restored;
       this._buckets = buildBuckets(products, restored, this._config);
     } else if (this._scoredDimensions.length > 0) {
-      const viable = this._scoredDimensions.filter(d => d.entropy > 0 && d.cardinality > 1 && !isPriceKey(d.key) && this.splitsProducts(d.key, products));
+      const viable = this._scoredDimensions.filter(d => d.entropy > 0 && d.cardinality > 1 && !isNeverAutoPicked(d.key) && this.splitsProducts(d.key, products));
       this._activeDimension = this._prescribedDimension(products) || viable[0] || null;
       this._buckets = this._activeDimension ? buildBuckets(products, this._activeDimension, this._config) : [];
     } else {
@@ -682,7 +682,7 @@ export class GPANEEngine {
     );
 
     if (this._scoredDimensions.length > 0) {
-      const viable0 = this._scoredDimensions.filter(d => d.entropy > 0 && d.cardinality > 1 && !isPriceKey(d.key) && this.splitsProducts(d.key, products));
+      const viable0 = this._scoredDimensions.filter(d => d.entropy > 0 && d.cardinality > 1 && !isNeverAutoPicked(d.key) && this.splitsProducts(d.key, products));
       this._activeDimension = this._prescribedDimension(products) || viable0[0] || null;
       this._buckets = this._activeDimension ? buildBuckets(products, this._activeDimension, this._config) : [];
     } else {
@@ -718,7 +718,7 @@ export class GPANEEngine {
       // prescription) — else "Design" returns with 42 singletons and a
       // 68-item "Sonstige" the moment the prescription declines it.
       // Nothing groups -> no dimension -> the products show as a hero row.
-      const viable = this._scoredDimensions.filter(d => d.entropy > 0 && d.cardinality > 1 && !isPriceKey(d.key) && this.splitsProducts(d.key, products));
+      const viable = this._scoredDimensions.filter(d => d.entropy > 0 && d.cardinality > 1 && !isNeverAutoPicked(d.key) && this.splitsProducts(d.key, products));
       this._activeDimension = prescribed || viable[0] || null;
       this._buckets = this._activeDimension ? buildBuckets(products, this._activeDimension, this._config) : [];
     } else {
@@ -753,13 +753,13 @@ export class GPANEEngine {
 }
 
 /**
- * Preis waehlt die Engine nie selbst: Rainwear, Youth Goggles und Kini
- * Gloves standen als "< 90 € / >= 90 €" da, obwohl die Stufen nichts ueber
- * die Produkte sagen (Review 2026-10-21, Sonja Goldmann). Als Pivot von
- * Hand bleibt Preis waehlbar.
+ * Preis und Jahrgang waehlt die Engine nie selbst: Rainwear, Youth Goggles
+ * und Kini Gloves standen als "< 90 € / >= 90 €" da, danach Rainwear als
+ * "2017 / 2018 / 2024", obwohl beides nichts ueber die Produkte sagt (Review
+ * 2026-10-21, Sonja Goldmann). Als Pivot von Hand bleiben beide waehlbar.
  */
-function isPriceKey(key: string): boolean {
-  return key === 'price' || key.startsWith('price_');
+function isNeverAutoPicked(key: string): boolean {
+  return key === 'price' || key.startsWith('price_') || key === 'model_year';
 }
 
 // ============================================================================
