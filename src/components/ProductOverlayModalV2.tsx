@@ -15,6 +15,28 @@ import { DIALOG_MORPH_EASE, DIALOG_MORPH_SECONDS, expandedDialogGeometry } from 
 // Storage API URL from environment
 const STORAGE_API_URL = STORAGE_API_BASE;
 
+/** Grundtoene fuer O'Neal-Farbnamen (erste Farbe eines Namens wie "black/neon yellow"). */
+const COLOR_TONES: Array<[RegExp, string]> = [
+  [/neon\s*yellow|hi-?vi[sz]|yellow|gelb/, '#e4f000'], [/neon\s*orange|orange/, '#ff7a1a'],
+  [/pink|magenta/, '#ff4fa3'], [/red|rot/, '#e0262b'], [/teal|petrol|turquoise/, '#14a3a3'],
+  [/navy|blue|blau|indigo/, '#2f6fe0'], [/olive|military|khaki/, '#7a8040'], [/green|gr(ü|ue)n/, '#2fa84f'],
+  [/purple|violet|lila/, '#8a4fd8'], [/sand|beige|cream|ecru/, '#d9c49a'], [/brown|braun/, '#8a5a35'],
+  [/gold/, '#c9a23a'], [/silver/, '#b8bcc2'], [/gr[ae]y|grau|charcoal|anthracite/, '#7d838a'],
+  [/white|wei(ß|ss)/, '#ffffff'], [/black|schwarz/, '#1a1a1a'],
+];
+
+/**
+ * Hintergrund der Farb-Vorschau: helle Toenung der ersten Farbe, damit die
+ * Farbe sofort erkennbar ist und das Produkt trotzdem absteht (owner
+ * 2026-10-21, media 131811). Volle Farbflaeche liesse schwarze Helme auf
+ * Schwarz verschwinden.
+ */
+function colorThumbBackground(colorName: string): string {
+  const first = (colorName || '').toLowerCase().split('/')[0].trim();
+  const tone = COLOR_TONES.find(([re]) => re.test(first))?.[1];
+  return tone ? `color-mix(in srgb, ${tone} 26%, #f3f4f6)` : '#f3f4f6';
+}
+
 type Props = {
   product: Product;
   onClose: () => void;
@@ -99,6 +121,8 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   const [isSiblingView, setIsSiblingView] = useState(false);
   /** Aufgeklappter Bereich im grossen Dialog (Produktdetails / Technische Daten). */
   const [openSection, setOpenSection] = useState<'details' | 'tech' | null>(null);
+  /** Kurze Bestaetigung am Knopf nach dem Hinzufuegen. */
+  const [justAdded, setJustAdded] = useState(false);
 
   // Always fetch full product details when modal opens
   // List API doesn't include variants with images array
@@ -742,7 +766,11 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
           availableSizes: availableSizes.length ? availableSizes : undefined,
         });
       }
+      // Eingabe leeren (sonst bestellt ein zweiter Klick doppelt); was im
+      // Warenkorb liegt, zeigt jede Groessen-Kachel weiter an (owner 2026-10-21).
       setSizeQty({});
+      setJustAdded(true);
+      window.setTimeout(() => setJustAdded(false), 1800);
       return;
     }
     if (onBuy) {
@@ -1429,7 +1457,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                       // Vorschaubild je Farbe: Hauptbild des Produkts in dieser Farbe
                       width: 56, height: 56, padding: 4, borderRadius: 8,
                       border: isActive ? '2px solid #ff6b00' : '1px solid rgba(255,255,255,0.25)',
-                      background: '#f3f4f6',
+                      background: colorThumbBackground(opt.color_name),
                       cursor: isActive ? 'default' : 'pointer',
                       transition: 'all 0.15s ease',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1456,6 +1484,65 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
           </div>
         );
       })()}
+
+      {/* Grosser Dialog: Groessen & Mengen neben der Farbe (owner 2026-10-21, media 131808) */}
+      {showExpandedContent && qtySizes.length > 0 && (
+        <div className="pom-size-qty" aria-label="Menge je Größe">
+          <div className="pom-size-qty-head">
+            <span>{showExpandedContent ? 'Größen & Mengen' : 'Menge je Größe'}</span>
+            {sizeQtyTotal > 0 && (
+              <button type="button" className="pom-size-qty-clear" onClick={() => setSizeQty({})}>zurücksetzen</button>
+            )}
+          </div>
+          <div className="pom-size-qty-grid">
+            {qtySizes.map(size => {
+              const qty = sizeQty[size] || 0;
+              const stock = stockForSize(size);
+              return (
+                <div
+                  key={size}
+                  className={`pom-size-qty-cell ${qty > 0 ? 'has-qty' : ''} ${(cartSizes[shortSize(size)] || 0) > 0 ? 'in-cart' : ''}`}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${size}: eins mehr`}
+                  // Ruhige Kachel wie im Entwurf (media 131805): Klick = +1,
+                  // Stepper erst, wenn eine Menge gesetzt ist.
+                  onClick={() => bumpSizeQty(size, 1)}
+                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); bumpSizeQty(size, 1); } }}
+                >
+                  <span className="pom-size-qty-label" title={size}>{size.replace(/\s*\(.*\)\s*$/, '')}</span>
+                  {stock !== null && (
+                    <span className={`pom-size-qty-stock ${stock > 0 ? 'ok' : 'none'}`}>{stock > 0 ? `${stock} verfügbar` : 'nicht verfügbar'}</span>
+                  )}
+                  {(cartSizes[shortSize(size)] || 0) > 0 && (
+                    <span className="pom-size-qty-incart">✓ {cartSizes[shortSize(size)]} im Warenkorb</span>
+                  )}
+                  {qty > 0 && (
+                    <div className="pom-size-qty-stepper" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
+                      <button type="button" onClick={() => bumpSizeQty(size, -1)} aria-label={`${size} weniger`}>−</button>
+                      <input
+                        inputMode="numeric"
+                        value={qty || ''}
+                        placeholder="0"
+                        aria-label={`Menge ${size}`}
+                        onChange={e => {
+                          const n = parseInt(e.target.value.replace(/\D/g, ''), 10);
+                          setSizeQty(prev => {
+                            const copy = { ...prev };
+                            if (!n) delete copy[size]; else copy[size] = Math.min(999, n);
+                            return copy;
+                          });
+                        }}
+                      />
+                      <button type="button" onClick={() => bumpSizeQty(size, 1)} aria-label={`${size} mehr`}>+</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Sizes — selectable chips; the chosen size goes into the cart via
           activeVariant (owner 2026-08-23: plain text left no way to pick). */}
@@ -1641,66 +1728,11 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         );
       })()}
 
-      {showExpandedContent && qtySizes.length > 0 && (
-        <div className="pom-size-qty" aria-label="Menge je Größe">
-          <div className="pom-size-qty-head">
-            <span>{showExpandedContent ? 'Größen & Mengen' : 'Menge je Größe'}</span>
-            {sizeQtyTotal > 0 && (
-              <button type="button" className="pom-size-qty-clear" onClick={() => setSizeQty({})}>zurücksetzen</button>
-            )}
-          </div>
-          <div className="pom-size-qty-grid">
-            {qtySizes.map(size => {
-              const qty = sizeQty[size] || 0;
-              const stock = stockForSize(size);
-              return (
-                <div
-                  key={size}
-                  className={`pom-size-qty-cell ${qty > 0 ? 'has-qty' : ''}`}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`${size}: eins mehr`}
-                  // Ruhige Kachel wie im Entwurf (media 131805): Klick = +1,
-                  // Stepper erst, wenn eine Menge gesetzt ist.
-                  onClick={() => bumpSizeQty(size, 1)}
-                  onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); bumpSizeQty(size, 1); } }}
-                >
-                  <span className="pom-size-qty-label" title={size}>{size.replace(/\s*\(.*\)\s*$/, '')}</span>
-                  {stock !== null && (
-                    <span className={`pom-size-qty-stock ${stock > 0 ? 'ok' : 'none'}`}>{stock > 0 ? `${stock} verfügbar` : 'nicht verfügbar'}</span>
-                  )}
-                  {qty > 0 && (
-                    <div className="pom-size-qty-stepper" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
-                      <button type="button" onClick={() => bumpSizeQty(size, -1)} aria-label={`${size} weniger`}>−</button>
-                      <input
-                        inputMode="numeric"
-                        value={qty || ''}
-                        placeholder="0"
-                        aria-label={`Menge ${size}`}
-                        onChange={e => {
-                          const n = parseInt(e.target.value.replace(/\D/g, ''), 10);
-                          setSizeQty(prev => {
-                            const copy = { ...prev };
-                            if (!n) delete copy[size]; else copy[size] = Math.min(999, n);
-                            return copy;
-                          });
-                        }}
-                      />
-                      <button type="button" onClick={() => bumpSizeQty(size, 1)} aria-label={`${size} mehr`}>+</button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {/* Buttons - hidden on mobile portrait (moved to top right) */}
       {(!isMobilePortrait || heroSheet) && (
         <div className="pom-actions" style={{ gap: '6px' }}>
           <button className="pom-button pom-button-primary" onClick={handleAddToCart} style={{ fontSize: '11px', padding: '8px 12px' }}>
-            {showExpandedContent && sizeQtyTotal > 0 ? `Add to Cart · ${sizeQtyTotal} Stk.` : 'Add to Cart'}
+            {showExpandedContent && justAdded ? '✓ Im Warenkorb' : showExpandedContent && sizeQtyTotal > 0 ? `Add to Cart · ${sizeQtyTotal} Stk.` : 'Add to Cart'}
           </button>
           {(onShowDetails || onCollapse) && !showExpandedContent && (
             <button className="pom-button" onClick={expanded ? onCollapse : onShowDetails} style={{ fontSize: '11px', padding: '8px 12px' }}>

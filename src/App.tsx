@@ -2224,7 +2224,7 @@ export default class App extends React.Component<Props, State> {
     }
   };
 
-  private openProductDetails(product: Product, options: { pushHistory?: boolean } = {}) {
+  private openProductDetails(product: Product, options: { pushHistory?: boolean; keepExpanded?: boolean } = {}) {
     const tapStage = resolveProductTapStage(this.state.selectedProduct?.id, product.id);
     const primaryVariant = getPrimaryVariant(product);
     // Establish selection ownership before the camera movement can trigger the
@@ -2256,7 +2256,10 @@ export default class App extends React.Component<Props, State> {
     this.setState({
       selectedProduct: product,
       selectedVariant: primaryVariant,
-      shouldShowV4Dialog: tapStage === 'detail',
+      // Farbwechsel im grossen Dialog: Kamera faehrt zum Produkt, der Dialog
+      // bleibt gross statt zu- und klein wieder aufzugehen (owner 2026-10-21,
+      // media 131810).
+      shouldShowV4Dialog: options.keepExpanded ? this.state.shouldShowV4Dialog : tapStage === 'detail',
       modalSequence: sequence,
       selectedIndex: seqIndex,
       modalDirection: 0,
@@ -4037,7 +4040,7 @@ export default class App extends React.Component<Props, State> {
                 onSiblingSelect={(pid) => {
                   const target = this.controller.getDisplayOrder().find(pr => String(pr.id) === String(pid));
                   if (!target) return false;
-                  this.openProductDetails(target, { pushHistory: false });
+                  this.openProductDetails(target, { pushHistory: false, keepExpanded: true });
                   return true;
                 }}
                 onBuy={this.handleProductBuy}
