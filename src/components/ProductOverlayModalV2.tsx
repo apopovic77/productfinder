@@ -1683,19 +1683,14 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         const isNorm = (line: string) => /^(EN|ECE|ISO|DIN|DOT|CPSC|ASTM|CE)\s?[\d./-]/i.test(line.replace(/<[^>]+>/g, ''));
         const norms = lines.filter(isNorm);
         const points = lines.filter((line: string) => !isNorm(line));
-        const section = (key: 'details' | 'tech', title: string, subtitle: string, icon: React.ReactNode, body: React.ReactNode) => (
-          <div className={`pom-acc ${openSection === key ? 'open' : ''}`}>
-            <button type="button" className="pom-acc-head" onClick={() => setOpenSection(openSection === key ? null : key)} aria-expanded={openSection === key}>
-              <span className="pom-acc-icon" aria-hidden="true">{icon}</span>
-              <span className="pom-acc-titles">
-                <span className="pom-acc-title">{title}</span>
-                <span className="pom-acc-sub">{subtitle}</span>
-              </span>
-              <span className="pom-acc-chevron" aria-hidden="true">⌄</span>
-            </button>
-            {openSection === key && <div className="pom-acc-body">{body}</div>}
-          </div>
-        );
+        // Tabs statt aufklappbarer Bereiche: nebeneinander aufgeklappt wirkte es
+        // schief (owner 2026-10-21, media 131817). Die Inhalte werden hier
+        // gesammelt und unten als Reiter mit einer Flaeche gezeigt.
+        const tabs: Array<{ key: 'details' | 'tech'; title: string; icon: React.ReactNode; body: React.ReactNode }> = [];
+        const section = (key: 'details' | 'tech', title: string, _subtitle: string, icon: React.ReactNode, body: React.ReactNode) => {
+          tabs.push({ key, title, icon, body });
+          return null;
+        };
         const rows = (heading: string, list: Array<[string, string]>) => list.length > 0 && (
           <div className="pom-sheet-group">
             <div className="pom-sheet-heading">{heading}</div>
@@ -1739,6 +1734,29 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                 {rows('Artikeldaten', article)}
               </div>,
             )}
+            {tabs.length > 0 && (() => {
+              const current = tabs.find(t => t.key === openSection) ?? tabs[0];
+              return (
+                <div className="pom-tabs">
+                  <div className="pom-tab-bar" role="tablist">
+                    {tabs.map(t => (
+                      <button
+                        key={t.key}
+                        type="button"
+                        role="tab"
+                        aria-selected={t.key === current.key}
+                        className={`pom-tab ${t.key === current.key ? 'active' : ''}`}
+                        onClick={() => setOpenSection(t.key)}
+                      >
+                        <span className="pom-tab-icon" aria-hidden="true">{t.icon}</span>
+                        {t.title}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="pom-tab-panel" role="tabpanel">{current.body}</div>
+                </div>
+              );
+            })()}
           </div>
         );
       })()}

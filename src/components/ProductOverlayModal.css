@@ -999,12 +999,21 @@
 
 /* Breiter Dialog: Produktdetails und Technische Daten nebeneinander
    (owner 2026-10-21, media 131813) */
-@media (min-width: 1700px) {
-  .pom-expanded .pom-expanded-extra { display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
-}
+
 @media (min-width: 769px) {
   /* Abstand unter der Bildspalte zaehlt beim Scrollen mit (Rand statt margin) */
   .pom-expanded-hero.pom-stage-flow { border-bottom: 20px solid transparent; background-clip: padding-box; }
   /* X bleibt beim Scrollen oben rechts stehen */
   .pom-expanded > .pom-close-row { position: sticky !important; top: 0 !important; right: auto !important; order: -1; align-self: flex-end; height: 0; margin-right: -26px; z-index: 10003 !important; }
 }
+
+/* Reiter fuer Produktdetails / Technische Daten (owner 2026-10-21, media 131817) */
+.pom-tabs { display: flex; flex-direction: column; align-self: stretch; width: 100%; }
+.pom-tab-bar { display: flex; gap: 4px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+.pom-tab { display: flex; align-items: center; gap: 8px; padding: 12px 18px; background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; color: rgba(255, 255, 255, 0.55); font-size: 14px; font-weight: 700; cursor: pointer; transition: color 0.15s ease, border-color 0.15s ease; }
+.pom-tab:hover { color: rgba(255, 255, 255, 0.85); }
+.pom-tab.active { color: #fff; border-bottom-color: #ff5a1f; }
+.pom-tab.active .pom-tab-icon { color: #ff5a1f; }
+.pom-tab-icon { display: flex; }
+.pom-tab:focus:not(:focus-visible) { outline: none; }
+.pom-tab-panel { padding-top: 18px; }
