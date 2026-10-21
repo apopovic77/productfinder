@@ -117,6 +117,8 @@ export class ProductFinderController {
       () => this.layoutService.getPivotDimension()
     );
     this.renderer.productsOnGpu = this.productsOnGpu;
+    // Outfit: hoehere Bildstufe ist freigestellt, Hoehen neu messen
+    this.renderer.onImageUpgraded = () => { if (this.layoutService.isOutfitActive()) this.handleResize(); };
     // Hero-Variante einmal beim Bootstrap (?hero=reveal), Default unveraendert.
     this.renderer.heroRevealMode = resolveHeroVariant() === 'reveal';
     }

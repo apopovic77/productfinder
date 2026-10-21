@@ -54,6 +54,13 @@ export type OutfitConfig<T> = {
   /** Figur, zu der ein Produkt gehoert (z. B. Marke); eine Figur je Schluessel */
   figureOf: (item: T) => string;
   isYouth: (item: T) => boolean;
+  /**
+   * Bildhoehe / Produkthoehe des aktuell geladenen Bildes (freier Rand oben
+   * und unten); 1 = Bild ist freigestellt. Damit stimmt die reale Hoehe.
+   */
+  contentScaleY?: (item: T) => number;
+  /** Seitenverhaeltnis B/H des geladenen Bildes, 0 = unbekannt */
+  imageAspect?: (item: T) => number;
   onLayout?: (nodes: LayoutNode<T>[]) => void;
 };
 
@@ -88,6 +95,8 @@ export class OutfitLayouter<T> {
     for (const node of nodes) {
       const slot = this.config.slotOf(node.data);
       if (!slot) { loose.push(node); continue; }
+      // Spiegelkopien stehen fuer die andere Seite, nicht als eigenes Teil
+      if (node.id.endsWith('@@mirror')) continue;
       const key = splitByKey ? this.config.figureOf(node.data) : singleKey;
       let fig = figures.find(f => f.key === key && !f.slots.has(slot));
       if (!fig) { fig = { key, slots: new Map() }; figures.push(fig); }
@@ -117,16 +126,34 @@ export class OutfitLayouter<T> {
       for (const [slot, node] of fig.slots) {
         const spec = OUTFIT_SLOTS[slot];
         const k = youth ? spec.youth : 1;
-        const h = spec.h * k * pxPerCm;
-        const w = h * spec.maxAspect;
-        const cx = axisX + spec.x * figH;
+        // reale Hoehe des Produkts; ein Bild mit Rand bekommt die Box um den
+        // Rand groesser, damit das Produkt selbst die richtige Hoehe hat
+        const pad = Math.max(1, Math.min(2, this.config.contentScaleY?.(node.data) ?? 1));
+        const h = spec.h * k * pxPerCm * pad;
+        const aspect = this.config.imageAspect?.(node.data) || 0;
+        // Einzelteil oder Paar: Stiefel/Knie von vorn als Paar breit (B/H > 0,8)
+        const single = (slot === 'glove') || ((slot === 'boot' || slot === 'knee' || slot === 'elbow') && aspect > 0 && aspect < 0.8);
+        const sideX = slot === 'glove' ? spec.x : slot === 'boot' ? 0.06 : slot === 'knee' ? 0.06 : spec.x;
+        const w = h * (single ? Math.min(spec.maxAspect, 0.9) : spec.maxAspect);
         const cy = groundY - spec.anchorY * figH;
-        node.posX.targetValue = cx - w / 2;
-        node.posY.targetValue = cy - h / 2;
-        node.width.targetValue = w;
-        node.height.targetValue = h;
-        node.scale.targetValue = 1;
-        node.opacity.targetValue = 1;
+        const place = (n: LayoutNode<T>, cx: number, visible: boolean) => {
+          n.posX.targetValue = cx - w / 2;
+          n.posY.targetValue = cy - h / 2;
+          n.width.targetValue = w;
+          n.height.targetValue = h;
+          n.scale.targetValue = 1;
+          n.opacity.targetValue = visible ? 1 : 0;
+        };
+        const mirror = nodes.find(m => m.id === `${node.id}@@mirror`);
+        if (single && sideX) {
+          // Original rechts (Betrachter links ist die rechte Koerperseite),
+          // gespiegelte Kopie auf der anderen Seite
+          place(node, axisX - sideX * figH, true);
+          if (mirror) place(mirror, axisX + sideX * figH, true);
+        } else {
+          place(node, axisX + (single ? spec.x : 0) * figH, true);
+          if (mirror) place(mirror, axisX, false);
+        }
       }
     });
 

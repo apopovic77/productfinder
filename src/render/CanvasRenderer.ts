@@ -3,6 +3,9 @@ import { ViewportTransform } from '../utils/ViewportTransform';
 import type { Product } from '../types/Product';
 import type { GroupHeaderInfo } from '../layout/PivotLayouter';
 import { LOD_CONFIG } from '../config/LODConfig';
+
+/** Endung von Knoten-ids, die gespiegelt gezeichnet werden. */
+export const MIRROR_SUFFIX = '@@mirror';
 import { ProductOverlayCanvas, DEFAULT_OVERLAY_STYLE } from './ProductOverlayCanvas';
 import { ProductOverlayCanvasV2, MODERN_OVERLAY_STYLE } from './ProductOverlayCanvasV2';
 import { backgroundImageQueue, globalImageQueue, lodImageQueue } from '../utils/GlobalImageQueue';
@@ -63,6 +66,8 @@ export class CanvasRenderer<T> {
   private rafId: number | null = null;
   private lodUpdateInterval: number | null = null;
   public hoveredItem: T | null = null;
+  /** Nach dem Nachladen einer hoeheren Bildstufe (Outfit misst neu). */
+  public onImageUpgraded?: () => void;
   public focusedItem: T | null = null;
   public hoveredGroupKey: string | null = null;
   public hoveredGroupLabel: string | null = null;
@@ -611,6 +616,7 @@ export class CanvasRenderer<T> {
             if (product && typeof product.loadImageFromUrl === 'function') {
               product._image = result.image;
               this.loadedImageSizes.set(node.id, requiredSize);
+              this.onImageUpgraded?.();
               this.pendingStorageIds.delete(storageId);
             }
           }).catch(() => {
@@ -1456,7 +1462,9 @@ export class CanvasRenderer<T> {
 
       if (opacity <= 0.01) {
         const hiddenProduct = n.data as any as Product;
-        if (hiddenProduct.isImageLoading) hiddenProduct.reprioritizeImageLoad(900);
+        // Unsichtbare Spiegelkopie: das Original desselben Produkts ist sichtbar,
+        // seine Ladeprioritaet nicht wieder herabsetzen
+        if (hiddenProduct.isImageLoading && !n.id.endsWith(MIRROR_SUFFIX)) hiddenProduct.reprioritizeImageLoad(900);
         culled++;
         continue;
       }
@@ -1575,7 +1583,8 @@ export class CanvasRenderer<T> {
       const centerX = x + w / 2;
       const centerY = y + h / 2;
       this.ctx.translate(centerX, centerY);
-      this.ctx.scale(scale, scale);
+      // Gespiegelte Kopie (Outfit: zweiter Handschuh/Stiefel fuer die andere Seite)
+      this.ctx.scale(n.id.endsWith(MIRROR_SUFFIX) ? -scale : scale, scale);
       this.ctx.translate(-centerX, -centerY);
 
       // Alternative images fanned out behind the product — that was the old

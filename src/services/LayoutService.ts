@@ -63,6 +63,7 @@ import type { PosterLayoutConfig } from '../layout/PosterLayouter';
 import { LaneLayouter } from '../layout/LaneLayouter';
 import type { LayoutNode } from '../layout/LayoutNode';
 import { OutfitLayouter, outfitSlotFrom, OUTFIT_SLOTS } from '../layout/OutfitLayouter';
+import { MIRROR_SUFFIX } from '../render/CanvasRenderer';
 import { CANVAS_PADDING_CONFIG } from '../config/CanvasPaddingConfig';
 import { AVAILABILITY_LABELS } from '../data/ProductRepository';
 
@@ -621,6 +622,23 @@ export class LayoutService {
         // eine Figur je Marke (O'Neal, Kini Red Bull ...)
         figureOf: p => p.brand || String(getProductValue(p, 'brand') ?? ''),
         isYouth: p => String(getProductValue(p, 'target_group') ?? '').toLowerCase().includes('jugend'),
+        // Thumbnail ohne trim hat Rand: Faktor aus den Trim-Daten der Ablage
+        contentScaleY: p => {
+          const img = p.image as HTMLImageElement | null | undefined;
+          if (img?.src?.includes('trim=true')) return 1;
+          // scale_y = Anteil des Produkts an der Bildhoehe
+          const sy = p.trimScale?.scale_y;
+          return sy && sy > 0 ? 1 / sy : 1;
+        },
+        imageAspect: p => {
+          const img = p.image as HTMLImageElement | null | undefined;
+          if (!img?.naturalWidth || !img.naturalHeight) return 0;
+          // ohne trim auch das Seitenverhaeltnis auf das Produkt umrechnen
+          const trimmed = img.src.includes('trim=true');
+          const sx = trimmed ? 1 : (p.trimScale?.scale_x ?? 1);
+          const sy = trimmed ? 1 : (p.trimScale?.scale_y ?? 1);
+          return (img.naturalWidth * sx) / (img.naturalHeight * sy);
+        },
       });
       if (this.layouter !== this.outfitLayouter) {
         this.layouter = this.outfitLayouter;
@@ -1066,7 +1084,17 @@ export class LayoutService {
     } else if (usePivot && this.outfitEnabled) {
       // Outfit: hintere Ebenen zuerst zeichnen (Jersey unter Hose, Helm vorn)
       const z = (p: Product) => { const slot = this.outfitSlot(p); return slot ? OUTFIT_SLOTS[slot].z : -1; };
-      this.engine.sync([...filtered].sort((a, b) => z(a) - z(b)), p => p.id);
+      // Handschuhe, Stiefel, Knie/Ellbogen bekommen eine Spiegelkopie fuer die
+      // andere Koerperseite; ist das Bild schon ein Paar, bleibt sie unsichtbar
+      const items: Product[] = [];
+      const ids: string[] = [];
+      for (const p of [...filtered].sort((a, b) => z(a) - z(b))) {
+        items.push(p); ids.push(p.id);
+        const slot = this.outfitSlot(p);
+        if (slot === 'glove' || slot === 'boot' || slot === 'knee' || slot === 'elbow') { items.push(p); ids.push(`${p.id}${MIRROR_SUFFIX}`); }
+      }
+      let at = 0;
+      this.engine.sync(items, () => ids[at++]);
     } else {
       this.engine.sync(filtered, p => p.id);
     }
