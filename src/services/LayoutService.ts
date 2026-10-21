@@ -455,6 +455,11 @@ export class LayoutService {
     this.drillDownService.forceReload(products);
   }
 
+  /** Filter auf der aktuellen Pivot-Ebene, ohne die Navigation zurueckzusetzen. */
+  setPivotProductFilter(filter: ((p: Product) => boolean) | null): void {
+    this.drillDownService.setProductFilter(filter);
+  }
+
   getMode(): LayoutMode {
     return this.mode;
   }

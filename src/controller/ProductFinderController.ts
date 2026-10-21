@@ -1,5 +1,5 @@
 import type { Product } from '../types/Product';
-import { FilterService, type FilterCriteria, type SortMode } from '../services/FilterService';
+import { FilterService, productSizes, type FilterCriteria, type SortMode } from '../services/FilterService';
 import { LayoutService, type LayoutMode } from '../services/LayoutService';
 import { FavoritesService } from '../services/FavoritesService';
 import { ViewportService } from '../services/ViewportService';
@@ -615,6 +615,42 @@ export class ProductFinderController {
     }
     this.layoutService.forceReloadPivot(filtered);
     this.onDataChanged();
+  }
+
+  /**
+   * Groessenfilter (owner 2026-10-21): nur Produkte in dieser Groesse, auf
+   * Wunsch nur lieferbare. Ebene und Gruppierung bleiben, die Gruppen werden
+   * mit den passenden Produkten neu gebildet.
+   */
+  setSizeFilter(size: string, inStockOnly: boolean): void {
+    this.filterService.setCriteria({ size, sizeInStock: size && inStockOnly ? '1' : '' });
+    this.layoutService.setPivotProductFilter(size
+      ? (p: Product) => productSizes(p, inStockOnly).includes(size)
+      : null);
+    this.onDataChanged();
+  }
+
+  getSizeFilter(): { size: string; inStockOnly: boolean } {
+    const c = this.filterService.getCriteria();
+    return { size: c.size, inStockOnly: c.sizeInStock === '1' };
+  }
+
+  /**
+   * Groessen der Produkte auf der aktuellen Ebene, in Groessenreihenfolge:
+   * die Listen der Produkte sind schon geordnet und werden zusammengefuehrt.
+   */
+  getSizeOptions(): string[] {
+    const order: string[] = [];
+    for (const node of this.layoutService.getEngine().all()) {
+      let prev = -1;
+      for (const size of productSizes(node.data)) {
+        const at = order.indexOf(size);
+        if (at >= 0) { prev = at; continue; }
+        order.splice(prev + 1, 0, size);
+        prev += 1;
+      }
+    }
+    return order;
   }
 
   getAiFilterProductIds(): string[] {

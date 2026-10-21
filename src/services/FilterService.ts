@@ -10,7 +10,18 @@ export type FilterCriteria = {
   priceMax: string;
   weightMin: string;
   weightMax: string;
+  /** Groessenfilter: nur Produkte, die es in dieser Groesse gibt (owner 2026-10-21) */
+  size: string;
+  /** '1' = nur Produkte, die in dieser Groesse lieferbar sind */
+  sizeInStock: string;
 };
+
+/** Groessen eines Produkts aus der Liste (size_list / size_list_in_stock). */
+export function productSizes(p: Product, inStockOnly = false): string[] {
+  const raw: any = (p as any).raw || {};
+  const list = inStockOnly ? raw.size_list_in_stock : raw.size_list;
+  return Array.isArray(list) ? list.map(String) : [];
+}
 
 export class FilterService {
   private sortMode: SortMode = 'none';
@@ -22,6 +33,8 @@ export class FilterService {
     priceMax: '',
     weightMin: '',
     weightMax: '',
+    size: '',
+    sizeInStock: '',
   };
   private includeIds: Set<string> | null = null;
 
@@ -50,6 +63,8 @@ export class FilterService {
       priceMax: '',
       weightMin: '',
       weightMax: '',
+      size: '',
+      sizeInStock: '',
     };
   }
 
@@ -94,6 +109,8 @@ export class FilterService {
       const w = p.specifications?.weight;
       if (weightMin && (w === undefined || w < Number(weightMin))) return false;
       if (weightMax && (w === undefined || w > Number(weightMax))) return false;
+
+      if (this.criteria.size && !productSizes(p, this.criteria.sizeInStock === '1').includes(this.criteria.size)) return false;
 
       if (this.includeIds && this.includeIds.size > 0) {
         if (!this.includeIds.has(String(p.id))) return false;

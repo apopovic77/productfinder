@@ -39,6 +39,8 @@ export type EngineMode = 'taxonomy' | 'gpane';
 export class GPANEEngine {
   private _config: GPANEConfig;
   private _allProducts: Product[] = [];
+  /** Zusaetzlicher Filter (z. B. Groesse), der die Navigation nicht zuruecksetzt. */
+  private _productFilter: ((p: Product) => boolean) | null = null;
   private _dimensions: PropertyAnalysis[] = [];
   private _constraints: Constraint[] = [];
   private _focusStack: FocusEntry[] = [];
@@ -734,10 +736,27 @@ export class GPANEEngine {
     }
   }
 
-  private _getConstrainedProducts(): Product[] {
-    if (this._constraints.length === 0) return this._allProducts;
+  /**
+   * Filter auf der aktuellen Ebene setzen oder loeschen (Groessenfilter,
+   * owner 2026-10-21). Anders als load() bleiben Ebene und Dimension; nur die
+   * Gruppen werden mit den gefilterten Produkten neu gebildet.
+   */
+  setProductFilter(filter: ((p: Product) => boolean) | null): void {
+    this._productFilter = filter;
+    if (this._mode === 'taxonomy') {
+      this._buildTaxonomyBuckets();
+      return;
+    }
+    if (this._activeDimension) {
+      this._buckets = buildBuckets(this._getVisibleProducts(), this._activeDimension, this._config);
+    }
+  }
 
-    return this._allProducts.filter(product => {
+  private _getConstrainedProducts(): Product[] {
+    const base = this._productFilter ? this._allProducts.filter(this._productFilter) : this._allProducts;
+    if (this._constraints.length === 0) return base;
+
+    return base.filter(product => {
       for (const constraint of this._constraints) {
         if (!matchesConstraint(product, constraint)) return false;
       }

@@ -3144,6 +3144,35 @@ export default class App extends React.Component<Props, State> {
                     ]}
                   />
                 </div>
+                {(() => {
+                  // Groessenfilter (owner 2026-10-21): "S" = gibt es in S,
+                  // "S · lieferbar" = in S auf Lager. Ebene und Gruppierung bleiben.
+                  const sizes = this.controller.getSizeOptions();
+                  const current = this.controller.getSizeFilter();
+                  if (sizes.length < 2 && !current.size) return null;
+                  const value = current.size ? `${current.size}${current.inStockOnly ? '|stock' : ''}` : '';
+                  return (
+                    <div className="pf-header-select-group">
+                      <CustomSelect
+                        className="pf-header-select pf-header-size-select"
+                        value={value}
+                        onChange={(v) => {
+                          const [size, flag] = String(v).split('|');
+                          this.controller.setSizeFilter(size || '', flag === 'stock');
+                          this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false });
+                          this.syncPivotUI();
+                        }}
+                        options={[
+                          { value: '', label: 'Größe' },
+                          ...sizes.flatMap(size => [
+                            { value: size, label: size },
+                            { value: `${size}|stock`, label: `${size} · lieferbar` },
+                          ]),
+                        ]}
+                      />
+                    </div>
+                  );
+                })()}
                 <div className="pf-header-select-group">
                   <CustomSelect
                     className="pf-header-select pf-header-sort-select"

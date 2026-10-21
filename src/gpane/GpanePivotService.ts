@@ -136,6 +136,12 @@ export class GpanePivotService {
     this._rebuildGroupCache();
   }
 
+  /** Filter ohne Neuladen: Ebene und Dimension bleiben (Groessenfilter). */
+  setProductFilter(filter: ((p: Product) => boolean) | null): void {
+    this.engine.setProductFilter(filter);
+    this._rebuildGroupCache();
+  }
+
   /**
    * Force reload with new products (e.g. after API re-fetch or filter change).
    */
