@@ -441,13 +441,12 @@ export class LayoutService {
    * weil es dort sonst gar nichts zu gruppieren gibt.
    */
   private groupedViewWorthwhile(): boolean {
-    const all = this.drillDownService.getCurrentBuckets();
-    if (all.length === 0) return true;
-    // Nur die Gruppe "Weitere": die Uebersicht zeigte das eine Produkt unter
-    // "WEITERE", die Karte sprang erst danach in die Hero-Sicht, und Zurueck
-    // landete auf dieser Zwischenebene (owner 2026-10-21, 3SRS HEAT, media
-    // 131704-131706).
-    const buckets = all.filter(b => !b.isUnknown);
+    // Ohne echte Gruppe (keine Dimension teilt mehr, oder nur "Weitere")
+    // gibt es nichts zu gruppieren: direkt die Hero-Sicht. Vorher zeigte die
+    // Uebersicht das eine Produkt unter "WEITERE", die Karte sprang erst
+    // danach in die Hero-Sicht, und Zurueck landete auf dieser Zwischenebene
+    // (owner 2026-10-21, 3SRS HEAT, media 131704-131711).
+    const buckets = this.drillDownService.getCurrentBuckets().filter(b => !b.isUnknown);
     return buckets.some(b => (b.objectIds?.length ?? 0) > 1);
   }
 
