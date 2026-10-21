@@ -34,9 +34,12 @@ export function expandedDialogGeometry(
   // Gross und zentriert, 150 px Rand auf jeder Seite, ohne Stimmungsbild
   // daneben (owner 2026-10-21). Auf kleinen Bildschirmen schrumpft der Rand,
   // damit Bildspalte und Text Platz behalten.
-  const marginX = Math.max(16, Math.min(EXPANDED_MARGIN, Math.floor((viewportWidth - 760) / 2)));
+  // Breite: 75 % der Flaeche zwischen den 150-px-Raendern, mindestens 760 px;
+  // ganz breit verlor sich der Inhalt (owner 2026-10-21).
+  const baseMarginX = Math.max(16, Math.min(EXPANDED_MARGIN, Math.floor((viewportWidth - 760) / 2)));
+  const width = Math.min(viewportWidth - baseMarginX * 2, Math.max(760, Math.round((viewportWidth - baseMarginX * 2) * 0.75)));
+  const marginX = Math.round((viewportWidth - width) / 2);
   const marginY = Math.max(16, Math.min(EXPANDED_MARGIN, Math.floor((viewportHeight - 480) / 2)));
-  const width = viewportWidth - marginX * 2;
   const height = viewportHeight - marginY * 2;
   return { width, height, marginX, marginY, stageWidth: Math.min(760, Math.round(width * 0.46)) };
 }
