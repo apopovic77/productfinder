@@ -278,7 +278,9 @@ export const ONEAL_TAXONOMY: TaxonomyNode[] = [
 
   // ---- Motorrad ----
   {
-    label: 'Motorrad',
+    // Strasse statt Offroad. "Motorrad" neben "MX" las sich wie dasselbe
+    // (owner 2026-10-21, media 131713); Name wie im gefuehrten Einstieg.
+    label: 'Street / Adventure',
     slug: 'motorrad',
     match: p => isMotorrad(p) && isAdult(p),
     children: [
