@@ -50,7 +50,7 @@ export function buildBuckets(
     case 'boolean_split':
       return booleanBuckets(products, key);
     case 'multi_expansion':
-      return multiValueBuckets(products, key, maxBuckets);
+      return multiValueBuckets(products, key, maxBuckets, override?.listOrder);
     case 'text_token':
       return textBuckets(products, key, maxBuckets, 'token');
     case 'text_prefix':
@@ -315,26 +315,32 @@ function booleanBuckets(products: Product[], key: string): Bucket[] {
 // Multi-Value Buckets
 // ============================================================================
 
-function multiValueBuckets(products: Product[], key: string, maxBuckets: number): Bucket[] {
+function multiValueBuckets(products: Product[], key: string, maxBuckets: number, listOrder?: boolean): Bucket[] {
   const groups = new Map<string, string[]>();
   const unknown: string[] = [];
+  // Reihenfolge der Werte, wie sie in den Listen der Produkte stehen
+  // (Groessen XS, S, M ... statt nach Anzahl)
+  const order: string[] = [];
 
   for (const product of products) {
     const v = getProductValue(product, key);
     if (!v || !Array.isArray(v) || v.length === 0) {
       unknown.push(product.id);
     } else {
+      let prev = -1;
       for (const item of v) {
         const label = String(item);
         if (!groups.has(label)) groups.set(label, []);
         groups.get(label)!.push(product.id);
+        const at = order.indexOf(label);
+        if (at >= 0) prev = at; else { order.splice(prev + 1, 0, label); prev += 1; }
       }
     }
   }
 
   let buckets: Bucket[] = Array.from(groups.entries())
     .map(([label, ids]) => makeBucket(label, ids))
-    .sort((a, b) => b.count - a.count);
+    .sort((a, b) => listOrder ? order.indexOf(a.label) - order.indexOf(b.label) : b.count - a.count);
 
   if (buckets.length > maxBuckets) {
     const keep = buckets.slice(0, maxBuckets - 1);

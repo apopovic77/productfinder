@@ -144,8 +144,11 @@ export class GPANEEngine {
     const groups = new Map<string, number>();
     for (const prod of products) {
       const v = getProductValue(prod, key);
-      const k = v === null || v === undefined || v === '' ? '' : String(v);
-      if (k) groups.set(k, (groups.get(k) ?? 0) + 1);
+      // Mehrfachwerte zaehlen je Wert (ein Helm steht in jeder seiner Groessen)
+      for (const item of Array.isArray(v) ? v : [v]) {
+        const k = item === null || item === undefined || item === '' ? '' : String(item);
+        if (k) groups.set(k, (groups.get(k) ?? 0) + 1);
+      }
     }
     let real = 0, singles = 0;
     for (const n of groups.values()) { if (n >= 2) real++; else singles += n; }

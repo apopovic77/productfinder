@@ -3150,6 +3150,8 @@ export default class App extends React.Component<Props, State> {
                   const sizes = this.controller.getSizeOptions();
                   const current = this.controller.getSizeFilter();
                   if (sizes.length < 2 && !current.size) return null;
+                  // Nach Groesse gruppiert: der Filter waere doppelt
+                  if (pivotDimension === 'size' && !current.size) return null;
                   const value = current.size ? `${current.size}${current.inStockOnly ? '|stock' : ''}` : '';
                   return (
                     <div className="pf-header-select-group">

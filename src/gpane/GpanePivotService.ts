@@ -64,6 +64,7 @@ export class GpanePivotService {
   private _currentBuckets: Bucket[] = [];
   private _groupMap: Map<string, Product[]> = new Map();
   private _productGroupKey: Map<string, string> = new Map();
+  private _productGroupKeys = new Map<string, string[]>();
 
   // Compatibility: dimension order for sorting
   private _dimensionOrder = new Map<GroupDimension, Map<string, number>>();
@@ -359,6 +360,20 @@ export class GpanePivotService {
     return groups;
   }
 
+  /**
+   * Alle Gruppen eines Produkts auf der aktuellen Ebene. Bei Mehrfachwerten
+   * (Groesse, Sportart MX+MTB) steht ein Produkt in mehreren Gruppen und
+   * erscheint dann in jeder als eigener Knoten (owner 2026-10-21).
+   */
+  getGroupKeys(product: Product): string[] {
+    return this._productGroupKeys.get(product.id) ?? [this.getGroupKey(product)];
+  }
+
+  /** Die aktive Dimension hat Mehrfachwerte: Produkte koennen mehrfach erscheinen. */
+  isMultiMembership(): boolean {
+    return this.engine.mode === 'gpane' && this.engine.activeDimension?.dataType === 'multi_value';
+  }
+
   getGroupKey(product: Product): string {
     return this._productGroupKey.get(product.id) || 'N/A';
   }
@@ -491,6 +506,7 @@ export class GpanePivotService {
     this._currentBuckets = this.engine.buckets;
     this._groupMap = new Map();
     this._productGroupKey = new Map();
+    this._productGroupKeys = new Map();
 
     const allProducts = this.engine.focusedProducts;
     const idToProduct = new Map<string, Product>();
@@ -506,6 +522,9 @@ export class GpanePivotService {
           if (!this._productGroupKey.has(id)) {
             this._productGroupKey.set(id, bucket.label);
           }
+          // Alle Gruppen eines Produkts (Mehrfachwerte wie Groesse, Sportart)
+          const all = this._productGroupKeys.get(id);
+          if (all) all.push(bucket.label); else this._productGroupKeys.set(id, [bucket.label]);
         }
       }
       this._groupMap.set(bucket.label, products);

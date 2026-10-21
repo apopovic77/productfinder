@@ -18,6 +18,8 @@ export type PivotConfig<T> = {
   orientation: Orientation;
   flow: Flow;
   groupKey: (t: T) => string;
+  /** Gruppe eines Knotens; vorrangig vor groupKey, wenn ein Produkt mehrfach erscheint. */
+  nodeGroupKey?: (n: LayoutNode<T>) => string;
   groupSort?: (a: string, b: string) => number;
   itemSort?: (a: T, b: T) => number;
   frameGap: number;
@@ -97,7 +99,7 @@ export class PivotLayouter<T> {
     // Group products by category
     const groups = new Map<string, LayoutNode<T>[]>();
     for (const n of nodes) {
-      const key = this.config.groupKey(n.data);
+      const key = this.config.nodeGroupKey ? this.config.nodeGroupKey(n) : this.config.groupKey(n.data);
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(n);
     }

@@ -455,6 +455,19 @@ function mapProduct(p: ApiProduct): Product | null {
       }
     : undefined);
 
+  // Groessen als Mehrfachwert "XS|S|M" (Pivot-Dimension Groesse: ein Produkt
+  // steht in jeder seiner Groessen, owner 2026-10-21)
+  const sizeList: string[] = Array.isArray(apiAny.size_list) ? apiAny.size_list.map(String).filter(Boolean) : [];
+  addAttribute(attributes, sizeList.length > 1
+    ? {
+        key: 'size',
+        label: 'Größe',
+        type: 'enum',
+        value: sizeList.join('|'),
+        sourcePath: 'size_list',
+      }
+    : undefined);
+
   // Image count (has image or not)
   const hasImage = apiAny.storage?.id ? 1 : 0;
   addAttribute(attributes, {

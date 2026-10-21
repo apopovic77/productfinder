@@ -191,6 +191,8 @@ export interface PropertyOverride {
   __upstreamLock?: boolean;
   customBuckets?: string[];
   normalization?: Record<string, string>;
+  /** Mehrfachwerte: Gruppen in der Reihenfolge der Produktlisten (Groessen) */
+  listOrder?: boolean;
 }
 
 // ============================================================================
@@ -281,8 +283,19 @@ export const DEFAULT_CONFIG: GPANEConfig = {
  * Read an attribute value from a Product.
  * Central accessor — the ONLY place GPANE touches Product internals.
  */
+/**
+ * Attribute, deren Text mehrere Werte traegt ("XS|S|M"). Produkt-Attribute
+ * kennen nur Einzelwerte; fuer die Engine werden sie hier zur Liste und damit
+ * zur Mehrfach-Dimension (Produkt in mehreren Gruppen, owner 2026-10-21).
+ */
+export const MULTI_VALUE_KEYS = new Set<string>();
+export const MULTI_VALUE_SEP = '|';
+
 export function getProductValue(product: Product, key: string): unknown {
   const attr = product.attributes[key];
   if (!attr) return undefined;
+  if (MULTI_VALUE_KEYS.has(key) && typeof attr.value === 'string') {
+    return attr.value.split(MULTI_VALUE_SEP).filter(Boolean);
+  }
   return attr.value;
 }

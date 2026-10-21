@@ -871,7 +871,7 @@ export class ProductFinderController {
       // Nachbarn ordnen sich UM ihn an und die Kamera macht nur noch den
       // Zoom-Glide auf den Anker statt einer Querfahrt.
       const rowNodes = this.layoutService.getEngine().all();
-      const anchor = rowNodes.find(n => n.data.id === product.id);
+      const anchor = this.nodeForProduct(product.id, rowNodes);
       if (anchor) {
         const curCX = (anchor.posX.value ?? anchor.posX.targetValue ?? 0)
           + (anchor.width.value ?? anchor.width.targetValue ?? 0) / 2;
@@ -892,7 +892,7 @@ export class ProductFinderController {
 
     // Find the node for this product
     const nodes = this.layoutService.getEngine().all();
-    const node = nodes.find(n => n.data.id === product.id);
+    const node = this.nodeForProduct(product.id, nodes);
 
     if (!node) {
       console.warn('[ProductFinderController] Product node not found for centering');
@@ -1021,7 +1021,7 @@ export class ProductFinderController {
       }
     }
     if (!candidates.length) return null;
-    if (candidates.length === 1) return candidates[0].node.data;
+    if (candidates.length === 1) { this._lastHitNodeId = candidates[0].node.id; return candidates[0].node.data; }
 
     // Ueberlappende Rects (Poster-Stapel): oberster Kandidat mit OPAKEM
     // Pixel am Klickpunkt gewinnt; ohne verwertbares Sampling gilt die
@@ -1029,10 +1029,23 @@ export class ProductFinderController {
     for (const candidate of candidates) {
       const opaque = this.hitsOpaquePixel(candidate.node, worldPos.x, worldPos.y,
         candidate.nx, candidate.ny, candidate.nw, candidate.nh);
-      if (opaque === null) return candidate.node.data;
-      if (opaque) return candidate.node.data;
+      if (opaque === null || opaque) { this._lastHitNodeId = candidate.node.id; return candidate.node.data; }
     }
+    this._lastHitNodeId = candidates[0].node.id;
     return candidates[0].node.data;
+  }
+
+  /**
+   * Knoten eines Produkts. Steht es mehrfach da (Mehrfach-Dimension wie
+   * Groesse), gewinnt die zuletzt getroffene Kopie, sonst die erste.
+   */
+  private _lastHitNodeId: string | null = null;
+  private nodeForProduct(productId: string, nodes = this.layoutService.getEngine().all()) {
+    if (this._lastHitNodeId) {
+      const hit = nodes.find(n => n.id === this._lastHitNodeId);
+      if (hit && String(hit.data.id) === String(productId)) return hit;
+    }
+    return nodes.find(n => String(n.data.id) === String(productId));
   }
 
   // Renderer Access
@@ -1048,7 +1061,7 @@ export class ProductFinderController {
     if (prev && prev.data !== product) prev.scale.targetValue = 1;
     this._hoverScaledId = null;
     if (product && this.isHeroRootOverview()) {
-      const node = nodes.find(n => n.data === product);
+      const node = this.nodeForProduct(product.id, nodes);
       if (node) {
         node.scale.targetValue = HOVER_SCALE;
         this._hoverScaledId = product.id;
@@ -1583,7 +1596,7 @@ export class ProductFinderController {
    */
   getProductNode(productId: string) {
     const nodes = this.layoutService.getEngine().all();
-    const node = nodes.find(n => n.data.id === productId);
+    const node = this.nodeForProduct(productId, nodes);
     if (node) {
       // Product node found
     } else {

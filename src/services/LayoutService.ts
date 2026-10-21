@@ -1,6 +1,6 @@
 import type { Product } from '../types/Product';
 import { BRAND_BANNERS, CATALOG_ENTRY_CONFIG, resolveCatalogFlow, resolveCategoryPresentation } from '../config/CatalogEntryConfig';
-import type { TaxonomyNode } from '../gpane/types';
+import { type TaxonomyNode, MULTI_VALUE_KEYS } from '../gpane/types';
 import { ProductLayoutAccessors } from '../layout/Accessors';
 import { WeightScalePolicy } from '../layout/ScalePolicy';
 import { SimpleLayouter, type SimpleLayoutConfig } from '../layout/SimpleLayouter';
@@ -61,8 +61,13 @@ import { ACTIVE_PIVOT_PROFILE } from '../config/pivot';
 import { PosterLayouter, type PosterRowDefinition } from '../layout/PosterLayouter';
 import type { PosterLayoutConfig } from '../layout/PosterLayouter';
 import { LaneLayouter } from '../layout/LaneLayouter';
+import type { LayoutNode } from '../layout/LayoutNode';
 import { CANVAS_PADDING_CONFIG } from '../config/CanvasPaddingConfig';
 import { AVAILABILITY_LABELS } from '../data/ProductRepository';
+
+/** Trenner in Knoten-ids von Produkt-Kopien (Produkt in mehreren Gruppen). */
+export const COPY_SEP = '@@';
+MULTI_VALUE_KEYS.add('size');
 
 export type LayoutMode = 'grid' | 'masonry' | 'compact' | 'large' | 'pivot' | 'poster' | 'lanes';
 
@@ -161,6 +166,8 @@ export class LayoutService {
         // Lieferbarkeit als waehlbare Gruppierung (owner 2026-10-21). Niedrige
         // Prioritaet: die Engine nimmt sie nicht von selbst, aber sie steht im
         // Menue, sobald sie die Ebene teilt.
+        // Groesse als Mehrfach-Dimension: jeder Helm in jeder seiner Groessen
+        size: { label: 'Größe', dataType: 'multi_value', strategy: 'multi_expansion', priority: 0.04, listOrder: true, bucketCount: 24 },
         availability: { label: 'Verfügbarkeit', dataType: 'categorical', strategy: 'identity', priority: 0.05, customBuckets: [...AVAILABILITY_LABELS] },
       },
       hierarchies: [{
@@ -196,6 +203,7 @@ export class LayoutService {
       this.pivotConfig = {
         ...this.pivotConfig,
         groupKey: (p: Product) => this.drillDownService.getGroupKey(p),
+      nodeGroupKey: (n: LayoutNode<Product>) => this.nodeGroupKey(n),
         groupSort: (a: string, b: string) => {
           const comparator = this.drillDownService.getGroupComparator();
           return comparator(a, b);
@@ -208,6 +216,7 @@ export class LayoutService {
     if (mode === 'lanes') {
       return new LaneLayouter<Product>({
         groupKey: (p: Product) => this.drillDownService.getGroupKey(p),
+      nodeGroupKey: (n: LayoutNode<Product>) => this.nodeGroupKey(n),
         groupSort: (a: string, b: string) => {
           const comparator = this.drillDownService.getGroupComparator();
           return comparator(a, b);
@@ -234,6 +243,7 @@ export class LayoutService {
       orientation: 'columns',
       flow: 'ltr',
       groupKey: (p: Product) => this.drillDownService.getGroupKey(p),
+      nodeGroupKey: (n: LayoutNode<Product>) => this.nodeGroupKey(n),
       groupSort: (a: string, b: string) => {
         const comparator = this.drillDownService.getGroupComparator();
         return comparator(a, b);
@@ -311,6 +321,7 @@ export class LayoutService {
       minCellSize: minCell,
       maxCellSize: maxCell,
       groupKey: (p: Product) => this.drillDownService.getGroupKey(p),
+      nodeGroupKey: (n: LayoutNode<Product>) => this.nodeGroupKey(n),
       groupSort: (a: string, b: string) => {
         const comparator = this.drillDownService.getGroupComparator();
         return comparator(a, b);
@@ -908,9 +919,16 @@ export class LayoutService {
     for (const node of this.engine.all()) {
       nodeMap.set(node.id, node.data);
     }
+    // Kopien (Produkt in mehreren Gruppen) zaehlen einmal: Blaettern und
+    // "11 / 51" beziehen sich auf Produkte, nicht auf Kacheln
+    const seen = new Set<string>();
     return this.displayOrderIds
       .map(id => nodeMap.get(id))
-      .filter((p): p is Product => Boolean(p));
+      .filter((p): p is Product => {
+        if (!p || seen.has(p.id)) return false;
+        seen.add(p.id);
+        return true;
+      });
   }
   
   getDisplayOrderForGroup(groupKey: string): Product[] {
@@ -995,7 +1013,23 @@ export class LayoutService {
       ? this.drillDownService.filterProducts(products)
       : products;
 
-    this.engine.sync(filtered, p => p.id);
+    // Mehrfachwerte (Groesse, Sportart MX+MTB): ein Knoten je Gruppe des
+    // Produkts. Die erste Kopie behaelt die Produkt-id, weitere heissen
+    // "<id>@@<Gruppe>" (owner 2026-10-21: Produkt in jeder Gruppe zeigen).
+    if (usePivot && this.drillDownService.isMultiMembership()) {
+      const items: Product[] = [];
+      const ids: string[] = [];
+      for (const p of filtered) {
+        this.drillDownService.getGroupKeys(p).forEach((key, i) => {
+          items.push(p);
+          ids.push(i === 0 ? p.id : `${p.id}${COPY_SEP}${key}`);
+        });
+      }
+      let at = 0;
+      this.engine.sync(items, () => ids[at++]);
+    } else {
+      this.engine.sync(filtered, p => p.id);
+    }
     this.primeNewNodesFromCache();
     this.applyAnimationDuration();
 
@@ -1005,9 +1039,15 @@ export class LayoutService {
       this.nodeToGroup.clear();
       for (const node of this.engine.all()) {
         this.displayOrderIds.push(node.id);
-        this.nodeToGroup.set(node.id, this.drillDownService.getGroupKey(node.data));
+        this.nodeToGroup.set(node.id, this.nodeGroupKey(node));
       }
     }
+  }
+
+  /** Gruppe eines Knotens: Kopien tragen sie in der id, sonst die erste Gruppe des Produkts. */
+  nodeGroupKey(node: LayoutNode<Product>): string {
+    const at = node.id.indexOf(COPY_SEP);
+    return at >= 0 ? node.id.slice(at + COPY_SEP.length) : this.drillDownService.getGroupKey(node.data);
   }
   
   private cacheCurrentNodePositions(): void {
