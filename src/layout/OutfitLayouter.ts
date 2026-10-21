@@ -164,6 +164,21 @@ export class OutfitLayouter<T> {
         n.opacity.targetValue = visible ? 1 : 0;
       };
       const mirror = nodes.find(m => m.id === `${node.id}@@mirror`);
+      // Brille zum Helm: Helmbilder sind seitlich/45°, die Brille von vorn mit
+      // Band; ueber den Helm gelegt wirkte das wild (owner 2026-10-21, media
+      // 131914). Mit Helm steht sie daher neben dem Kopf, ohne Helm im Gesicht.
+      if (slot === 'goggle' && wornNodes.has('helmet')) {
+        const helmetSpec = OUTFIT_SLOTS.helmet;
+        const gh = h * 0.9;
+        const gw = gh * spec.maxAspect;
+        node.posX.targetValue = axisX + figH * 0.12;
+        node.posY.targetValue = groundY - helmetSpec.anchorY * figH + figH * 0.02;
+        node.width.targetValue = gw;
+        node.height.targetValue = gh;
+        node.scale.targetValue = 1;
+        node.opacity.targetValue = 1;
+        continue;
+      }
       if (single && sideX) {
         // Original rechts (Betrachter links ist die rechte Koerperseite),
         // gespiegelte Kopie auf der anderen Seite
