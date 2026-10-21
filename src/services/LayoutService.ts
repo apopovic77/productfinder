@@ -21,6 +21,9 @@ import { ONEAL_TAXONOMY } from '../gpane';
  *  - Im Vollmodus ("Alle Produkte", alle Marken) kommen zuerst die Marken,
  *    darunter der Sport-Baum. Leere Knoten blendet die Engine aus.
  */
+/** Ab so vielen Produkten zeigt eine Ebene ohne Gruppen zuerst eine Uebersicht. */
+const FLAT_OVERVIEW_MIN = 3;
+
 function catalogTaxonomy(): TaxonomyNode[] {
   const locked = new Set(CATALOG_ENTRY_CONFIG.sports.filter(s => !s.enabled).map(s => s.id));
   const sports = pruneLockedSports(ONEAL_TAXONOMY, locked);
@@ -488,9 +491,10 @@ export class LayoutService {
     // Ohne echte Gruppe, aber mit mehreren Produkten: flache Uebersicht ohne
     // Ueberschriften, Klick oeffnet die Hero-Sicht, Zurueck fuehrt hierher
     // (owner 2026-10-21: "sehe nur zwei Produkte von sechs, haette gerne
-    // trotzdem eine Uebersicht"). Ein einzelnes Produkt geht weiter direkt
-    // in die Hero-Sicht.
-    return this.groupsWorthwhile() || this.engine.all().length > 1;
+    // trotzdem eine Uebersicht"). Ein oder zwei Produkte gehen weiter direkt
+    // in die Hero-Sicht, dort sind sie ohnehin beide zu sehen (owner
+    // 2026-10-21, 3SRS Youth SOLID mit zwei Farben, media 131775-131777).
+    return this.groupsWorthwhile() || this.engine.all().length >= FLAT_OVERVIEW_MIN;
   }
 
   /** Mindestens eine Gruppe der Ebene enthaelt mehr als ein Produkt. */

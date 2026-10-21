@@ -209,6 +209,8 @@ export class ProductFinderController {
    * The LayoutService already synced with correct filtered products.
    * We only need to re-layout and notify listeners — NO re-sync.
    */
+  private _overviewScaleLock = false;
+
   private onPivotChanged(): void {
     if (this.canvas) {
       const vt = this.viewportService.getTransform();
@@ -382,6 +384,17 @@ export class ProductFinderController {
 
     const isPhone = (this.canvas?.clientWidth ?? 0) < 768;
     const isRootOverview = isHeroMode && !isPhone && this.layoutService.isHeroRootOverview();
+    // Die Uebersicht steht immer 1:1. Ohne Untergrenze zwang 'Zoom-out bis
+    // Inhalt passt' eine kleine Uebersicht (vier Brillen) auf 2,6-fach
+    // (owner 2026-10-21, media 131777).
+    const vtScale = this.viewportService.getTransform();
+    if (vtScale && isRootOverview) {
+      vtScale.minScaleOverride = 1;
+      this._overviewScaleLock = true;
+    } else if (vtScale && this._overviewScaleLock) {
+      vtScale.minScaleOverride = null;
+      this._overviewScaleLock = false;
+    }
     if (isRootOverview) {
       // Desktop category-root overview: fitted static grid — no paged
       // snapping, no dock shift, no first-product centring.
