@@ -39,6 +39,8 @@ export class HeroLayouter<T> implements ILayouter<T> {
    * das Bucket-Label). Leer -> Fallback auf Attribut-Kandidaten.
    */
   public posterBuckets: Array<{ label: string; ids: Set<string> }> = [];
+  /** Keine Gruppe mit mehr als einem Produkt: alle Produkte in einem Stapel ohne Ueberschrift. */
+  public flatOverview = false;
 
   constructor(private config: HeroLayoutConfig<T>) {}
 
@@ -262,7 +264,9 @@ export class HeroLayouter<T> implements ILayouter<T> {
       return units;
     };
     const groups = new Map<string, LayoutNode<T>[]>();
-    if (this.posterBuckets.length >= 2) {
+    if (this.flatOverview) {
+      groups.set('', [...nodes]);
+    } else if (this.posterBuckets.length >= 2) {
       // Gruppen = Engine-Buckets (Bucket-Reihenfolge, Rest -> WEITERE)
       // "N/A" (Produkte ohne Wert) ist fuer Haendler keine Gruppe — Rest.
       const labelOf = (label: string) => (label === 'N/A' ? 'WEITERE' : label);
@@ -315,7 +319,7 @@ export class HeroLayouter<T> implements ILayouter<T> {
             units += advanceAfter(list[end - 1], list[end]);
             end++;
           }
-          shelves.push({ key, nodes: list.slice(start, end), showHeader: start === 0 });
+          shelves.push({ key, nodes: list.slice(start, end), showHeader: start === 0 && key !== '' });
           start = end;
         }
       }

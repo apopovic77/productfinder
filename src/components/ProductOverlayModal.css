@@ -500,8 +500,8 @@
 
 /* ---- Desktop hero dock (design 2026-08-23): dark card, right of the stage ---- */
 .pom-info-panel.pom-hero-dock {
-  /* Slight 3D tilt is animated by framer-motion (rotateY -7deg -> 0 when
-     the card expands); only the origin lives here. */
+  /* Slight 3D tilt is animated by framer-motion (rotateY -7deg on entry,
+     settling to 0 so the text stays sharp); only the origin lives here. */
   transform-origin: 0% 50%;
   background: rgba(20, 20, 22, 0.92);
   backdrop-filter: blur(24px);

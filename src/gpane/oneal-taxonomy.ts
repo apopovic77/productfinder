@@ -375,6 +375,7 @@ export const ONEAL_TAXONOMY: TaxonomyNode[] = [
           { label: 'Protektoren', slug: 'protektoren', match: p => isYouth(p) && hasSport(p, 'MX') && hasType(p, 'Protektor') },
           { label: 'Handschuhe', slug: 'handschuhe', match: p => isYouth(p) && hasSport(p, 'MX') && hasType(p, 'Handschuh') },
           { label: 'Stiefel', slug: 'stiefel', match: p => isYouth(p) && hasSport(p, 'MX') && hasType(p, 'Stiefel') },
+          { label: 'Socken', slug: 'socken', match: p => isYouth(p) && hasSport(p, 'MX') && hasType(p, 'Socke') },
         ],
       },
     ],

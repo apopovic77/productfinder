@@ -23,7 +23,7 @@ import { ONEAL_TAXONOMY } from '../gpane';
  */
 function catalogTaxonomy(): TaxonomyNode[] {
   const locked = new Set(CATALOG_ENTRY_CONFIG.sports.filter(s => !s.enabled).map(s => s.id));
-  const sports = ONEAL_TAXONOMY.filter(node => !locked.has(node.slug));
+  const sports = pruneLockedSports(ONEAL_TAXONOMY, locked);
   if (resolveCatalogFlow().gates.length > 0) return sports;
   return Object.keys(BRAND_BANNERS).map(brand => ({
     label: brand,
@@ -32,6 +32,24 @@ function catalogTaxonomy(): TaxonomyNode[] {
     children: sports,
   }));
 }
+/**
+ * Gesperrte Sportarten auch in Unterknoten weglassen ('Kinder MTB',
+ * 'Frauen MTB'). Bleibt danach nur ein Kind, entfaellt die Zwischenstufe:
+ * 'Kinder' zeigt direkt Helme, Brillen, Kleidung ... statt einer einzigen
+ * Kachel 'Kinder MX' (owner 2026-10-21, media 131770).
+ */
+function pruneLockedSports(nodes: TaxonomyNode[], locked: Set<string>): TaxonomyNode[] {
+  const isLocked = (slug: string) => [...locked].some(id => slug === id || slug.endsWith(`-${id}`));
+  return nodes
+    .filter(node => !isLocked(node.slug))
+    .map(node => {
+      if (!node.children?.length) return node;
+      let children = pruneLockedSports(node.children, locked);
+      while (children.length === 1 && children[0].children?.length) children = children[0].children;
+      return { ...node, children };
+    });
+}
+
 // Legacy import kept for type compatibility
 import type { PriceBucketMode } from '../types/pivot';
 import { HeroLayouter } from '../layout/HeroLayouter';
@@ -467,6 +485,16 @@ export class LayoutService {
     // Uebersicht das eine Produkt unter "WEITERE", die Karte sprang erst
     // danach in die Hero-Sicht, und Zurueck landete auf dieser Zwischenebene
     // (owner 2026-10-21, 3SRS HEAT, media 131704-131711).
+    // Ohne echte Gruppe, aber mit mehreren Produkten: flache Uebersicht ohne
+    // Ueberschriften, Klick oeffnet die Hero-Sicht, Zurueck fuehrt hierher
+    // (owner 2026-10-21: "sehe nur zwei Produkte von sechs, haette gerne
+    // trotzdem eine Uebersicht"). Ein einzelnes Produkt geht weiter direkt
+    // in die Hero-Sicht.
+    return this.groupsWorthwhile() || this.engine.all().length > 1;
+  }
+
+  /** Mindestens eine Gruppe der Ebene enthaelt mehr als ein Produkt. */
+  groupsWorthwhile(): boolean {
     const buckets = this.drillDownService.getCurrentBuckets().filter(b => !b.isUnknown);
     return buckets.some(b => (b.objectIds?.length ?? 0) > 1);
   }
@@ -528,6 +556,7 @@ export class LayoutService {
         if (this.heroLayouter) {
           this.heroLayouter.overviewMode = this.isHeroRootOverview();
           this.heroLayouter.posterMode = this.posterOverview;
+          this.heroLayouter.flatOverview = !this.groupsWorthwhile();
           // Gruppen der Poster-View = Engine-Buckets der Ebene, damit der
           // Gruppen-Klick eine echte Pivot-Action ist (media 120646).
           this.heroLayouter.posterBuckets = this.drillDownService.getCurrentBuckets()

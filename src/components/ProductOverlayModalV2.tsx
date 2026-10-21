@@ -960,7 +960,10 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     height: heroSheet || isMobilePortrait
       ? undefined
       : (expanded ? expandedGeometry.height : heroDock ? dockGeometry.height : undefined),
-    rotateY: !isMobilePortrait && !expanded ? -7 : 0,
+    // Schraeg nur beim Hereinkommen (initial), dann gerade: auf -7deg zeichnete
+    // Chrome den Text als Bitmap und er wirkte unscharf (owner 2026-10-21,
+    // media 131760).
+    rotateY: 0,
     transformPerspective: 1400,
   };
 
@@ -1000,7 +1003,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       // Mount = fertige Geometrie, nur Opacity faded ein. Ohne das startet
       // Framer beim Layout-Wert (width:auto = breit) und morpht sichtbar
       // auf 340px zusammen (owner 2026-08-25, media 120605).
-      initial={{ ...morphTarget, opacity: 0 }}
+      initial={{ ...morphTarget, rotateY: !isMobilePortrait && !expanded ? -7 : 0, opacity: 0 }}
       exit={{ opacity: 0 }}
       transition={drawerExpand ? {
         // Schublade: Geometrie springt, das Einfahren macht die CSS-Klasse

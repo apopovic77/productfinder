@@ -1411,6 +1411,9 @@ export class ProductFinderController {
   drillIntoProductGroup(product: Product): boolean {
     const buckets = this.layoutService.getCurrentBuckets().filter((b: any) => !b.isUnknown);
     if (buckets.length < 2) return false;
+    // Flache Uebersicht (jede Gruppe nur ein Produkt): Klick oeffnet das
+    // Produkt selbst, statt in eine Ein-Produkt-Ebene zu fuehren.
+    if (!buckets.some((b: any) => (b.objectIds?.length ?? 0) > 1)) return false;
     const id = String(product.id);
     const bucket = buckets.find((b: any) => b.objectIds.includes(id));
     if (!bucket) return false;

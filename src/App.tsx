@@ -1219,6 +1219,7 @@ export default class App extends React.Component<Props, State> {
   }
   
   private syncPivotUI = () => {
+    this.clearKeyboardFocus();
     const currentDim = this.controller.getPivotDimension();
     const availableDims = this.controller.getAvailablePivotDimensions();
     const definitions = this.controller.getPivotDimensionDefinitions();
@@ -2281,7 +2282,17 @@ export default class App extends React.Component<Props, State> {
     }
   }
 
+  /**
+   * Tastatur-Markierung (gruener Rahmen) gilt nur, solange per Tastatur
+   * navigiert wird: Maus und Ebenenwechsel heben sie auf (owner 2026-10-21,
+   * media 131763 — der Rahmen blieb nach einem Pfeiltasten-Druck stehen).
+   */
+  private clearKeyboardFocus = () => {
+    if (this.state.focusedIndex !== -1) this.setState({ focusedIndex: -1 });
+  };
+
   private handleCanvasClick = (e: MouseEvent) => {
+    this.clearKeyboardFocus();
     const canvas = this.canvasRef.current;
     if (!canvas) return;
 
@@ -2380,6 +2391,7 @@ export default class App extends React.Component<Props, State> {
   };
 
   private handleCanvasMouseMove = (e: MouseEvent) => {
+    this.clearKeyboardFocus();
     const canvas = this.canvasRef.current;
     if (!canvas) return;
 
