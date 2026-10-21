@@ -142,7 +142,9 @@ export function rankStageBackgrounds(styles: StageBackgroundStyle[], h: Backgrou
     const visible = st.visibleHeightCm ?? DEFAULT_VISIBLE_CM[t.env];
     if (!helmet && realistic && h.heightCm && visible && h.heightCm / visible < MIN_SCENE_FRACTION) return -50;
     let s = 0;
-    if (helmet && street) s += { urban: 6, studio: 3, brand: 1, nature: 0, offroad: -4 }[t.env] + (st.id === 'BG02' ? 1 : 0);
+    // Strasse/Adventure: dunkler Asphalt-/Betonboden (BG02 Dark Studio,
+    // 131858), dann Neon mit nassem Asphalt, dann Industrie (owner 2026-10-21)
+    if (helmet && street) s += st.id === 'BG02' ? 8 : st.id === 'BG07' ? 6 : { urban: 4, studio: 2, brand: 1, nature: 0, offroad: -4 }[t.env];
     else if (helmet) s += { offroad: 6, nature: 2, brand: 1, studio: 0, urban: -2 }[t.env] + (st.id === 'BG04' || st.id === 'BG10' ? 1 : 0);
     else if (street) s += { studio: 3, urban: 3, nature: 1, brand: 1, offroad: -3 }[t.env];
     else if (mtbOnly) s += { nature: 4, offroad: 1, studio: 1, urban: 0, brand: 0 }[t.env];
