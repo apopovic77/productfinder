@@ -632,22 +632,12 @@ export class LayoutService {
         // eine Figur je Marke (O'Neal, Kini Red Bull ...)
         figureOf: p => p.brand || String(getProductValue(p, 'brand') ?? ''),
         isYouth: p => String(getProductValue(p, 'target_group') ?? '').toLowerCase().includes('jugend'),
-        // Thumbnail ohne trim hat Rand: Faktor aus den Trim-Daten der Ablage
-        contentScaleY: p => {
-          const img = p.image as HTMLImageElement | null | undefined;
-          if (img?.src?.includes('trim=true')) return 1;
-          // scale_y = Anteil des Produkts an der Bildhoehe
-          const sy = p.trimScale?.scale_y;
-          return sy && sy > 0 ? 1 / sy : 1;
-        },
+        // Produktbilder werden freigestellt geladen (trim=true, auch aus dem
+        // Cache als blob:): Bildmasse = Produktmasse
+        contentScaleY: () => 1,
         imageAspect: p => {
           const img = p.image as HTMLImageElement | null | undefined;
-          if (!img?.naturalWidth || !img.naturalHeight) return 0;
-          // ohne trim auch das Seitenverhaeltnis auf das Produkt umrechnen
-          const trimmed = img.src.includes('trim=true');
-          const sx = trimmed ? 1 : (p.trimScale?.scale_x ?? 1);
-          const sy = trimmed ? 1 : (p.trimScale?.scale_y ?? 1);
-          return (img.naturalWidth * sx) / (img.naturalHeight * sy);
+          return img?.naturalWidth && img.naturalHeight ? img.naturalWidth / img.naturalHeight : 0;
         },
       });
       if (this.layouter !== this.outfitLayouter) {

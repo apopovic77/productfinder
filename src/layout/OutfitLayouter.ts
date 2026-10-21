@@ -142,52 +142,74 @@ export class OutfitLayouter<T> {
     const youth = first ? this.config.isYouth(first.data) : false;
     this.figureHeaders = [{ x: axisX - figH * 0.27, y: top - 14, text: 'AUSRÜSTUNG', raw: '', maxWidth: figH * 0.55, static: true }];
 
+    // Aufgeloeste Figur (owner 2026-10-21): Reihenfolge und reale
+    // Groessenverhaeltnisse bleiben, aber die Teile ueberlappen nicht mehr.
+    // Mitte: Kopf bis Fuss untereinander mit Luft; seitlich: Handschuhe,
+    // Ellbogen, Brille.
+    const gap = figH * 0.02;
+    type Piece = { slot: OutfitSlot; node: LayoutNode<T>; h: number; w: number; single: boolean };
+    const pieces: Piece[] = [];
     for (const [slot, node] of wornNodes) {
       const spec = OUTFIT_SLOTS[slot];
       const k = youth ? spec.youth : 1;
-      // reale Hoehe des Produkts; ein Bild mit Rand bekommt die Box um den
-      // Rand groesser, damit das Produkt selbst die richtige Hoehe hat
       const padY = Math.max(1, Math.min(2, this.config.contentScaleY?.(node.data) ?? 1));
       const h = spec.h * k * pxPerCm * padY;
       const aspect = this.config.imageAspect?.(node.data) || 0;
-      // Einzelteil oder Paar: Stiefel/Knie von vorn als Paar breit (B/H > 0,8)
       const single = (slot === 'glove') || ((slot === 'boot' || slot === 'knee' || slot === 'elbow') && aspect > 0 && aspect < 0.8);
-      const sideX = slot === 'glove' ? spec.x : slot === 'boot' ? 0.06 : slot === 'knee' ? 0.06 : spec.x;
-      const w = h * (single ? Math.min(spec.maxAspect, 0.9) : spec.maxAspect);
-      const cy = groundY - spec.anchorY * figH;
-      const place = (n: LayoutNode<T>, cx: number, visible: boolean) => {
-        n.posX.targetValue = cx - w / 2;
-        n.posY.targetValue = cy - h / 2;
-        n.width.targetValue = w;
-        n.height.targetValue = h;
-        n.scale.targetValue = 1;
-        n.opacity.targetValue = visible ? 1 : 0;
-      };
-      const mirror = nodes.find(m => m.id === `${node.id}@@mirror`);
-      // Brille zum Helm: Helmbilder sind seitlich/45°, die Brille von vorn mit
-      // Band; ueber den Helm gelegt wirkte das wild (owner 2026-10-21, media
-      // 131914). Mit Helm steht sie daher neben dem Kopf, ohne Helm im Gesicht.
-      if (slot === 'goggle' && wornNodes.has('helmet')) {
-        const helmetSpec = OUTFIT_SLOTS.helmet;
-        const gh = h * 0.9;
-        const gw = gh * spec.maxAspect;
-        node.posX.targetValue = axisX + figH * 0.12;
-        node.posY.targetValue = groundY - helmetSpec.anchorY * figH + figH * 0.02;
-        node.width.targetValue = gw;
-        node.height.targetValue = gh;
-        node.scale.targetValue = 1;
-        node.opacity.targetValue = 1;
+      const w = h * (single ? Math.min(spec.maxAspect, 0.9) : (aspect > 0 ? Math.min(spec.maxAspect, aspect) : spec.maxAspect));
+      pieces.push({ slot, node, h, w, single });
+    }
+    const sideSlots: OutfitSlot[] = ['glove', 'elbow', 'goggle'];
+    const column = pieces.filter(p => !sideSlots.includes(p.slot))
+      .sort((a, b) => OUTFIT_SLOTS[b.slot].anchorY - OUTFIT_SLOTS[a.slot].anchorY);
+    const side = pieces.filter(p => sideSlots.includes(p.slot));
+    // Paare (Stiefel, Knie als Einzelbild) brauchen Breite fuer zwei
+    const pairW = (p: Piece) => (p.single && (p.slot === 'boot' || p.slot === 'knee') ? p.w * 2 + gap * 0.5 : p.w);
+    const totalH = column.reduce((sum, p) => sum + p.h, 0) + Math.max(0, column.length - 1) * gap;
+    const fit = Math.min(1, figH / Math.max(1, totalH));
+    let y = groundY - figH + Math.max(0, (figH - totalH * fit) / 2);
+    const colPos = new Map<OutfitSlot, { cy: number; w: number; h: number }>();
+    const place = (n: LayoutNode<T>, cx: number, cy: number, w: number, h: number, visible = true) => {
+      n.posX.targetValue = cx - w / 2;
+      n.posY.targetValue = cy - h / 2;
+      n.width.targetValue = w;
+      n.height.targetValue = h;
+      n.scale.targetValue = 1;
+      n.opacity.targetValue = visible ? 1 : 0;
+    };
+    for (const p of column) {
+      const h = p.h * fit, w = p.w * fit;
+      const cy = y + h / 2;
+      const mirror = nodes.find(m => m.id === `${p.node.id}@@mirror`);
+      if (p.single && (p.slot === 'boot' || p.slot === 'knee')) {
+        place(p.node, axisX - (w / 2 + gap * 0.25), cy, w, h);
+        if (mirror) place(mirror, axisX + (w / 2 + gap * 0.25), cy, w, h);
+      } else {
+        place(p.node, axisX, cy, w, h);
+        if (mirror) place(mirror, axisX, cy, w, h, false);
+      }
+      colPos.set(p.slot, { cy, w: pairW(p) * fit, h });
+      y += h + gap;
+    }
+    // Seitlich: auf Hoehe ihres Bezugsteils, ausserhalb der breitesten Mitte
+    const torso = colPos.get('jersey') ?? colPos.get('jacket') ?? colPos.get('chest');
+    const legs = colPos.get('pants');
+    const head = colPos.get('helmet');
+    const widest = Math.max(0, ...[...colPos.values()].map(c => c.w));
+    for (const p of side) {
+      const h = p.h * fit, w = p.w * fit;
+      const mirror = nodes.find(m => m.id === `${p.node.id}@@mirror`);
+      if (p.slot === 'goggle') {
+        if (head) place(p.node, axisX + head.w / 2 + gap + w / 2, head.cy, w, h);
+        else place(p.node, axisX, groundY - OUTFIT_SLOTS.goggle.anchorY * figH, w, h);
         continue;
       }
-      if (single && sideX) {
-        // Original rechts (Betrachter links ist die rechte Koerperseite),
-        // gespiegelte Kopie auf der anderen Seite
-        place(node, axisX - sideX * figH, true);
-        if (mirror) place(mirror, axisX + sideX * figH, true);
-      } else {
-        place(node, axisX + (single ? spec.x : 0) * figH, true);
-        if (mirror) place(mirror, axisX, false);
-      }
+      // Handschuhe auf Hoehe des Hosenbunds, Ellbogen auf Hoehe des Oberteils
+      const ref = p.slot === 'glove' ? (legs ? legs.cy - legs.h / 2 + h / 2 : torso ? torso.cy + torso.h / 2 : groundY - OUTFIT_SLOTS.glove.anchorY * figH)
+        : (torso ? torso.cy : groundY - OUTFIT_SLOTS.elbow.anchorY * figH);
+      const dx = Math.max(widest, torso?.w ?? 0) / 2 + gap + w / 2;
+      place(p.node, axisX - dx, ref, w, h);
+      if (mirror) place(mirror, axisX + dx, ref, w, h);
     }
 
     // Alternativen: Oberkoerper links, Beine/Fuesse/Haende rechts, auf Hoehe

@@ -16,6 +16,7 @@ import { DIALOG_MORPH_EASE, DIALOG_MORPH_SECONDS, expandedDialogGeometry } from 
 const STORAGE_API_URL = STORAGE_API_BASE;
 import { DEFAULT_STAGE_BACKGROUND, STAGE_BACKGROUND_BASE, STAGE_BACKGROUND_STYLES, fetchStageBackgrounds, rankStageBackgrounds, stageBackgroundUrl, type StageBackgroundStyle } from '../config/stageBackgrounds';
 import { CATALOG_PRODUCTS_BASE, CATALOG_PRODUCTS_KEY } from '../config/apiConfig';
+import { flyToCart } from '../utils/flyToCart';
 import { OUTFIT_SLOTS, outfitSlotFrom } from '../layout/OutfitLayouter';
 
 /**
@@ -824,8 +825,12 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       return copy;
     });
 
+  const addToCartRef = useRef<HTMLButtonElement | null>(null);
   const handleAddToCart = () => {
     soundService.tick();
+    // Partikel vom Knopf zum Warenkorb
+    const r = addToCartRef.current?.getBoundingClientRect();
+    if (r && onBuy) flyToCart({ x: r.left + r.width / 2, y: r.top + r.height / 2 }, Math.max(1, sizeQtyTotal));
     if (onBuy && showExpandedContent && sizeQtyTotal > 0) {
       for (const [size, quantity] of Object.entries(sizeQty)) {
         if (quantity <= 0) continue;
@@ -1959,7 +1964,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       {/* Buttons - hidden on mobile portrait (moved to top right) */}
       {(!isMobilePortrait || heroSheet) && (
         <div className="pom-actions" style={{ gap: '6px' }}>
-          <button className="pom-button pom-button-primary" onClick={handleAddToCart} style={{ fontSize: '11px', padding: '8px 12px' }}>
+          <button ref={addToCartRef} className="pom-button pom-button-primary" onClick={handleAddToCart} style={{ fontSize: '11px', padding: '8px 12px' }}>
             {showExpandedContent && justAdded ? '✓ Im Warenkorb' : showExpandedContent && sizeQtyTotal > 0 ? `Add to Cart · ${sizeQtyTotal} Stk.` : 'Add to Cart'}
           </button>
           {(onShowDetails || onCollapse) && !showExpandedContent && (
