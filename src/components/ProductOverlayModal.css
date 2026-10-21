@@ -1089,3 +1089,8 @@
 .pom-feature-ico-empty { width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid rgba(255, 255, 255, 0.3); }
 .pom-stage-flow .pom-stage-main .pf-zoom-box, .pom-stage-flow .pom-stage-main .pom-expanded-hero-img { background-color: transparent !important; }
 .pom-stage-flow .pom-expanded-thumb { background-size: contain, cover; background-position: center, center; background-repeat: no-repeat, no-repeat; }
+.pom-feature-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.pom-feature-card { display: flex; gap: 14px; align-items: flex-start; padding: 14px; border-radius: 12px; background: rgba(255, 255, 255, 0.05); }
+.pom-feature-card .pom-feature-ico { flex: 0 0 auto; width: 36px; height: 36px; color: #ff5a1f; }
+.pom-feature-card strong { display: block; font-size: 14px; color: #fff !important; margin-bottom: 4px; }
+.pom-feature-card p { margin: 0; font-size: 12.5px; line-height: 1.5; color: rgba(255, 255, 255, 0.7) !important; }

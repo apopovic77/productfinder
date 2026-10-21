@@ -1828,6 +1828,21 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
             {points.length + norms.length > 0 && section('details', 'Produktdetails', 'Material, Passform und Besonderheiten',
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h16M4 12h16M4 17h10" /></svg>,
               <div className="pom-expanded-desc">
+                {/* Merkmalskarten aus dem Katalog: Icon, Titel, belegender Satz
+                    aus dem Langtext (Entwurf media 131843) */}
+                {Array.isArray(raw.features) && raw.features.some((f: any) => f.text) && (
+                  <div className="pom-feature-cards">
+                    {raw.features.filter((f: any) => f.text).slice(0, 4).map((f: any) => (
+                      <div key={f.key} className="pom-feature-card">
+                        <FeatureIcon iconKey={f.key} />
+                        <div>
+                          <strong>{f.title}</strong>
+                          <p>{f.text}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {points.length > 0 && (
                   <ul className="pom-desc-cards">
                     {points.map((line: string, i: number) => (
