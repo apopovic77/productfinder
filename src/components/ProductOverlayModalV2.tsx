@@ -14,7 +14,8 @@ import { DIALOG_MORPH_EASE, DIALOG_MORPH_SECONDS, expandedDialogGeometry } from 
 
 // Storage API URL from environment
 const STORAGE_API_URL = STORAGE_API_BASE;
-import { DEFAULT_STAGE_BACKGROUND, STAGE_BACKGROUND_BASE, STAGE_BACKGROUND_STYLES, stageBackgroundUrl } from '../config/stageBackgrounds';
+import { DEFAULT_STAGE_BACKGROUND, STAGE_BACKGROUND_BASE, STAGE_BACKGROUND_STYLES, fetchStageBackgrounds, stageBackgroundUrl, type StageBackgroundStyle } from '../config/stageBackgrounds';
+import { CATALOG_PRODUCTS_BASE, CATALOG_PRODUCTS_KEY } from '../config/apiConfig';
 
 /**
  * Merkmal-Icons (58 SVGs von Higgsfield, owner 2026-10-21): inline, damit
@@ -155,6 +156,14 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     setBgStyle(id);
     try { localStorage.setItem('pf-stage-bg', id); } catch { /* ohne Speicher nur fuer diese Sitzung */ }
   };
+  // Hintergruende aus der Katalog-Registry, sonst die eingebaute Liste
+  const [bgStyles, setBgStyles] = useState<StageBackgroundStyle[]>(STAGE_BACKGROUND_STYLES);
+  useEffect(() => {
+    let alive = true;
+    fetchStageBackgrounds(product.id, CATALOG_PRODUCTS_BASE, CATALOG_PRODUCTS_KEY)
+      .then(styles => { if (alive) setBgStyles(styles ?? STAGE_BACKGROUND_STYLES); });
+    return () => { alive = false; };
+  }, [product.id]);
   /** Kurze Bestaetigung am Knopf nach dem Hinzufuegen. */
   const [justAdded, setJustAdded] = useState(false);
 
@@ -1216,7 +1225,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         // Katalog sie liefert (features: [{key, title, subtitle}])
         const stageFeatures: Array<{ key: string; title: string; subtitle?: string }> =
           Array.isArray(rawProduct.features) ? rawProduct.features.slice(0, 4) : [];
-        const stageBgUrl = stageBackground ?? stageBackgroundUrl(bgStyle, product.id);
+        const stageBgUrl = stageBackground ?? stageBackgroundUrl(bgStyles.some(st => st.id === bgStyle) ? bgStyle : DEFAULT_STAGE_BACKGROUND, product.id, undefined, bgStyles);
         const stageThumbBg = stageBgUrl ? `url(${stageBgUrl.replace('width=1200', 'width=300')})` : '';
         const stage = (
           <div
@@ -1234,7 +1243,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
               style={stageBgUrl ? { backgroundImage: `url(${stageBgUrl})` } : undefined}
             >
             <div className="pom-stage-bgpick" role="group" aria-label="Hintergrund">
-              {STAGE_BACKGROUND_STYLES.map(st => (
+              {bgStyles.map(st => (
                 <button key={st.id} type="button" title={st.label}
                   className={`pom-stage-bgdot ${bgStyle === st.id ? 'active' : ''}`}
                   style={st.storageIds[0] ? { backgroundImage: `url(${STAGE_BACKGROUND_BASE}/storage/media/${st.storageIds[0]}?width=60&format=webp&quality=60)` } : undefined}
