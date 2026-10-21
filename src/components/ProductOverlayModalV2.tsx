@@ -89,6 +89,9 @@ type Props = {
    * Liste stand nur die eigene Farbe da (owner 2026-10-21, media 131797).
    */
   colorOptions?: Array<{ id: string | number; colorName: string; storageId?: number }>;
+  /** Benachrichtigen, wenn wieder verfuegbar: Zustand und Umschalter */
+  restockState?: 'none' | 'open' | 'fulfilled';
+  onToggleRestock?: () => void;
   /** Hintergrundbild der Buehne im grossen Dialog (Hintergrund-Matrix) */
   stageBackground?: string;
   /** Expanded state: the SAME card grows into the detail view (true morph). */
@@ -134,7 +137,7 @@ interface ParsedFeature {
  * Product Overlay Modal V2 - HALF WIDTH VERSION (240px)
  * Same design as V1, but with compact half-width layout
  */
-export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady, onShowDetails, expanded = false, onCollapse, locale, onSiblingSelect, colorOptions, stageBackground, onStepProduct, stepPosition, dealerPrices, dealerActive = false, dealerPricesPending = false, cartLines = [] }) => {
+export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady, onShowDetails, expanded = false, onCollapse, locale, onSiblingSelect, colorOptions, stageBackground, restockState = 'none', onToggleRestock, onStepProduct, stepPosition, dealerPrices, dealerActive = false, dealerPricesPending = false, cartLines = [] }) => {
   const isMobilePortrait = window.innerWidth <= 768 && window.innerHeight > window.innerWidth;
   // Phone: the dark hero card as a full-width bottom sheet (owner 2026-08-23,
   // "die Karte auch im Desktop-Style"). Same markup as the desktop dock,
@@ -1930,6 +1933,17 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
           {productUrl && !showExpandedContent && (
             <button className="pom-button pom-button-secondary" onClick={handleShowInHP} style={{ fontSize: '11px', padding: '8px 12px' }}>
               Show in HP
+            </button>
+          )}
+          {/* Benachrichtigen, wenn wieder verfuegbar (Entwurf media 131843):
+              sobald eine Groesse fehlt; ohne Haendler-Login fuehrt er zur Anmeldung */}
+          {showExpandedContent && onToggleRestock && (sizesInStock < matrixSizes.length || restockState !== 'none') && (
+            <button type="button" className={`pom-button pom-restock ${restockState}`} onClick={onToggleRestock}>
+              <span aria-hidden="true">🔔</span>
+              <span>
+                <strong>{restockState === 'open' ? 'Benachrichtigung aktiv' : restockState === 'fulfilled' ? 'Wieder verfügbar' : 'Benachrichtigen'}</strong>
+                <small>{restockState === 'open' ? 'Klick zum Abbestellen' : restockState === 'fulfilled' ? 'Bestand ist zurück' : 'wenn wieder verfügbar'}</small>
+              </span>
             </button>
           )}
           {/* Grosser Dialog: ein Hauptknopf, geschlossen wird oben rechts */}

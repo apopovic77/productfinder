@@ -328,3 +328,39 @@ export async function b2bListOrders(session: B2BSession, limit = 50): Promise<B2
     };
   });
 }
+
+// === Benachrichtigen, wenn wieder verfuegbar (owner 2026-10-21, oneal-api-v2 PR #19) ===
+// Nur mit Haendler-Session; die Kundennummer bestimmt der Server aus der Session.
+
+export type RestockRequest = {
+  id: number;
+  product_id: number;
+  size: string | null;
+  status: 'open' | 'fulfilled';
+  created_at: string;
+  fulfilled_at: string | null;
+};
+
+async function restockFetch<T>(session: B2BSession, path: string, init: RequestInit = {}): Promise<T> {
+  const res = await fetch(`${ONEAL_API_BASE}/restock-requests${path}`, {
+    ...init,
+    headers: { 'Content-Type': 'application/json', 'X-API-Key': ONEAL_API_KEY, Authorization: `Bearer ${session.token}` },
+  });
+  if (res.status === 204) return undefined as T;
+  const body = await res.json().catch(() => null);
+  if (!res.ok) throw new B2BError(res.status, body?.error ?? 'http_error', body?.message ?? 'Benachrichtigung fehlgeschlagen.', body);
+  return body as T;
+}
+
+export async function restockList(session: B2BSession): Promise<RestockRequest[]> {
+  const r = await restockFetch<{ requests: RestockRequest[] }>(session, '');
+  return r?.requests ?? [];
+}
+
+export async function restockCreate(session: B2BSession, productId: number, size?: string): Promise<RestockRequest> {
+  return restockFetch<RestockRequest>(session, '', { method: 'POST', body: JSON.stringify(size ? { product_id: productId, size } : { product_id: productId }) });
+}
+
+export async function restockDelete(session: B2BSession, id: number): Promise<void> {
+  await restockFetch<void>(session, `/${id}`, { method: 'DELETE' });
+}

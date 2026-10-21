@@ -5,6 +5,7 @@ import {
   B2B_LIVE_ORDERS, b2bCreateOrder, b2bFetchPrices, b2bLogin, b2bLogout, b2bValidateSession,
   b2bListOrders, clearCheckoutRef, getOrCreateCheckoutRef, loadB2BSession,
   B2BError, type B2BPrice, type B2BSession, type B2BStoredOrder,
+  restockList, restockCreate, restockDelete, type RestockRequest,
 } from './services/B2BService';
 import { resolveCartLineSkus } from './utils/cartSku';
 import type { CartB2BState } from './components/cart/CartView';
@@ -223,6 +224,8 @@ type State = {
   b2bVariantsById: Record<string, ProductVariant[]>;
   /** Händler-Login-Dialog (Header) offen. */
   b2bLoginOpen: boolean;
+  /** Benachrichtigungswuensche des eingeloggten Haendlers */
+  restockRequests: RestockRequest[];
   /** Kleines Konto-Menü unter dem Header-Icon (nur angemeldet). */
   b2bMenuOpen: boolean;
   /** Letzte Übergabe an den B2B-Shop (Bestätigungsansicht). */
@@ -341,6 +344,7 @@ const createInitialState = (): State => {
     b2bPricesPending: false,
     b2bVariantsById: {},
     b2bLoginOpen: false,
+    restockRequests: [],
     b2bMenuOpen: false,
     orderConfirmation: null,
     cartPanelOpen: false,
@@ -437,6 +441,7 @@ export default class App extends React.Component<Props, State> {
     document.body.classList.add('pf-finder-active');
     // Gespeicherte Händler-Sitzung (Veloconnect) prüfen — nicht blockierend.
     void this.validateB2BSessionOnBoot();
+    this.loadRestockRequests();
     window.addEventListener('keydown', this.handleRealtimeDemoHotkey);
     // Marken fuer das Breadcrumb-Dropdown (Markenwechsel im Kontext)
     fetchFacets().then((data: any) => {
@@ -560,6 +565,8 @@ export default class App extends React.Component<Props, State> {
   private sheetObserver: ResizeObserver | null = null;
 
   componentDidUpdate(prevProps: Props, prevState: State): void {
+    // Benachrichtigungen mit der Haendler-Session laden bzw. leeren
+    if (prevState.b2bSession?.token !== this.state.b2bSession?.token) this.loadRestockRequests();
     if (this.state.b2bSession && (prevState.cartItems !== this.state.cartItems
         || prevState.selectedProduct?.id !== this.state.selectedProduct?.id)) {
       this.scheduleB2BPriceRefresh();
@@ -2412,6 +2419,24 @@ export default class App extends React.Component<Props, State> {
       .map(p => ({ id: p.id, colorName: colorOf(p) || p.name, storageId: p.primaryImage?.storage_id }));
   }
 
+  private loadRestockRequests = () => {
+    const session = this.state.b2bSession;
+    if (!session) { if (this.state.restockRequests.length) this.setState({ restockRequests: [] }); return; }
+    restockList(session).then(list => this.setState({ restockRequests: list })).catch(() => {});
+  };
+
+  /** Benachrichtigung an/aus; ohne Haendler-Login erst anmelden. */
+  private toggleRestock = async (productId: number) => {
+    const session = this.state.b2bSession;
+    if (!session) { this.setState({ b2bLoginOpen: true }); return; }
+    const open = this.state.restockRequests.find(r => r.product_id === productId && r.status === 'open' && !r.size);
+    try {
+      if (open) await restockDelete(session, open.id);
+      else await restockCreate(session, productId);
+    } catch { /* Fehler: Liste neu laden zeigt den echten Stand */ }
+    this.loadRestockRequests();
+  };
+
   private handleCanvasMouseMove = (e: MouseEvent) => {
     this.clearKeyboardFocus();
     const canvas = this.canvasRef.current;
@@ -4069,6 +4094,11 @@ export default class App extends React.Component<Props, State> {
                 onStepProduct={this.stepCardProduct}
                 stepPosition={this.cardStepPosition()}
                 colorOptions={this.colorOptionsFor(selectedProduct)}
+                restockState={(() => {
+                  const mine = this.state.restockRequests.filter(r => String(r.product_id) === String(selectedProduct.id) && !r.size);
+                  return mine.find(r => r.status === 'open') ? 'open' : mine.find(r => r.status === 'fulfilled') ? 'fulfilled' : 'none';
+                })()}
+                onToggleRestock={Number.isSafeInteger(Number(selectedProduct.id)) ? () => this.toggleRestock(Number(selectedProduct.id)) : undefined}
                 onSiblingSelect={(pid) => {
                   const target = this.controller.getDisplayOrder().find(pr => String(pr.id) === String(pid));
                   if (!target) return false;
