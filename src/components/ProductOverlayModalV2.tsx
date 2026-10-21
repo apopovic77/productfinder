@@ -712,6 +712,15 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       return true;
     });
   }, [availableSizes]);
+  // Farbwechsel im grossen Dialog: bis die Daten der neuen Farbe da sind,
+  // bleiben die bisherigen Groessen stehen. Sonst verschwand die Matrix kurz
+  // und "Add to Cart" blitzte unter den Farben auf (owner 2026-10-21, media
+  // 131823/131824).
+  const lastQtySizesRef = useRef<string[]>([]);
+  const detailsStale = isLoadingDetails || !fullProduct || String(fullProduct.id) !== String(product.id);
+  const sizesPending = expanded && detailsStale && qtySizes.length === 0;
+  if (qtySizes.length > 0) lastQtySizesRef.current = qtySizes;
+  const matrixSizes = sizesPending ? lastQtySizesRef.current : qtySizes;
   const stockForSize = (size: string): number | null => {
     const key = size.replace(/\s*\(.*\)\s*$/, '').trim();
     let total: number | null = null;
@@ -1522,7 +1531,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       })()}
 
       {/* Grosser Dialog: Groessen & Mengen neben der Farbe (owner 2026-10-21, media 131808) */}
-      {showExpandedContent && qtySizes.length > 0 && (
+      {showExpandedContent && matrixSizes.length > 0 && (
         <div className="pom-size-qty" aria-label="Menge je Größe">
           <div className="pom-size-qty-head">
             <span>{showExpandedContent ? 'Größen & Mengen' : 'Menge je Größe'}</span>
@@ -1531,7 +1540,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
             )}
           </div>
           <div className="pom-size-qty-grid">
-            {qtySizes.map(size => {
+            {matrixSizes.map(size => {
               const qty = sizeQty[size] || 0;
               const stock = stockForSize(size);
               return (
@@ -1547,7 +1556,9 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                   onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); bumpSizeQty(size, 1); } }}
                 >
                   <span className="pom-size-qty-label" title={size}>{size.replace(/\s*\(.*\)\s*$/, '')}</span>
-                  {stock !== null && (
+                  {sizesPending ? (
+                    <span className="pom-size-qty-stock none">…</span>
+                  ) : stock !== null && (
                     <span className={`pom-size-qty-stock ${stock > 0 ? 'ok' : 'none'}`}>{stock > 0 ? `${stock} verfügbar` : 'nicht verfügbar'}</span>
                   )}
                   {(cartSizes[shortSize(size)] || 0) > 0 && (
@@ -1582,7 +1593,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
 
       {/* Sizes — selectable chips; the chosen size goes into the cart via
           activeVariant (owner 2026-08-23: plain text left no way to pick). */}
-      {availableSizes.length > 0 && !(showExpandedContent && qtySizes.length > 0) && (
+      {availableSizes.length > 0 && !(showExpandedContent && matrixSizes.length > 0) && (
         <div className="pom-size-block" style={{ flex: '0 1 auto', minWidth: 0 }}>
           <div style={{ fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.8, marginBottom: '6px' }}>
             Size: <span style={{ opacity: 1 }}>{selectedSize || availableSizes[0]}</span>
