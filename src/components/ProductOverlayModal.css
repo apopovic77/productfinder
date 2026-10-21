@@ -973,3 +973,38 @@
 .pom-expanded-thumb:focus:not(:focus-visible),
 .pom-color-thumb:focus:not(:focus-visible),
 .pom-expanded .pom-actions .pom-button:focus:not(:focus-visible) { outline: none; box-shadow: none; }
+
+/* Nach dem Aufklappen keine Einblend-Animation mehr: sonst sprang beim
+   Entfernen der Schubladen-Klasse die Grundregel ein, und jeder Farbwechsel
+   baute Bildspalte und Inhalt mit Animation neu auf (owner 2026-10-21). */
+.pom-info-panel.pom-expanded.pom-intro-done,
+.pom-info-panel.pom-expanded.pom-intro-done > *,
+.pom-expanded-hero.pom-intro-done { animation: none; }
+
+/* Bildspalte im Fluss des Dialogs (owner 2026-10-21, media 131812): scrollt
+   mit, Hauptbild oben, weitere Bilder zwei pro Zeile nach unten. */
+@media (min-width: 769px) {
+  .pom-expanded-hero.pom-stage-flow { bottom: auto; height: auto; display: block; }
+  .pom-stage-flow .pom-expanded-hero-img,
+  .pom-stage-flow .pom-expanded-hero-img.pf-zoom-box,
+  .pom-stage-flow .pom-expanded-hero-video { display: block; width: 100%; height: clamp(320px, 52vh, 620px); box-sizing: border-box; }
+  .pom-stage-flow .pom-expanded-hero-thumbs {
+    display: grid; grid-auto-flow: row; grid-template-columns: repeat(2, 1fr); grid-auto-columns: auto;
+    gap: 12px; margin-top: 12px; overflow: visible; scroll-snap-type: none;
+  }
+  .pom-stage-flow .pom-expanded-thumb { height: auto; aspect-ratio: 1 / 1; }
+  /* Die Bildspalte bestimmt mit, wie weit der Dialog scrollt */
+  .pom-info-panel.pom-expanded { overflow-y: auto; }
+}
+
+/* Breiter Dialog: Produktdetails und Technische Daten nebeneinander
+   (owner 2026-10-21, media 131813) */
+@media (min-width: 1700px) {
+  .pom-expanded .pom-expanded-extra { display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
+}
+@media (min-width: 769px) {
+  /* Abstand unter der Bildspalte zaehlt beim Scrollen mit (Rand statt margin) */
+  .pom-expanded-hero.pom-stage-flow { border-bottom: 20px solid transparent; background-clip: padding-box; }
+  /* X bleibt beim Scrollen oben rechts stehen */
+  .pom-expanded > .pom-close-row { position: sticky !important; top: 0 !important; right: auto !important; order: -1; align-self: flex-end; height: 0; margin-right: -26px; z-index: 10003 !important; }
+}

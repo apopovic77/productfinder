@@ -201,6 +201,15 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   // kann dann ohne Warten erscheinen, statt 470 ms eine leere Box zu zeigen
   // (owner 2026-10-20, Video 131627).
   const drawerExpand = expanded && !heroSheet && !isMobilePortrait;
+  // Einfahren nur beim Aufklappen; ein Farbwechsel danach tauscht den Inhalt
+  // ohne Animation (owner 2026-10-21).
+  const [drawerIntroDone, setDrawerIntroDone] = useState(false);
+  useEffect(() => {
+    if (!drawerExpand) { setDrawerIntroDone(false); return; }
+    const t = window.setTimeout(() => setDrawerIntroDone(true), DIALOG_MORPH_SECONDS * 1000 + 50);
+    return () => window.clearTimeout(t);
+  }, [drawerExpand]);
+  const drawerIntro = drawerExpand && !drawerIntroDone;
   const [morphSettled, setMorphSettled] = useState(false);
   useEffect(() => {
     if (!expanded) { setMorphSettled(false); return; }
@@ -377,7 +386,15 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     return () => clearTimeout(timer);
   }, [product.id, product.media, variants, selectedColor, getColor]);
 
-  const allImages = thumbnailsLoading ? [] : thumbnailImages;
+  // Farbwechsel im grossen Dialog: bis die neuen Bilder da sind, bleiben die
+  // bisherigen stehen. Vorher war die Bildspalte kurz leer und baute sich mit
+  // Einfahr-Animation neu auf (owner 2026-10-21: Glitch beim Farbwechsel).
+  const lastImagesRef = useRef<typeof thumbnailImages>([]);
+  const imagesPending = thumbnailsLoading || (isLoadingDetails && thumbnailImages.length === 0);
+  if (!imagesPending && thumbnailImages.length > 0) lastImagesRef.current = thumbnailImages;
+  const allImages = imagesPending
+    ? (expanded ? lastImagesRef.current : [])
+    : thumbnailImages;
 
   // Auto-cycle through the gallery while the card is open (owner
   // 2026-08-23): advance every few seconds, but ONLY to an image whose
@@ -1004,7 +1021,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   return (
     <motion.div
       ref={panelRef}
-      className={`pom-info-panel pom-panel-standalone ${heroDock ? 'pom-hero-dock' : ''} ${heroSheet && !expanded ? 'pom-hero-sheet' : ''} ${showExpandedContent ? 'pom-expanded' : ''} ${drawerExpand ? 'pom-drawer' : ''}`}
+      className={`pom-info-panel pom-panel-standalone ${heroDock ? 'pom-hero-dock' : ''} ${heroSheet && !expanded ? 'pom-hero-sheet' : ''} ${showExpandedContent ? 'pom-expanded' : ''} ${drawerIntro ? 'pom-drawer' : ''} ${drawerExpand && drawerIntroDone ? 'pom-intro-done' : ''}`}
       style={{
         position: 'fixed',
         // ANCHOR NEVER MOVES (fluid morph, owner 2026-08-24): the dock card
@@ -1079,7 +1096,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       }}
     >
       {/* Action buttons - top right on mobile, close only on desktop */}
-      <div style={{
+      <div className="pom-close-row" style={{
         position: 'absolute',
         top: '6px',
         right: '6px',
@@ -1110,20 +1127,18 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         const heroSrc = active?.storageId
           ? `${STORAGE_API_URL}/storage/media/${active.storageId}?width=1000&format=webp&quality=85&trim=true`
           : active?.src;
-        // Fixed to the viewport: the stage must NOT scroll with the info
-        // column (owner 2026-08-24 — two separate blocks). The dialog
-        // geometry is deterministic (anchored bottom-right).
+        // Bildspalte im Dialog, scrollt mit ihm: Hauptbild oben, die weiteren
+        // Bilder darunter zwei pro Zeile nach unten (owner 2026-10-21, media
+        // 131812). Vorher fest am Bildschirm mit seitlich scrollender Leiste.
         const stageStyle: React.CSSProperties = isMobilePortrait ? {} : {
-          position: 'fixed',
-          // Links im zentrierten Dialog, 20 px innen (expandedDialogGeometry)
-          left: `${expandedGeometry.marginX + 20}px`,
-          top: `${expandedGeometry.marginY + 20}px`,
-          bottom: `${expandedGeometry.marginY + 20}px`,
+          position: 'absolute',
+          left: '20px',
+          top: '20px',
           width: `${expandedGeometry.stageWidth}px`,
         };
         const stage = (
           <div
-            className={`pom-expanded-hero ${drawerExpand ? 'pom-drawer-stage' : ''}`}
+            className={`pom-expanded-hero ${isMobilePortrait ? '' : 'pom-stage-flow'} ${drawerIntro ? 'pom-drawer-stage' : ''} ${drawerExpand && drawerIntroDone ? 'pom-intro-done' : ''}`}
             style={{
               ...stageStyle,
               zIndex: 10002,
@@ -1189,7 +1204,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         );
         // Portal: position:fixed inside the dialog is captured by its
         // transform (framer) — outside it is truly viewport-fixed.
-        return isMobilePortrait ? stage : createPortal(stage, document.body);
+        return stage;
       })()}
 
       {/* Handy-Karte (owner 2026-10-18, media 131110): oben die Fotopunkte
