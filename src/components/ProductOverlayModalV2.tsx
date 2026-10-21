@@ -650,8 +650,14 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   const stockForSize = (size: string): number | null => {
     const key = size.replace(/\s*\(.*\)\s*$/, '').trim();
     let total: number | null = null;
+    // Nur Varianten derselben Kollektion wie die gewaehlte: EXT Enduro Jacket
+    // fuehrt jede Groesse zweimal (2028 ohne Bestand, alte A*-Nummer mit
+    // Bestand), das Badge zeigte "S: Nicht auf Lager · 5 von 5 Groessen
+    // lieferbar" (Review 2026-10-21).
+    const workbook = (activeVariant as any)?.in_workbook;
     for (const v of variants as any[]) {
       if (getColor(v) !== selectedColor) continue;
+      if (typeof workbook === 'boolean' && typeof v.in_workbook === 'boolean' && v.in_workbook !== workbook) continue;
       if (String(getSize(v) || '').replace(/\s*\(.*\)\s*$/, '').trim() !== key) continue;
       if (typeof v.stock_available === 'number') total = (total ?? 0) + Math.max(0, v.stock_available);
     }
