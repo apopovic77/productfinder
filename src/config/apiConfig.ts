@@ -18,6 +18,14 @@ export const ONEAL_API_BASE: string =
 export const ONEAL_API_KEY: string =
   import.meta.env.VITE_ONEAL_API_KEY || 'oneal_demo_token';
 
+/**
+ * Optional: Produkte (Liste und Einzelprodukt) aus der Katalog-Plattform statt
+ * aus oneal-api-v2 (Stufe 4, Test-Instanz /next/). Leer = bisheriger Weg; B2B,
+ * Medien und Sprachberater bleiben in jedem Fall bei ONEAL_API_BASE.
+ */
+export const CATALOG_PRODUCTS_BASE: string = import.meta.env.VITE_CATALOG_PRODUCTS_BASE || '';
+export const CATALOG_PRODUCTS_KEY: string = import.meta.env.VITE_CATALOG_PRODUCTS_KEY || '';
+
 export const STORAGE_API_BASE: string =
   import.meta.env.VITE_STORAGE_API_URL || 'https://gsgbot.arkturian.com/storage-api';
 

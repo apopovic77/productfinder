@@ -7,7 +7,7 @@ import {
 } from 'arkturian-oneal-sdk';
 import { Product, type ProductData, ProductAttribute, type PrimitiveAttributeValue, type AttributeType } from '../types/Product';
 import { ACTIVE_PIVOT_PROFILE } from '../config/pivot';
-import { ONEAL_API_BASE, ONEAL_API_KEY } from '../config/apiConfig';
+import { CATALOG_PRODUCTS_BASE, CATALOG_PRODUCTS_KEY, ONEAL_API_BASE, ONEAL_API_KEY } from '../config/apiConfig';
 import { CATALOG_ENTRY_CONFIG, resolveCatalogScope, resolveRelevantOnly } from '../config/CatalogEntryConfig';
 
 const API_BASE = ONEAL_API_BASE;
@@ -793,7 +793,26 @@ export function buildProductsRequestUrl(query: Query): string {
   return `${API_BASE}/products?${params.toString()}`;
 }
 
+/** Liste aus der Katalog-Plattform (gleiches Format wie /v1/products). */
+async function fetchProductsFromCatalog(query: Query): Promise<Product[]> {
+  const params = new URLSearchParams();
+  if (query.brand) params.set('brand', query.brand);
+  if (query.search) params.set('search', query.search);
+  params.set('limit', String(query.limit ?? 10000));
+  if (query.offset) params.set('offset', String(query.offset));
+  if (resolveCatalogScope() === 'workbook') params.set('workbook', 'true');
+  const response = await fetch(`${CATALOG_PRODUCTS_BASE}/products?${params.toString()}`, {
+    headers: { 'X-API-Key': CATALOG_PRODUCTS_KEY },
+  });
+  if (!response.ok) throw new Error(`Katalog-Plattform: ${response.status}`);
+  const data = await response.json();
+  return (data.results || [])
+    .map(mapProduct)
+    .filter((product: Product | null): product is Product => Boolean(product));
+}
+
 async function fetchProductsFromApi(query: Query): Promise<Product[]> {
+  if (CATALOG_PRODUCTS_BASE) return fetchProductsFromCatalog(query);
   const workbook = resolveCatalogScope() === 'workbook';
   const collectionYear = workbook
     ? undefined
@@ -870,11 +889,15 @@ export function fetchFacets(): Promise<FacetsData> {
  */
 export async function fetchProductById(productId: number | string): Promise<Product | null> {
   try {
-    const response = await fetch(`${API_BASE}/products/${productId}`, {
-      headers: {
-        'X-API-Key': API_KEY,
-      },
-    });
+    const response = CATALOG_PRODUCTS_BASE
+      ? await fetch(`${CATALOG_PRODUCTS_BASE}/products/${encodeURIComponent(String(productId))}`, {
+          headers: { 'X-API-Key': CATALOG_PRODUCTS_KEY },
+        })
+      : await fetch(`${API_BASE}/products/${productId}`, {
+          headers: {
+            'X-API-Key': API_KEY,
+          },
+        });
     if (!response.ok) {
       console.error('[ProductRepository] Failed to fetch product:', response.status);
       return null;
