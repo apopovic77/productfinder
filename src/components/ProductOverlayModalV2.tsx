@@ -36,6 +36,12 @@ type Props = {
   stepPosition?: { index: number; count: number };
   /** Colour sibling chosen in the card — App re-selects it on the canvas. */
   onSiblingSelect?: (productId: string | number) => boolean;
+  /**
+   * Alle Farben dieses Designs aus dem Katalog (inkl. der aktuellen), mit dem
+   * Hauptbild je Farbe. Die API liefert keine Geschwister mit; ohne diese
+   * Liste stand nur die eigene Farbe da (owner 2026-10-21, media 131797).
+   */
+  colorOptions?: Array<{ id: string | number; colorName: string; storageId?: number }>;
   /** Expanded state: the SAME card grows into the detail view (true morph). */
   expanded?: boolean;
   onCollapse?: () => void;
@@ -79,7 +85,7 @@ interface ParsedFeature {
  * Product Overlay Modal V2 - HALF WIDTH VERSION (240px)
  * Same design as V1, but with compact half-width layout
  */
-export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady, onShowDetails, expanded = false, onCollapse, locale, onSiblingSelect, onStepProduct, stepPosition, dealerPrices, dealerActive = false, dealerPricesPending = false, cartLines = [] }) => {
+export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady, onShowDetails, expanded = false, onCollapse, locale, onSiblingSelect, colorOptions, onStepProduct, stepPosition, dealerPrices, dealerActive = false, dealerPricesPending = false, cartLines = [] }) => {
   const isMobilePortrait = window.innerWidth <= 768 && window.innerHeight > window.innerWidth;
   // Phone: the dark hero card as a full-width bottom sheet (owner 2026-08-23,
   // "die Karte auch im Desktop-Style"). Same markup as the desktop dock,
@@ -934,23 +940,21 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     return { bottom: Math.round(bottom), height: Math.round(height), scale: Math.round(scale * 1000) / 1000 };
   })();
   const dockScale = dockActive ? dockGeometry.scale : 1;
-  // Aufgeklappt (Desktop) fuellt der Dialog die rechte Bildschirmhaelfte in
-  // voller Hoehe, auch ueber der Kopfleiste. Links bleibt die Haelfte fuer das Stimmungsbild,
-  // dessen Motiv vorher hinter dem schwebenden Dialog verschwand (owner
-  // 2026-10-20, media 131623/131625). Unter 1500 px reicht die Haelfte nicht
-  // fuer Bildspalte und Text, dann mindestens 760 px.
+  // Aufgeklappt (Desktop) liegt der Dialog gross und zentriert ueber allem,
+  // 150 px Rand auf jeder Seite, ohne Stimmungsbild (owner 2026-10-21;
+  // vorher rechte Bildschirmhaelfte mit Stimmungsbild links, 2026-10-20).
   const expandedGeometry = expandedDialogGeometry();
   const halfScreen = expanded && !(heroSheet || isMobilePortrait);
 
   const morphTarget = {
-    bottom: expanded ? 0 : (heroSheet || isMobilePortrait ? 8 : heroDock ? dockGeometry.bottom : 88),
-    right: heroSheet || isMobilePortrait ? 8 : halfScreen ? 0 : 208,
+    bottom: halfScreen ? expandedGeometry.marginY : expanded ? 0 : (heroSheet || isMobilePortrait ? 8 : heroDock ? dockGeometry.bottom : 88),
+    right: heroSheet || isMobilePortrait ? 8 : halfScreen ? expandedGeometry.marginX : 208,
     scale: dockScale,
     x: -DOCK_WIDTH * (dockScale - 1),
-    borderBottomLeftRadius: expanded ? 0 : 18,
-    borderBottomRightRadius: expanded ? 0 : 18,
-    borderTopLeftRadius: halfScreen ? 0 : 18,
-    borderTopRightRadius: halfScreen ? 0 : 18,
+    borderBottomLeftRadius: expanded && !halfScreen ? 0 : 18,
+    borderBottomRightRadius: expanded && !halfScreen ? 0 : 18,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
     width: heroSheet || isMobilePortrait
       ? undefined
       : (expanded ? expandedGeometry.width : DOCK_WIDTH),
@@ -1081,9 +1085,10 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         // geometry is deterministic (anchored bottom-right).
         const stageStyle: React.CSSProperties = isMobilePortrait ? {} : {
           position: 'fixed',
-          left: `${window.innerWidth - expandedGeometry.width + 20}px`,
-          top: '20px',
-          bottom: '20px',
+          // Links im zentrierten Dialog, 20 px innen (expandedDialogGeometry)
+          left: `${expandedGeometry.marginX + 20}px`,
+          top: `${expandedGeometry.marginY + 20}px`,
+          bottom: `${expandedGeometry.marginY + 20}px`,
           width: `${expandedGeometry.stageWidth}px`,
         };
         const stage = (
@@ -1362,11 +1367,15 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         const currentColor = activeRaw?.color_name || selectedColor;
         const currentId = activeRaw?.id;
 
-        // Build a stable list: current color + siblings
-        const options: Array<{ id: number | string; color_name: string }> = [];
-        if (currentColor) options.push({ id: currentId ?? 'current', color_name: currentColor });
-        for (const sib of siblings) {
-          options.push({ id: sib.id, color_name: sib.color_name });
+        // Stabile Liste: Farben aus dem Katalog, sonst aktuelle Farbe + API-Geschwister
+        const options: Array<{ id: number | string; color_name: string; storageId?: number }> = [];
+        if (colorOptions && colorOptions.length > 1) {
+          for (const opt of colorOptions) options.push({ id: opt.id, color_name: opt.colorName, storageId: opt.storageId });
+        } else {
+          if (currentColor) options.push({ id: currentId ?? 'current', color_name: currentColor });
+          for (const sib of siblings) {
+            options.push({ id: sib.id, color_name: sib.color_name });
+          }
         }
         if (options.length === 0) return null;
         // Handy-Karte: eine einzige Farbe steht schon im Titel — die Zeile
@@ -1380,7 +1389,10 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
             </div>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               {options.map((opt) => {
-                const isActive = opt.id === currentId || (opt.id === 'current' && options.length === 1);
+                const isActive = String(opt.id) === String(currentId ?? product.id) || (opt.id === 'current' && options.length === 1);
+                const thumb = opt.storageId
+                  ? `${STORAGE_API_URL}/storage/media/${opt.storageId}?width=120&format=webp&quality=80&trim=true`
+                  : null;
                 return (
                   <button
                     key={String(opt.id)}
@@ -1399,7 +1411,15 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                         setSelectedImageIndex(0);
                       }
                     }}
-                    style={{
+                    style={thumb ? {
+                      // Vorschaubild je Farbe: Hauptbild des Produkts in dieser Farbe
+                      width: 56, height: 56, padding: 4, borderRadius: 8,
+                      border: isActive ? '2px solid #ff6b00' : '1px solid rgba(255,255,255,0.25)',
+                      background: '#f3f4f6',
+                      cursor: isActive ? 'default' : 'pointer',
+                      transition: 'all 0.15s ease',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    } : {
                       padding: '6px 12px', fontSize: '11px', borderRadius: '6px',
                       border: isActive ? '2px solid #ff6b00' : '1px solid rgba(255,255,255,0.25)',
                       background: isActive ? 'rgba(255,107,0,0.18)' : 'rgba(255,255,255,0.08)',
@@ -1409,8 +1429,11 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                       transition: 'all 0.15s ease',
                     }}
                     title={opt.color_name}
+                    aria-label={opt.color_name}
                   >
-                    {opt.color_name}
+                    {thumb
+                      ? <img src={thumb} alt={opt.color_name} loading="lazy" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                      : opt.color_name}
                   </button>
                 );
               })}

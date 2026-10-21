@@ -2390,6 +2390,24 @@ export default class App extends React.Component<Props, State> {
     this.props.onRequestCategorySelection();
   };
 
+  /**
+   * Alle Farben des Designs (gleiche Marke und Designgruppe) aus dem
+   * Katalog, mit Hauptbild je Farbe. Die Produkt-API liefert keine
+   * Geschwister; der Farbwechsel im Dialog zeigte deshalb nur die eigene
+   * Farbe (owner 2026-10-21, media 131797).
+   */
+  private colorOptionsFor(product: Product): Array<{ id: string | number; colorName: string; storageId?: number }> {
+    const designOf = (p: Product) => String(getProductValue(p, 'design_group') ?? (p as any).raw?.design_group ?? '').trim();
+    const design = designOf(product);
+    if (!design) return [];
+    const brand = product.brand ?? '';
+    const colorOf = (p: Product) => String((p as any).raw?.color_name ?? getProductValue(p, 'color_name') ?? '').trim();
+    return this.controller.getCatalogAllProducts()
+      .filter(p => (p.brand ?? '') === brand && designOf(p) === design)
+      .sort((a, b) => colorOf(a).localeCompare(colorOf(b)))
+      .map(p => ({ id: p.id, colorName: colorOf(p) || p.name, storageId: p.primaryImage?.storage_id }));
+  }
+
   private handleCanvasMouseMove = (e: MouseEvent) => {
     this.clearKeyboardFocus();
     const canvas = this.canvasRef.current;
@@ -3972,25 +3990,9 @@ export default class App extends React.Component<Props, State> {
             // - Motocross (MX): 6629
             const videoStorageId = isMotocross ? 6629 : 6623;
 
-            // Product-related backdrop query (taxonomy terms match the German
-            // AI image descriptions); the sport video stays as fallback only
-            // Marke und Produkttyp in die Suche: ohne sie lautete die Anfrage
-            // fast immer nur "MX Action Lifestyle" (derived_taxonomy ist leer)
-            // und lieferte ueberall dasselbe O'Neal-Foto (owner 2026-10-20,
-            // media 131629).
-            const heroFamily = (selectedProduct as any).derived_taxonomy?.product_family;
-            const heroBrand = selectedProduct.brand ?? String(getProductValue(selectedProduct, 'brand') ?? '');
-            const heroType = getProductValue(selectedProduct, 'product_type');
-            const heroImageQuery = [isMotocross ? 'MX' : 'MTB', heroBrand, heroType ?? heroFamily, 'Action Lifestyle']
-              .filter(Boolean)
-              .join(' ');
-            // Bild links vom Detaildialog = Banner der Kategorie, zuerst das
-            // der Marke (Sonja Goldmann 2026-10-21). Ohne Banner bleibt die
-            // Bildsuche.
-            const heroCategory = resolveCatalogCategory(selectedProduct, this.props.entrySelection?.sportId ?? 'moto');
-            const heroBanner = (heroBrand && heroCategory?.bannersByBrand?.[heroBrand]) || heroCategory?.banner;
-            const heroBannerId = heroBanner?.mode === 'image' ? heroBanner.storageId : undefined;
-
+            // Kein Stimmungsbild mehr hinter dem aufgeklappten Dialog: er liegt
+            // gross und zentriert ueber der dunklen Abdeckung (owner
+            // 2026-10-21). Vorher Kategorie-Banner bzw. Bildsuche links davon.
             // Stimmungsbild schon mit der Karte unsichtbar einhaengen: Suche und
             // Bild sind fertig, wenn "Mehr Details" aufgeht, und beide blenden
             // im selben Takt ein. Als eigenes, verschluesseltes Kind von
@@ -4008,10 +4010,7 @@ export default class App extends React.Component<Props, State> {
               >
                 <HeroVideoBackground
                   storageId={videoStorageId}
-                  imageQuery={heroImageQuery}
-                  imageBrand={heroBrand || undefined}
-                  imageSeed={Number(selectedProduct.id) || 0}
-                  bannerStorageId={heroBannerId}
+                  showMedia={false}
                   backdropOpacity={1}
                   active={this.state.shouldShowV4Dialog}
                   onClose={() => this.setState({ shouldShowV4Dialog: false })}
@@ -4034,6 +4033,7 @@ export default class App extends React.Component<Props, State> {
                 onShowDetails={() => this.setState({ shouldShowV4Dialog: true })}
                 onStepProduct={this.stepCardProduct}
                 stepPosition={this.cardStepPosition()}
+                colorOptions={this.colorOptionsFor(selectedProduct)}
                 onSiblingSelect={(pid) => {
                   const target = this.controller.getDisplayOrder().find(pr => String(pr.id) === String(pid));
                   if (!target) return false;

@@ -23,6 +23,11 @@ interface HeroVideoBackgroundProps {
    * 2026-10-21). Gesetzt hat es Vorrang vor der Bildsuche.
    */
   bannerStorageId?: number;
+  /**
+   * Bild oder Video hinter dem Dialog. Aus: nur die dunkle Abdeckung, der
+   * aufgeklappte Dialog liegt zentriert darueber (owner 2026-10-21).
+   */
+  showMedia?: boolean;
   /** Opacity of the optional lifestyle backdrop; zero keeps the product canvas visible. */
   backdropOpacity?: number;
   onClose: () => void;
@@ -47,6 +52,7 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
   imageBrand,
   imageSeed = 0,
   bannerStorageId,
+  showMedia = true,
   backdropOpacity = 1,
   onClose,
   active = true,
@@ -235,7 +241,7 @@ export const HeroVideoBackground: React.FC<HeroVideoBackgroundProps> = ({
       onClick={onClose}
     >
       {/* Product-related backdrop image (Ken-Burns), sport video as fallback */}
-      {bgImageUrl ? (
+      {!showMedia ? null : bgImageUrl ? (
         <div
           className={`hero-bg-image ${isLoaded && !isClosing ? 'loaded' : ''}`}
           style={{

@@ -6,12 +6,17 @@
  * entstehen und gleichzeitig an ihrem Platz sind, statt nachzumessen.
  */
 export type ExpandedDialogGeometry = {
-  /** Breite des Dialogs; links davon liegt die freie Flaeche. */
   width: number;
   height: number;
+  /** Abstand zum linken/rechten bzw. oberen/unteren Bildschirmrand */
+  marginX: number;
+  marginY: number;
   /** Breite der Bildspalte im Dialog */
   stageWidth: number;
 };
+
+/** Rand des aufgeklappten Dialogs auf jeder Seite (Desktop). */
+const EXPANDED_MARGIN = 150;
 
 /** Dauer und Kurve der Dialog-Animation, auch fuer den Hintergrund. */
 export const DIALOG_MORPH_SECONDS = 0.45;
@@ -26,7 +31,12 @@ export function expandedDialogGeometry(
   viewportWidth = window.innerWidth,
   viewportHeight = window.innerHeight,
 ): ExpandedDialogGeometry {
-  // Unter 1520 px reicht die Haelfte nicht fuer Bildspalte und Text.
-  const width = Math.min(viewportWidth, Math.max(760, Math.round(viewportWidth / 2)));
-  return { width, height: viewportHeight, stageWidth: Math.min(492, Math.round(width * 0.46)) };
+  // Gross und zentriert, 150 px Rand auf jeder Seite, ohne Stimmungsbild
+  // daneben (owner 2026-10-21). Auf kleinen Bildschirmen schrumpft der Rand,
+  // damit Bildspalte und Text Platz behalten.
+  const marginX = Math.max(16, Math.min(EXPANDED_MARGIN, Math.floor((viewportWidth - 760) / 2)));
+  const marginY = Math.max(16, Math.min(EXPANDED_MARGIN, Math.floor((viewportHeight - 480) / 2)));
+  const width = viewportWidth - marginX * 2;
+  const height = viewportHeight - marginY * 2;
+  return { width, height, marginX, marginY, stageWidth: Math.min(760, Math.round(width * 0.46)) };
 }
