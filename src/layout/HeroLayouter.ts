@@ -340,11 +340,10 @@ export class HeroLayouter<T> implements ILayouter<T> {
 
     // Zellgroesse iterativ verkleinern bis die Blöcke die Seite fuellen,
     // ohne sie zu sprengen; darunter scrollt die Overview vertikal weiter.
-    // Flache Uebersicht hat wenige Produkte und keine Ueberschriften: groesser
-    // starten, die Schleife unten verkleinert, bis alles auf die Seite passt.
-    let cellH = this.flatOverview
-      ? Math.max(150, view.height * 0.55)
-      : Math.min(280, Math.max(150, view.height * 0.32));
+    // Gross starten, die Schleife unten verkleinert, bis alles auf die Seite
+    // passt. Die fruehere Obergrenze 280px liess wenige Gruppen winzig in
+    // der Seitenmitte stehen (owner 2026-10-22, RAINWEAR › Preis, media 131971).
+    let cellH = Math.max(150, view.height * 0.55);
     const layoutOnce = (h: number) => {
       const w = h * cellAspect;
       // Ueberbreite Gruppen in zeilen-fuellende Teilstapel brechen —
