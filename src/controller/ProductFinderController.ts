@@ -1197,7 +1197,7 @@ export class ProductFinderController {
    * einer: Hero wie bisher. Einziger Eingang fuer die Realtime-Projektion.
    */
   applyAgentProducts(products: Product[]): void {
-    this.setGlobalSearchProducts(products);
+    this.setGlobalSearchProducts(products, { outfit: true });
     if (products.length > 1) {
       this.exitHeroPresentation();
       this.setViewOverride('grouped');
@@ -1228,13 +1228,15 @@ export class ProductFinderController {
    * WHOLE catalog (all categories/sports); the pivot engine re-scores
    * generic dimensions over it. null restores the category set.
    */
-  setGlobalSearchProducts(matches: Product[] | null): void {
+  setGlobalSearchProducts(matches: Product[] | null, options: { outfit?: boolean } = {}): void {
     const entryCategory = this.preConfig.entrySelection?.categoryId
       ? getCatalogCategory(this.preConfig.entrySelection.sportId, this.preConfig.entrySelection.categoryId)
       : undefined;
     // Smart-Search-Ergebnis: Ausruestung an der Figur (Issue #2547); dieser
-    // Weg kommt aus applyAgentProducts, nicht aus setAiFilterProductIds
-    this.layoutService.setOutfitEnabled(!!(matches && matches.length));
+    // Weg kommt aus applyAgentProducts, nicht aus setAiFilterProductIds.
+    // Die Textsuche zeigt ihre Treffer normal: "neon" stapelte 74 Produkte
+    // an der Figur uebereinander (owner 2026-10-22, media 132049).
+    this.layoutService.setOutfitEnabled(!!(options.outfit && matches && matches.length));
     if (matches && matches.length) {
       this.globalSearchActive = true;
       this.products = matches;

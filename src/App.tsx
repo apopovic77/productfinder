@@ -1598,9 +1598,14 @@ export default class App extends React.Component<Props, State> {
         this.applySearchFilter(this.state.footerSearchTerm);
         return;
       }
-      const [firstMatch] = this.filterFooterSearchResults(this.state.footerSearchTerm);
-      if (firstMatch) {
-        this.handleFooterSearchSelect(firstMatch.id);
+      // Enter = alle Treffer im Finder (owner 2026-10-22). Nur bei genau
+      // einem Treffer oeffnet Enter das Produkt direkt.
+      const matches = this.filterFooterSearchResults(this.state.footerSearchTerm);
+      if (matches.length === 1) {
+        this.handleFooterSearchSelect(matches[0].id);
+      } else if (matches.length > 1) {
+        event.preventDefault();
+        this.applySearchFilter(this.state.footerSearchTerm);
       }
     }
     if (event.key === 'Escape') {
@@ -3130,7 +3135,7 @@ export default class App extends React.Component<Props, State> {
                       </span>
                       <div className="pf-search-panel-actions">
                         {total > 0 && (
-                          <button type="button" className="pf-search-panel-apply" onClick={() => this.applySearchFilter(footerSearchTerm)} title="Alle Treffer im Finder anzeigen (Shift+Enter)">
+                          <button type="button" className="pf-search-panel-apply" onClick={() => this.applySearchFilter(footerSearchTerm)} title="Alle Treffer im Finder anzeigen (Enter)">
                             Alle {total} im Finder zeigen
                           </button>
                         )}
