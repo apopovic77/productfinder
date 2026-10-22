@@ -2007,17 +2007,7 @@ export class CanvasRenderer<T> {
         this.ctx.font = `${fontWeight} ${fontSize}px ${BUCKET_BUTTON_CONFIG.font.family}`;
 
         // Mobile: always left-aligned; Desktop: dynamic alignment
-        let textAlign: CanvasTextAlign;
-        if (isMobileCanvas) {
-          textAlign = 'left';
-        } else {
-          const allHeaders = this.getGroupHeaders();
-          const totalColumns = allHeaders.length;
-          const columnIndex = allHeaders.indexOf(header);
-          textAlign = (totalColumns === 2 && columnIndex === 1)
-            ? 'left'
-            : BUCKET_BUTTON_CONFIG.font.alignHorizontal;
-        }
+        const textAlign: CanvasTextAlign = isMobileCanvas ? 'left' : BUCKET_BUTTON_CONFIG.font.alignHorizontal;
 
         this.ctx.textAlign = textAlign;
         const verticalAlign = BUCKET_BUTTON_CONFIG.font.alignVertical;

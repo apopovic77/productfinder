@@ -85,7 +85,7 @@ export const BUCKET_BUTTON_CONFIG = {
      * Options: 'left', 'center', 'right'
      * Default: 'center'
      */
-    alignHorizontal: 'right' as 'left' | 'center' | 'right',
+    alignHorizontal: 'left' as 'left' | 'center' | 'right',
 
     /**
      * Vertical text alignment
