@@ -818,10 +818,12 @@ export class LayoutService {
     // Cache positions BEFORE removing nodes — so they can return to same spot
     this.cacheCurrentNodePositions();
 
-    // Get the products from the clicked bucket
-    const currentNodes = this.engine.all();
-    const groupProducts = currentNodes
-      .filter(n => this.drillDownService.getGroupKey(n.data) === value)
+    // Get the products from the clicked bucket. Bei Mehrfachwerten (Groesse)
+    // zaehlt die Gruppe des Knotens, nicht die erste des Produkts; sonst fand
+    // "S" nichts und die Groessen-Kopien blieben stehen (owner 2026-10-22).
+    const seen = new Set<string>();
+    const groupProducts = this.engine.all()
+      .filter(n => this.nodeGroupKey(n) === value && !seen.has(n.data.id) && seen.add(n.data.id))
       .map(n => n.data);
 
     if (this.drillDownService.drillDown(value)) {
