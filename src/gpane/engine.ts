@@ -553,39 +553,19 @@ export class GPANEEngine {
   get navigationStack(): NavigationEntry[] { return this._navigationStack; }
 
   /**
-   * Determine if hero mode should take over instead of further pivoting.
-   * Hero competes with pivot dimensions via scoring:
-   * - Few products → high hero score
-   * - Low quality pivot dimensions → hero wins
-   * - Deep drill level → hero more relevant
+   * Hero (bzw. flache Uebersicht) nur, wenn keine Dimension die Produkte
+   * sinnvoll teilt. Vorher gewann Hero, sobald seine Bewertung ueber der
+   * bestbewerteten Dimension lag — auch wenn diese gar nicht trennte oder nie
+   * automatisch gewaehlt wird. RAINWEAR > Jacke zeigte so eine einzelne
+   * Gruppe statt einer Gruppierung (owner 2026-10-22).
    */
   private _shouldUseHeroMode(products: Product[]): boolean {
     const count = products.length;
-    const threshold = this._config.heroThreshold;
-
-    // Too many products for hero
-    if (count > threshold) return false;
-    // No products
-    if (count === 0) return false;
-
-    // Hero score: inversely proportional to product count
-    // At 1 product → 1.0, at threshold → 0.0
-    const countScore = 1 - (count / threshold);
-
-    // Drill depth bonus: deeper = more likely hero
-    const depth = this._focusStack.length;
-    const depthBonus = Math.min(0.3, depth * 0.1);
-
-    // Dimension quality: how good is the best available pivot?
-    const bestDimScore = this._scoredDimensions.length > 0
-      ? this._scoredDimensions[0].score.total
-      : 0;
-
-    // Hero total score
-    const heroScore = countScore + depthBonus;
-
-    // Hero wins if it scores higher than the best dimension
-    return heroScore > bestDimScore;
+    if (count === 0 || count > this._config.heroThreshold) return false;
+    if (this._prescribedDimension(products)) return false;
+    const groupable = this._scoredDimensions.some(d =>
+      d.entropy > 0 && d.cardinality > 1 && !isNeverAutoPicked(d) && this.splitsProducts(d.key, products));
+    return !groupable;
   }
 
   canSubsplit(dimensionKey: string, bucketObjectIds: string[]): boolean {

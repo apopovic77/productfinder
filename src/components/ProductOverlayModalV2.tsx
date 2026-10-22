@@ -42,7 +42,7 @@ function FeatureIcon({ iconKey }: { iconKey: string }) {
     : <span className="pom-feature-ico pom-feature-ico-empty" aria-hidden="true" />;
 }
 
-/** Grundtoene fuer O'Neal-Farbnamen (erste Farbe eines Namens wie "black/neon yellow"). */
+/** Grundtoene fuer O'Neal-Farbnamen (Teilfarben eines Namens wie "black/neon yellow"). */
 const COLOR_TONES: Array<[RegExp, string]> = [
   [/neon\s*yellow|hi-?vi[sz]|yellow|gelb/, '#e4f000'], [/neon\s*orange|orange/, '#ff7a1a'],
   [/pink|magenta/, '#ff4fa3'], [/red|rot/, '#e0262b'], [/teal|petrol|turquoise/, '#14a3a3'],
@@ -59,8 +59,14 @@ const COLOR_TONES: Array<[RegExp, string]> = [
  * Schwarz verschwinden.
  */
 function colorThumbBackground(colorName: string): string {
-  const first = (colorName || '').toLowerCase().split('/')[0].trim();
-  const tone = COLOR_TONES.find(([re]) => re.test(first))?.[1];
+  // Die erste BUNTE Farbe des Namens: "black/orange" ist orange. Mit der
+  // ersten Farbe waren alle ELEMENT-Handschuhe ("black/...") grau
+  // (owner 2026-10-22, media 132022). Nur neutrale Farben: die erste davon.
+  const parts = (colorName || '').toLowerCase().split('/').map(part => part.trim()).filter(Boolean);
+  const toneOf = (part: string) => COLOR_TONES.find(([re]) => re.test(part))?.[1];
+  const neutral = /black|schwarz|white|wei(ß|ss)|gr[ae]y|grau|charcoal|anthracite|silver/;
+  const accent = parts.find(part => !neutral.test(part) && toneOf(part));
+  const tone = toneOf(accent ?? parts[0] ?? '');
   return tone ? `color-mix(in srgb, ${tone} 26%, #f3f4f6)` : '#f3f4f6';
 }
 
