@@ -1234,8 +1234,11 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       )}
       {showExpandedContent && allImages.length > 0 && (() => {
         const active = allImages[Math.max(0, Math.min(selectedImageIndex, allImages.length - 1))];
+        // Dieselbe Adresse wie das Hero-Bild im Canvas (1300 px): liegt dann
+        // schon im Browser- und Server-Cache. Mit 1000 px rechnete der Server
+        // das Bild beim ersten Oeffnen neu, rund 4 s (owner 2026-10-22, media 132027).
         const heroSrc = active?.storageId
-          ? `${STORAGE_API_URL}/storage/media/${active.storageId}?width=1000&format=webp&quality=85&trim=true`
+          ? `${STORAGE_API_URL}/storage/media/${active.storageId}?width=1300&format=webp&quality=85&trim=true`
           : active?.src;
         // Bildspalte im Dialog, scrollt mit ihm: Hauptbild oben, die weiteren
         // Bilder darunter zwei pro Zeile nach unten (owner 2026-10-21, media
@@ -1364,9 +1367,10 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
               ))}
               {allImages.map((img, idx) => {
                 // Grosse Kacheln unter dem Hauptbild (owner 2026-10-21, media
-                // 131805): 130 px waeren dort unscharf.
+                // 131805): 130 px waeren dort unscharf. 520 px = Stufe des
+                // Canvas-Atlas, also meist schon geladen.
                 const thumbnailUrl = img.storageId
-                  ? `${STORAGE_API_URL}/storage/media/${img.storageId}?width=420&format=webp&quality=82&trim=true`
+                  ? `${STORAGE_API_URL}/storage/media/${img.storageId}?width=520&format=webp&quality=82&trim=true`
                   : img.src;
                 const isActive = idx === selectedImageIndex;
                 return (
