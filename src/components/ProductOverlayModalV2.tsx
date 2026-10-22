@@ -759,6 +759,10 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   // 131823/131824).
   const lastQtySizesRef = useRef<string[]>([]);
   const detailsStale = isLoadingDetails || !fullProduct || String(fullProduct.id) !== String(product.id);
+  // Dasselbe fuer die Groessen der kleinen Karte (owner 2026-10-22, media 131985)
+  const lastSizesRef = useRef<string[]>([]);
+  if (availableSizes.length > 0) lastSizesRef.current = availableSizes;
+  const shownSizes = detailsStale && availableSizes.length === 0 ? lastSizesRef.current : availableSizes;
   const sizesPending = expanded && detailsStale && qtySizes.length === 0;
   if (qtySizes.length > 0) lastQtySizesRef.current = qtySizes;
   const matrixSizes = sizesPending ? lastQtySizesRef.current : qtySizes;
@@ -986,30 +990,65 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   // Geometrie-Ziel des Morphs — von animate UND initial geteilt.
   // Expanded: buendig mit der Unterkante, nur die oberen Ecken rund
   // (owner 2026-08-24).
-  // Zweizeiliger Titel schob "Close" unter die Kartenkante (owner 2026-09-28,
-  // media 128374). Die Karte darf nicht scrollen — die Badges haengen aussen
-  // daneben —, also wird der Titel stufenweise kleiner, bis alles passt.
+  // Titel einzeilig in fester Groesse (owner 2026-10-22, media 131984-6):
+  // Vorher wurde er stufenweise kleiner, bis die Karte passte. Fehlten beim
+  // Farbwechsel Thumbnails oder Groessen noch, sprang er auf 56px und
+  // zweizeilig. Zu lange Namen kuerzt eine Ellipse in der Mitte.
   const panelRef = useRef<HTMLDivElement | null>(null);
   const heroModelRef = useRef<HTMLDivElement | null>(null);
+  const heroLine = heroDock && !expanded && !heroSheet;
+  const [heroModelText, setHeroModelText] = useState(heroTitle.model);
+  useLayoutEffect(() => {
+    const model = heroModelRef.current;
+    const full = heroTitle.model;
+    if (!model || !heroLine) { setHeroModelText(full); return; }
+    const fitText = () => {
+      const cs = getComputedStyle(model);
+      const avail = model.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      if (avail <= 0 || !model.parentElement) { setHeroModelText(full); return; }
+      // Messen im DOM mit derselben Klasse: Canvas kannte die Webschrift
+      // nicht und kuerzte zu frueh.
+      const probe = document.createElement('div');
+      probe.className = model.className;
+      probe.style.cssText = 'position:absolute;visibility:hidden;width:max-content;padding:0;left:-9999px;top:0';
+      model.parentElement.appendChild(probe);
+      const width = (t: string) => { probe.textContent = t; return probe.offsetWidth; };
+      const done = (t: string) => { probe.remove(); setHeroModelText(t); };
+      if (width(full) <= avail) { done(full); return; }
+      const middle = (keep: number) => {
+        const head = Math.ceil(keep / 2);
+        return full.slice(0, head).trimEnd() + '…' + full.slice(full.length - (keep - head)).trimStart();
+      };
+      let lo = 1, hi = full.length - 1;
+      while (lo < hi) {
+        const mid = Math.ceil((lo + hi) / 2);
+        if (width(middle(mid)) <= avail) lo = mid; else hi = mid - 1;
+      }
+      done(middle(lo));
+    };
+    fitText();
+    // Die Karte faehrt erst auf ihre Breite auf, die Webschrift laedt nach:
+    // bei jeder Breitenaenderung neu messen.
+    let lastW = model.clientWidth;
+    const ro = new ResizeObserver(() => {
+      if (model.clientWidth !== lastW) { lastW = model.clientWidth; fitText(); }
+    });
+    ro.observe(model);
+    let alive = true;
+    void document.fonts?.ready.then(() => { if (alive) fitText(); });
+    return () => { alive = false; ro.disconnect(); };
+  }, [heroTitle.model, heroLine]);
   useLayoutEffect(() => {
     const panel = panelRef.current;
-    const model = heroModelRef.current;
-    if (!panel || !model || !heroDock || expanded || heroSheet) {
-      if (model) model.style.fontSize = '';
+    if (!panel || !heroLine) {
       if (panel) panel.style.overflowY = '';
       return;
     }
-    const fits = () => panel.scrollHeight <= panel.clientHeight + 1;
+    // Sehr niedriges Fenster: lieber scrollen (Badges werden dann
+    // abgeschnitten) als einen unerreichbaren Close-Button.
     const fit = () => {
       panel.style.overflowY = '';
-      model.style.fontSize = '';
-      for (const size of [56, 46, 38, 32, 26]) {
-        model.style.fontSize = `${size}px`;
-        if (fits()) break;
-      }
-      // Sehr niedriges Fenster: lieber scrollen (Badges werden dann
-      // abgeschnitten) als einen unerreichbaren Close-Button.
-      if (!fits()) panel.style.overflowY = 'auto';
+      if (panel.scrollHeight > panel.clientHeight + 1) panel.style.overflowY = 'auto';
     };
     fit();
     window.addEventListener('resize', fit);
@@ -1437,7 +1476,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       {heroDock ? (
         <h2 className="pom-title pom-title-hero" style={{ margin: '0 0 4px', textTransform: 'uppercase', lineHeight: '1' }}>
           {heroTitle.series && <div className="pom-hero-series">{heroTitle.series}</div>}
-          <div className="pom-hero-model" ref={heroModelRef}>{heroTitle.model}</div>
+          <div className={heroLine ? 'pom-hero-model pom-hero-model-line' : 'pom-hero-model'} ref={heroModelRef} title={heroTitle.model}>{heroLine ? heroModelText : heroTitle.model}</div>
           {heroTitle.colour && (
             <div className="pom-hero-colour">
               {heroTitle.colour.split('/').map((c, i, arr) => (
@@ -1464,7 +1503,10 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       )}
 
       {/* Thumbnail Gallery - Compact */}
-      {allImages.length > 0 && (
+      {/* Im Dock steht die Leiste immer mit fester Hoehe, auch solange die
+          Bilder der neuen Farbe noch laden — sonst klappte die Karte beim
+          Farbwechsel zusammen (owner 2026-10-22, media 131985). */}
+      {(allImages.length > 0 || heroLine) && (
         <div className="pom-thumb-strip" style={{
           display: 'flex',
           gap: '4px',
@@ -1473,7 +1515,8 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
           overflowX: 'auto',
           overflowY: 'visible',
           maxWidth: '100%',
-          minHeight: '50px'
+          minHeight: '50px',
+          ...(heroLine ? { height: '50px', flexShrink: 0 } : {})
         }}>
           {allImages.map((img, idx) => {
             const thumbnailUrl = img.storageId
@@ -1528,7 +1571,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       )}
 
       {/* Price & Availability - Compact */}
-      <div className="pom-price-row" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+      <div className="pom-price-row" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', minHeight: '28px' }}>
         <div className="pom-price" style={{ fontSize: '16px' }}>{priceText}</div>
         {/* Noch kein Produktfoto (Owner 2026-09-26): Tag statt stiller Luecke. */}
         {product.isComingSoon && (
@@ -1732,13 +1775,13 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
 
       {/* Sizes — selectable chips; the chosen size goes into the cart via
           activeVariant (owner 2026-08-23: plain text left no way to pick). */}
-      {availableSizes.length > 0 && !(showExpandedContent && matrixSizes.length > 0) && (
+      {shownSizes.length > 0 && !(showExpandedContent && matrixSizes.length > 0) && (
         <div className="pom-size-block" style={{ flex: '0 1 auto', minWidth: 0 }}>
           <div style={{ fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.8, marginBottom: '6px' }}>
-            Size: <span style={{ opacity: 1 }}>{selectedSize || availableSizes[0]}</span>
+            Size: <span style={{ opacity: 1 }}>{selectedSize || shownSizes[0]}</span>
           </div>
           <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
-            {availableSizes.map(size => {
+            {shownSizes.map(size => {
               const isActive = size === selectedSize;
               // Lieferbarkeit auf einen Blick (owner 2026-10-21, media 131901):
               // lieferbare Groessen gruen umrandet, nicht lieferbare gedimmt und

@@ -516,6 +516,8 @@
 .pom-hero-dock .pom-title { color: #fff; }
 .pom-hero-series { color: rgba(255, 255, 255, 0.6) !important; font-size: 13px; font-weight: 600; letter-spacing: 0.14em; margin-bottom: 4px; }
 .pom-hero-model { font-family: 'ITC Avant Garde Gothic Condensed', 'ITC Avant Garde Gothic', sans-serif; font-size: 56px; font-weight: 700; line-height: 0.92; letter-spacing: 0.005em; color: #fff !important; text-wrap: balance; }
+/* Dock: einzeilig in fester Groesse, Kuerzung per Ellipse in der Mitte (JS) */
+.pom-hero-model.pom-hero-model-line { font-size: 28px; white-space: nowrap; overflow: hidden; text-wrap: nowrap; padding-right: 36px; } /* 36px: Platz fuer das X */
 .pom-hero-colour { margin-top: 10px; font-size: 15px; font-weight: 700; letter-spacing: 0.04em; color: rgba(255, 255, 255, 0.85) !important; }
 .pom-hero-colour .sep { color: rgba(255, 255, 255, 0.35) !important; font-weight: 400; }
 .pom-hero-colour .accent { color: #ff7a45 !important; } /* brand accent; a per-colour hue (neon yellow for "neon yellow") would lie for black/pink */
