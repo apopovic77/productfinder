@@ -74,6 +74,7 @@ import { ProductFinderRealtimeSurface } from './components/ProductFinderRealtime
 import { SeriesSelectionGate, type SeriesGateEntry } from './components/SeriesSelectionGate';
 import { FullModeIcon, fullModeHref, fullModeLabel, isFullFinderMode } from './components/FullModeToggle';
 import { resolveCatalogFlow, resolveVoiceModel } from './config/CatalogEntryConfig';
+import { initPfTrace, isPfTraceActive, pfTraceMark, pfTraceSession } from './utils/pfTrace';
 import {
   buildProductFinderCartContext,
   resolveProductPriceEur,
@@ -437,6 +438,8 @@ export default class App extends React.Component<Props, State> {
 
   async componentDidMount() {
     this.controller.setEntryTitle(this.props.categoryLabel ?? '');
+    initPfTrace(this.traceSnapshot);
+    if (isPfTraceActive()) this.forceUpdate();
     // Finder aktiv: der schwebende Vollmodus-Schalter der Gate-Seiten tritt
     // zurück, der Finder hat ihn im Header.
     document.body.classList.add('pf-finder-active');
@@ -1503,6 +1506,30 @@ export default class App extends React.Component<Props, State> {
     this.controller.exitHeroPresentation();
     this.controller.resetViewport();
     this.controller.handleResize();
+  };
+
+  /** Zustand fuer das Klickprotokoll (?trace=1): was der Tester gerade sieht. */
+  private traceSnapshot = (): Record<string, unknown> => {
+    const c = this.controller;
+    const buckets = c.getCurrentBuckets();
+    const product = this.state.selectedProduct;
+    return {
+      crumbs: c.getPivotBreadcrumbs(),
+      category: this.props.categoryLabel || undefined,
+      dimension: c.getPivotDimension(),
+      view: c.isOutfitActive() ? 'outfit' : c.isHeroRootOverview() ? 'grouped' : c.isPivotHeroMode() ? 'hero' : 'pivot',
+      viewOverride: c.getViewOverride(),
+      groups: buckets.slice(0, 15).map(b => `${b.label}:${b.objectIds.length}`),
+      groupCount: buckets.length,
+      products: c.getDisplayOrder().length,
+      product: product ? `${product.id} ${product.name}` : undefined,
+      dialog: product ? (this.state.shouldShowV4Dialog ? 'expanded' : 'card') : undefined,
+      search: this.state.searchFilterTerm || undefined,
+      smartSearch: this.state.aiFilterProductIds.length || undefined,
+      sizeFilter: c.getSizeFilter().size || undefined,
+      viewport: `${window.innerWidth}x${window.innerHeight}`,
+      url: window.location.pathname + window.location.search,
+    };
   };
 
   private resetToInitialView = () => {
@@ -4178,6 +4205,18 @@ export default class App extends React.Component<Props, State> {
           }}
         />
 
+        {/* Klickprotokoll aktiv (?trace=1): Sitzungs-ID zum Weitergeben und
+            ein Knopf, um eine Stelle als Problem zu markieren. */}
+        {isPfTraceActive() && (
+          <div className="pf-trace-badge" style={{ position: 'fixed', left: 12, bottom: 12, zIndex: 9999, display: 'flex', gap: 6, alignItems: 'center', padding: '5px 8px', borderRadius: 8, background: 'rgba(20,20,22,0.85)', color: '#fff', font: '600 11px system-ui, sans-serif' }}>
+            <span style={{ color: '#ff4d4d' }}>●</span>
+            <span title="Sitzungs-ID des Klickprotokolls">REC {pfTraceSession()}</span>
+            <button type="button" onClick={() => pfTraceMark(window.prompt('Was stimmt hier nicht? (optional)') ?? '')}
+              style={{ font: 'inherit', padding: '2px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.35)', background: 'transparent', color: '#fff', cursor: 'pointer' }}>
+              Problem markieren
+            </button>
+          </div>
+        )}
         {/* Nur auf Wunsch (Header-Icon, Ctrl+Shift+V, ?voice=1) — die alte
             Demo-Route blendete die Karte ungefragt ein (owner 2026-08-27,
             media 120886). realtimeDemoEnabled bleibt als Flag, mountet aber
