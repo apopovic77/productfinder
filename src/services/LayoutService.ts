@@ -764,6 +764,11 @@ export class LayoutService {
    */
   setPivotDimension(dimension: GroupDimension): void {
     if (this.mode !== 'pivot' && this.mode !== 'lanes') return;
+    // Dimension wechseln aendert die Ansicht nicht: stand die Ebene in der
+    // Gruppenansicht, bleibt sie dort. Vorher kippte eine selbst gewaehlte
+    // Dimension (Preis) in die Spalten (owner 2026-10-22, Protektoren >
+    // Oberkoerper, media 132045).
+    if (this.viewOverride === 'auto' && this.isHeroRootOverview()) this.viewOverride = 'grouped';
     const hasFilters = this.drillDownService.getFilters().length > 0;
     if (hasFilters) {
       this.drillDownService.setGroupingDimension(dimension);

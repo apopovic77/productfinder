@@ -264,7 +264,9 @@ function mapProduct(p: ApiProduct): Product | null {
         key: 'sport',
         label: 'Sport',
         type: 'enum',
-        value: sport.join(', '),
+        // Sortiert: "MX, MTB" und "MTB, MX" waren zwei Gruppen
+        // (owner 2026-10-22, Protektoren > Oberkoerper, media 132044)
+        value: [...sport].map(String).sort().join(', '),
         sourcePath: 'properties.sport',
       }
     : undefined);
