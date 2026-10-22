@@ -291,7 +291,14 @@ export class GPANEEngine {
       objectIds: matchingIds,
     });
 
-    if (node.children?.length) {
+    // Eine Kategorie, deren Unterkategorien die Produkte nicht teilen (alle
+    // 40 Street-/Adventure-Helme unter "Street"), ist keine Ebene: eine
+    // einzige Gruppe, keine Spalten moeglich. Dann wie ein Blatt behandeln,
+    // GPANE gruppiert (owner 2026-10-22, Protokoll 202610221752-9uu1).
+    const remaining = this._getVisibleProducts();
+    const childrenSplit = (node.children ?? [])
+      .filter(child => remaining.some(p => child.match(p))).length >= 2;
+    if (node.children?.length && childrenSplit) {
       this._currentTaxonomyNodes = node.children;
       this._buildTaxonomyBuckets();
       // Nav stack: taxonomy level
