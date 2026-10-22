@@ -1068,6 +1068,8 @@
   .pom-stage-arrow {
     position: absolute; top: 50%; transform: translateY(-50%);
     width: 40px; height: 40px; border-radius: 50%; border: 0;
+    /* Ohne padding:0 machte die Button-Grundregel eine Ellipse daraus (owner 2026-10-22, media 132035) */
+    padding: 0; box-sizing: border-box; min-width: 0; flex: 0 0 auto;
     background: rgba(20, 20, 22, 0.65); color: #fff; font-size: 26px; line-height: 1;
     display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 2;
   }

@@ -537,7 +537,12 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     if (sid == null || allImages.length === 0) return;
     syncedVariantImageRef.current = sid;
     const imgIndex = allImages.findIndex(img => img.storageId === sid);
-    if (imgIndex !== -1) setSelectedImageIndex(imgIndex);
+    if (imgIndex === -1) return;
+    setSelectedImageIndex(imgIndex);
+    // Canvas mitziehen: sonst markierte die Karte das erste Foto, waehrend
+    // die Buehne noch die Handflaeche aus dem Auto-Wechsel zeigte (owner
+    // 2026-10-22, ELEMENT RACEWEAR black, media 132033).
+    if (imgIndex !== selectedImageIndexRef.current) onImageSelect?.(sid);
   }, [activeVariant?.image_storage_id, allImages]);
 
   // Notify parent when variant changes (but NOT when viewing a sibling product)
@@ -1666,7 +1671,11 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
             <div style={{ fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.8, marginBottom: '6px' }}>
               {showExpandedContent ? 'Farbe' : 'Color'}: <span style={{ opacity: 1 }}>{currentColor}</span>
             </div>
-            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+            {/* Grosser Dialog: hoechstens drei Farben je Zeile, sonst liefen
+                sieben Farben quer ueber die Seite (owner 2026-10-22, media 132036) */}
+            <div style={showExpandedContent
+              ? { display: 'grid', gridTemplateColumns: 'repeat(3, max-content)', gap: '6px' }
+              : { display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               {options.map((opt) => {
                 const isActive = String(opt.id) === String(currentId ?? product.id) || (opt.id === 'current' && options.length === 1);
                 const thumb = opt.storageId
