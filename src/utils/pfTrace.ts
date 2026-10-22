@@ -1,17 +1,20 @@
 /**
- * Klickprotokoll fuer Tests (owner 2026-10-22): mit ?trace=1 schreibt der
- * Finder jede Aktion (Klick, Taste, Browser-Zurueck) und den Zustand kurz
- * danach mit und schickt beides an oneal-api-v2 (/pf-trace). Der Tester
- * nennt danach nur noch die Sitzungs-ID statt Screenshots zu machen.
+ * Klickprotokoll (owner 2026-10-22): der Finder schreibt jede Aktion (Klick,
+ * Taste, Browser-Zurueck) und den Zustand kurz danach mit und schickt beides
+ * an oneal-api-v2 (/pf-trace). Standardmaessig immer an, ohne Knopf und ohne
+ * Sitzungs-ID zum Merken: der Tester sagt nur "gerade eben", die juengste
+ * Sitzung zeigt den Pfad. Abschalten: Build mit VITE_PF_TRACE=off, fuer
+ * einen Tab ?trace=0.
  *
  * Erfasst wird generisch an document/window, nicht je Handler: neue Knoepfe
- * sind ohne Zutun dabei. ?trace=0 schaltet es fuer den Tab wieder ab.
+ * sind ohne Zutun dabei.
  */
 import { ONEAL_API_BASE, ONEAL_API_KEY } from '../config/apiConfig';
 
 type Snapshot = () => Record<string, unknown>;
 
 const STORAGE_KEY = 'pf-trace-session';
+const TRACE_ENABLED = import.meta.env.VITE_PF_TRACE !== 'off';
 const SETTLE_MS = 700;
 const FLUSH_MS = 2000;
 
@@ -24,10 +27,9 @@ let flushTimer: number | undefined;
 function readSession(): string {
   try {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('trace') === '0') { sessionStorage.removeItem(STORAGE_KEY); return ''; }
+    if (!TRACE_ENABLED || params.get('trace') === '0') { sessionStorage.removeItem(STORAGE_KEY); return ''; }
     const stored = sessionStorage.getItem(STORAGE_KEY);
     if (stored) return stored;
-    if (params.get('trace') !== '1') return '';
     const stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
     const id = `${stamp}-${Math.random().toString(36).slice(2, 6)}`;
     sessionStorage.setItem(STORAGE_KEY, id);

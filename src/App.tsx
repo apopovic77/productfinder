@@ -74,7 +74,7 @@ import { ProductFinderRealtimeSurface } from './components/ProductFinderRealtime
 import { SeriesSelectionGate, type SeriesGateEntry } from './components/SeriesSelectionGate';
 import { FullModeIcon, fullModeHref, fullModeLabel, isFullFinderMode } from './components/FullModeToggle';
 import { resolveCatalogFlow, resolveVoiceModel } from './config/CatalogEntryConfig';
-import { initPfTrace, isPfTraceActive, pfTraceMark, pfTraceSession } from './utils/pfTrace';
+import { initPfTrace } from './utils/pfTrace';
 import {
   buildProductFinderCartContext,
   resolveProductPriceEur,
@@ -439,7 +439,6 @@ export default class App extends React.Component<Props, State> {
   async componentDidMount() {
     this.controller.setEntryTitle(this.props.categoryLabel ?? '');
     initPfTrace(this.traceSnapshot);
-    if (isPfTraceActive()) this.forceUpdate();
     // Finder aktiv: der schwebende Vollmodus-Schalter der Gate-Seiten tritt
     // zurück, der Finder hat ihn im Header.
     document.body.classList.add('pf-finder-active');
@@ -1508,7 +1507,7 @@ export default class App extends React.Component<Props, State> {
     this.controller.handleResize();
   };
 
-  /** Zustand fuer das Klickprotokoll (?trace=1): was der Tester gerade sieht. */
+  /** Zustand fuer das Klickprotokoll: was der Tester gerade sieht. */
   private traceSnapshot = (): Record<string, unknown> => {
     const c = this.controller;
     const buckets = c.getCurrentBuckets();
@@ -4205,18 +4204,6 @@ export default class App extends React.Component<Props, State> {
           }}
         />
 
-        {/* Klickprotokoll aktiv (?trace=1): Sitzungs-ID zum Weitergeben und
-            ein Knopf, um eine Stelle als Problem zu markieren. */}
-        {isPfTraceActive() && (
-          <div className="pf-trace-badge" style={{ position: 'fixed', left: 12, bottom: 12, zIndex: 9999, display: 'flex', gap: 6, alignItems: 'center', padding: '5px 8px', borderRadius: 8, background: 'rgba(20,20,22,0.85)', color: '#fff', font: '600 11px system-ui, sans-serif' }}>
-            <span style={{ color: '#ff4d4d' }}>●</span>
-            <span title="Sitzungs-ID des Klickprotokolls">REC {pfTraceSession()}</span>
-            <button type="button" onClick={() => pfTraceMark(window.prompt('Was stimmt hier nicht? (optional)') ?? '')}
-              style={{ font: 'inherit', padding: '2px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.35)', background: 'transparent', color: '#fff', cursor: 'pointer' }}>
-              Problem markieren
-            </button>
-          </div>
-        )}
         {/* Nur auf Wunsch (Header-Icon, Ctrl+Shift+V, ?voice=1) — die alte
             Demo-Route blendete die Karte ungefragt ein (owner 2026-08-27,
             media 120886). realtimeDemoEnabled bleibt als Flag, mountet aber
