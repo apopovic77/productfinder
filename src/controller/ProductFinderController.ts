@@ -1654,8 +1654,7 @@ export class ProductFinderController {
   }
 
   handleGroupHeaderClick_byLabel(label: string): void {
-    this.layoutService.drillDownPivot(label);
-    this.onPivotChanged();
+    this.drillDownPivot(label);
   }
 
   getLayoutEngine() {
@@ -1667,15 +1666,10 @@ export class ProductFinderController {
   }
 
   drillDownGroup(groupKey: string): void {
-    this.layoutService.drillDownPivot(groupKey);
+    // Eigene Verlaufs-Kopie ohne rawTrail liess Browser-Zurueck an den Anfang
+    // springen (AI-Explorer 2026-10-22). Derselbe Weg wie jeder andere Drill.
+    this.drillDownPivot(groupKey);
     this.onDataChanged();
-
-    // Push history state for browser back button
-    if (!this.ignoreNextHistoryPush) {
-      const state = this.layoutService.getPivotBreadcrumbs();
-      window.history.pushState({ ...(window.history.state ?? {}), pivotDepth: state.length - 1, breadcrumbs: state }, '');
-    }
-    this.ignoreNextHistoryPush = false;
   }
 
   /**

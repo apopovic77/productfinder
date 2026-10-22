@@ -603,6 +603,15 @@ export class GPANEEngine {
       };
     }).filter(b => b.count > 0);  // hide empty taxonomy nodes
 
+    // Eine Kategorie-Ebene mit nur einer Gruppe trennt nichts (Suche "kini":
+    // nur "Kini Red Bull" auf der obersten Ebene, AI-Explorer 2026-10-22).
+    // Dann gruppiert GPANE. Gilt fuer Wurzel und Zurueck; beim Hineinklicken
+    // faengt taxonomyDrillDown den Fall schon vorher ab.
+    if (this._buckets.length < 2 && products.length > 1) {
+      this._switchToGpane();
+      return;
+    }
+
     // Also run analysis in background so dimensions are available for manual pivot
     this._analyze();
     const visible = this._getVisibleProducts();
