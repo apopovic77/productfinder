@@ -13,6 +13,8 @@ export type HeroLayoutConfig<T> = {
   minHeight?: number;
   horizontalPadding?: number;
   onLayout?: (nodes: LayoutNode<T>[]) => void;
+  /** Gruppe eines Knotens; Kopien bei Mehrfachwerten (Groesse) stehen in ihrer eigenen. */
+  nodeGroupKey?: (node: LayoutNode<T>) => string;
 };
 
 export class HeroLayouter<T> implements ILayouter<T> {
@@ -305,7 +307,10 @@ export class HeroLayouter<T> implements ILayouter<T> {
       for (const bucket of this.posterBuckets) groups.set(labelOf(bucket.label), []);
       for (const node of nodes) {
         const id = String((node.data as any)?.id ?? '');
-        const bucket = this.posterBuckets.find(item => item.ids.has(id));
+        const own = this.config.nodeGroupKey?.(node);
+        const bucket = own && groups.has(labelOf(own))
+          ? { label: own }
+          : this.posterBuckets.find(item => item.ids.has(id));
         const key = bucket ? labelOf(bucket.label) : 'WEITERE';
         const list = groups.get(key);
         if (list) list.push(node); else groups.set(key, [node]);

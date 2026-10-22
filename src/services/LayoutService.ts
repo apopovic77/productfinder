@@ -296,13 +296,13 @@ export class LayoutService {
       maxWidthRatio: desktop ? 0.42 : undefined,
       minHeight: this.pivotConfig.minCellSize ?? 120,
       horizontalPadding: this.pivotConfig.framePadding ?? 40,
+      nodeGroupKey: node => this.nodeGroupKey(node),
       onLayout: nodes => {
         this.displayOrderIds = [];
         this.nodeToGroup.clear();
         for (const node of nodes) {
           this.displayOrderIds.push(node.id);
-          const key = this.drillDownService.getGroupKey(node.data);
-          this.nodeToGroup.set(node.id, key);
+          this.nodeToGroup.set(node.id, this.nodeGroupKey(node));
         }
       }
     });
