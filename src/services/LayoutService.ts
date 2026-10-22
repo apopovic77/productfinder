@@ -88,6 +88,7 @@ export class LayoutService {
   
   // GPANE pivot service (replaces PivotDrillDownService)
   private drillDownService: GpanePivotService;
+  private entryTitle = '';
   private pivotGroups: PivotGroup[] = [];
   private pivotConfig: PivotConfig<Product>;
   private animationDuration = 0.4;
@@ -670,7 +671,9 @@ export class LayoutService {
           this.heroLayouter.overviewMode = this.isHeroRootOverview();
           this.heroLayouter.posterMode = this.posterOverview;
           this.heroLayouter.flatOverview = !this.groupsWorthwhile();
-          this.heroLayouter.flatTitle = this.drillDownService.getBreadcrumbs().slice(1).pop() ?? '';
+          // Am Einstieg ueber ?category= kennt die Engine nur "Alle" — dann
+          // traegt die Kategorie aus der Navigation den Titel (owner 2026-10-22).
+          this.heroLayouter.flatTitle = this.drillDownService.getBreadcrumbs().slice(1).pop() ?? this.entryTitle;
           // Gruppen der Poster-View = Engine-Buckets der Ebene, damit der
           // Gruppen-Klick eine echte Pivot-Action ist (media 120646).
           this.heroLayouter.posterBuckets = this.drillDownService.getCurrentBuckets()
@@ -775,6 +778,14 @@ export class LayoutService {
    */
   getPivotDimension(): GroupDimension {
     return this.drillDownService.getDimension();
+  }
+
+  setEntryTitle(title: string): void {
+    this.entryTitle = title;
+  }
+
+  isPivotUngrouped(): boolean {
+    return this.drillDownService.isUngrouped();
   }
   
   getPivotDimensions(): GroupDimension[] {

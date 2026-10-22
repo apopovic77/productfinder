@@ -176,6 +176,11 @@ export class GpanePivotService {
     return this.engine.activeDimension?.key || '__taxonomy__';
   }
 
+  /** Keine Kategorie-Ebene und keine Dimension gewaehlt (flache Uebersicht). */
+  isUngrouped(): boolean {
+    return this.engine.mode !== 'taxonomy' && !this.engine.activeDimension;
+  }
+
   getHierarchy(): GroupDimension[] {
     // Return available dimensions as the "hierarchy"
     return this.engine.scoredDimensions.map(d => d.key);

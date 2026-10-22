@@ -1376,6 +1376,15 @@ export class ProductFinderController {
   getPivotDimension(): GroupDimension {
     return this.layoutService.getPivotDimension();
   }
+
+  /** Titel der Einstiegs-Kategorie (Header-Navigation), z. B. "RAINWEAR". */
+  setEntryTitle(title: string): void {
+    this.layoutService.setEntryTitle(title);
+  }
+
+  isPivotUngrouped(): boolean {
+    return this.layoutService.isPivotUngrouped();
+  }
   
   isHeroRootOverview(): boolean {
     return this.layoutService.isHeroRootOverview() && (this.canvas?.clientWidth ?? 0) >= 768;

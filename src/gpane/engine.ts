@@ -30,6 +30,9 @@ import { analyzeProperties } from './analyzer';
 import { buildBuckets, canSubsplit } from './bucketer';
 import { scoreDimensions } from './scorer';
 
+/** Bis zu dieser Produktzahl reicht eine Gruppe mit mind. zwei Produkten. */
+const SMALL_LEVEL_MAX = 12;
+
 // ============================================================================
 // GPANE Engine
 // ============================================================================
@@ -152,7 +155,11 @@ export class GPANEEngine {
     }
     let real = 0, singles = 0;
     for (const n of groups.values()) { if (n >= 2) real++; else singles += n; }
-    if (real < 2) return false;
+    // Kleine Ebenen: eine echte Gruppe plus Einzelstuecke trennt sinnvoll
+    // (RAINWEAR: 5 Jacken, 1 Hose — owner 2026-10-22). Der Einzelstueck-
+    // Anteil unten haelt Listen (Brillen-Designs) weiter draussen.
+    const small = products.length <= SMALL_LEVEL_MAX;
+    if (groups.size < 2 || real < (small ? 1 : 2)) return false;
     // Steht jedes Produkt in jeder Gruppe (3SRS: jeder Helm in jeder Groesse),
     // trennt die Dimension nichts, wie eine Eigenschaft, die keiner hat: eine
     // Nulloperation, nicht waehlbar (owner 2026-10-22).

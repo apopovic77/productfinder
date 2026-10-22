@@ -436,6 +436,7 @@ export default class App extends React.Component<Props, State> {
   state: State = createInitialState();
 
   async componentDidMount() {
+    this.controller.setEntryTitle(this.props.categoryLabel ?? '');
     // Finder aktiv: der schwebende Vollmodus-Schalter der Gate-Seiten tritt
     // zurück, der Finder hat ihn im Header.
     document.body.classList.add('pf-finder-active');
@@ -565,6 +566,7 @@ export default class App extends React.Component<Props, State> {
   private sheetObserver: ResizeObserver | null = null;
 
   componentDidUpdate(prevProps: Props, prevState: State): void {
+    if (prevProps.categoryLabel !== this.props.categoryLabel) this.controller.setEntryTitle(this.props.categoryLabel ?? '');
     // Benachrichtigungen mit der Haendler-Session laden bzw. leeren
     if (prevState.b2bSession?.token !== this.state.b2bSession?.token) this.loadRestockRequests();
     if (this.state.b2bSession && (prevState.cartItems !== this.state.cartItems
@@ -2882,8 +2884,10 @@ export default class App extends React.Component<Props, State> {
     const cats = this.controller.getUniqueCategories();
     const seasons = this.controller.getUniqueSeasons();
     const totalCartQuantity = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+    const ungrouped = this.controller.isPivotUngrouped();
     const getDimensionLabel = (dim: GroupDimension) => {
-      if (dim === '__taxonomy__') return 'Category';
+      // Ohne gewaehlte Dimension stand hier "Category" (owner 2026-10-22, RAINWEAR)
+      if (dim === '__taxonomy__') return ungrouped ? 'Gruppieren' : 'Kategorie';
       return pivotDefinitions.find(d => d.key === dim)?.label ?? dim;
     };
     const footerSearchResults = this.filterFooterSearchResults(footerSearchTerm);
