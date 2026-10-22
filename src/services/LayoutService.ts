@@ -552,6 +552,13 @@ export class LayoutService {
     this.viewOverride = atRoot ? this.entryViewOverride : 'auto';
   }
 
+  /**
+   * Ansicht je Pfadtiefe: beim Hineinklicken fuer die verlassene Ebene
+   * gemerkt, beim Zurueck (Breadcrumb, Hochgehen) wiederhergestellt
+   * (owner 2026-10-22).
+   */
+  private viewOverrideTrail: Array<'auto' | 'pivot' | 'grouped' | undefined> = [];
+
   setViewOverride(override: 'auto' | 'pivot' | 'grouped'): void {
     this.viewOverride = override;
   }
@@ -812,6 +819,8 @@ export class LayoutService {
    * Drill down into a pivot group
    */
   drillDownPivot(value: string): void {
+    const leftView = this.viewOverride;
+    const leftDepth = this.drillDownService.getRawTrail().length;
     this.resetViewOverride(false);
     if (this.mode !== 'pivot' && this.mode !== 'lanes') return;
 
@@ -827,6 +836,8 @@ export class LayoutService {
       .map(n => n.data);
 
     if (this.drillDownService.drillDown(value)) {
+      this.viewOverrideTrail.length = leftDepth;
+      this.viewOverrideTrail[leftDepth] = leftView;
       if (groupProducts.length > 0) {
         this.engine.sync(groupProducts, (p: Product) => p.id);
       }
@@ -843,6 +854,11 @@ export class LayoutService {
     if (this.mode !== 'pivot' && this.mode !== 'lanes') return;
     this.cacheCurrentNodePositions();
     if (this.drillDownService.drillUp()) {
+      // Zurueck auf die Ansicht, in der die Ebene verlassen wurde
+      const depth = this.drillDownService.getRawTrail().length;
+      const leftView = this.viewOverrideTrail[depth];
+      this.viewOverrideTrail.length = depth;
+      if (leftView) this.viewOverride = leftView;
       const filtered = this.drillDownService.filterProducts([]);
       this.engine.sync(filtered, (p: Product) => p.id);
       this.primeNewNodesFromCache();
@@ -855,6 +871,7 @@ export class LayoutService {
    */
   resetPivot(): void {
     this.resetViewOverride(true);
+    this.viewOverrideTrail = [];
     if (this.mode !== 'pivot' && this.mode !== 'lanes') return;
     this.cacheCurrentNodePositions();
     this.drillDownService.reset();
