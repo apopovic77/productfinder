@@ -7,6 +7,7 @@ import { sanitizeInlineHtml, extractYouTubeIds } from '../utils/richText';
 import { useImageQueue } from '../hooks/useImageQueue';
 import { fetchProductById } from '../data/ProductRepository';
 import { ZoomableImage } from './ZoomableImage';
+import { colorParts, isNeutralColor } from '../utils/colorName';
 import './ProductOverlayModal.css';
 import { STORAGE_API_BASE } from '../config/apiConfig';
 import { getVariantBaseColor, getVariantSize } from '../utils/variantImageHelpers';
@@ -62,10 +63,9 @@ function colorThumbBackground(colorName: string): string {
   // Die erste BUNTE Farbe des Namens: "black/orange" ist orange. Mit der
   // ersten Farbe waren alle ELEMENT-Handschuhe ("black/...") grau
   // (owner 2026-10-22, media 132022). Nur neutrale Farben: die erste davon.
-  const parts = (colorName || '').toLowerCase().split('/').map(part => part.trim()).filter(Boolean);
+  const parts = colorParts(colorName);
   const toneOf = (part: string) => COLOR_TONES.find(([re]) => re.test(part))?.[1];
-  const neutral = /black|schwarz|white|wei(ß|ss)|gr[ae]y|grau|charcoal|anthracite|silver/;
-  const accent = parts.find(part => !neutral.test(part) && toneOf(part));
+  const accent = parts.find(part => !isNeutralColor(part) && toneOf(part));
   const tone = toneOf(accent ?? parts[0] ?? '');
   return tone ? `color-mix(in srgb, ${tone} 26%, #f3f4f6)` : '#f3f4f6';
 }

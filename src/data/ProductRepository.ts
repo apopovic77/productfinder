@@ -9,6 +9,7 @@ import { Product, type ProductData, ProductAttribute, type PrimitiveAttributeVal
 import { ACTIVE_PIVOT_PROFILE } from '../config/pivot';
 import { CATALOG_PRODUCTS_BASE, CATALOG_PRODUCTS_KEY, ONEAL_API_BASE, ONEAL_API_KEY } from '../config/apiConfig';
 import { CATALOG_ENTRY_CONFIG, resolveCatalogScope, resolveRelevantOnly } from '../config/CatalogEntryConfig';
+import { accentColor } from '../utils/colorName';
 
 /** Gruppen der Pivot-Dimension Verfuegbarkeit, in dieser Reihenfolge. */
 export const AVAILABILITY_LABELS = ['Alle Größen lieferbar', 'Teilweise lieferbar', 'Nicht lieferbar'] as const;
@@ -570,9 +571,9 @@ function mapProduct(p: ApiProduct): Product | null {
   // 49 colour names for 119 helmets, 32 of them singletons. The first
   // colour before the slash gives black 54 / blue 14 / white 11 / red 10 …
   // (audit 2026-08-23). Derived here, not stored — LIUS has no such field.
-  const baseColor = typeof apiAny.color_name === 'string'
-    ? apiAny.color_name.split('/')[0].trim().toLowerCase()
-    : '';
+  // Die erste BUNTE Teilfarbe, nicht die erste: "white/neon" stand unter
+  // WHITE, "black/neon yellow" unter BLACK (owner 2026-10-22, media 132048).
+  const baseColor = typeof apiAny.color_name === 'string' ? accentColor(apiAny.color_name) : '';
   addAttribute(attributes, baseColor
     ? {
         key: 'color_base',
