@@ -14,6 +14,9 @@ export type Orientation = 'rows' | 'columns';
 export type Flow = 'ltr' | 'rtl' | 'ttb' | 'btt';
 export type InnerLayoutType = 'grid' | 'shelf';
 
+/** Eine Pivot-Zelle darf bis zu diesem Anteil der verfuegbaren Hoehe wachsen. */
+const MAX_CELL_HEIGHT_RATIO = 0.45;
+
 export type PivotConfig<T> = {
   orientation: Orientation;
   flow: Flow;
@@ -309,8 +312,14 @@ export class PivotLayouter<T> {
       };
       
       const preferredMin = this.config.minCellSize ?? 5;
-      const preferredMax = this.config.maxCellSize ?? Math.min(matrixWidth, matrixHeight);
-      
+      // Die feste Obergrenze (250 px) liess wenige Produkte klein in einer Reihe
+      // stehen, obwohl die Spalte Platz fuer zwei Reihen in doppelter Groesse
+      // hatte (owner 2026-10-22, 131949). Bis knapp die halbe Hoehe darf eine
+      // Zelle wachsen; ein Einzelstueck wird so nicht bildschirmfuellend.
+      const preferredMax = this.config.maxCellSize
+        ? Math.max(this.config.maxCellSize, matrixHeight * MAX_CELL_HEIGHT_RATIO)
+        : Math.min(matrixWidth, matrixHeight);
+
       const absoluteMin = 5;
       const searchMin = absoluteMin;
       const searchMax = Math.max(
@@ -364,8 +373,16 @@ export class PivotLayouter<T> {
           globalCols = Math.max(1, Math.floor((matrixWidth + spacing) / (globalCellSize + spacing)));
           globalRows = Math.max(1, Math.floor((matrixHeight + spacing) / (globalCellSize + spacing)));
         }
+        // Eine Spalte mehr bei fast gleicher Groesse: drei Helme als 2+1
+        // statt als Turm aus drei Reihen (owner 2026-10-22, 131949)
+        const wider = (matrixWidth - spacing * globalCols) / (globalCols + 1);
+        if (globalCols < maxProductsInAnyGroup && wider >= globalCellSize * 0.9) {
+          globalCellSize = wider;
+          globalCols += 1;
+          globalRows = Math.max(1, Math.floor((matrixHeight + spacing) / (globalCellSize + spacing)));
+        }
       }
-      
+
       // Enforce hard minimum cell size (content may overflow)
       if (this.config.minCellSize && globalCellSize < this.config.minCellSize) {
         globalCellSize = this.config.minCellSize;
