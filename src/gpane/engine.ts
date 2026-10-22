@@ -405,7 +405,7 @@ export class GPANEEngine {
     const poppedNav = this._navigationStack.pop();
 
     if (this._mode === 'gpane' && this._taxonomyPath.length > 0) {
-      this._focusStack.pop();
+      const left = this._focusStack.pop();
 
       if (this._focusStack.length < this._taxonomyPath.length) {
         // Going back INTO taxonomy — pop taxonomy path too
@@ -428,7 +428,7 @@ export class GPANEEngine {
       } else {
         // Still in GPANE — restore the dimension from the nav entry we're going BACK to
         const currentNav = this._navigationStack[this._navigationStack.length - 1];
-        const restoreDim = currentNav?.dimensionKey || null;
+        const restoreDim = levelDimension(left) || currentNav?.dimensionKey || null;
         this._switchToGpaneWithDimension(restoreDim);
       }
       return;
@@ -440,9 +440,11 @@ export class GPANEEngine {
     }
 
     // Pure GPANE mode (no taxonomy)
-    this._focusStack.pop();
+    const left = this._focusStack.pop();
     const currentNav = this._navigationStack[this._navigationStack.length - 1];
-    const restoreDim = currentNav?.dimensionKey || null;
+    // Die Dimension, in der die Ebene verlassen wurde (Groesse -> S -> zurueck
+    // landete sonst ohne Gruppierung, owner 2026-10-22)
+    const restoreDim = levelDimension(left) || currentNav?.dimensionKey || null;
     if (restoreDim) {
       this._switchToGpaneWithDimension(restoreDim);
     } else {
@@ -669,7 +671,7 @@ export class GPANEEngine {
     this._heroMode = false;
 
     if (this._scoredDimensions.length > 0) {
-      const viable = this._scoredDimensions.filter(d => d.entropy > 0 && d.cardinality > 1 && !isNeverAutoPicked(d.key) && this.splitsProducts(d.key, products));
+      const viable = this._scoredDimensions.filter(d => d.entropy > 0 && d.cardinality > 1 && !isNeverAutoPicked(d) && this.splitsProducts(d.key, products));
       this._activeDimension = this._prescribedDimension(products) || viable[0] || null;
       this._buckets = this._activeDimension ? buildBuckets(products, this._activeDimension, this._config) : [];
     } else {
@@ -698,7 +700,7 @@ export class GPANEEngine {
     );
 
     if (this._scoredDimensions.length > 0) {
-      const viable0 = this._scoredDimensions.filter(d => d.entropy > 0 && d.cardinality > 1 && !isNeverAutoPicked(d.key) && this.splitsProducts(d.key, products));
+      const viable0 = this._scoredDimensions.filter(d => d.entropy > 0 && d.cardinality > 1 && !isNeverAutoPicked(d) && this.splitsProducts(d.key, products));
       this._activeDimension = this._prescribedDimension(products) || viable0[0] || null;
       this._buckets = this._activeDimension ? buildBuckets(products, this._activeDimension, this._config) : [];
     } else {
@@ -734,7 +736,7 @@ export class GPANEEngine {
       // prescription) — else "Design" returns with 42 singletons and a
       // 68-item "Sonstige" the moment the prescription declines it.
       // Nothing groups -> no dimension -> the products show as a hero row.
-      const viable = this._scoredDimensions.filter(d => d.entropy > 0 && d.cardinality > 1 && !isNeverAutoPicked(d.key) && this.splitsProducts(d.key, products));
+      const viable = this._scoredDimensions.filter(d => d.entropy > 0 && d.cardinality > 1 && !isNeverAutoPicked(d) && this.splitsProducts(d.key, products));
       this._activeDimension = prescribed || viable[0] || null;
       this._buckets = this._activeDimension ? buildBuckets(products, this._activeDimension, this._config) : [];
     } else {
@@ -791,7 +793,17 @@ export class GPANEEngine {
  * "2017 / 2018 / 2024", obwohl beides nichts ueber die Produkte sagt (Review
  * 2026-10-21, Sonja Goldmann). Als Pivot von Hand bleiben beide waehlbar.
  */
-function isNeverAutoPicked(key: string): boolean {
+/** Dimension der Ebene, aus der ein Fokus-Eintrag stammt (nicht die Taxonomie). */
+function levelDimension(entry: { dimension: string } | undefined): string | null {
+  return entry && entry.dimension !== '__taxonomy__' ? entry.dimension : null;
+}
+
+function isNeverAutoPicked(dim: ScoredDimension): boolean {
+  const key = dim.key;
+  // Mehrfachwerte (Groesse): ein Produkt stuende in mehreren Gruppen. Das ist
+  // ein Filter auf Wunsch, keine Startsicht; bei RAINWEAR blieb Groesse mit
+  // der schlechtesten Bewertung als einzige uebrig (owner 2026-10-22).
+  if (dim.dataType === 'multi_value') return true;
   return key === 'price' || key.startsWith('price_') || key === 'model_year';
 }
 

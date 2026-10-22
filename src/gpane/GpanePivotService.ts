@@ -59,6 +59,8 @@ export class GpanePivotService {
   private _heroThreshold = HERO_THRESHOLD;
   private _heroModeActive = false;
   private _userSelectedDimension = false;
+  /** Selbst gewaehlte Dimension je verlassener Ebene, fuers Zurueck (owner 2026-10-22). */
+  private _userSelectedTrail: boolean[] = [];
 
   // Caches for LayoutService compatibility
   private _currentBuckets: Bucket[] = [];
@@ -200,6 +202,7 @@ export class GpanePivotService {
   drillDown(value: string): boolean {
     // Below the drilled level the engine picks again — the user's explicit
     // dimension choice applied to THIS level only.
+    this._userSelectedTrail.push(this._userSelectedDimension);
     this._userSelectedDimension = false;
     if (this.engine.mode === 'taxonomy') {
       // Find taxonomy node by label
@@ -234,12 +237,14 @@ export class GpanePivotService {
   drillUp(): boolean {
     if (!this.canDrillUp()) return false;
     this.engine.unfocus();
+    this._userSelectedDimension = this._userSelectedTrail.pop() ?? false;
     this._rebuildGroupCache();
     return true;
   }
 
   reset(): void {
     this._userSelectedDimension = false;
+    this._userSelectedTrail = [];
     this.engine.reset();
     this._rebuildGroupCache();
   }

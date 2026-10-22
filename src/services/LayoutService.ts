@@ -860,7 +860,8 @@ export class LayoutService {
       this.viewOverrideTrail.length = depth;
       if (leftView) this.viewOverride = leftView;
       const filtered = this.drillDownService.filterProducts([]);
-      this.engine.sync(filtered, (p: Product) => p.id);
+      if (this.drillDownService.isMultiMembership()) this.syncMultiMembership(filtered);
+      else this.engine.sync(filtered, (p: Product) => p.id);
       this.primeNewNodesFromCache();
       this.updatePivotGroups();
     }
@@ -1090,16 +1091,7 @@ export class LayoutService {
     // Produkts. Die erste Kopie behaelt die Produkt-id, weitere heissen
     // "<id>@@<Gruppe>" (owner 2026-10-21: Produkt in jeder Gruppe zeigen).
     if (usePivot && this.drillDownService.isMultiMembership()) {
-      const items: Product[] = [];
-      const ids: string[] = [];
-      for (const p of filtered) {
-        this.drillDownService.getGroupKeys(p).forEach((key, i) => {
-          items.push(p);
-          ids.push(i === 0 ? p.id : `${p.id}${COPY_SEP}${key}`);
-        });
-      }
-      let at = 0;
-      this.engine.sync(items, () => ids[at++]);
+      this.syncMultiMembership(filtered);
     } else if (usePivot && this.outfitEnabled) {
       // Outfit: hintere Ebenen zuerst zeichnen (Jersey unter Hose, Helm vorn)
       const z = (p: Product) => { const slot = this.outfitSlot(p); return slot ? OUTFIT_SLOTS[slot].z : -1; };
@@ -1129,6 +1121,20 @@ export class LayoutService {
         this.nodeToGroup.set(node.id, this.nodeGroupKey(node));
       }
     }
+  }
+
+  /** Ein Knoten je Gruppe des Produkts (Mehrfachwerte wie Groesse). */
+  private syncMultiMembership(products: Product[]): void {
+    const items: Product[] = [];
+    const ids: string[] = [];
+    for (const p of products) {
+      this.drillDownService.getGroupKeys(p).forEach((key, i) => {
+        items.push(p);
+        ids.push(i === 0 ? p.id : `${p.id}${COPY_SEP}${key}`);
+      });
+    }
+    let at = 0;
+    this.engine.sync(items, () => ids[at++]);
   }
 
   /** Gruppe eines Knotens: Kopien tragen sie in der id, sonst die erste Gruppe des Produkts. */

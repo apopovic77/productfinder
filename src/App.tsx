@@ -1380,9 +1380,11 @@ export default class App extends React.Component<Props, State> {
     const { pivotBreadcrumbs } = this.state;
     if (index < 0 || index >= pivotBreadcrumbs.length) return;
 
-    // The root crumb is a persistent Home action, even when it is the
-    // currently active (and only) breadcrumb.
-    if (index === 0) {
+    // The root crumb is a persistent Home action when you are already at the
+    // root. From a deeper level it goes back like every other crumb and keeps
+    // the root's grouping and view (RAINWEAR > Groesse > S > zurueck landete
+    // sonst ungruppiert, owner 2026-10-22).
+    if (index === 0 && pivotBreadcrumbs.length <= 1) {
       this.resetToInitialView();
       return;
     }
