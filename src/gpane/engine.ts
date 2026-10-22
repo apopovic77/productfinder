@@ -153,6 +153,10 @@ export class GPANEEngine {
     let real = 0, singles = 0;
     for (const n of groups.values()) { if (n >= 2) real++; else singles += n; }
     if (real < 2) return false;
+    // Steht jedes Produkt in jeder Gruppe (3SRS: jeder Helm in jeder Groesse),
+    // trennt die Dimension nichts, wie eine Eigenschaft, die keiner hat: eine
+    // Nulloperation, nicht waehlbar (owner 2026-10-22).
+    if ([...groups.values()].every(n => n === products.length)) return false;
     // A level where most products would stand alone is a list, not a
     // grouping — it fills the stage with one-helmet columns or, capped by
     // maxBuckets, stuffs everything into "Sonstige" (owner report
