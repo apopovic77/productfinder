@@ -12,6 +12,8 @@ import { CATALOG_ENTRY_CONFIG, resolveCatalogScope, resolveRelevantOnly } from '
 
 /** Gruppen der Pivot-Dimension Verfuegbarkeit, in dieser Reihenfolge. */
 export const AVAILABILITY_LABELS = ['Alle Größen lieferbar', 'Teilweise lieferbar', 'Nicht lieferbar'] as const;
+/** Artikel mit genau einer Groesse ("One Size") stehen in der Groessen-Dimension als "Uni". */
+export const UNI_SIZE = 'Uni';
 
 const API_BASE = ONEAL_API_BASE;
 const API_KEY = ONEAL_API_KEY;
@@ -456,9 +458,14 @@ function mapProduct(p: ApiProduct): Product | null {
     : undefined);
 
   // Groessen als Mehrfachwert "XS|S|M" (Pivot-Dimension Groesse: ein Produkt
-  // steht in jeder seiner Groessen, owner 2026-10-21)
-  const sizeList: string[] = Array.isArray(apiAny.size_list) ? apiAny.size_list.map(String).filter(Boolean) : [];
-  addAttribute(attributes, sizeList.length > 1
+  // steht in jeder seiner Groessen, owner 2026-10-21). Eine einzige Groesse
+  // ("One Size", Brillen) heisst "Uni"; nicht lieferbare Groessen bleiben in
+  // der Liste, ein Artikel mit Groessen wird also nie zu Uni (owner 2026-10-22).
+  const sizeList: string[] = Array.isArray(apiAny.size_list)
+    ? [...new Set<string>(apiAny.size_list.map(String).filter(Boolean)
+        .map((s: string) => (/^one\s*size$/i.test(s.trim()) ? UNI_SIZE : s)))]
+    : [];
+  addAttribute(attributes, sizeList.length > 0
     ? {
         key: 'size',
         label: 'Größe',
