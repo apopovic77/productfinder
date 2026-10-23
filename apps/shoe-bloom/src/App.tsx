@@ -37,8 +37,9 @@ export function App() {
   }, [designs, design, view]);
 
   const shoes: Shoe[] = useMemo(() => (designs ?? []).flatMap((d) => d.shoes), [designs]);
-  // Seitenansichten, im Atlas alle mit der Spitze nach links; jedes Produkt genau einmal
+  // Seitenansichten ('left side'; 'right side' gespiegelt); jedes Produkt genau einmal
   const images = useMemo(() => shoes.map((s) => s.sideImage), [shoes]);
+  const mirrored = useMemo(() => new Set(shoes.flatMap((s, i) => (s.sideMirrored ? [i] : []))), [shoes]);
   const instanceProduct = useMemo(() => shoes.map((_, i) => i), [shoes]);
   const bloomProducts = useMemo(() => {
     if (!designs) return [];
@@ -91,7 +92,7 @@ export function App() {
       <Canvas camera={{ position: [0, 0, 9.5], fov: 35 }} dpr={[1, 2]} gl={{ antialias: true }}>
         <Suspense fallback={null}>
           {instanceProduct.length > 0 && (
-            <EngineScene images={images} instanceProduct={instanceProduct} view={view} bloomProducts={bloomProducts}
+            <EngineScene images={images} mirrored={mirrored} instanceProduct={instanceProduct} view={view} bloomProducts={bloomProducts}
                          focus={focus} onPick={onPick} onCurrent={setCurrent} />
           )}
         </Suspense>

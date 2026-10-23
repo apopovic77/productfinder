@@ -24,6 +24,8 @@ export type EngineView = 'bloom' | 'wall' | 'floor';
 interface Props {
   /** Bild je Produkt (Index = Produkt). */
   images: string[];
+  /** Produkte, deren Bild gespiegelt in den Atlas kommt (nach Bilddaten, nicht geraten). */
+  mirrored?: Set<number>;
   /** Produkt je Instanz der Fläche; die ersten images.length Instanzen sind die Produkte selbst. */
   instanceProduct: number[];
   view: EngineView;
@@ -58,7 +60,7 @@ function flatTile(r: LayoutResult, size: number): LayoutResult {
   return r;
 }
 
-export function EngineScene({ images, instanceProduct, view, bloomProducts, focus, onPick, onCurrent, onReady }: Props) {
+export function EngineScene({ images, mirrored, instanceProduct, view, bloomProducts, focus, onPick, onCurrent, onReady }: Props) {
   const { camera, gl, size: canvasSize } = useThree();
   const count = instanceProduct.length;
   const [atlas, setAtlas] = useState<ImageAtlas | null>(null);
@@ -84,8 +86,7 @@ export function EngineScene({ images, instanceProduct, view, bloomProducts, focu
   // Atlas aus den Produktbildern, UV-Kachel je Instanz
   useEffect(() => {
     let alive = true;
-    // Spitze einheitlich nach links (Bilder ohne Seitenansicht werden gespiegelt)
-    buildImageAtlas(images, { face: -1 }).then((a) => {
+    buildImageAtlas(images, { mirror: mirrored }).then((a) => {
       if (!alive) return;
       const uv = mesh.geometry.getAttribute('aUVOffset') as THREE.InstancedBufferAttribute;
       instanceProduct.forEach((p, i) => uv.setXYZW(i, ...a.uv(p)));
@@ -100,7 +101,7 @@ export function EngineScene({ images, instanceProduct, view, bloomProducts, focu
       onReady?.();
     });
     return () => { alive = false; };
-  }, [images, instanceProduct, mesh, uniforms, onReady]);
+  }, [images, mirrored, instanceProduct, mesh, uniforms, onReady]);
 
   // Fläche: integriertes Layout 'plane', quadratische Kacheln
   const wall = useMemo(() => {

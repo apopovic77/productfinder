@@ -25,33 +25,11 @@ function load(url: string): Promise<HTMLImageElement | null> {
   });
 }
 
-/**
- * Richtung eines freigestellten Seitenbilds: Die Spitze steht dort, wo die Sohle (unterstes Fünftel der
- * deckenden Pixel) weiter über die Mitte des Objekts hinausreicht. -1 = links, 1 = rechts.
- */
-export function toeDirection(img: HTMLImageElement): -1 | 1 {
-  const w = 96, h = Math.max(1, Math.round((96 * img.height) / img.width));
-  const c = document.createElement('canvas');
-  c.width = w; c.height = h;
-  const ctx = c.getContext('2d', { willReadFrequently: true })!;
-  ctx.drawImage(img, 0, 0, w, h);
-  const a = ctx.getImageData(0, 0, w, h).data;
-  let minX = w, maxX = 0, top = h, bottom = 0;
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (a[(y * w + x) * 4 + 3] > 40) {
-    minX = Math.min(minX, x); maxX = Math.max(maxX, x); top = Math.min(top, y); bottom = Math.max(bottom, y);
-  }
-  const band = bottom - (bottom - top) * 0.2;
-  let sum = 0, n = 0;
-  for (let y = Math.floor(band); y <= bottom; y++) for (let x = 0; x < w; x++) if (a[(y * w + x) * 4 + 3] > 40) { sum += x; n++; }
-  const mid = (minX + maxX) / 2;
-  return n && sum / n > mid ? 1 : -1;
-}
-
 export interface AtlasOptions {
   tile?: number;
   pad?: number;
-  /** Alle Bilder in diese Richtung drehen (Spiegeln, wenn toeDirection abweicht). */
-  face?: -1 | 1;
+  /** Bilder, die gespiegelt in den Atlas kommen (Index), z. B. Ansicht „right side“ neben „left side“. */
+  mirror?: Set<number>;
 }
 
 export async function buildImageAtlas(urls: string[], opts: AtlasOptions = {}): Promise<ImageAtlas> {
@@ -69,7 +47,7 @@ export async function buildImageAtlas(urls: string[], opts: AtlasOptions = {}): 
     const s = Math.min(box / img.width, box / img.height);
     const w = img.width * s, h = img.height * s;
     const dx = x0 + (tile - w) / 2, dy = y0 + (tile - h) / 2;
-    if (opts.face && toeDirection(img) !== opts.face) {
+    if (opts.mirror?.has(i)) {
       ctx.save();
       ctx.translate(dx + w, dy);
       ctx.scale(-1, 1);
