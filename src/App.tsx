@@ -57,6 +57,7 @@ import { soundService } from './services/SoundService';
 import { resolveProductTapStage } from './utils/ProductTapFlow';
 import QuickSearchCommandPalette from './components/QuickSearchCommandPalette';
 import { AiProductQueryService } from './services/AiProductQueryService';
+import { OutfitImageService } from './services/OutfitImageService';
 import { categoryMediaService } from './services/CategoryMediaService';
 import { FOOTER_CONFIG, type FooterPosition } from './config/FooterConfig';
 import { STORAGE_API_BASE as CENTRAL_STORAGE_BASE, STORAGE_API_KEY as CENTRAL_STORAGE_KEY } from './config/apiConfig';
@@ -182,6 +183,8 @@ type State = {
   quickSearchError: string | null;
   aiFilterProductIds: string[];
   aiLastResultCount: number | null;
+  /** Outfit-Bild der Smart Search: entsteht im Hintergrund, ersetzt dann den Stapel */
+  outfitImage: { status: 'pending' | 'done' | 'failed'; url?: string; show: boolean } | null;
   quickSearchPosition: { x: number; y: number } | null;
 
   // AI Prompt (Footer)
@@ -317,6 +320,7 @@ const createInitialState = (): State => {
     quickSearchError: null,
     aiFilterProductIds: [],
     aiLastResultCount: null,
+    outfitImage: null,
     quickSearchPosition: null,
 
     aiPrompt: '',
@@ -1544,6 +1548,7 @@ export default class App extends React.Component<Props, State> {
       shouldShowV4Dialog: false,
       aiFilterProductIds: [],
       aiLastResultCount: null,
+      outfitImage: null,
       aiPrompt: '',
       searchFilterTerm: null,
       footerSearchTerm: '',
@@ -2761,7 +2766,28 @@ export default class App extends React.Component<Props, State> {
 
   private clearAiFilter = () => {
     this.controller.setGlobalSearchProducts(null);
-    this.setState({ aiFilterProductIds: [], aiLastResultCount: null }, () => this.syncPivotUI());
+    this.outfitImageToken++;
+    this.setState({ aiFilterProductIds: [], aiLastResultCount: null, outfitImage: null }, () => this.syncPivotUI());
+  };
+
+  /**
+   * Outfit-Wunsch (Outfit-Layout aktiv): Bild im Hintergrund erzeugen lassen,
+   * der Stapel bleibt Platzhalter (owner 2026-10-22). Eine neue Suche macht
+   * die alte Anfrage ueber das Token ungueltig.
+   */
+  private outfitImageToken = 0;
+  private startOutfitImage = (ids: string[]) => {
+    const token = ++this.outfitImageToken;
+    if (!this.controller.isOutfitActive()) { this.setState({ outfitImage: null }); return; }
+    this.setState({ outfitImage: { status: 'pending', show: true } });
+    OutfitImageService.generate(ids, () => token === this.outfitImageToken)
+      .then(result => {
+        if (token !== this.outfitImageToken) return;
+        this.setState({ outfitImage: result.status === 'done' && result.url
+          ? { status: 'done', url: result.url, show: true }
+          : { status: 'failed', show: false } });
+      })
+      .catch(() => { if (token === this.outfitImageToken) this.setState({ outfitImage: { status: 'failed', show: false } }); });
   };
 
   /**
@@ -2778,6 +2804,7 @@ export default class App extends React.Component<Props, State> {
     this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false, searchFilterTerm: null });
     this.controller.applyAgentProducts(products);
     this.syncPivotUI();
+    this.startOutfitImage(products.map(p => String(p.id)));
     return products.map(p => String(p.id));
   };
 
@@ -4204,6 +4231,38 @@ export default class App extends React.Component<Props, State> {
           }}
         />
 
+        {/* Outfit-Bild der Smart Search: erst der Stapel mit Hinweis, dann das
+            KI-Bild ueber der Buehne; umschaltbar zurueck auf die Produkte. */}
+        {this.state.outfitImage && this.controller.isOutfitActive() && (() => {
+          const outfit = this.state.outfitImage!;
+          const pill: React.CSSProperties = { position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 60, padding: '7px 14px', borderRadius: 999, background: 'rgba(15,15,17,0.88)', color: '#fff', font: '600 12px system-ui, sans-serif', border: '1px solid rgba(255,255,255,0.18)', cursor: 'default' };
+          if (outfit.status === 'pending') {
+            return <div className="pf-outfit-pending" style={pill}>KI-Bild des Outfits wird erzeugt … ca. 1–2 Min.</div>;
+          }
+          if (outfit.status !== 'done' || !outfit.url) return null;
+          if (!outfit.show) {
+            return (
+              <button type="button" className="pf-outfit-toggle" style={{ ...pill, cursor: 'pointer' }}
+                onClick={() => this.setState({ outfitImage: { ...outfit, show: true } })}>
+                KI-Bild des Outfits ansehen
+              </button>
+            );
+          }
+          return (
+            <div className="pf-outfit-image" style={{ position: 'fixed', top: 48, left: 0, right: 0, bottom: 0, zIndex: 55, background: '#0b0b0d', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+              <div style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center' }}>
+                <img src={outfit.url} alt="KI-Visualisierung des Outfits" style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain', borderRadius: 10 }} />
+                <div style={{ position: 'absolute', left: 12, top: 12, padding: '5px 10px', borderRadius: 6, background: 'rgba(0,0,0,0.6)', color: '#fff', font: '600 11px system-ui, sans-serif' }}>
+                  KI-Visualisierung · Logos und Details können vom Produkt abweichen
+                </div>
+              </div>
+              <button type="button" className="pf-outfit-toggle" onClick={() => this.setState({ outfitImage: { ...outfit, show: false } })}
+                style={{ position: 'absolute', bottom: 24, left: '50%', transform: 'translateX(-50%)', padding: '9px 18px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(15,15,17,0.85)', color: '#fff', font: '600 13px system-ui, sans-serif', cursor: 'pointer' }}>
+                Produkte anzeigen
+              </button>
+            </div>
+          );
+        })()}
         {/* Nur auf Wunsch (Header-Icon, Ctrl+Shift+V, ?voice=1) — die alte
             Demo-Route blendete die Karte ungefragt ein (owner 2026-08-27,
             media 120886). realtimeDemoEnabled bleibt als Flag, mountet aber
