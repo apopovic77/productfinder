@@ -6,6 +6,7 @@ import { soundService } from '../services/SoundService';
 import { sanitizeInlineHtml, extractYouTubeIds } from '../utils/richText';
 import { useImageQueue } from '../hooks/useImageQueue';
 import { fetchProductById } from '../data/ProductRepository';
+import { resolveCatalogScope } from '../config/CatalogEntryConfig';
 import { ZoomableImage } from './ZoomableImage';
 import { colorParts, isNeutralColor } from '../utils/colorName';
 import './ProductOverlayModal.css';
@@ -199,7 +200,16 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   const activeProduct = fullProduct || product;
 
   // Extract variants from active product
-  const variants = (activeProduct as any).variants || [];
+  // Nur Varianten des gezeigten Katalogs (Workbook 2028), wie Liste und
+  // Gruppe "Alle Groessen lieferbar": Auslaufgroessen (Z**, nicht im
+  // Workbook) standen sonst durchgestrichen in der Karte (owner 2026-10-23,
+  // 2SRS SPYDE: XS/3XL). Ohne Workbook-Variante bleiben alle.
+  const variants = useMemo(() => {
+    const all: any[] = (activeProduct as any).variants || [];
+    if (resolveCatalogScope() !== 'workbook') return all;
+    const inBook = all.filter(v => v?.in_workbook === true);
+    return inBook.length ? all.filter(v => v?.in_workbook !== false) : all;
+  }, [activeProduct]);
   const rawProduct = (product as any).raw || {};
   const derivedTaxonomy = product.derived_taxonomy || (rawProduct as any)?.derived_taxonomy;
   const metaInfo = (product.meta && Object.keys(product.meta).length ? product.meta : rawProduct?.meta) || {};

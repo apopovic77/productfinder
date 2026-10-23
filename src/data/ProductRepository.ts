@@ -783,7 +783,13 @@ function mapProduct(p: ApiProduct): Product | null {
         customs_tariff: v.customs_tariff,
         model_year: v.model_year,
         stock_available: v.stock_available,
+        stock_on_hand: v.stock_on_hand,
+        stock_reserved: v.stock_reserved,
         is_nos: v.is_nos,
+        // Kollektion: Auslaufgroessen (Z**) sind nicht im Workbook 2028;
+        // fehlte hier, darum zeigte die Karte sie trotz Katalog-Filter
+        in_workbook: v.in_workbook,
+        is_discontinued: v.is_discontinued,
       };
     }),
     raw: p as any,

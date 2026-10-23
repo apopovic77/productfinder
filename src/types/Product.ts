@@ -102,6 +102,9 @@ export type ProductVariant = {
   /** Lager minus reserviert; kann negativ sein. */
   stock_available?: number | null;
   is_nos?: boolean;
+  /** Teil des Workbooks 2028 (Katalog); false = Auslauf (Z**) */
+  in_workbook?: boolean;
+  is_discontinued?: boolean;
 };
 
 /** Taxonomy info derived by the pivot profile / API. */
