@@ -19,6 +19,10 @@ export const DIMENSION_ICONS: Record<string, string> = {
   model_year: 'dim_model_year',
   target_group: 'dim_target_group',
   availability: 'dim_availability',
+  color_base: 'dim_color',
+  size: 'dim_size',
+  product_line: 'dim_product_line',
+  design_group: 'dim_product_line',
 };
 
 const TYPE_VALUES: Record<string, string> = {
