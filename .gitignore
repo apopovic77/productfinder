@@ -25,3 +25,4 @@ dist-ssr
 .env
 atlas/*.png
 atlas/**/*.png
+dist-shoe-bloom
