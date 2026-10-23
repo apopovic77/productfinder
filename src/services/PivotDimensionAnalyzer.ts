@@ -113,7 +113,7 @@ const ATTRIBUTE_HINTS: Record<string, AttributeHint> = {
     priorityBoost: 0.12,
   },
   design_group: {
-    label: 'Design',
+    label: 'Produktlinie',
     role: 'class',
     priorityBoost: 0.09,
   },

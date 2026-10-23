@@ -156,7 +156,10 @@ export class LayoutService {
         // Model names are categories, not prose. Auto-detected as text they
         // were bucketed by first word: "3SRS Helmet VISION" collapsed into
         // "3SRS" — one group for 65 designs, a wasted click (audit 2026-08-23).
-        design_group: { label: 'Design', dataType: 'categorical' },
+        // Eine Dimension fuer Serie und Modell (owner 2026-10-23): im Menue
+        // heisst auch das Modell "Produktlinie"; engine.selectableDimensions
+        // zeigt es nur, wo nach Serie nichts mehr zu teilen ist.
+        design_group: { label: 'Produktlinie', dataType: 'categorical' },
         // Flow-Varianten ohne Marken-Gate laden alle Marken — dann ist
         // Marke eine reguläre Pivot-Dimension (owner 2026-08-25).
         brand: { label: 'Marke', dataType: 'categorical' },

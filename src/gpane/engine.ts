@@ -218,6 +218,10 @@ export class GPANEEngine {
       if (signature) seen.add(signature);
       keep.add(dim.key);
     }
+    // Serie und Modell sind fuer den Nutzer eine Art der Einteilung: teilt
+    // die Serie (product_line), steht das Modell (design_group) nicht extra
+    // im Menue; innerhalb einer Serie uebernimmt das Modell (owner 2026-10-23)
+    if (keep.has('product_line')) keep.delete('design_group');
     return candidates.filter(d => keep.has(d.key));
   }
 

@@ -548,7 +548,7 @@ function mapProduct(p: ApiProduct): Product | null {
   addAttribute(attributes, apiAny.design_group
     ? {
         key: 'design_group',
-        label: 'Design',
+        label: 'Produktlinie',
         type: 'string',
         value: apiAny.design_group,
         sourcePath: 'design_group',
