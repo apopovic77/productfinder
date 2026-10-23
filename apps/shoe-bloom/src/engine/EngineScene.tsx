@@ -11,7 +11,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import {
-  applyShaderToMaterial, computeLayout, computeRadialFan, createMorphGeometry, createUniforms, focusLayout, morphTo,
+  applyShaderToMaterial, computeLayout, computeRadialFan, createMorphGeometry, createMorphMesh, createUniforms, focusLayout,
+  morphTo,
   type LayoutResult,
 } from '@arkturian/wave-engine';
 import { ScrollInertia } from '../layout/ScrollInertia';
@@ -60,23 +61,15 @@ export function EngineScene({ images, instanceProduct, view, bloomProducts, focu
   const [atlas, setAtlas] = useState<ImageAtlas | null>(null);
   const uniforms = useMemo(() => createUniforms(), []);
   const mesh = useMemo(() => {
-    // Instanziert über die Geometrie statt InstancedMesh: ohne instanceMatrix (4 Attribute) bleibt der
-    // Morph-Shader auch auf Geräten mit 16 Vertex-Attributen inkl. gl_InstanceID lauffähig (SwiftShader u. a.).
-    // Die Positionen kommen ohnehin aus den Engine-Attributen; ausgeblendete Instanzen haben Maßstab 0.
-    const source = createMorphGeometry({ maxInstances: count });
-    const geometry = new THREE.InstancedBufferGeometry();
-    for (const [name, a] of Object.entries(source.attributes)) geometry.setAttribute(name, a);
-    geometry.setIndex(source.getIndex());
-    geometry.userData = source.userData;
-    geometry.instanceCount = count;
+    // Mesh-Variante der Engine: InstancedBufferGeometry ohne instanceMatrix (4 Attribut-Slots frei), die
+    // Positionen kommen aus den Engine-Attributen; ausgeblendete Instanzen haben Maßstab 0.
+    const geometry = createMorphGeometry({ maxInstances: count, instancing: 'geometry' }) as THREE.InstancedBufferGeometry;
     const material = new THREE.MeshBasicMaterial({ transparent: true, alphaTest: 0.02, depthWrite: true });
     // Unschärfe-Pfad als Compile-Option; eigener Cache-Schlüssel, damit three das Programm nicht mit einem
     // Morph-Material ohne Unschärfe teilt (gleiche onBeforeCompile-Quelle)
     material.onBeforeCompile = (shader) => applyShaderToMaterial(shader, uniforms, { motionBlur: true });
     material.customProgramCacheKey = () => 'wave-morph-blur';
-    const m = new THREE.Mesh(geometry, material) as unknown as THREE.InstancedMesh;
-    m.frustumCulled = false;
-    return m;
+    return createMorphMesh(geometry, material);
   }, [count, uniforms]);
   const inertia = useMemo(() => new ScrollInertia({ friction: 1.6, snap: 0 }), []);
   const current = useRef<LayoutResult[]>([]);
