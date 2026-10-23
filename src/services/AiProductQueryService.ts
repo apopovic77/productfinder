@@ -22,11 +22,22 @@ type AgentResponse = {
   explanation?: string;
 };
 
+/**
+ * Der Finder zeigt nur die gewaehlte Marke. Ohne Hinweis stellte der Agent
+ * eine O'Neal-Ausruestung mit Kini-Red-Bull-Jersey und -Hose zusammen; beide
+ * fielen beim Abgleich still heraus (owner 2026-10-23, Post #5618).
+ */
+function brandHint(brand?: string | null): string {
+  return brand
+    ? `\n[Marke: nur Produkte der Marke "${brand}" (Feld brand). Treffer anderer Marken kann der Finder hier nicht zeigen.]`
+    : '';
+}
+
 export class AiProductQueryService {
-  static async queryProducts(userPrompt: string): Promise<AiQueryResult> {
+  static async queryProducts(userPrompt: string, opts: { brand?: string | null } = {}): Promise<AiQueryResult> {
     const data = await AgentDispatchService.query<AgentResponse>(
       PRODUCT_SEARCH_AGENT,
-      `${userPrompt}\n\n${CATALOG_SCOPE_HINT}`,
+      `${userPrompt}\n\n${CATALOG_SCOPE_HINT}${brandHint(opts.brand)}`,
     );
 
     if (!Array.isArray(data.ids)) {

@@ -185,6 +185,8 @@ type State = {
   aiLastResultCount: number | null;
   /** Outfit-Bild der Smart Search: entsteht im Hintergrund, ersetzt dann den Stapel */
   outfitImage: { status: 'idle' | 'pending' | 'done' | 'failed'; url?: string; show: boolean } | null;
+  /** Smart-Search-Treffer, die der Finder hier nicht zeigen kann (andere Marke/Kollektion) */
+  aiMissingCount: number;
   quickSearchPosition: { x: number; y: number } | null;
 
   // AI Prompt (Footer)
@@ -321,6 +323,7 @@ const createInitialState = (): State => {
     aiFilterProductIds: [],
     aiLastResultCount: null,
     outfitImage: null,
+    aiMissingCount: 0,
     quickSearchPosition: null,
 
     aiPrompt: '',
@@ -2837,7 +2840,7 @@ export default class App extends React.Component<Props, State> {
   private clearAiFilter = () => {
     this.controller.setGlobalSearchProducts(null);
     this.outfitImageToken++;
-    this.setState({ aiFilterProductIds: [], aiLastResultCount: null, outfitImage: null }, () => this.syncPivotUI());
+    this.setState({ aiFilterProductIds: [], aiLastResultCount: null, outfitImage: null, aiMissingCount: 0 }, () => this.syncPivotUI());
   };
 
   /**
@@ -2890,6 +2893,10 @@ export default class App extends React.Component<Props, State> {
   private applyAiResult = (productIds: string[]): string[] => {
     const byId = new Map(this.controller.getCatalogAllProducts().map(p => [String(p.id), p]));
     const products = productIds.map(id => byId.get(String(id))).filter((p): p is Product => Boolean(p));
+    // Treffer ausserhalb des gezeigten Katalogs (andere Marke) nicht still
+    // verschlucken: der Nutzer sah eine Ausruestung ohne Jersey und Hose
+    const missing = productIds.length - products.length;
+    this.setState({ aiMissingCount: missing > 0 ? missing : 0 });
     if (!products.length) return [];
     this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false, searchFilterTerm: null });
     this.controller.applyAgentProducts(products);
@@ -2916,7 +2923,7 @@ export default class App extends React.Component<Props, State> {
     this.setState({ quickSearchLoading: true, quickSearchError: null });
 
     try {
-      const { productIds } = await AiProductQueryService.queryProducts(query);
+      const { productIds } = await AiProductQueryService.queryProducts(query, { brand: this.props.brand });
       if (!productIds.length) {
         this.setState({
           quickSearchLoading: false,
@@ -2962,7 +2969,7 @@ export default class App extends React.Component<Props, State> {
     this.setState({ aiPromptLoading: true, aiPromptError: null });
 
     try {
-      const { productIds } = await AiProductQueryService.queryProducts(query);
+      const { productIds } = await AiProductQueryService.queryProducts(query, { brand: this.props.brand });
       if (!productIds.length) {
         this.setState({
           aiPromptLoading: false,
@@ -3080,7 +3087,7 @@ export default class App extends React.Component<Props, State> {
         />
         {aiFilterProductIds.length > 0 && (
           <div className="quicksearch-indicator">
-            <span>KI-Filter aktiv ({aiFilterProductIds.length})</span>
+            <span>KI-Filter aktiv ({aiFilterProductIds.length}){this.state.aiMissingCount > 0 ? ` · ${this.state.aiMissingCount} Treffer anderer Marke nicht gezeigt` : ''}</span>
             <button type="button" onClick={this.clearAiFilter}>Zurücksetzen</button>
           </div>
         )}
