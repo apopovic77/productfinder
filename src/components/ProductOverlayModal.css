@@ -1147,9 +1147,15 @@
 .pom-expanded .pom-actions .pom-restock strong { font-size: 11.5px; }
 .pom-expanded .pom-actions .pom-restock small { font-size: 10.5px; }
 
-/* Grosser Dialog: hoechstens drei Farben je Zeile, auf Laptop-Breite zwei,
-   sonst stossen sie an die Spalte "Groessen & Mengen" (owner 2026-10-23, media 132105) */
+/* Grosser Dialog: hoechstens drei Farben je Zeile neben "Groessen & Mengen"
+   (owner 2026-10-22). Auf Laptop-Breite stehen Farben und Groessen
+   untereinander, beide mit voller Breite; die Features unter dem Bild
+   zwei statt vier je Zeile (owner 2026-10-23, media 132105/132106). */
 .pom-color-grid { grid-template-columns: repeat(3, max-content); }
 @media (max-width: 1600px) {
-  .pom-color-grid { grid-template-columns: repeat(2, max-content); }
+  .pom-expanded .pom-variant-row { flex-direction: column; gap: 18px !important; }
+  .pom-expanded .pom-variant-row > div:first-child { flex: 0 0 auto; width: 100%; }
+  .pom-expanded .pom-variant-row > .pom-size-qty { width: 100%; }
+  .pom-color-grid { display: flex !important; flex-wrap: wrap; }
+  .pom-stage-features { grid-template-columns: repeat(2, 1fr) !important; row-gap: 14px; }
 }
