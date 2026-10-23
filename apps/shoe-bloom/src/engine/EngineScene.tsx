@@ -70,10 +70,10 @@ export function EngineScene({ images, instanceProduct, view, bloomProducts, focu
     geometry.userData = source.userData;
     geometry.instanceCount = count;
     const material = new THREE.MeshBasicMaterial({ transparent: true, alphaTest: 0.02, depthWrite: true });
-    // Unschärfe-Pfad als Compile-Option (wave-engine PR #11); ältere Pakete ignorieren das dritte Argument
-    const applyShader = applyShaderToMaterial as (s: Parameters<typeof applyShaderToMaterial>[0],
-      u: Parameters<typeof applyShaderToMaterial>[1], o?: { motionBlur?: boolean }) => void;
-    material.onBeforeCompile = (shader) => applyShader(shader, uniforms, { motionBlur: true });
+    // Unschärfe-Pfad als Compile-Option; eigener Cache-Schlüssel, damit three das Programm nicht mit einem
+    // Morph-Material ohne Unschärfe teilt (gleiche onBeforeCompile-Quelle)
+    material.onBeforeCompile = (shader) => applyShaderToMaterial(shader, uniforms, { motionBlur: true });
+    material.customProgramCacheKey = () => 'wave-morph-blur';
     const m = new THREE.Mesh(geometry, material) as unknown as THREE.InstancedMesh;
     m.frustumCulled = false;
     return m;
@@ -236,10 +236,8 @@ export function EngineScene({ images, instanceProduct, view, bloomProducts, focu
     camera.lookAt(look);
     // Unschärfe aus der Kamerafahrt: die Kacheln bewegen sich relativ zur Kamera entgegen
     const vx = view === 'wall' ? inertia.velocity : 0;
-    // (uBlur* gibt es ab der Engine mit Bewegungsunschärfe im Shader; ältere Pakete ignorieren das)
-    const blur = uniforms as typeof uniforms & { uBlurVelocity?: { value: THREE.Vector3 }; uBlurStrength?: { value: number } };
-    blur.uBlurVelocity?.value.set(-vx, 0, 0);
-    if (blur.uBlurStrength) blur.uBlurStrength.value = Math.abs(vx) > 0.05 ? SHUTTER * 2.5 : 0;
+    uniforms.uBlurVelocity.value.set(-vx, 0, 0);
+    uniforms.uBlurStrength.value = Math.abs(vx) > 0.05 ? SHUTTER * 2.5 : 0;
     // Feldwelle: in der Fläche voll, in der Blüte leise, im Fokus aus
     const field = focus >= 0 ? 0 : view === 'wall' ? 1 : 0.25;
     uniforms.uFieldAnimStrength.value += (field - uniforms.uFieldAnimStrength.value) * Math.min(dt * 2, 1);
