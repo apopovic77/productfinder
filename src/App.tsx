@@ -184,7 +184,7 @@ type State = {
   aiFilterProductIds: string[];
   aiLastResultCount: number | null;
   /** Outfit-Bild der Smart Search: entsteht im Hintergrund, ersetzt dann den Stapel */
-  outfitImage: { status: 'pending' | 'done' | 'failed'; url?: string; show: boolean } | null;
+  outfitImage: { status: 'idle' | 'pending' | 'done' | 'failed'; url?: string; show: boolean } | null;
   quickSearchPosition: { x: number; y: number } | null;
 
   // AI Prompt (Footer)
@@ -2846,16 +2846,26 @@ export default class App extends React.Component<Props, State> {
    * die alte Anfrage ueber das Token ungueltig.
    */
   private outfitImageToken = 0;
+  /**
+   * Nur anbieten, nicht von selbst erzeugen (owner 2026-10-23): ein Knopf
+   * "Ausruestung mit KI zeigen" startet das Bild. Nach dem Layout kennt das
+   * Outfit-Layout die getragenen Teile; das Bild zeigt genau diese, dasselbe
+   * Outfit = derselbe Cache-Eintrag.
+   */
+  private outfitImageIds: string[] = [];
   private startOutfitImage = (ids: string[]) => {
     const token = ++this.outfitImageToken;
-    // Nach dem Layout: dann kennt das Outfit-Layout die getragenen Teile.
-    // Das Bild zeigt genau diese; dasselbe Outfit = derselbe Cache-Eintrag.
     window.setTimeout(() => {
       if (token !== this.outfitImageToken) return;
       if (!this.controller.isOutfitActive()) { this.setState({ outfitImage: null }); return; }
       const worn = this.controller.getOutfitWornIds();
-      this.requestOutfitImage(worn.length >= 3 ? worn : ids, token);
+      this.outfitImageIds = worn.length >= 3 ? worn : ids;
+      this.setState({ outfitImage: { status: 'idle', show: false } });
     }, 0);
+  };
+
+  private requestCurrentOutfitImage = () => {
+    this.requestOutfitImage(this.outfitImageIds, this.outfitImageToken);
   };
 
   private requestOutfitImage = (ids: string[], token: number) => {
@@ -4315,6 +4325,14 @@ export default class App extends React.Component<Props, State> {
         {this.state.outfitImage && this.controller.isOutfitActive() && (() => {
           const outfit = this.state.outfitImage!;
           const pill: React.CSSProperties = { position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 60, padding: '7px 14px', borderRadius: 999, background: 'rgba(15,15,17,0.88)', color: '#fff', font: '600 12px system-ui, sans-serif', border: '1px solid rgba(255,255,255,0.18)', cursor: 'default' };
+          if (outfit.status === 'idle' || outfit.status === 'failed') {
+            return (
+              <button type="button" className="pf-outfit-toggle" style={{ ...pill, cursor: 'pointer', background: '#ff5a1f', border: 'none' }}
+                onClick={this.requestCurrentOutfitImage}>
+                {outfit.status === 'failed' ? 'KI-Bild fehlgeschlagen – nochmal versuchen' : 'Ausrüstung mit KI zeigen'}
+              </button>
+            );
+          }
           if (outfit.status === 'pending') {
             return <div className="pf-outfit-pending" style={pill}>KI-Bild des Outfits wird erzeugt … ca. 1–2 Min.</div>;
           }
