@@ -24,6 +24,10 @@
 .pf-b2b-dialog-close {
   width: 32px; height: 32px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.14);
   background: rgba(255,255,255,0.06); color: #ccc; cursor: pointer; font-size: 14px;
+  /* Ohne das machte die globale Button-Regel (padding 0.6em 1.2em) ein Oval
+     mit verschobenem Kreuz (owner 2026-10-23, media 132136) */
+  padding: 0; box-sizing: border-box; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center; line-height: 1;
 }
 .pf-b2b-dialog-body { display: flex; flex-direction: column; gap: 12px; padding: 4px 20px 20px; }
 .pf-b2b-dialog-intro { margin: 0; font-size: 13px; line-height: 1.45; color: #c9d1d9; }

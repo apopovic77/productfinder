@@ -1159,3 +1159,4 @@
   .pom-color-grid { display: flex !important; flex-wrap: wrap; }
   .pom-stage-features { grid-template-columns: repeat(2, 1fr) !important; row-gap: 14px; }
 }
+.pom-thumb-strip::-webkit-scrollbar { display: none; }

@@ -48,6 +48,7 @@
   align-items: center;
   justify-content: center;
   transition: background 0.15s;
+  padding: 0; box-sizing: border-box; flex-shrink: 0; /* globale Button-Regel machte 36x28 */
 }
 .cart-close:hover {
   background: rgba(255, 255, 255, 0.12);

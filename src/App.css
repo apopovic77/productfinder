@@ -2767,3 +2767,20 @@ body {
   position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 4px;
   font-size: 10px; line-height: 16px; border-radius: 999px; box-sizing: border-box;
 }
+
+/* Einheitliche Symbol-Knoepfe im Header (owner 2026-10-23, media 132135):
+   vorher 36x32, Raender von unsichtbar bis blau, Hintergruende gemischt */
+.pf-header .pf-header-actions > .pf-header-btn {
+  box-sizing: border-box; width: 34px !important; height: 34px; min-width: 34px !important; min-height: 34px;
+  padding: 0 !important; border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: transparent; color: #fff;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.pf-header .pf-header-actions > .pf-header-btn:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.35); }
+.pf-header .pf-header-actions > .pf-header-btn.active { background: rgba(255, 255, 255, 0.14); border-color: rgba(255, 255, 255, 0.35); }
+.pf-header .pf-header-actions > .pf-header-btn:focus { outline: none; }
+.pf-header .pf-header-actions > .pf-header-btn:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.pf-header .pf-header-actions > .pf-header-ai-btn:not(.pf-header-speak-btn) { background: #ff5a1f; border-color: #ff5a1f; }
+.pf-header .pf-header-actions > .pf-header-ai-btn:not(.pf-header-speak-btn):hover { background: #ff6d38; }
+.pf-header .pf-view-switch { height: 34px; box-sizing: border-box; }

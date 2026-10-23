@@ -1553,7 +1553,9 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
           overflowY: 'visible',
           maxWidth: '100%',
           minHeight: '50px',
-          ...(heroLine ? { height: '50px', flexShrink: 0 } : {})
+          // 45 px Thumbs + 5 % Vergroesserung + Rand: 50 px schnitten die
+          // Unterkante ab, die Scrollleiste lag darunter (owner 2026-10-23, media 132139)
+          ...(heroLine ? { height: '58px', padding: '4px 3px', boxSizing: 'border-box' as const, alignItems: 'center', scrollbarWidth: 'none' as const, flexShrink: 0 } : {})
         }}>
           {allImages.map((img, idx) => {
             const thumbnailUrl = img.storageId
