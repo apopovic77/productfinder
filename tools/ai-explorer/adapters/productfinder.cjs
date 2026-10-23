@@ -66,6 +66,14 @@ module.exports = {
       s.canPivot = c.canShowPivotColumns();
       s.dims = c.getAvailablePivotDimensions();
       s.bucketLabels = c.getCurrentBuckets().filter(b => !b.isUnknown).map(b => b.label);
+      // Runde Symbolknoepfe, die die globale Button-Regel verzerrt (Oval statt Kreis)
+      s.distortedRound = [...document.querySelectorAll('button, a.pf-header-btn')].filter(el => {
+        if (el.closest('.pf-view-switch')) return false;
+        const cs = getComputedStyle(el), r = el.getBoundingClientRect();
+        if (!r.width || cs.display === 'none' || cs.visibility === 'hidden') return false;
+        const round = cs.borderRadius.includes('50%') || parseFloat(cs.borderRadius) >= r.height / 2 - 1;
+        return round && r.height <= 48 && r.width <= 60 && Math.abs(r.width - r.height) > 1.5 && !/[A-Za-z]{3}/.test(el.textContent || '');
+      }).map(el => `${String(el.className).split(' ')[0] || el.tagName} ${Math.round(el.getBoundingClientRect().width)}x${Math.round(el.getBoundingClientRect().height)}`);
       return s;
     });
   },
@@ -239,6 +247,12 @@ module.exports = {
       name: 'Outfit nur bei Smart Search',
       check({ step }) {
         return step.state.view === 'outfit' && !step.state.smartSearch ? `Outfit-Layout ohne Smart Search (${step.state.search ?? ''})` : null;
+      },
+    },
+    {
+      name: 'Runde Knoepfe sind rund',
+      check({ step }) {
+        return step.state.distortedRound?.length ? step.state.distortedRound.join(', ') : null;
       },
     },
     {
