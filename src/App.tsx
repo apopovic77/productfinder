@@ -4342,9 +4342,28 @@ export default class App extends React.Component<Props, State> {
                 })()}
                 onToggleRestock={Number.isSafeInteger(Number(selectedProduct.id)) ? () => this.toggleRestock(Number(selectedProduct.id)) : undefined}
                 onSiblingSelect={(pid) => {
-                  const target = this.controller.getDisplayOrder().find(pr => String(pr.id) === String(pid));
+                  const find = () => this.controller.getDisplayOrder().find(pr => String(pr.id) === String(pid));
+                  let target = find();
+                  // Farbe liegt nicht in dieser Ebene (z. B. ZEBRA red unter
+                  // "Nicht lieferbar"): Ebene fuer Ebene zurueck, bis sie zu
+                  // sehen ist. Vorher blieben Titel und Buehne beim vorigen
+                  // Produkt stehen (owner 2026-10-23, media 132152).
+                  let climbed = false;
+                  while (!target && this.controller.canDrillUpPivot()) {
+                    this.controller.drillUpPivot();
+                    climbed = true;
+                    target = find();
+                  }
                   if (!target) return false;
-                  this.openProductDetails(target, { pushHistory: false, keepExpanded: true });
+                  if (!climbed) {
+                    this.openProductDetails(target, { pushHistory: false, keepExpanded: true });
+                    return true;
+                  }
+                  const open = target;
+                  this.syncPivotUI();
+                  // Nach dem Hochgehen erst die neue Buehne aufbauen lassen,
+                  // sonst schloss die Ebenen-Aenderung die frisch geoeffnete Karte
+                  window.setTimeout(() => this.openProductDetails(open, { pushHistory: false, keepExpanded: true }), 60);
                   return true;
                 }}
                 onBuy={this.handleProductBuy}

@@ -191,13 +191,13 @@ export class GpanePivotService {
     // (storage 120460): "Körperteil" was offered on 42 MX helmets and put
     // all of them under one header, KOPF. A dimension with one column is
     // not selectable — it is not a grouping.
-    return this.engine.usefulDimensions.map(d => d.key);
+    return this.engine.selectableDimensions.map(d => d.key);
   }
 
   canUseDimension(dimension: GroupDimension): boolean {
     if (dimension === '__taxonomy__') return true;
     if (dimension === 'poster:group') return false; // not supported in GPANE
-    return this.engine.usefulDimensions.some(d => d.key === dimension);
+    return this.engine.selectableDimensions.some(d => d.key === dimension);
   }
 
   // ==========================================================================

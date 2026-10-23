@@ -32,6 +32,8 @@ import { scoreDimensions } from './scorer';
 
 /** Bis zu dieser Produktzahl reicht eine Gruppe mit mind. zwei Produkten. */
 const SMALL_LEVEL_MAX = 12;
+/** Von Hand waehlbare Dimension: hoechstens so viele Gruppen. */
+const MANUAL_MAX_GROUPS = 40;
 
 // ============================================================================
 // GPANE Engine
@@ -128,7 +130,7 @@ export class GPANEEngine {
    * menu: a dimension with one bucket (e.g. "Körperteil" on helmets — always
    * "Kopf") is not a choice, it is a no-op that costs the dealer a click.
    */
-  splitsProducts(key: string, products: Product[]): boolean {
+  splitsProducts(key: string, products: Product[], manual = false): boolean {
     // Numeric dimensions (price) are grouped as RANGES by the bucketer, so
     // the raw-value singleton test below would reject them although the
     // actual grouping is fine (owner 2026-08-23: "warum fehlt Preis?").
@@ -152,6 +154,14 @@ export class GPANEEngine {
         const k = item === null || item === undefined || item === '' ? '' : String(item);
         if (k) groups.set(k, (groups.get(k) ?? 0) + 1);
       }
+    }
+    // Von Hand waehlbar (owner 2026-10-23: "Farbe sollte auch waehlbar
+    // sein", ZEBRA-Stiefel in 12 Farben): mindestens zwei Gruppen, keine
+    // Nulloperation, nicht ausufernd. Die strengen Regeln unten gelten nur
+    // fuer die automatische Wahl.
+    if (manual) {
+      if (groups.size < 2 || groups.size > MANUAL_MAX_GROUPS) return false;
+      return ![...groups.values()].every(n => n === products.length);
     }
     let real = 0, singles = 0;
     for (const n of groups.values()) { if (n >= 2) real++; else singles += n; }
@@ -182,6 +192,12 @@ export class GPANEEngine {
   get usefulDimensions(): ScoredDimension[] {
     const products = this._getVisibleProducts();
     return this._scoredDimensions.filter(d => this.splitsProducts(d.key, products));
+  }
+
+  /** Dimensionen, die der Nutzer von Hand waehlen kann (lockerer als die Automatik). */
+  get selectableDimensions(): ScoredDimension[] {
+    const products = this._getVisibleProducts();
+    return this._scoredDimensions.filter(d => this.splitsProducts(d.key, products, true));
   }
 
   private _prescribedDimension(products: Product[]): ScoredDimension | null {
