@@ -13,6 +13,9 @@ export type OutfitImageStatus = {
   detail?: string | null;
 };
 
+/** Hintergrund des KI-Bildes (owner 2026-10-23: Standard transparent). */
+export type OutfitBackground = 'transparent' | 'studio';
+
 const POLL_MS = 3000;
 const MAX_WAIT_MS = 300_000;
 
@@ -24,11 +27,12 @@ function imageUrl(hash: string): string {
 
 export class OutfitImageService {
   /** Bild anfordern und warten; isCurrent() = false bricht still ab (neue Suche). */
-  static async generate(ids: string[], isCurrent: () => boolean): Promise<OutfitImageStatus> {
+  static async generate(ids: string[], isCurrent: () => boolean, background: OutfitBackground = 'transparent'): Promise<OutfitImageStatus> {
     const res = await fetch(`${ONEAL_API_BASE}/outfit-image`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ ids }),
+      // transparent = freigestellt (Alpha), studio = Standard-Hintergrund des Katalogs
+      body: JSON.stringify(background === 'transparent' ? { ids, style: 'transparent' } : { ids }),
     });
     if (!res.ok) throw new Error(`Outfit-Bild: HTTP ${res.status}`);
     let status = (await res.json()) as OutfitImageStatus;

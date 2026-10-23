@@ -57,7 +57,7 @@ import { soundService } from './services/SoundService';
 import { resolveProductTapStage } from './utils/ProductTapFlow';
 import QuickSearchCommandPalette from './components/QuickSearchCommandPalette';
 import { AiProductQueryService } from './services/AiProductQueryService';
-import { OutfitImageService } from './services/OutfitImageService';
+import { OutfitImageService, type OutfitBackground } from './services/OutfitImageService';
 import { categoryMediaService } from './services/CategoryMediaService';
 import { FOOTER_CONFIG, type FooterPosition } from './config/FooterConfig';
 import { STORAGE_API_BASE as CENTRAL_STORAGE_BASE, STORAGE_API_KEY as CENTRAL_STORAGE_KEY } from './config/apiConfig';
@@ -187,6 +187,8 @@ type State = {
   outfitImage: { status: 'idle' | 'pending' | 'done' | 'failed'; url?: string; show: boolean } | null;
   /** Smart-Search-Treffer, die der Finder hier nicht zeigen kann (andere Marke/Kollektion) */
   aiMissingCount: number;
+  /** Hintergrund des KI-Outfit-Bildes, Standard transparent (owner 2026-10-23) */
+  outfitBackground: OutfitBackground;
   quickSearchPosition: { x: number; y: number } | null;
 
   // AI Prompt (Footer)
@@ -324,6 +326,7 @@ const createInitialState = (): State => {
     aiLastResultCount: null,
     outfitImage: null,
     aiMissingCount: 0,
+    outfitBackground: ((): OutfitBackground => { try { return localStorage.getItem('pf-outfit-background') === 'studio' ? 'studio' : 'transparent'; } catch { return 'transparent'; } })(),
     quickSearchPosition: null,
 
     aiPrompt: '',
@@ -2871,9 +2874,19 @@ export default class App extends React.Component<Props, State> {
     this.requestOutfitImage(this.outfitImageIds, this.outfitImageToken);
   };
 
-  private requestOutfitImage = (ids: string[], token: number) => {
+  private setOutfitBackground = (background: OutfitBackground) => {
+    try { localStorage.setItem('pf-outfit-background', background); } catch { /* nur Komfort */ }
+    this.setState({ outfitBackground: background });
+    // Bild schon da: gleich in der anderen Variante (eigener Cache-Eintrag)
+    if (this.state.outfitImage?.status === 'done') {
+      this.outfitImageToken++;
+      this.requestOutfitImage(this.outfitImageIds, this.outfitImageToken, background);
+    }
+  };
+
+  private requestOutfitImage = (ids: string[], token: number, background: OutfitBackground = this.state.outfitBackground) => {
     this.setState({ outfitImage: { status: 'pending', show: true } });
-    OutfitImageService.generate(ids, () => token === this.outfitImageToken)
+    OutfitImageService.generate(ids, () => token === this.outfitImageToken, background)
       .then(result => {
         if (token !== this.outfitImageToken) return;
         this.setState({ outfitImage: result.status === 'done' && result.url
@@ -4334,12 +4347,24 @@ export default class App extends React.Component<Props, State> {
         {this.state.outfitImage && this.controller.isOutfitActive() && (() => {
           const outfit = this.state.outfitImage!;
           const pill: React.CSSProperties = { position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 60, padding: '7px 14px', borderRadius: 999, background: 'rgba(15,15,17,0.88)', color: '#fff', font: '600 12px system-ui, sans-serif', border: '1px solid rgba(255,255,255,0.18)', cursor: 'default' };
+          const transparent = this.state.outfitBackground === 'transparent';
+          const backgroundToggle = (
+            <button type="button" className="pf-outfit-bg-toggle"
+              title="Hintergrund des KI-Bildes umschalten"
+              onClick={() => this.setOutfitBackground(transparent ? 'studio' : 'transparent')}
+              style={{ font: '600 12px system-ui, sans-serif', padding: '7px 12px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(15,15,17,0.88)', color: '#fff', cursor: 'pointer' }}>
+              Hintergrund: {transparent ? 'transparent' : 'Studio'}
+            </button>
+          );
           if (outfit.status === 'idle' || outfit.status === 'failed') {
             return (
-              <button type="button" className="pf-outfit-toggle" style={{ ...pill, cursor: 'pointer', background: '#ff5a1f', border: 'none' }}
-                onClick={this.requestCurrentOutfitImage}>
-                {outfit.status === 'failed' ? 'KI-Bild fehlgeschlagen – nochmal versuchen' : 'Ausrüstung mit KI zeigen'}
-              </button>
+              <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 60, display: 'flex', gap: 8 }}>
+                <button type="button" className="pf-outfit-toggle" style={{ ...pill, position: 'static', transform: 'none', cursor: 'pointer', background: '#ff5a1f', border: 'none' }}
+                  onClick={this.requestCurrentOutfitImage}>
+                  {outfit.status === 'failed' ? 'KI-Bild fehlgeschlagen – nochmal versuchen' : 'Ausrüstung mit KI zeigen'}
+                </button>
+                {backgroundToggle}
+              </div>
             );
           }
           if (outfit.status === 'pending') {
@@ -4355,17 +4380,20 @@ export default class App extends React.Component<Props, State> {
             );
           }
           return (
-            <div className="pf-outfit-image" style={{ position: 'fixed', top: 48, left: 0, right: 0, bottom: 0, zIndex: 55, background: '#0b0b0d', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+            <div className="pf-outfit-image" style={{ position: 'fixed', top: 48, left: 0, right: 0, bottom: 0, zIndex: 55, background: transparent ? '#f3f4f6' : '#0b0b0d', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
               <div style={{ position: 'relative', height: '100%', display: 'flex', alignItems: 'center' }}>
                 <img src={outfit.url} alt="KI-Visualisierung des Outfits" style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain', borderRadius: 10 }} />
                 <div style={{ position: 'absolute', left: 12, top: 12, padding: '5px 10px', borderRadius: 6, background: 'rgba(0,0,0,0.6)', color: '#fff', font: '600 11px system-ui, sans-serif' }}>
                   KI-Visualisierung · Logos und Details können vom Produkt abweichen
                 </div>
               </div>
-              <button type="button" className="pf-outfit-toggle" onClick={() => this.setState({ outfitImage: { ...outfit, show: false } })}
-                style={{ position: 'absolute', bottom: 24, left: '50%', transform: 'translateX(-50%)', padding: '9px 18px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(15,15,17,0.85)', color: '#fff', font: '600 13px system-ui, sans-serif', cursor: 'pointer' }}>
-                Produkte anzeigen
-              </button>
+              <div style={{ position: 'absolute', bottom: 24, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 8 }}>
+                <button type="button" className="pf-outfit-toggle" onClick={() => this.setState({ outfitImage: { ...outfit, show: false } })}
+                  style={{ padding: '9px 18px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(15,15,17,0.85)', color: '#fff', font: '600 13px system-ui, sans-serif', cursor: 'pointer' }}>
+                  Produkte anzeigen
+                </button>
+                {backgroundToggle}
+              </div>
             </div>
           );
         })()}
