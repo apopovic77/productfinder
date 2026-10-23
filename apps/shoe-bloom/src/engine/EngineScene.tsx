@@ -11,10 +11,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import {
-  applyShaderToMaterial, computeLayout, computeRadialFan, createMorphGeometry, createUniforms, morphTo,
+  applyShaderToMaterial, computeLayout, computeRadialFan, createMorphGeometry, createUniforms, focusLayout, morphTo,
   type LayoutResult,
 } from '@arkturian/wave-engine';
-import { focusLayout } from '../layout/focus';
 import { ScrollInertia } from '../layout/ScrollInertia';
 import { buildImageAtlas, type ImageAtlas } from './atlas';
 
@@ -71,7 +70,10 @@ export function EngineScene({ images, instanceProduct, view, bloomProducts, focu
     geometry.userData = source.userData;
     geometry.instanceCount = count;
     const material = new THREE.MeshBasicMaterial({ transparent: true, alphaTest: 0.02, depthWrite: true });
-    material.onBeforeCompile = (shader) => applyShaderToMaterial(shader, uniforms);
+    // Unschärfe-Pfad als Compile-Option (wave-engine PR #11); ältere Pakete ignorieren das dritte Argument
+    const applyShader = applyShaderToMaterial as (s: Parameters<typeof applyShaderToMaterial>[0],
+      u: Parameters<typeof applyShaderToMaterial>[1], o?: { motionBlur?: boolean }) => void;
+    material.onBeforeCompile = (shader) => applyShader(shader, uniforms, { motionBlur: true });
     const m = new THREE.Mesh(geometry, material) as unknown as THREE.InstancedMesh;
     m.frustumCulled = false;
     return m;
