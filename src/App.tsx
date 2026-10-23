@@ -3443,10 +3443,11 @@ export default class App extends React.Component<Props, State> {
             <a
               className={`pf-header-btn pf-header-full-mode-btn ${!targetFull ? 'active' : ''}`}
               href={fullModeHref(targetFull)}
-              title={targetFull ? 'Finder mit allen Produkten öffnen' : 'Zurück zur geführten Auswahl'}
+              title={`${fullModeLabel(targetFull)}: ${targetFull ? 'Finder mit allen Produkten öffnen' : 'Zurück zur geführten Auswahl'}`}
+              aria-label={fullModeLabel(targetFull)}
             >
+              {/* Nur Symbol (owner 2026-10-23): der Text steht im Tooltip */}
               <FullModeIcon full={targetFull} />
-              {!this.isMobileLayout() && <span className="pf-header-dealer-label">{fullModeLabel(targetFull)}</span>}
             </a>
             ); })()}
             <button
@@ -3455,12 +3456,12 @@ export default class App extends React.Component<Props, State> {
               onClick={() => (this.state.b2bSession
                 ? this.setState(prev => ({ b2bMenuOpen: !prev.b2bMenuOpen }))
                 : this.setState({ b2bLoginOpen: true }))}
-              title={this.state.b2bSession ? `Händlerkonto ${this.state.b2bSession.customerNumber}` : 'Händler-Login (B2B-Shop)'}
+              title={this.state.b2bSession
+                ? `Händlerkonto: Kunde ${this.state.b2bSession.customerNumber}${this.state.b2bSession.customerClass ? ` · ${this.state.b2bSession.customerClass}` : ''}`
+                : 'Händler-Login (B2B-Shop)'}
+              aria-label={this.state.b2bSession ? 'Händlerkonto' : 'Händler-Login'}
             >
               <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l1-5h16l1 5"/><path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/><path d="M5 12v8h14v-8"/><path d="M10 20v-5h4v5"/></svg>
-              {!this.isMobileLayout() && (
-                <span className="pf-header-dealer-label">{this.state.b2bSession ? `Kunde ${this.state.b2bSession.customerNumber}${this.state.b2bSession.customerClass ? ` · ${this.state.b2bSession.customerClass}` : ''}` : 'Händler-Login'}</span>
-              )}
             </button>
             {/* Am Handy startet das Personen-Icon den Sprachberater, am
                 Desktop der Knopf "Sprechen" neben Smart Search. */}
@@ -3485,8 +3486,9 @@ export default class App extends React.Component<Props, State> {
                   className="pf-header-btn pf-header-ai-btn"
                   onClick={() => this.setState({ isQuickSearchOpen: true })}
                   title="Smart Search — beschreiben, was du suchst (F3)"
+                  aria-label="Smart Search"
                 >
-                  Smart Search
+                  <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
                 </button>
                 {this.props.realtimeDemoAvailable && (
                   <button
@@ -3495,9 +3497,9 @@ export default class App extends React.Component<Props, State> {
                     onClick={() => this.setState(prev => ({ realtimeShortcutEnabled: !prev.realtimeShortcutEnabled }))}
                     title={this.state.realtimeShortcutEnabled ? 'Sprachberater beenden' : 'Sprachberater starten — mit der KI sprechen'}
                     aria-pressed={this.state.realtimeShortcutEnabled}
+                    aria-label="Sprechen"
                   >
-                    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 17v5"/></svg>
-                    Sprechen
+                    <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 17v5"/></svg>
                   </button>
                 )}
                 <button
