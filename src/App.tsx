@@ -187,8 +187,11 @@ type State = {
   outfitImage: { status: 'idle' | 'pending' | 'done' | 'failed'; url?: string; show: boolean } | null;
   /** Smart-Search-Treffer, die der Finder hier nicht zeigen kann (andere Marke/Kollektion) */
   aiMissingCount: number;
+  /** Laufende/fertige Smart Search im Hintergrund (Pille unten links) */
+  smartJob: { query: string; status: 'running' | 'done' | 'error'; productIds?: string[]; message?: string } | null;
   /** Hintergrund des KI-Outfit-Bildes, Standard transparent (owner 2026-10-23) */
   outfitBackground: OutfitBackground;
+  outfitSettingsOpen: boolean;
   quickSearchPosition: { x: number; y: number } | null;
 
   // AI Prompt (Footer)
@@ -326,6 +329,8 @@ const createInitialState = (): State => {
     aiLastResultCount: null,
     outfitImage: null,
     aiMissingCount: 0,
+    smartJob: null,
+    outfitSettingsOpen: false,
     outfitBackground: ((): OutfitBackground => { try { return localStorage.getItem('pf-outfit-background') === 'studio' ? 'studio' : 'transparent'; } catch { return 'transparent'; } })(),
     quickSearchPosition: null,
 
@@ -583,7 +588,8 @@ export default class App extends React.Component<Props, State> {
   private sheetObserver: ResizeObserver | null = null;
 
   componentDidUpdate(prevProps: Props, prevState: State): void {
-    if (prevState.pivotBreadcrumbs !== this.state.pivotBreadcrumbs || prevProps.categoryLabel !== this.props.categoryLabel) {
+    if (prevState.pivotBreadcrumbs !== this.state.pivotBreadcrumbs || prevProps.categoryLabel !== this.props.categoryLabel
+      || prevState.aiFilterProductIds !== this.state.aiFilterProductIds || prevState.searchFilterTerm !== this.state.searchFilterTerm) {
       this.scrollCrumbsToEnd();
     }
     if (prevProps.categoryLabel !== this.props.categoryLabel) this.controller.setEntryTitle(this.props.categoryLabel ?? '');
@@ -2925,50 +2931,62 @@ export default class App extends React.Component<Props, State> {
     this.setState({ quickSearchPosition: position });
   };
 
+  /**
+   * Smart Search im Hintergrund (owner 2026-10-23): das Fenster schliesst
+   * sofort, die Suche (ca. 1 Min.) laeuft weiter, eine animierte Pille zeigt
+   * den Stand. Das Ergebnis wird erst auf Klick angewendet, damit es dem
+   * Nutzer nicht mitten im Arbeiten die Ansicht wegzieht.
+   */
+  private smartJobToken = 0;
   private handleQuickSearchSubmit = async () => {
-    if (this.state.quickSearchLoading) return;
     const query = this.state.quickSearchPrompt.trim();
     if (!query) {
       this.setState({ quickSearchError: 'Bitte gib eine Suchbeschreibung ein.' });
       return;
     }
-
-    this.setState({ quickSearchLoading: true, quickSearchError: null });
-
+    const token = ++this.smartJobToken;
+    this.setState({
+      isQuickSearchOpen: false,
+      quickSearchPrompt: '',
+      quickSearchError: null,
+      smartJob: { query, status: 'running' },
+    });
     try {
       const { productIds } = await AiProductQueryService.queryProducts(query, { brand: this.props.brand });
+      if (token !== this.smartJobToken) return;
       if (!productIds.length) {
-        this.setState({
-          quickSearchLoading: false,
-          quickSearchError: 'Keine passenden Produkte gefunden. Bitte prompt präzisieren.',
-        });
+        this.setState({ smartJob: { query, status: 'error', message: 'Keine passenden Produkte gefunden.' } });
         return;
       }
-      const matchedIds = this.applyAiResult(productIds);
-      if (!matchedIds.length) {
-        this.setState({
-          quickSearchLoading: false,
-          quickSearchError: 'Die gefundenen Produkte sind nicht im aktuellen Katalog. Bitte anders formulieren.',
-        });
-        return;
-      }
-      // Save to history (deduplicate, max 10)
-      const historyEntry = { query, productIds: matchedIds, resultCount: matchedIds.length };
-      const existingHistory = this.state.aiSearchHistory.filter(h => h.query !== query);
-      const newHistory = [historyEntry, ...existingHistory].slice(0, 10);
-
-      this.setState({
-        quickSearchLoading: false,
-        isQuickSearchOpen: false,
-        quickSearchPrompt: '',
-        aiFilterProductIds: matchedIds,
-        aiLastResultCount: matchedIds.length,
-        aiSearchHistory: newHistory,
-      });
+      this.setState({ smartJob: { query, status: 'done', productIds } });
     } catch (error) {
+      if (token !== this.smartJobToken) return;
       const message = error instanceof Error ? error.message : 'Die KI-Suche ist fehlgeschlagen.';
-      this.setState({ quickSearchLoading: false, quickSearchError: message });
+      this.setState({ smartJob: { query, status: 'error', message } });
     }
+  };
+
+  private applySmartJob = () => {
+    const job = this.state.smartJob;
+    if (!job || job.status !== 'done' || !job.productIds) return;
+    const matchedIds = this.applyAiResult(job.productIds);
+    if (!matchedIds.length) {
+      this.setState({ smartJob: { ...job, status: 'error', message: 'Die gefundenen Produkte sind nicht in dieser Marke.' } });
+      return;
+    }
+    const historyEntry = { query: job.query, productIds: matchedIds, resultCount: matchedIds.length };
+    const newHistory = [historyEntry, ...this.state.aiSearchHistory.filter(h => h.query !== job.query)].slice(0, 10);
+    this.setState({
+      smartJob: null,
+      aiFilterProductIds: matchedIds,
+      aiLastResultCount: matchedIds.length,
+      aiSearchHistory: newHistory,
+    });
+  };
+
+  private dismissSmartJob = () => {
+    this.smartJobToken++;
+    this.setState({ smartJob: null });
   };
 
   private handleAIPromptSubmit = async () => {
@@ -3098,12 +3116,8 @@ export default class App extends React.Component<Props, State> {
         onAutoPosition={this.handleQuickSearchAutoPosition}
         onDrag={this.handleQuickSearchDrag}
         />
-        {aiFilterProductIds.length > 0 && (
-          <div className="quicksearch-indicator">
-            <span>KI-Filter aktiv ({aiFilterProductIds.length}){this.state.aiMissingCount > 0 ? ` · ${this.state.aiMissingCount} Treffer anderer Marke nicht gezeigt` : ''}</span>
-            <button type="button" onClick={this.clearAiFilter}>Zurücksetzen</button>
-          </div>
-        )}
+        {/* KI-Filter steht als Chip in der Breadcrumb-Leiste (owner 2026-10-23,
+            media 132131): der alte schwebende Kasten lag ueber dem Header */}
         {/* Primary toolbar intentionally hidden to maximize canvas area. Developer overlay remains accessible via F1. */}
 
         {/* Header bar with logo and title */}
@@ -3254,6 +3268,18 @@ export default class App extends React.Component<Props, State> {
                   </span>
                 </React.Fragment>
               ); }); })()}
+              {aiFilterProductIds.length > 0 && (
+                <span className="pf-search-filter-chip pf-ai-filter-chip"
+                  title={`Smart-Search-Ergebnis: ${aiFilterProductIds.length} Produkte${this.state.aiMissingCount > 0 ? ` · ${this.state.aiMissingCount} Treffer anderer Marke nicht gezeigt` : ''}`}>
+                  <span className="pf-search-filter-chip-icon" aria-hidden="true">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/></svg>
+                  </span>
+                  <span className="pf-search-filter-chip-text">
+                    KI · {aiFilterProductIds.length}{this.state.aiMissingCount > 0 ? ` (+${this.state.aiMissingCount} andere Marke)` : ''}
+                  </span>
+                  <button type="button" className="pf-search-filter-chip-close" onClick={this.clearAiFilter} aria-label="KI-Filter zurücksetzen">×</button>
+                </span>
+              )}
               {searchFilterTerm && (
                 <span className="pf-search-filter-chip" title="Click ✕ to remove search filter">
                   <span className="pf-search-filter-chip-icon">🔍</span>
@@ -3473,7 +3499,7 @@ export default class App extends React.Component<Props, State> {
                     vermischte zwei Funktionen. */}
                 <button
                   type="button"
-                  className="pf-header-btn pf-header-ai-btn"
+                  className={`pf-header-btn pf-header-ai-btn ${this.state.smartJob?.status === 'running' ? 'pf-smart-running' : ''}`}
                   onClick={() => this.setState({ isQuickSearchOpen: true })}
                   title="Smart Search — beschreiben, was du suchst (F3)"
                   aria-label="Smart Search"
@@ -4319,28 +4345,62 @@ export default class App extends React.Component<Props, State> {
           }}
         />
 
+        {/* Smart Search im Hintergrund: animierte Pille, Ergebnis auf Klick */}
+        {this.state.smartJob && (() => {
+          const job = this.state.smartJob!;
+          const short = job.query.length > 38 ? `${job.query.slice(0, 36)}…` : job.query;
+          const count = job.productIds?.length ?? 0;
+          return (
+            <div className={`pf-smart-pill ${job.status}`} role="status" aria-live="polite">
+              <span className="pf-smart-pill-icon" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
+              </span>
+              {job.status === 'running' && <span>Smart Search: »{short}« läuft …</span>}
+              {job.status === 'done' && (
+                <button type="button" className="pf-smart-pill-action" onClick={this.applySmartJob}>
+                  {count} {count === 1 ? 'Treffer' : 'Treffer'} für »{short}« – anzeigen
+                </button>
+              )}
+              {job.status === 'error' && <span>Smart Search: {job.message}</span>}
+              <button type="button" className="pf-smart-pill-close" onClick={this.dismissSmartJob} aria-label={job.status === 'running' ? 'Suche abbrechen' : 'Schließen'} title={job.status === 'running' ? 'Suche abbrechen' : 'Schließen'}>×</button>
+            </div>
+          );
+        })()}
         {/* Outfit-Bild der Smart Search: erst der Stapel mit Hinweis, dann das
             KI-Bild ueber der Buehne; umschaltbar zurueck auf die Produkte. */}
         {this.state.outfitImage && this.controller.isOutfitActive() && (() => {
           const outfit = this.state.outfitImage!;
           const pill: React.CSSProperties = { position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 60, padding: '7px 14px', borderRadius: 999, background: 'rgba(15,15,17,0.88)', color: '#fff', font: '600 12px system-ui, sans-serif', border: '1px solid rgba(255,255,255,0.18)', cursor: 'default' };
           const transparent = this.state.outfitBackground === 'transparent';
-          const backgroundToggle = (
-            <button type="button" className="pf-outfit-bg-toggle"
-              title="Hintergrund des KI-Bildes umschalten"
-              onClick={() => this.setOutfitBackground(transparent ? 'studio' : 'transparent')}
-              style={{ font: '600 12px system-ui, sans-serif', padding: '7px 12px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(15,15,17,0.88)', color: '#fff', cursor: 'pointer' }}>
-              Hintergrund: {transparent ? 'transparent' : 'Studio'}
-            </button>
+          // Geteilter Pillen-Knopf (owner 2026-10-23, media 132130): links die
+          // Aktion, Trennstrich, rechts Zahnrad mit den Einstellungen
+          const splitPill = (label: string, onMain: () => void, primary: boolean) => (
+            <div className={`pf-split-pill ${primary ? 'primary' : ''}`}>
+              <button type="button" className="pf-split-pill-main" onClick={onMain}>{label}</button>
+              <span className="pf-split-pill-divider" aria-hidden="true" />
+              <button type="button" className="pf-split-pill-gear" aria-label="Einstellungen KI-Bild" title="Einstellungen KI-Bild"
+                aria-expanded={this.state.outfitSettingsOpen}
+                onClick={() => this.setState(prev => ({ outfitSettingsOpen: !prev.outfitSettingsOpen }))}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              </button>
+              {this.state.outfitSettingsOpen && (
+                <div className="pf-split-pill-menu" role="menu">
+                  <div className="pf-split-pill-menu-title">Hintergrund</div>
+                  {([['transparent', 'Transparent (freigestellt)'], ['studio', 'Studio-Hintergrund']] as const).map(([value, text]) => (
+                    <button key={value} type="button" role="menuitemradio" aria-checked={this.state.outfitBackground === value}
+                      className={`pf-split-pill-option ${this.state.outfitBackground === value ? 'active' : ''}`}
+                      onClick={() => { this.setState({ outfitSettingsOpen: false }); if (this.state.outfitBackground !== value) this.setOutfitBackground(value); }}>
+                      {this.state.outfitBackground === value ? '✓ ' : ''}{text}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           );
           if (outfit.status === 'idle' || outfit.status === 'failed') {
             return (
-              <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 60, display: 'flex', gap: 8 }}>
-                <button type="button" className="pf-outfit-toggle" style={{ ...pill, position: 'static', transform: 'none', cursor: 'pointer', background: '#ff5a1f', border: 'none' }}
-                  onClick={this.requestCurrentOutfitImage}>
-                  {outfit.status === 'failed' ? 'KI-Bild fehlgeschlagen – nochmal versuchen' : 'Ausrüstung mit KI zeigen'}
-                </button>
-                {backgroundToggle}
+              <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 60 }}>
+                {splitPill(outfit.status === 'failed' ? 'KI-Bild fehlgeschlagen – nochmal versuchen' : 'Ausrüstung mit KI zeigen', this.requestCurrentOutfitImage, true)}
               </div>
             );
           }
@@ -4364,12 +4424,8 @@ export default class App extends React.Component<Props, State> {
                   KI-Visualisierung · Logos und Details können vom Produkt abweichen
                 </div>
               </div>
-              <div style={{ position: 'absolute', bottom: 24, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: 8 }}>
-                <button type="button" className="pf-outfit-toggle" onClick={() => this.setState({ outfitImage: { ...outfit, show: false } })}
-                  style={{ padding: '9px 18px', borderRadius: 999, border: '1px solid rgba(255,255,255,0.3)', background: 'rgba(15,15,17,0.85)', color: '#fff', font: '600 13px system-ui, sans-serif', cursor: 'pointer' }}>
-                  Produkte anzeigen
-                </button>
-                {backgroundToggle}
+              <div style={{ position: 'absolute', bottom: 24, left: '50%', transform: 'translateX(-50%)' }}>
+                {splitPill('Produkte anzeigen', () => this.setState({ outfitImage: { ...outfit, show: false }, outfitSettingsOpen: false }), false)}
               </div>
             </div>
           );
