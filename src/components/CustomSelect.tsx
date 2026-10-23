@@ -13,6 +13,12 @@ type CustomSelectProps = {
   onChange: (value: string) => void;
   placeholder?: string;
   className?: string;
+  /** Symbol statt Beschriftung im Knopf (Header, owner 2026-10-23); der
+   *  Tooltip nennt dann title und die aktuelle Wahl. */
+  icon?: React.ReactNode;
+  title?: string;
+  /** Mindestbreite des Menues, wenn der Knopf schmaler ist (Symbol-Modus) */
+  menuMinWidth?: number;
 };
 
 export const CustomSelect: React.FC<CustomSelectProps> = ({
@@ -21,6 +27,9 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
   onChange,
   placeholder = 'Select...',
   className = '',
+  icon,
+  title,
+  menuMinWidth = 0,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [openUpwards, setOpenUpwards] = useState(false);
@@ -64,7 +73,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
       setDropdownPosition({
         top: shouldOpenUpwards ? rect.top - 8 : rect.bottom + 8,
         left: rect.left,
-        width: rect.width,
+        width: Math.max(rect.width, menuMinWidth),
       });
     }
   }, [isOpen]);
@@ -82,10 +91,12 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
         onClick={() => setIsOpen(!isOpen)}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
+        title={title ? `${title}: ${selectedOption?.label || placeholder}` : undefined}
+        aria-label={title}
       >
-        <span className="custom-select-value">
-          {selectedOption?.label || placeholder}
-        </span>
+        {icon
+          ? <span className="custom-select-icon" aria-hidden="true">{icon}</span>
+          : <span className="custom-select-value">{selectedOption?.label || placeholder}</span>}
         <svg
           className={`custom-select-arrow ${isOpen ? 'open' : ''}`}
           width="20"

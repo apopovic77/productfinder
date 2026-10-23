@@ -130,7 +130,7 @@ export function QuickSearchCommandPalette({
                 </svg>
               </button>
             </div>
-            <p>Beschreibe, was du suchst. Die KI sucht im ganzen Katalog.</p>
+            <p>Beschreibe, was du suchst. Die KI sucht im Katalog der gewählten Marke.</p>
           </header>
           <div className="quicksearch-body">
             <label htmlFor="quicksearch-input" className="quicksearch-label">

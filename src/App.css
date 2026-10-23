@@ -1872,7 +1872,9 @@ body {
   cursor: pointer;
   transition: all 0.15s ease;
   flex-shrink: 0;
+  padding: 0; /* allgemeiner Button-Innenabstand drueckte das X auf Breite 0 */
 }
+.quicksearch-close svg { flex-shrink: 0; width: 16px; height: 16px; }
 
 .quicksearch-close:hover {
   background: rgba(255, 255, 255, 0.2);
@@ -1912,6 +1914,7 @@ body {
 
 .quicksearch-input {
   width: 100%;
+  box-sizing: border-box; /* sonst ragte das Feld rechts ueber die Karte (owner 2026-10-23, media 132125) */
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.4);
   padding: 16px 18px;
@@ -2656,3 +2659,9 @@ body {
   width: 36px; min-width: 36px; padding: 0 !important;
   display: inline-flex; align-items: center; justify-content: center;
 }
+
+/* Gruppieren und Sortieren als Symbol (owner 2026-10-23): schmal, Pfeil dicht dran */
+.pf-header .pf-header-dimension-select,
+.pf-header .pf-header-sort-select { width: auto; }
+.pf-header-select .custom-select-icon { display: inline-flex; align-items: center; }
+.pf-header-select .custom-select-trigger:has(.custom-select-icon) { gap: 2px; padding: 0 4px 0 8px; }
