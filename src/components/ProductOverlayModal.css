@@ -1146,3 +1146,10 @@
 .pom-expanded .pom-actions .pom-restock { width: auto !important; flex: 0 0 auto; padding: 4px 14px !important; gap: 8px; }
 .pom-expanded .pom-actions .pom-restock strong { font-size: 11.5px; }
 .pom-expanded .pom-actions .pom-restock small { font-size: 10.5px; }
+
+/* Grosser Dialog: hoechstens drei Farben je Zeile, auf Laptop-Breite zwei,
+   sonst stossen sie an die Spalte "Groessen & Mengen" (owner 2026-10-23, media 132105) */
+.pom-color-grid { grid-template-columns: repeat(3, max-content); }
+@media (max-width: 1600px) {
+  .pom-color-grid { grid-template-columns: repeat(2, max-content); }
+}

@@ -294,15 +294,19 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     )] as string[];
   }, [selectedColor, variants, getColor, getSize]);
 
-  // Initialize size when color changes
+  // Keine Groesse vorauswaehlen: die kleinste stand markiert da, auch wenn sie
+  // nicht lieferbar war (owner 2026-10-23, media 132104). Nur eine einzige
+  // Groesse (Uni) wird gewaehlt; nach Farbwechsel bleibt eine gewaehlte
+  // Groesse, wenn es sie auch in der neuen Farbe gibt.
+  const [sizeHint, setSizeHint] = useState(false);
   useEffect(() => {
-    if (availableSizes.length > 0 && (!selectedSize || !availableSizes.includes(selectedSize))) {
-      const newSize = availableSizes[0];
-      if (newSize !== selectedSize) {
-        setSelectedSize(newSize);
-      }
+    if (availableSizes.length === 1) {
+      if (selectedSize !== availableSizes[0]) setSelectedSize(availableSizes[0]);
+    } else if (selectedSize && availableSizes.length > 0 && !availableSizes.includes(selectedSize)) {
+      setSelectedSize('');
     }
   }, [selectedColor, availableSizes, selectedSize]);
+  useEffect(() => { if (selectedSize) setSizeHint(false); }, [selectedSize]);
 
   // Expanded detail text (LIUS long_text, locale-aware) + video ids — used
   // by BOTH the right info column and the hero stage (video plays IN the
@@ -320,9 +324,11 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   useEffect(() => { setStageVideoId(null); }, [product.id, expanded]);
 
   // Find active variant
+  // Ohne gewaehlte Groesse: erste Variante der gewaehlten Farbe (nicht die
+  // erste ueberhaupt, die konnte eine andere Farbe sein)
   const activeVariant = variants.find((v: any) =>
     getColor(v) === selectedColor && getSize(v) === selectedSize
-  ) || variants[0];
+  ) || variants.find((v: any) => getColor(v) === selectedColor) || variants[0];
 
   // Extract data
   const keyFeatures = product.key_features || [];
@@ -842,6 +848,12 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
 
   const addToCartRef = useRef<HTMLButtonElement | null>(null);
   const handleAddToCart = () => {
+    // Einzelbestellung braucht eine bewusst gewaehlte Groesse
+    const matrixOrder = onBuy && showExpandedContent && sizeQtyTotal > 0;
+    if (!matrixOrder && availableSizes.length > 1 && !selectedSize) {
+      setSizeHint(true);
+      return;
+    }
     soundService.tick();
     // Partikel vom Knopf zum Warenkorb
     const r = addToCartRef.current?.getBoundingClientRect();
@@ -878,7 +890,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         variantLabel: variantLabel || undefined,
         // The cart is a size matrix — hand it the chosen size and the clean
         // size list (issue #1303: quantity landed nowhere visible).
-        size: selectedSize || availableSizes[0] || undefined,
+        size: selectedSize || undefined,
         availableSizes: availableSizes.length ? availableSizes : undefined,
       });
     }
@@ -1673,8 +1685,8 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
             </div>
             {/* Grosser Dialog: hoechstens drei Farben je Zeile, sonst liefen
                 sieben Farben quer ueber die Seite (owner 2026-10-22, media 132036) */}
-            <div style={showExpandedContent
-              ? { display: 'grid', gridTemplateColumns: 'repeat(3, max-content)', gap: '6px' }
+            <div className={showExpandedContent ? 'pom-color-grid' : undefined} style={showExpandedContent
+              ? { display: 'grid', gap: '6px' }
               : { display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               {options.map((opt) => {
                 const isActive = String(opt.id) === String(currentId ?? product.id) || (opt.id === 'current' && options.length === 1);
@@ -1797,7 +1809,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       {shownSizes.length > 0 && !(showExpandedContent && matrixSizes.length > 0) && (
         <div className="pom-size-block" style={{ flex: '0 1 auto', minWidth: 0 }}>
           <div style={{ fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.8, marginBottom: '6px' }}>
-            Size: <span style={{ opacity: 1 }}>{selectedSize || shownSizes[0]}</span>
+            Size: <span style={{ opacity: 1, color: sizeHint ? '#ff7a45' : undefined }}>{selectedSize || (sizeHint ? 'bitte zuerst wählen' : 'bitte wählen')}</span>
           </div>
           <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
             {shownSizes.map(size => {
