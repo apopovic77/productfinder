@@ -7,3 +7,4 @@ export * from './ProductFinderRealtimeAuditBuffer';
 export * from './ProductSelectionResolveClient';
 export * from './ProductFinderSelectionProjection';
 export * from './createProductFinderSelectionProjection';
+export * from './FinderUiTools';

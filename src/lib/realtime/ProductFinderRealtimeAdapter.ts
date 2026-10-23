@@ -18,6 +18,8 @@ export interface ProductFinderEntryContext {
   collection_year: number;
   /** Modellvergleich (Owner 2026-09-27): nur aus der BFF-Freigabeliste. */
   model?: 'gpt-realtime' | 'gpt-realtime-2.1';
+  /** Stufe 2 (Post #5634): UI-Werkzeuge anfordern, nur wenn der Host sie ausfuehrt. */
+  finder_ui_tools?: true;
   entry_selection: Readonly<{
     sport_id: string;
     category_id: string | null;

@@ -15,6 +15,7 @@ import {
   type ProductFinderEntryContext,
   type ProductFinderCartContext,
   type ProductFinderSelectedVariantContext,
+  type FinderUiToolPort,
 } from '../lib/realtime';
 import { soundService } from '../services/SoundService';
 import './ProductFinderRealtimeSurface.css';
@@ -30,6 +31,8 @@ interface ProductFinderRealtimeSurfaceProps {
   selectedVariant: ProductFinderSelectedVariantContext | null;
   cart: ProductFinderCartContext | null;
   onSelectionProjected(productId: string, count: number): void;
+  /** UI-Werkzeuge des Beraters (Stufe 2); ohne Port fordert der Finder sie nicht an. */
+  uiTools?: FinderUiToolPort;
 }
 
 const STATUS_LABELS = {
@@ -68,7 +71,11 @@ export function ProductFinderRealtimeSurface({
   selectedVariant,
   cart,
   onSelectionProjected,
+  uiTools,
 }: ProductFinderRealtimeSurfaceProps) {
+  // Neuester Port ohne neue Sitzung je Render
+  const uiToolsRef = useRef<FinderUiToolPort | null>(uiTools ?? null);
+  uiToolsRef.current = uiTools ?? null;
   const selectedVariantContext = useMemo<ProductFinderSelectedVariantContext | null>(() => {
     if (!selectedVariant) return null;
     return Object.freeze({
@@ -89,6 +96,7 @@ export function ProductFinderRealtimeSurface({
           onSelectionProjected(productId, count);
         },
       ),
+      uiTools: () => uiToolsRef.current,
       audioOwnership: {
         setRealtimeOwned: active => soundService.setRealtimeOwned(active),
       },

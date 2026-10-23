@@ -1,3 +1,4 @@
+import { isFinderUiTool, runFinderUiTool, type FinderUiToolPort } from './FinderUiTools';
 import {
   CART_DETAILS_FUNCTION_OUTPUT_KIND,
   PRODUCT_DETAILS_FUNCTION_OUTPUT_KIND,
@@ -82,6 +83,8 @@ export interface ProductFinderRealtimeControllerOptions {
   selectionProjection: ProductSelectionProjectionPort;
   audioOwnership?: AudioOwnershipPort;
   telemetry?: TelemetryPort;
+  /** UI-Werkzeuge (Stufe 2): liefert den aktuellen Host-Port oder null. */
+  uiTools?: () => FinderUiToolPort | null;
 }
 
 /** Sprachnamen fuer die Begruessungs-Instruktion (Gate-Locale -> Sprache). */
@@ -100,7 +103,8 @@ const GREETING_LANGUAGE: Record<string, string> = {
  * die Sprache zu raten; danach gilt die Persona-Sprachregel von AiApi.
  */
 const GREETING_TEXT: Record<string, string> = {
-  de: 'Wie kann ich Ihnen helfen?',
+  // Anrede du (owner/AiApi 2026-10-23, Prompt b9f3ed3)
+  de: 'Wie kann ich dir helfen?',
   en: 'How can I help you?',
   sl: 'Kako vam lahko pomagam?',
   it: 'Come posso aiutarla?',
@@ -131,7 +135,10 @@ export class ProductFinderRealtimeController {
     });
     this.session = new RealtimeBrowserSession(this.adapter.core, {
       mintSession: context => options.server.mintSession(context),
-      executeTool: call => options.server.executeTool(call),
+      // UI-Werkzeuge laufen lokal und gehen nie an den BFF (Post #5634).
+      executeTool: call => (isFinderUiTool(call.name)
+        ? runFinderUiTool(options.uiTools?.() ?? null, call.name, call.args)
+        : options.server.executeTool(call)),
       replaceableToolOutputs: {
         product_details: PRODUCT_DETAILS_FUNCTION_OUTPUT_KIND,
         cart_details: CART_DETAILS_FUNCTION_OUTPUT_KIND,

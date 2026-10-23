@@ -21,7 +21,11 @@ import type {
   ProductFinderSelectedVariantContext,
 } from './ProductFinderRealtimeController';
 
+import { FINDER_UI_TOOLS } from './FinderUiTools';
+
 const ALLOWED_TOOLS = new Set(['find_products', 'refine_search', 'product_details', 'cart_details']);
+/** Vom Browser selbst ausgefuehrt (FinderUiTools), nie an den BFF geschickt. */
+const CLIENT_TOOLS: ReadonlySet<string> = new Set(FINDER_UI_TOOLS);
 const REQUIRED_TOOLS = ['find_products', 'refine_search'] as const;
 const PRODUCT_RESULT_STATUSES = new Set(['matches', 'empty', 'unavailable']);
 const PRODUCT_DETAILS_STATUSES = new Set(['details', 'no_focus', 'no_such_position', 'unavailable']);
@@ -123,7 +127,7 @@ function hasCompatibleToolContract(value: unknown): value is string[] {
   return tools.size === value.length
     && tools.size >= REQUIRED_TOOLS.length
     && REQUIRED_TOOLS.every(tool => tools.has(tool))
-    && [...tools].every(tool => typeof tool === 'string' && ALLOWED_TOOLS.has(tool));
+    && [...tools].every(tool => typeof tool === 'string' && (ALLOWED_TOOLS.has(tool) || CLIENT_TOOLS.has(tool)));
 }
 
 function isBoundedHintString(value: unknown, maxLength = 100): value is string {
@@ -481,6 +485,7 @@ export class ProductFinderRealtimeBffClient implements ProductFinderRealtimeServ
       collection_year: context.collection_year,
       entry_selection: context.entry_selection,
       ...(context.model ? { model: context.model } : {}),
+      ...(context.finder_ui_tools === true ? { finder_ui_tools: true as const } : {}),
     };
     const response = await this.fetchImpl(this.sessionEndpoint, {
       method: 'POST',

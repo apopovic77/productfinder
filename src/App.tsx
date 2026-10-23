@@ -82,6 +82,7 @@ import {
   buildProductFinderCartContext,
   resolveProductPriceEur,
   type ProductFinderCartContext,
+  type FinderUiToolPort,
 } from './lib/realtime';
 
 function clamp(n: number, min: number, max: number) {
@@ -2930,6 +2931,46 @@ export default class App extends React.Component<Props, State> {
     this.setState({ aiFilterProductIds: matched, aiLastResultCount: matched.length });
   };
 
+  /**
+   * UI-Werkzeuge des Sprachberaters (Stufe 2, Post #5634): jede Antwort sagt
+   * nur, was wirklich passiert ist; das Modell meldet Erfolg allein daraus.
+   */
+  private realtimeUiTools: FinderUiToolPort = {
+    setGrouping: (dimension) => {
+      if (this.controller.getPivotDimension() === dimension) return { ok: true, dimension };
+      if (!this.controller.getAvailablePivotDimensions().includes(dimension as GroupDimension)) {
+        return { error: 'dimension_nicht_verfuegbar' };
+      }
+      this.handleDimensionClick(dimension as GroupDimension);
+      return this.controller.getPivotDimension() === dimension ? { ok: true, dimension } : { error: 'dimension_nicht_verfuegbar' };
+    },
+    toggleFavorite: () => {
+      const product = this.state.selectedProduct;
+      if (!product) return { error: 'kein_produkt_geoeffnet' };
+      const id = String(product.id);
+      const favorite = !this.state.favoriteIds.includes(id);
+      this.toggleFavorite(id);
+      return { favorite };
+    },
+    openMySelection: () => {
+      this.setState({ savedOutfitsOpen: true });
+      return { ok: true, favorites: this.state.favoriteIds.length, outfits: this.state.savedOutfits.length };
+    },
+    showOutfitImage: () => {
+      if (this.state.outfitImage?.status === 'pending') return { error: 'laeuft_bereits' };
+      // Outfit-Layout aktiv: die getragenen Teile, sonst die aktuelle Trefferliste
+      const worn = this.controller.isOutfitActive() ? this.controller.getOutfitWornIds() : [];
+      const ids = worn.length ? worn
+        : this.state.aiFilterProductIds.length ? this.state.aiFilterProductIds
+        : this.controller.getDisplayOrder().map(p => String(p.id));
+      if (!ids.length) return { error: 'keine_trefferliste' };
+      if (ids.length < 3) return { error: 'zu_wenige_teile' };
+      this.outfitImageIds = ids.slice(0, 40);
+      this.requestOutfitImage(this.outfitImageIds, ++this.outfitImageToken);
+      return { started: true };
+    },
+  };
+
   private loadFavorites = () => {
     void FavoriteProductService.list(this.savedOutfitOwner()).then(ids => this.setState({ favoriteIds: ids }));
   };
@@ -4608,6 +4649,7 @@ export default class App extends React.Component<Props, State> {
             autoStart={this.state.realtimeShortcutEnabled}
             onClosed={() => this.setState({ realtimeShortcutEnabled: false })}
             onSelectionProjected={this.handleRealtimeSelectionProjected}
+            uiTools={this.realtimeUiTools}
             focusedProductId={selectedProduct
               && Number.isSafeInteger(Number(selectedProduct.id))
               && Number(selectedProduct.id) > 0
@@ -4621,6 +4663,7 @@ export default class App extends React.Component<Props, State> {
               language: this.props.locale,
               collection_year: this.props.catalogYear,
               model: resolveVoiceModel(),
+              finder_ui_tools: true,
               entry_selection: this.props.entrySelection
                 ? {
                     sport_id: this.props.entrySelection.sportId,
