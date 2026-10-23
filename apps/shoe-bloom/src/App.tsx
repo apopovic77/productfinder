@@ -3,7 +3,6 @@ import { Canvas } from '@react-three/fiber';
 import { EngineScene, type EngineView } from './engine/EngineScene';
 import { loadDesigns, type Design, type Shoe } from './data';
 
-const WALL_COUNT = 196;
 
 /**
  * Alles über die Wave-Engine (ein instanziertes Morph-Partikel je Kachel):
@@ -38,13 +37,9 @@ export function App() {
   }, [designs, design, view]);
 
   const shoes: Shoe[] = useMemo(() => (designs ?? []).flatMap((d) => d.shoes), [designs]);
-  const images = useMemo(() => shoes.map((s) => s.image), [shoes]);
-  // Instanz i < Anzahl Stiefel = der Stiefel selbst; danach Wiederholungen, gestreut
-  const instanceProduct = useMemo(() => {
-    const n = shoes.length;
-    if (!n) return [];
-    return Array.from({ length: Math.max(WALL_COUNT, n) }, (_, i) => (i < n ? i : (i * 7 + Math.floor(i / n) * 3) % n));
-  }, [shoes]);
+  // Seitenansichten, im Atlas alle mit der Spitze nach links; jedes Produkt genau einmal
+  const images = useMemo(() => shoes.map((s) => s.sideImage), [shoes]);
+  const instanceProduct = useMemo(() => shoes.map((_, i) => i), [shoes]);
   const bloomProducts = useMemo(() => {
     if (!designs) return [];
     if (design) return design.shoes.map((s) => shoes.indexOf(s));
@@ -109,7 +104,7 @@ export function App() {
             return (
               <button key={s.id} className={idx === focus ? 'swatch active' : 'swatch'} title={s.color}
                       onClick={() => setFocus(idx === focus ? -1 : idx)}>
-                <img src={s.image.replace('width=640', 'width=120')} alt={s.color} />
+                <img src={s.sideImage.replace('width=640', 'width=120')} alt={s.color} />
                 <span>{s.color}</span>
               </button>
             );

@@ -39,8 +39,10 @@ interface Props {
 
 const SHUTTER = 1 / 24; // Belichtungszeit der Unschärfe in Sekunden
 const BLOOM_TILE = 2.7;
-const WALL_RADIUS = 9;
-const FLOOR_ROW_GAP = 1.15; // Reihenabstand am Boden relativ zum Rasterabstand
+/** Halbe Kantenlänge der Fläche je nach Anzahl: Kachelgröße bleibt etwa gleich (196 Kacheln ≈ 9). */
+const wallRadius = (count: number) => 0.65 * Math.sqrt(count);
+const FLOOR_ROW_GAP = 2.4; // Reihenabstand am Boden relativ zum Rasterabstand
+const FLOOR_SPREAD = 2.1; // Abstand nebeneinander am Boden relativ zum Rasterabstand
 
 function hidden(): LayoutResult {
   return {
@@ -83,7 +85,8 @@ export function EngineScene({ images, instanceProduct, view, bloomProducts, focu
   // Atlas aus den Produktbildern, UV-Kachel je Instanz
   useEffect(() => {
     let alive = true;
-    buildImageAtlas(images).then((a) => {
+    // Spitze im Atlas nach rechts: der Morph-Shader zeigt die Kachel gespiegelt, auf dem Bildschirm also nach links
+    buildImageAtlas(images, { face: 1 }).then((a) => {
       if (!alive) return;
       const uv = mesh.geometry.getAttribute('aUVOffset') as THREE.InstancedBufferAttribute;
       instanceProduct.forEach((p, i) => uv.setXYZW(i, ...a.uv(p)));
@@ -102,7 +105,7 @@ export function EngineScene({ images, instanceProduct, view, bloomProducts, focu
 
   // Fläche: integriertes Layout 'plane', quadratische Kacheln
   const wall = useMemo(() => {
-    const raw = computeLayout('plane', { count, options: { radius: WALL_RADIUS, size: 1 } });
+    const raw = computeLayout('plane', { count, options: { radius: wallRadius(count), size: 1 } });
     const xs = [...new Set(raw.map((r) => r.target.position.x.toFixed(3)))].map(Number).sort((a, b) => a - b);
     const step = xs.length > 1 ? xs[1] - xs[0] : 1;
     return raw.map((r) => flatTile(r, step * 0.94));
@@ -118,7 +121,7 @@ export function EngineScene({ images, instanceProduct, view, bloomProducts, focu
       const size = r.target.size.y;
       // jede zweite Reihe um eine halbe Kachel versetzt: sonst bilden die Spalten Gassen zum Fluchtpunkt
       const row = rowYs.findIndex((y) => Math.abs(y - r.target.position.y) < 1e-3);
-      const x = r.target.position.x + (row % 2) * step * 0.5;
+      const x = (r.target.position.x + (row % 2) * step * 0.5) * FLOOR_SPREAD;
       const f: LayoutResult = {
         target: { ...r.target, position: new THREE.Vector3(x, size / 2, -(front - r.target.position.y) * FLOOR_ROW_GAP),
           quaternion: new THREE.Quaternion(), scale: r.target.scale.clone(), size: r.target.size.clone(),
@@ -248,8 +251,8 @@ export function EngineScene({ images, instanceProduct, view, bloomProducts, focu
         lookTarget.current.set(inertia.value, 0, 0);
       } else {
         // leicht schräg von oben auf den Boden, Blick in die Reihen hinein
-        camTarget.current.set(inertia.value, narrow ? 2.6 : 2.1, narrow ? 7.5 : 5.2);
-        lookTarget.current.set(inertia.value, 0.55, -5);
+        camTarget.current.set(inertia.value, narrow ? 1.3 : 0.95, narrow ? 6.5 : 4.3);
+        lookTarget.current.set(inertia.value, 0.25, -8);
       }
       panAxis.current = inertia.value;
     } else {

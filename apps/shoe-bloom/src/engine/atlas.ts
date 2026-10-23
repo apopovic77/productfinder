@@ -25,7 +25,37 @@ function load(url: string): Promise<HTMLImageElement | null> {
   });
 }
 
-export async function buildImageAtlas(urls: string[], tile = 512, pad = 0.14): Promise<ImageAtlas> {
+/**
+ * Richtung eines freigestellten Seitenbilds: Die Spitze steht dort, wo die Sohle (unterstes Fünftel der
+ * deckenden Pixel) weiter über die Mitte des Objekts hinausreicht. -1 = links, 1 = rechts.
+ */
+export function toeDirection(img: HTMLImageElement): -1 | 1 {
+  const w = 96, h = Math.max(1, Math.round((96 * img.height) / img.width));
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d', { willReadFrequently: true })!;
+  ctx.drawImage(img, 0, 0, w, h);
+  const a = ctx.getImageData(0, 0, w, h).data;
+  let minX = w, maxX = 0, top = h, bottom = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (a[(y * w + x) * 4 + 3] > 40) {
+    minX = Math.min(minX, x); maxX = Math.max(maxX, x); top = Math.min(top, y); bottom = Math.max(bottom, y);
+  }
+  const band = bottom - (bottom - top) * 0.2;
+  let sum = 0, n = 0;
+  for (let y = Math.floor(band); y <= bottom; y++) for (let x = 0; x < w; x++) if (a[(y * w + x) * 4 + 3] > 40) { sum += x; n++; }
+  const mid = (minX + maxX) / 2;
+  return n && sum / n > mid ? 1 : -1;
+}
+
+export interface AtlasOptions {
+  tile?: number;
+  pad?: number;
+  /** Alle Bilder in diese Richtung drehen (Spiegeln, wenn toeDirection abweicht). */
+  face?: -1 | 1;
+}
+
+export async function buildImageAtlas(urls: string[], opts: AtlasOptions = {}): Promise<ImageAtlas> {
+  const tile = opts.tile ?? 512, pad = opts.pad ?? 0.14;
   const cols = Math.max(1, Math.ceil(Math.sqrt(urls.length)));
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = cols * tile;
@@ -38,7 +68,14 @@ export async function buildImageAtlas(urls: string[], tile = 512, pad = 0.14): P
     const box = tile * (1 - 2 * pad);
     const s = Math.min(box / img.width, box / img.height);
     const w = img.width * s, h = img.height * s;
-    ctx.drawImage(img, x0 + (tile - w) / 2, y0 + (tile - h) / 2, w, h);
+    const dx = x0 + (tile - w) / 2, dy = y0 + (tile - h) / 2;
+    if (opts.face && toeDirection(img) !== opts.face) {
+      ctx.save();
+      ctx.translate(dx + w, dy);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, 0, 0, w, h);
+      ctx.restore();
+    } else ctx.drawImage(img, dx, dy, w, h);
     aspect.push(img.width / img.height);
   });
   const texture = new THREE.CanvasTexture(canvas);

@@ -13,6 +13,8 @@ export interface Shoe {
   design: string;
   color: string;
   image: string;
+  /** Seitenansicht (Spitze in eine einheitliche Richtung, s. atlas), sonst das Hauptbild. */
+  sideImage: string;
   price: number | null;
   sizes: string[];
   sizesInStock: string[];
@@ -50,12 +52,24 @@ export async function loadDesigns(): Promise<Design[]> {
     if (!PRODUCT_TYPES.includes(p.properties?.product_type ?? '') || !p.storage) continue;
     const design = p.design_group || p.name;
     const shoe: Shoe = {
-      id: p.id, name: p.name, design, color: p.color_name || '', image: imageUrl(p.storage.id),
+      id: p.id, name: p.name, design, color: p.color_name || '', image: imageUrl(p.storage.id), sideImage: imageUrl(p.storage.id),
       price: p.price_from, sizes: p.size_list ?? [], sizesInStock: p.size_list_in_stock ?? [],
       line: p.properties.product_line ?? null, targetGroup: p.properties.target_group ?? null,
     };
     byDesign.set(design, [...(byDesign.get(design) ?? []), shoe]);
   }
+  // Seitenansicht je Produkt aus dem Einzelabruf (Bildansicht 'left side', sonst 'right side')
+  const all = [...byDesign.values()].flat();
+  await Promise.all(all.map(async (shoe) => {
+    try {
+      const r = await fetch(`${API_BASE}/products/${shoe.id}`, { headers: { 'X-API-Key': API_KEY } });
+      if (!r.ok) return;
+      const d = (await r.json()) as { images?: { view?: string | null; storage?: { id: number } | null }[] };
+      const side = (v: string) => d.images?.find((im) => (im.view ?? '').replace('rigth', 'right') === v && im.storage);
+      const hit = side('left side') ?? side('right side');
+      if (hit?.storage) shoe.sideImage = imageUrl(hit.storage.id);
+    } catch { /* Hauptbild bleibt */ }
+  }));
   // Designs mit vielen Farben zuerst: die tragen die Blüte
   return [...byDesign.entries()]
     .map(([name, shoes]) => ({ name, shoes }))
