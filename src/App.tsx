@@ -57,7 +57,7 @@ import { soundService } from './services/SoundService';
 import { resolveProductTapStage } from './utils/ProductTapFlow';
 import QuickSearchCommandPalette from './components/QuickSearchCommandPalette';
 import { AiProductQueryService } from './services/AiProductQueryService';
-import { OutfitImageService, SavedOutfitService, outfitImageUrl, outfitOwner, type OutfitBackground, type SavedOutfit } from './services/OutfitImageService';
+import { FavoriteProductService, OutfitImageService, SavedOutfitService, outfitImageUrl, outfitOwner, type OutfitBackground, type SavedOutfit } from './services/OutfitImageService';
 import { categoryMediaService } from './services/CategoryMediaService';
 import { FOOTER_CONFIG, type FooterPosition } from './config/FooterConfig';
 import { STORAGE_API_BASE as CENTRAL_STORAGE_BASE, STORAGE_API_KEY as CENTRAL_STORAGE_KEY } from './config/apiConfig';
@@ -197,6 +197,8 @@ type State = {
   /** Meine Outfits: gespeicherte KI-Outfits des Nutzers (owner 2026-10-23) */
   savedOutfits: SavedOutfit[];
   savedOutfitsOpen: boolean;
+  /** Merkliste: Produkte mit Herz (owner 2026-10-23), neueste zuerst */
+  favoriteIds: string[];
   quickSearchPosition: { x: number; y: number } | null;
 
   // AI Prompt (Footer)
@@ -338,6 +340,7 @@ const createInitialState = (): State => {
     outfitSettingsOpen: false,
     savedOutfits: [],
     savedOutfitsOpen: false,
+    favoriteIds: [],
     outfitBackground: ((): OutfitBackground => { try { return localStorage.getItem('pf-outfit-background') === 'studio' ? 'studio' : 'transparent'; } catch { return 'transparent'; } })(),
     quickSearchPosition: null,
 
@@ -464,6 +467,7 @@ export default class App extends React.Component<Props, State> {
     // Outfit-Bild fuer jedes Agenten-Ergebnis, auch aus der Sprach-Suche
     this.controller.onAgentProductsApplied = ids => this.startOutfitImage(ids);
     this.loadSavedOutfits();
+    this.loadFavorites();
     window.addEventListener('resize', this.scrollCrumbsToEnd);
     window.setTimeout(this.scrollCrumbsToEnd, 0);
     // Finder aktiv: der schwebende Vollmodus-Schalter der Gate-Seiten tritt
@@ -602,7 +606,7 @@ export default class App extends React.Component<Props, State> {
     }
     if (prevProps.categoryLabel !== this.props.categoryLabel) this.controller.setEntryTitle(this.props.categoryLabel ?? '');
     // Benachrichtigungen mit der Haendler-Session laden bzw. leeren
-    if (prevState.b2bSession?.token !== this.state.b2bSession?.token) { this.loadRestockRequests(); this.loadSavedOutfits(); }
+    if (prevState.b2bSession?.token !== this.state.b2bSession?.token) { this.loadRestockRequests(); this.loadSavedOutfits(); this.loadFavorites(); }
     if (this.state.b2bSession && (prevState.cartItems !== this.state.cartItems
         || prevState.selectedProduct?.id !== this.state.selectedProduct?.id)) {
       this.scheduleB2BPriceRefresh();
@@ -2926,6 +2930,33 @@ export default class App extends React.Component<Props, State> {
     this.setState({ aiFilterProductIds: matched, aiLastResultCount: matched.length });
   };
 
+  private loadFavorites = () => {
+    void FavoriteProductService.list(this.savedOutfitOwner()).then(ids => this.setState({ favoriteIds: ids }));
+  };
+
+  private toggleFavorite = (productId: string) => {
+    const id = String(productId);
+    const liked = this.state.favoriteIds.includes(id);
+    // sofort zeigen, Server bestaetigt
+    this.setState(prev => ({ favoriteIds: liked ? prev.favoriteIds.filter(f => f !== id) : [id, ...prev.favoriteIds] }));
+    const call = liked ? FavoriteProductService.remove(this.savedOutfitOwner(), id) : FavoriteProductService.add(this.savedOutfitOwner(), id);
+    void call.then(ids => { if (ids) this.setState({ favoriteIds: ids }); });
+  };
+
+  /** Lieblingsprodukt oeffnen: Merkliste im Finder zeigen, dann die Karte. */
+  private openFavorite = (product: Product) => {
+    this.showFavorites();
+    window.setTimeout(() => this.openProductDetails(product), 60);
+  };
+
+  /** Alle Lieblingsprodukte im Finder zeigen (wie ein Suchergebnis). */
+  private showFavorites = () => {
+    if (!this.state.favoriteIds.length) return;
+    this.setState({ savedOutfitsOpen: false });
+    const matched = this.applyAiResult(this.state.favoriteIds);
+    this.setState({ aiFilterProductIds: matched, aiLastResultCount: matched.length });
+  };
+
   private deleteSavedOutfit = (hash: string) => {
     void SavedOutfitService.remove(this.savedOutfitOwner(), hash).then(list => { if (list) this.setState({ savedOutfits: list }); });
   };
@@ -3570,11 +3601,11 @@ export default class App extends React.Component<Props, State> {
                   type="button"
                   className={`pf-header-btn pf-header-saved-btn ${this.state.savedOutfitsOpen ? 'active' : ''}`}
                   onClick={() => this.setState(prev => ({ savedOutfitsOpen: !prev.savedOutfitsOpen }))}
-                  title={`Meine Outfits (${this.state.savedOutfits.length})`}
-                  aria-label="Meine Outfits"
+                  title={`Meine Auswahl: ${this.state.savedOutfits.length} Outfits, ${this.state.favoriteIds.length} Lieblingsprodukte`}
+                  aria-label="Meine Auswahl"
                 >
                   <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
-                  {this.state.savedOutfits.length > 0 && <span className="pf-header-cart-count">{this.state.savedOutfits.length}</span>}
+                  {this.state.savedOutfits.length + this.state.favoriteIds.length > 0 && <span className="pf-header-cart-count">{this.state.savedOutfits.length + this.state.favoriteIds.length}</span>}
                 </button>
                 <button
                   type="button"
@@ -4343,6 +4374,8 @@ export default class App extends React.Component<Props, State> {
                   const mine = this.state.restockRequests.filter(r => String(r.product_id) === String(selectedProduct.id) && !r.size);
                   return mine.find(r => r.status === 'open') ? 'open' : mine.find(r => r.status === 'fulfilled') ? 'fulfilled' : 'none';
                 })()}
+                isFavorite={this.state.favoriteIds.includes(String(selectedProduct.id))}
+                onToggleFavorite={() => this.toggleFavorite(String(selectedProduct.id))}
                 onToggleRestock={Number.isSafeInteger(Number(selectedProduct.id)) ? () => this.toggleRestock(Number(selectedProduct.id)) : undefined}
                 onSiblingSelect={(pid) => {
                   const find = () => this.controller.getDisplayOrder().find(pr => String(pr.id) === String(pid));
@@ -4424,12 +4457,42 @@ export default class App extends React.Component<Props, State> {
 
         {/* Meine Outfits: Seitenfenster mit den gespeicherten KI-Outfits */}
         {this.state.savedOutfitsOpen && (
-          <aside className="pf-saved-panel" aria-label="Meine Outfits">
+          <aside className="pf-saved-panel" aria-label="Meine Auswahl">
             <div className="pf-saved-head">
-              <h2>Meine Outfits</h2>
+              <h2>Meine Auswahl</h2>
               <button type="button" className="pf-saved-close" onClick={() => this.setState({ savedOutfitsOpen: false })} aria-label="Schließen">×</button>
             </div>
             <p className="pf-saved-owner">{this.state.b2bSession ? `Händlerkonto ${this.state.b2bSession.customerNumber}` : 'In diesem Browser gespeichert'}</p>
+            {(() => {
+              const byId = new Map(this.controller.getCatalogAllProducts().map(p => [String(p.id), p]));
+              const liked = this.state.favoriteIds.map(id => byId.get(id)).filter((p): p is NonNullable<typeof p> => !!p);
+              return (
+                <section className="pf-saved-section">
+                  <div className="pf-saved-subhead">
+                    <h3>Lieblingsprodukte <span>{liked.length}</span></h3>
+                    {liked.length > 0 && <button type="button" className="pf-saved-showall" onClick={this.showFavorites}>Alle zeigen</button>}
+                  </div>
+                  {liked.length === 0 ? (
+                    <p className="pf-saved-empty">Noch keine. Tipp in der Produktkarte auf das Herz, dann landet das Produkt hier.</p>
+                  ) : (
+                    <div className="pf-fav-grid">
+                      {liked.map(p => (
+                        <div key={p.id} className="pf-saved-card">
+                          <button type="button" className="pf-saved-open pf-fav-open" title={p.name} onClick={() => this.openFavorite(p)}>
+                            {p.primaryImage?.storage_id
+                              ? <img src={buildMediaUrl({ storageId: p.primaryImage.storage_id, width: 300, quality: 80, trim: true })} alt={p.name} loading="lazy" />
+                              : <span className="pf-fav-noimg" />}
+                            <span className="pf-saved-meta"><span className="pf-saved-query">{p.name}</span></span>
+                          </button>
+                          <button type="button" className="pf-saved-delete" onClick={() => this.toggleFavorite(String(p.id))} aria-label="Von der Merkliste entfernen" title="Entfernen">×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              );
+            })()}
+            <div className="pf-saved-subhead"><h3>Outfits <span>{this.state.savedOutfits.length}</span></h3></div>
             {this.state.savedOutfits.length === 0 ? (
               <p className="pf-saved-empty">Noch keine Outfits. Lass dir in der Smart Search eine Ausrüstung mit KI zeigen, sie landet automatisch hier.</p>
             ) : (

@@ -100,6 +100,9 @@ type Props = {
   colorOptions?: Array<{ id: string | number; colorName: string; storageId?: number }>;
   /** Benachrichtigen, wenn wieder verfuegbar: Zustand und Umschalter */
   restockState?: 'none' | 'open' | 'fulfilled';
+  /** Merkliste: Herz in der Karte (owner 2026-10-23) */
+  isFavorite?: boolean;
+  onToggleFavorite?: () => void;
   onToggleRestock?: () => void;
   /** Hintergrundbild der Buehne im grossen Dialog (Hintergrund-Matrix) */
   stageBackground?: string;
@@ -146,7 +149,7 @@ interface ParsedFeature {
  * Product Overlay Modal V2 - HALF WIDTH VERSION (240px)
  * Same design as V1, but with compact half-width layout
  */
-export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady, onShowDetails, expanded = false, onCollapse, locale, onSiblingSelect, colorOptions, stageBackground, restockState = 'none', onToggleRestock, onStepProduct, stepPosition, dealerPrices, dealerActive = false, dealerPricesPending = false, cartLines = [] }) => {
+export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady, onShowDetails, expanded = false, onCollapse, locale, onSiblingSelect, colorOptions, stageBackground, restockState = 'none', onToggleRestock, isFavorite = false, onToggleFavorite, onStepProduct, stepPosition, dealerPrices, dealerActive = false, dealerPricesPending = false, cartLines = [] }) => {
   const isMobilePortrait = window.innerWidth <= 768 && window.innerHeight > window.innerWidth;
   // Phone: the dark hero card as a full-width bottom sheet (owner 2026-08-23,
   // "die Karte auch im Desktop-Style"). Same markup as the desktop dock,
@@ -1244,6 +1247,12 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         {isMobilePortrait && !heroSheet && (
           <button className="pom-button pom-button-primary" onClick={handleAddToCart} style={{ fontSize: '10px', padding: '4px 10px', borderRadius: '6px' }}>
             Cart
+          </button>
+        )}
+        {onToggleFavorite && (
+          <button type="button" className={`pom-fav ${isFavorite ? 'on' : ''}`} onClick={onToggleFavorite}
+            aria-pressed={isFavorite} aria-label={isFavorite ? 'Von der Merkliste entfernen' : 'Auf die Merkliste'} title={isFavorite ? 'Von der Merkliste entfernen' : 'Auf die Merkliste'}>
+            <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-9.3-9.4C1.5 7.8 3.6 4.5 7 4.5c2 0 3.6 1.1 5 2.9 1.4-1.8 3-2.9 5-2.9 3.4 0 5.5 3.3 4.3 6.6-1.8 4.8-9.3 9.4-9.3 9.4z" /></svg>
           </button>
         )}
         <button className="pom-close" onClick={expanded && onCollapse ? onCollapse : onClose} aria-label="Close" style={{ position: 'static', flex: '0 0 auto', fontSize: '18px', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

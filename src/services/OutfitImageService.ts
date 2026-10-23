@@ -95,3 +95,28 @@ export class SavedOutfitService {
     return res.ok ? res.json() : null;
   }
 }
+
+/**
+ * Merkliste (Herz an Produkten, owner 2026-10-23): Produkt-IDs je Besitzer,
+ * neueste zuerst, im Bereich "Meine Auswahl" neben den Outfits.
+ */
+export class FavoriteProductService {
+  static async list(owner: string): Promise<string[]> {
+    const res = await fetch(`${ONEAL_API_BASE}/favorites?owner=${encodeURIComponent(owner)}`, { headers });
+    return res.ok ? res.json() : [];
+  }
+
+  static async add(owner: string, productId: string): Promise<string[] | null> {
+    const res = await fetch(`${ONEAL_API_BASE}/favorites`, {
+      method: 'POST', headers, body: JSON.stringify({ owner, product_id: productId }),
+    });
+    return res.ok ? res.json() : null;
+  }
+
+  static async remove(owner: string, productId: string): Promise<string[] | null> {
+    const res = await fetch(`${ONEAL_API_BASE}/favorites/${encodeURIComponent(productId)}?owner=${encodeURIComponent(owner)}`, {
+      method: 'DELETE', headers,
+    });
+    return res.ok ? res.json() : null;
+  }
+}

@@ -1160,3 +1160,16 @@
   .pom-stage-features { grid-template-columns: repeat(2, 1fr) !important; row-gap: 14px; }
 }
 .pom-thumb-strip::-webkit-scrollbar { display: none; }
+
+/* Merkliste: Herz neben dem Schliessen-Knopf (owner 2026-10-23) */
+.pom-fav {
+  width: 28px; height: 28px; min-width: 28px; border-radius: 50%; border: none; padding: 0;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  background: rgba(0, 0, 0, 0.3); color: #fff; transition: transform 0.15s ease, background 0.2s ease;
+}
+.pom-fav svg { fill: none; stroke: currentColor; stroke-width: 2; }
+.pom-fav:hover { background: rgba(0, 0, 0, 0.5); transform: scale(1.1); }
+.pom-fav.on { color: #ff3b5c; }
+.pom-fav.on svg { fill: currentColor; }
+.pom-hero-dock .pom-fav { background: rgba(255, 255, 255, 0.1); }
+.pom-hero-sheet .pom-fav { background: rgba(60, 60, 64, 0.9); }
