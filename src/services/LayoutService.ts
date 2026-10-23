@@ -614,6 +614,11 @@ export class LayoutService {
     this.outfitEnabled = on;
   }
 
+  /** Produkt-ids an der Figur (leer, solange das Outfit-Layout nicht aktiv ist). */
+  getOutfitWornIds(): string[] {
+    return this.outfitLayouter && this.layouter === this.outfitLayouter ? [...this.outfitLayouter.wornProductIds] : [];
+  }
+
   /** Klick in der Outfit-Ansicht: Alternative an die Figur nehmen. */
   wearOutfitAlternative(nodeId: string, product: Product): boolean {
     if (!this.outfitLayouter || this.layouter !== this.outfitLayouter) return false;

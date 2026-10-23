@@ -82,6 +82,8 @@ export class OutfitLayouter<T> {
    */
   private worn = new Map<OutfitSlot, string>();
   private alternativeIds = new Set<string>();
+  /** Produkt-ids an der Figur nach dem letzten Layout (fuer das Outfit-Bild). */
+  public wornProductIds: string[] = [];
 
   /** Knoten ist eine Alternative neben der Figur (nicht getragen). */
   isAlternative(nodeId: string): boolean {
@@ -124,6 +126,7 @@ export class OutfitLayouter<T> {
       if (this.worn.has('jacket')) wornNodes.delete('jersey'); else wornNodes.delete('jacket');
     }
     const wornIds = new Set([...wornNodes.values()].map(n => n.id));
+    this.wornProductIds = [...wornNodes.values()].map(idOf);
     const alternatives = [...bySlot.values()].flat().filter(n => !wornIds.has(n.id));
     this.alternativeIds = new Set(alternatives.map(n => n.id));
 

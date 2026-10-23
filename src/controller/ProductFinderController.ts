@@ -1196,12 +1196,20 @@ export class ProductFinderController {
    * nicht. Mehrere Treffer: Gruppen-/Poster-Uebersicht ohne Fokus; genau
    * einer: Hero wie bisher. Einziger Eingang fuer die Realtime-Projektion.
    */
+  /** Nach jedem Agenten-Ergebnis (Smart Search getippt oder gesprochen). */
+  onAgentProductsApplied?: (productIds: string[]) => void;
+
   applyAgentProducts(products: Product[]): void {
     this.setGlobalSearchProducts(products, { outfit: true });
     if (products.length > 1) {
       this.exitHeroPresentation();
       this.setViewOverride('grouped');
     }
+    this.onAgentProductsApplied?.(products.map(p => String(p.id)));
+  }
+
+  getOutfitWornIds(): string[] {
+    return this.layoutService.getOutfitWornIds();
   }
 
   isOutfitActive(): boolean {

@@ -443,6 +443,8 @@ export default class App extends React.Component<Props, State> {
   async componentDidMount() {
     this.controller.setEntryTitle(this.props.categoryLabel ?? '');
     initPfTrace(this.traceSnapshot);
+    // Outfit-Bild fuer jedes Agenten-Ergebnis, auch aus der Sprach-Suche
+    this.controller.onAgentProductsApplied = ids => this.startOutfitImage(ids);
     // Finder aktiv: der schwebende Vollmodus-Schalter der Gate-Seiten tritt
     // zurück, der Finder hat ihn im Header.
     document.body.classList.add('pf-finder-active');
@@ -2411,7 +2413,9 @@ export default class App extends React.Component<Props, State> {
     const product = this.controller.hitTest(x, y);
     if (product && this.controller.isOutfitActive()) {
       // Outfit: Alternative anklicken = anziehen; getragenes Teil = Karte
-      if (!this.controller.wearOutfitAlternative(product)) this.openProductDetails(product);
+      // Getauschtes Teil: neues Bild, der Stapel ist bis dahin Platzhalter
+      if (this.controller.wearOutfitAlternative(product)) this.startOutfitImage([]);
+      else this.openProductDetails(product);
       return;
     }
     if (product) {
@@ -2778,7 +2782,17 @@ export default class App extends React.Component<Props, State> {
   private outfitImageToken = 0;
   private startOutfitImage = (ids: string[]) => {
     const token = ++this.outfitImageToken;
-    if (!this.controller.isOutfitActive()) { this.setState({ outfitImage: null }); return; }
+    // Nach dem Layout: dann kennt das Outfit-Layout die getragenen Teile.
+    // Das Bild zeigt genau diese; dasselbe Outfit = derselbe Cache-Eintrag.
+    window.setTimeout(() => {
+      if (token !== this.outfitImageToken) return;
+      if (!this.controller.isOutfitActive()) { this.setState({ outfitImage: null }); return; }
+      const worn = this.controller.getOutfitWornIds();
+      this.requestOutfitImage(worn.length >= 3 ? worn : ids, token);
+    }, 0);
+  };
+
+  private requestOutfitImage = (ids: string[], token: number) => {
     this.setState({ outfitImage: { status: 'pending', show: true } });
     OutfitImageService.generate(ids, () => token === this.outfitImageToken)
       .then(result => {
@@ -2804,7 +2818,6 @@ export default class App extends React.Component<Props, State> {
     this.setState({ selectedProduct: null, selectedVariant: null, dialogPosition: null, shouldShowV4Dialog: false, searchFilterTerm: null });
     this.controller.applyAgentProducts(products);
     this.syncPivotUI();
-    this.startOutfitImage(products.map(p => String(p.id)));
     return products.map(p => String(p.id));
   };
 
