@@ -17,7 +17,7 @@ export function App() {
   const [focus, setFocus] = useState(-1);
   const [current, setCurrent] = useState(-1);
   const [view, setView] = useState<EngineView>(() =>
-    ['wall', 'band'].includes(new URLSearchParams(window.location.search).get('view') ?? '') ? 'wall' : 'bloom');
+    (({ wall: 'wall', band: 'wall', floor: 'floor' } as Record<string, EngineView>)[new URLSearchParams(window.location.search).get('view') ?? ''] ?? 'bloom'));
   const timer = useRef<number | undefined>(undefined);
 
   useEffect(() => {
@@ -33,7 +33,7 @@ export function App() {
     if (!designs) return;
     const url = new URL(window.location.href);
     if (design) url.searchParams.set('design', design.name); else url.searchParams.delete('design');
-    if (view === 'wall') url.searchParams.set('view', 'wall'); else url.searchParams.delete('view');
+    if (view !== 'bloom') url.searchParams.set('view', view); else url.searchParams.delete('view');
     window.history.replaceState(null, '', url);
   }, [designs, design, view]);
 
@@ -59,7 +59,7 @@ export function App() {
 
   const onPick = useCallback((instance: number) => {
     if (instance < 0) { setFocus(-1); return; }
-    if (view === 'wall') { setFocus((f) => (f === instance ? -1 : instance)); return; }
+    if (view !== 'bloom') { setFocus((f) => (f === instance ? -1 : instance)); return; }
     if (!designs) return;
     if (!design) {
       const d = designs.find((x) => shoes.indexOf(x.shoes[0]) === instance);
@@ -72,7 +72,7 @@ export function App() {
   }, [designs, design, shoes, view, switchTo]);
 
   const shoe = focus >= 0 ? shoes[instanceProduct[focus]] : null;
-  const front = view === 'wall' && current >= 0 ? shoes[instanceProduct[current]] : null;
+  const front = view !== 'bloom' && current >= 0 ? shoes[instanceProduct[current]] : null;
 
   return (
     <div className="stage">
@@ -80,12 +80,13 @@ export function App() {
         <div className="label">_MODEL:</div>
         <div className="model">{shoe ? `${shoe.design} · ${shoe.color}` : front ? `${front.design} · ${front.color}` : design ? design.name : "O'NEAL BOOTS 2028"}</div>
         <div className="label">_ACTION:</div>
-        <div className="action">{design || view === 'wall' ? 'CUSTOMIZE' : 'CHOOSE'}</div>
+        <div className="action">{design || view !== 'bloom' ? 'CUSTOMIZE' : 'CHOOSE'}</div>
       </header>
 
       <div className="views" role="tablist">
         <button className={view === 'bloom' ? 'on' : ''} onClick={() => { setFocus(-1); setView('bloom'); }}>Blüte</button>
-        <button className={view === 'wall' ? 'on' : ''} onClick={() => { setFocus(-1); setView('wall'); }}>Fläche</button>
+        <button className={view === 'wall' ? 'on' : ''} onClick={() => { setFocus(-1); setView('wall'); }}>Fläche V1</button>
+        <button className={view === 'floor' ? 'on' : ''} onClick={() => { setFocus(-1); setView('floor'); }}>Fläche Perspektive</button>
       </div>
 
       {design && view === 'bloom' && (
@@ -135,7 +136,7 @@ export function App() {
       {!designs && !error && <div className="loading">Lade Stiefel …</div>}
       {error && <div className="loading">{error}</div>}
       {designs && !shoe && view === 'bloom' && !design && <div className="hint-bottom">Tippe auf einen Stiefel, um seine Farben aufblühen zu lassen</div>}
-      {designs && !shoe && view === 'wall' && <div className="hint-bottom">Wischen fährt die Fläche entlang, Tippen holt einen Stiefel nach vorn</div>}
+      {designs && !shoe && view !== 'bloom' && <div className="hint-bottom">Wischen fährt die Fläche entlang, Tippen holt einen Stiefel nach vorn</div>}
     </div>
   );
 }

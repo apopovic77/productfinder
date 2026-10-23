@@ -18,7 +18,8 @@ import {
 import { ScrollInertia } from '../layout/ScrollInertia';
 import { buildImageAtlas, type ImageAtlas } from './atlas';
 
-export type EngineView = 'bloom' | 'wall';
+/** wall = Fläche V1 (frontal, Wand); floor = Fläche Perspektive (am Boden, Kamera schräg von oben). */
+export type EngineView = 'bloom' | 'wall' | 'floor';
 
 interface Props {
   /** Bild je Produkt (Index = Produkt). */
@@ -39,6 +40,7 @@ interface Props {
 const SHUTTER = 1 / 24; // Belichtungszeit der Unschärfe in Sekunden
 const BLOOM_TILE = 2.7;
 const WALL_RADIUS = 9;
+const FLOOR_ROW_GAP = 1.15; // Reihenabstand am Boden relativ zum Rasterabstand
 
 function hidden(): LayoutResult {
   return {
@@ -76,6 +78,7 @@ export function EngineScene({ images, instanceProduct, view, bloomProducts, focu
   const currentInstance = useRef(-1);
   const camTarget = useRef(new THREE.Vector3());
   const lookTarget = useRef(new THREE.Vector3());
+  const panAxis = useRef(0);
 
   // Atlas aus den Produktbildern, UV-Kachel je Instanz
   useEffect(() => {
@@ -104,6 +107,27 @@ export function EngineScene({ images, instanceProduct, view, bloomProducts, focu
     const step = xs.length > 1 ? xs[1] - xs[0] : 1;
     return raw.map((r) => flatTile(r, step * 0.94));
   }, [count]);
+  // Fläche Perspektive: dasselbe Raster auf den Boden gelegt (Reihen nach hinten), die Kacheln stehen
+  // aufrecht mit der Unterkante auf y = 0; die Kamera blickt leicht schräg von oben darauf
+  const floor = useMemo(() => {
+    const ys = wall.map((r) => r.target.position.y);
+    const front = Math.max(...ys);
+    const rowYs = [...new Set(ys.map((y) => y.toFixed(3)))].map(Number).sort((a, b) => b - a);
+    const step = rowYs.length > 1 ? rowYs[0] - rowYs[1] : 1;
+    return wall.map((r) => {
+      const size = r.target.size.y;
+      // jede zweite Reihe um eine halbe Kachel versetzt: sonst bilden die Spalten Gassen zum Fluchtpunkt
+      const row = rowYs.findIndex((y) => Math.abs(y - r.target.position.y) < 1e-3);
+      const x = r.target.position.x + (row % 2) * step * 0.5;
+      const f: LayoutResult = {
+        target: { ...r.target, position: new THREE.Vector3(x, size / 2, -(front - r.target.position.y) * FLOOR_ROW_GAP),
+          quaternion: new THREE.Quaternion(), scale: r.target.scale.clone(), size: r.target.size.clone(),
+          trapezoid: r.target.trapezoid.clone(), morph: r.target.morph ? { ...r.target.morph } : undefined },
+        current: r.current,
+      };
+      return f;
+    });
+  }, [wall]);
   const wallBounds = useMemo(() => {
     const xs = wall.map((r) => r.target.position.x);
     return { min: Math.min(...xs), max: Math.max(...xs) };
@@ -127,13 +151,14 @@ export function EngineScene({ images, instanceProduct, view, bloomProducts, focu
   const lastBloom = useRef<number[] | null>(null);
   useEffect(() => {
     if (!atlas) return;
-    const base = view === 'wall' ? wall : bloom;
-    const focusPos = view === 'wall'
-      ? { x: camTarget.current.x - 0.8, y: 0.1, z: 3.2 }
+    const base = view === 'wall' ? wall : view === 'floor' ? floor : bloom;
+    const panX = camTarget.current.x;
+    const focusPos = view === 'wall' ? { x: panX - 0.8, y: 0.1, z: 3.2 }
+      : view === 'floor' ? { x: panAxis.current, y: 1.25, z: 2.4 }
       : { x: 0, y: 0.15, z: 1.6 };
     const { results } = focusLayout(base, focus, {
-      position: focusPos, scale: view === 'wall' ? 2.2 : 1.35, recedeScale: view === 'wall' ? 1 : 0.8,
-      recedeDepth: view === 'wall' ? 0 : -1.4, dim: 1,
+      position: focusPos, scale: view === 'wall' ? 2.2 : view === 'floor' ? 1.5 : 1.35, recedeScale: view === 'bloom' ? 0.8 : 1,
+      recedeDepth: view === 'bloom' ? -1.4 : 0, dim: 1,
     });
     const viewChanged = lastView.current !== view || lastBloom.current !== bloomProducts;
     morphTo(mesh, uniforms, results, viewChanged
@@ -142,32 +167,33 @@ export function EngineScene({ images, instanceProduct, view, bloomProducts, focu
     current.current = results;
     lastView.current = view;
     lastBloom.current = bloomProducts;
-  }, [atlas, view, wall, bloom, focus, mesh, uniforms, bloomProducts]);
+  }, [atlas, view, wall, floor, bloom, focus, mesh, uniforms, bloomProducts]);
 
   // Wischen: nur in der Fläche und ohne Fokus, auf der x-Achse
   useEffect(() => {
     const el = gl.domElement;
     let down = false, lastX = 0, moved = 0, startX = 0, startY = 0;
+    const panning = view !== 'bloom';
     const worldPerPx = () => {
-      const dist = 10.5;
+      const dist = view === 'floor' ? 6 : 10.5;
       const h = 2 * Math.tan(THREE.MathUtils.degToRad((camera as THREE.PerspectiveCamera).fov / 2)) * dist;
       return h / el.clientHeight;
     };
     const onDown = (e: PointerEvent) => {
       down = true; lastX = startX = e.clientX; startY = e.clientY; moved = 0;
-      if (view === 'wall' && focus < 0) inertia.grab();
+      if (panning && focus < 0) inertia.grab();
     };
     const onMove = (e: PointerEvent) => {
       if (!down) return;
       const dx = e.clientX - lastX;
       lastX = e.clientX;
       moved = Math.max(moved, Math.hypot(e.clientX - startX, e.clientY - startY));
-      if (view === 'wall' && focus < 0) inertia.drag(-dx * worldPerPx());
+      if (panning && focus < 0) inertia.drag(-dx * worldPerPx());
     };
     const onUp = (e: PointerEvent) => {
       if (!down) return;
       down = false;
-      if (view === 'wall' && focus < 0) inertia.release();
+      if (panning && focus < 0) inertia.release();
       if (moved < 8) pick(e.clientX, e.clientY);
     };
     const pick = (cx: number, cy: number) => {
@@ -189,7 +215,7 @@ export function EngineScene({ images, instanceProduct, view, bloomProducts, focu
       onPick(best);
     };
     const onWheel = (e: WheelEvent) => {
-      if (view !== 'wall' || focus >= 0) return;
+      if (!panning || focus >= 0) return;
       e.preventDefault();
       inertia.nudge((e.deltaX || e.deltaY) * 0.01);
     };
@@ -209,7 +235,7 @@ export function EngineScene({ images, instanceProduct, view, bloomProducts, focu
     const dt = Math.min(rawDt, 0.05);
     uniforms.uTime.value = state.clock.elapsedTime;
     const narrow = canvasSize.width < canvasSize.height;
-    if (view === 'wall') {
+    if (view !== 'bloom') {
       inertia.update(dt);
       // an den Rändern der Fläche zurückfedern
       const lo = wallBounds.min + 2, hi = wallBounds.max - 2;
@@ -217,8 +243,15 @@ export function EngineScene({ images, instanceProduct, view, bloomProducts, focu
         const bound = inertia.value < lo ? lo : hi;
         inertia.velocity += ((bound - inertia.value) * 30 - inertia.velocity * 8) * dt;
       }
-      camTarget.current.set(inertia.value + (narrow ? 1.5 : 3.4), 0.6, narrow ? 13 : 10.5);
-      lookTarget.current.set(inertia.value, 0, 0);
+      if (view === 'wall') {
+        camTarget.current.set(inertia.value + (narrow ? 1.5 : 3.4), 0.6, narrow ? 13 : 10.5);
+        lookTarget.current.set(inertia.value, 0, 0);
+      } else {
+        // leicht schräg von oben auf den Boden, Blick in die Reihen hinein
+        camTarget.current.set(inertia.value, narrow ? 2.6 : 2.1, narrow ? 7.5 : 5.2);
+        lookTarget.current.set(inertia.value, 0.55, -5);
+      }
+      panAxis.current = inertia.value;
     } else {
       inertia.velocity = 0;
       camTarget.current.set(0, 0, narrow ? 13 : 9.5);
@@ -228,17 +261,21 @@ export function EngineScene({ images, instanceProduct, view, bloomProducts, focu
     const look = new THREE.Vector3().copy(lookTarget.current);
     camera.lookAt(look);
     // Unschärfe aus der Kamerafahrt: die Kacheln bewegen sich relativ zur Kamera entgegen
-    const vx = view === 'wall' ? inertia.velocity : 0;
+    const vx = view !== 'bloom' ? inertia.velocity : 0;
     uniforms.uBlurVelocity.value.set(-vx, 0, 0);
     uniforms.uBlurStrength.value = Math.abs(vx) > 0.05 ? SHUTTER * 2.5 : 0;
     // Feldwelle: in der Fläche voll, in der Blüte leise, im Fokus aus
-    const field = focus >= 0 ? 0 : view === 'wall' ? 1 : 0.25;
+    const field = focus >= 0 ? 0 : view === 'bloom' ? 0.25 : 1;
     uniforms.uFieldAnimStrength.value += (field - uniforms.uFieldAnimStrength.value) * Math.min(dt * 2, 1);
-    uniforms.uWaveDir.value.set(0.55, 0.1, 0.83);
-    if (view === 'wall' && onCurrent) {
+    // Wand: Welle in die Tiefe; Boden: die Schuhe heben und senken sich als Welle quer über die Reihen
+    if (view === 'floor') uniforms.uWaveDir.value.set(0.45, 0.89, 0);
+    else uniforms.uWaveDir.value.set(0.55, 0.1, 0.83);
+    if (view !== 'bloom' && onCurrent) {
       let best = -1, bestD = Infinity;
-      wall.forEach((r, i) => {
-        const d = Math.hypot(r.target.position.x - inertia.value, r.target.position.y);
+      (view === 'floor' ? floor : wall).forEach((r, i) => {
+        const d = view === 'floor'
+          ? Math.abs(r.target.position.x - inertia.value) + Math.abs(r.target.position.z) * 10
+          : Math.hypot(r.target.position.x - inertia.value, r.target.position.y);
         if (d < bestD) { bestD = d; best = i; }
       });
       if (best !== currentInstance.current) { currentInstance.current = best; onCurrent(best); }
