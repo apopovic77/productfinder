@@ -36,7 +36,13 @@ body { background: radial-gradient(ellipse at 55% 35%, var(--bg-1) 0%, #f1f2f3 4
 .size.out { color: #b5b9bd; }
 .hint { margin-top: 8px; font-size: 11px; color: var(--ink-soft); }
 .loading, .hint-bottom { position: absolute; left: 0; right: 0; bottom: 28px; text-align: center; font-size: 14px; color: var(--ink-soft); z-index: 2; pointer-events: none; }
+.views { position: absolute; top: 28px; left: 50%; transform: translateX(-50%); z-index: 3; display: flex;
+  background: rgba(255,255,255,.7); border: 1px solid #c8cbce; border-radius: 20px; overflow: hidden; }
+.views button { border: 0; background: transparent; padding: 8px 18px; font-size: 14px; color: var(--ink); cursor: pointer; }
+.views button.on { background: var(--ink); color: #fff; }
+.stage canvas { touch-action: none; }
 @media (max-width: 700px) {
+  .views { top: auto; bottom: 120px; }
   .caption { top: 16px; left: 16px; }
   .caption .action { font-size: 24px; }
   .back { top: 16px; right: 16px; }
