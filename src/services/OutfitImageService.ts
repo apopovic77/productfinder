@@ -21,7 +21,7 @@ const MAX_WAIT_MS = 300_000;
 
 const headers = { 'Content-Type': 'application/json', 'X-API-Key': ONEAL_API_KEY };
 
-function imageUrl(hash: string): string {
+export function outfitImageUrl(hash: string): string {
   return `${ONEAL_API_BASE}/outfit-image/${hash}.png`;
 }
 
@@ -44,6 +44,54 @@ export class OutfitImageService {
       status = (await poll.json()) as OutfitImageStatus;
     }
     if (status.status === 'pending') status = { ...status, status: 'failed', detail: 'Zeitueberschreitung' };
-    return status.status === 'done' ? { ...status, url: imageUrl(status.hash) } : status;
+    return status.status === 'done' ? { ...status, url: outfitImageUrl(status.hash) } : status;
+  }
+}
+
+/** Gespeichertes KI-Outfit ("Meine Outfits", owner 2026-10-23). */
+export type SavedOutfit = {
+  hash: string;
+  ids: string[];
+  background: OutfitBackground;
+  query?: string | null;
+  created_at?: string | null;
+};
+
+/**
+ * Besitzer der Outfit-Liste: angemeldetes Haendlerkonto, sonst dieser
+ * Browser (zufaellige ID, im localStorage gemerkt).
+ */
+export function outfitOwner(customerNumber?: string | null): string {
+  if (customerNumber) return `kunde-${String(customerNumber).replace(/[^A-Za-z0-9_-]/g, '')}`.slice(0, 64);
+  try {
+    let id = localStorage.getItem('pf-device-id');
+    if (!id) {
+      id = `browser-${Math.random().toString(36).slice(2, 12)}`;
+      localStorage.setItem('pf-device-id', id);
+    }
+    return id;
+  } catch {
+    return 'browser-anonym';
+  }
+}
+
+export class SavedOutfitService {
+  static async list(owner: string): Promise<SavedOutfit[]> {
+    const res = await fetch(`${ONEAL_API_BASE}/outfit-image/saved?owner=${encodeURIComponent(owner)}`, { headers });
+    return res.ok ? res.json() : [];
+  }
+
+  static async save(owner: string, outfit: SavedOutfit): Promise<SavedOutfit[] | null> {
+    const res = await fetch(`${ONEAL_API_BASE}/outfit-image/saved`, {
+      method: 'POST', headers, body: JSON.stringify({ owner, ...outfit }),
+    });
+    return res.ok ? res.json() : null;
+  }
+
+  static async remove(owner: string, hash: string): Promise<SavedOutfit[] | null> {
+    const res = await fetch(`${ONEAL_API_BASE}/outfit-image/saved/${hash}?owner=${encodeURIComponent(owner)}`, {
+      method: 'DELETE', headers,
+    });
+    return res.ok ? res.json() : null;
   }
 }

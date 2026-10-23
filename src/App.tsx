@@ -57,7 +57,7 @@ import { soundService } from './services/SoundService';
 import { resolveProductTapStage } from './utils/ProductTapFlow';
 import QuickSearchCommandPalette from './components/QuickSearchCommandPalette';
 import { AiProductQueryService } from './services/AiProductQueryService';
-import { OutfitImageService, type OutfitBackground } from './services/OutfitImageService';
+import { OutfitImageService, SavedOutfitService, outfitImageUrl, outfitOwner, type OutfitBackground, type SavedOutfit } from './services/OutfitImageService';
 import { categoryMediaService } from './services/CategoryMediaService';
 import { FOOTER_CONFIG, type FooterPosition } from './config/FooterConfig';
 import { STORAGE_API_BASE as CENTRAL_STORAGE_BASE, STORAGE_API_KEY as CENTRAL_STORAGE_KEY } from './config/apiConfig';
@@ -192,6 +192,9 @@ type State = {
   /** Hintergrund des KI-Outfit-Bildes, Standard transparent (owner 2026-10-23) */
   outfitBackground: OutfitBackground;
   outfitSettingsOpen: boolean;
+  /** Meine Outfits: gespeicherte KI-Outfits des Nutzers (owner 2026-10-23) */
+  savedOutfits: SavedOutfit[];
+  savedOutfitsOpen: boolean;
   quickSearchPosition: { x: number; y: number } | null;
 
   // AI Prompt (Footer)
@@ -331,6 +334,8 @@ const createInitialState = (): State => {
     aiMissingCount: 0,
     smartJob: null,
     outfitSettingsOpen: false,
+    savedOutfits: [],
+    savedOutfitsOpen: false,
     outfitBackground: ((): OutfitBackground => { try { return localStorage.getItem('pf-outfit-background') === 'studio' ? 'studio' : 'transparent'; } catch { return 'transparent'; } })(),
     quickSearchPosition: null,
 
@@ -456,6 +461,7 @@ export default class App extends React.Component<Props, State> {
     initPfTrace(this.traceSnapshot);
     // Outfit-Bild fuer jedes Agenten-Ergebnis, auch aus der Sprach-Suche
     this.controller.onAgentProductsApplied = ids => this.startOutfitImage(ids);
+    this.loadSavedOutfits();
     window.addEventListener('resize', this.scrollCrumbsToEnd);
     window.setTimeout(this.scrollCrumbsToEnd, 0);
     // Finder aktiv: der schwebende Vollmodus-Schalter der Gate-Seiten tritt
@@ -594,7 +600,7 @@ export default class App extends React.Component<Props, State> {
     }
     if (prevProps.categoryLabel !== this.props.categoryLabel) this.controller.setEntryTitle(this.props.categoryLabel ?? '');
     // Benachrichtigungen mit der Haendler-Session laden bzw. leeren
-    if (prevState.b2bSession?.token !== this.state.b2bSession?.token) this.loadRestockRequests();
+    if (prevState.b2bSession?.token !== this.state.b2bSession?.token) { this.loadRestockRequests(); this.loadSavedOutfits(); }
     if (this.state.b2bSession && (prevState.cartItems !== this.state.cartItems
         || prevState.selectedProduct?.id !== this.state.selectedProduct?.id)) {
       this.scheduleB2BPriceRefresh();
@@ -2872,6 +2878,13 @@ export default class App extends React.Component<Props, State> {
       if (!this.controller.isOutfitActive()) { this.setState({ outfitImage: null }); return; }
       const worn = this.controller.getOutfitWornIds();
       this.outfitImageIds = worn.length >= 3 ? worn : ids;
+      const saved = this.pendingSavedOutfit;
+      this.pendingSavedOutfit = null;
+      if (saved) {
+        this.outfitImageIds = saved.ids;
+        this.setState({ outfitImage: { status: 'done', url: outfitImageUrl(saved.hash), show: true } });
+        return;
+      }
       this.setState({ outfitImage: { status: 'idle', show: false } });
     }, 0);
   };
@@ -2890,6 +2903,31 @@ export default class App extends React.Component<Props, State> {
     }
   };
 
+  /** Suchtext, aus dem das aktuelle Outfit stammt (fuer "Meine Outfits"). */
+  private lastOutfitQuery = '';
+  /** Beim Oeffnen eines gespeicherten Outfits: dessen Bild statt des Knopfs zeigen. */
+  private pendingSavedOutfit: SavedOutfit | null = null;
+
+  private savedOutfitOwner = () => outfitOwner(this.state.b2bSession?.customerNumber);
+
+  private loadSavedOutfits = () => {
+    void SavedOutfitService.list(this.savedOutfitOwner()).then(list => this.setState({ savedOutfits: list }));
+  };
+
+  private openSavedOutfit = (entry: SavedOutfit) => {
+    const byId = new Map(this.controller.getCatalogAllProducts().map(p => [String(p.id), p]));
+    if (!entry.ids.some(id => byId.has(String(id)))) return;
+    this.pendingSavedOutfit = entry;
+    this.lastOutfitQuery = entry.query || '';
+    this.setState({ savedOutfitsOpen: false, outfitBackground: entry.background === 'studio' ? 'studio' : 'transparent' });
+    const matched = this.applyAiResult(entry.ids);
+    this.setState({ aiFilterProductIds: matched, aiLastResultCount: matched.length });
+  };
+
+  private deleteSavedOutfit = (hash: string) => {
+    void SavedOutfitService.remove(this.savedOutfitOwner(), hash).then(list => { if (list) this.setState({ savedOutfits: list }); });
+  };
+
   private requestOutfitImage = (ids: string[], token: number, background: OutfitBackground = this.state.outfitBackground) => {
     this.setState({ outfitImage: { status: 'pending', show: true } });
     OutfitImageService.generate(ids, () => token === this.outfitImageToken, background)
@@ -2898,6 +2936,12 @@ export default class App extends React.Component<Props, State> {
         this.setState({ outfitImage: result.status === 'done' && result.url
           ? { status: 'done', url: result.url, show: true }
           : { status: 'failed', show: false } });
+        // Meine Outfits: jedes fertige Bild landet in der Liste des Nutzers
+        if (result.status === 'done') {
+          void SavedOutfitService.save(this.savedOutfitOwner(), {
+            hash: result.hash, ids, background, query: this.lastOutfitQuery || null,
+          }).then(list => { if (list) this.setState({ savedOutfits: list }); });
+        }
       })
       .catch(() => { if (token === this.outfitImageToken) this.setState({ outfitImage: { status: 'failed', show: false } }); });
   };
@@ -2969,6 +3013,7 @@ export default class App extends React.Component<Props, State> {
   private applySmartJob = () => {
     const job = this.state.smartJob;
     if (!job || job.status !== 'done' || !job.productIds) return;
+    this.lastOutfitQuery = job.query;
     const matchedIds = this.applyAiResult(job.productIds);
     if (!matchedIds.length) {
       this.setState({ smartJob: { ...job, status: 'error', message: 'Die gefundenen Produkte sind nicht in dieser Marke.' } });
@@ -3518,6 +3563,16 @@ export default class App extends React.Component<Props, State> {
                     <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><path d="M12 17v5"/></svg>
                   </button>
                 )}
+                <button
+                  type="button"
+                  className={`pf-header-btn pf-header-saved-btn ${this.state.savedOutfitsOpen ? 'active' : ''}`}
+                  onClick={() => this.setState(prev => ({ savedOutfitsOpen: !prev.savedOutfitsOpen }))}
+                  title={`Meine Outfits (${this.state.savedOutfits.length})`}
+                  aria-label="Meine Outfits"
+                >
+                  <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+                  {this.state.savedOutfits.length > 0 && <span className="pf-header-cart-count">{this.state.savedOutfits.length}</span>}
+                </button>
                 <button
                   type="button"
                   className={`pf-header-btn pf-header-cart-btn ${cartItems.length ? 'has-items' : ''}`}
@@ -4345,6 +4400,34 @@ export default class App extends React.Component<Props, State> {
           }}
         />
 
+        {/* Meine Outfits: Seitenfenster mit den gespeicherten KI-Outfits */}
+        {this.state.savedOutfitsOpen && (
+          <aside className="pf-saved-panel" aria-label="Meine Outfits">
+            <div className="pf-saved-head">
+              <h2>Meine Outfits</h2>
+              <button type="button" className="pf-saved-close" onClick={() => this.setState({ savedOutfitsOpen: false })} aria-label="Schließen">×</button>
+            </div>
+            <p className="pf-saved-owner">{this.state.b2bSession ? `Händlerkonto ${this.state.b2bSession.customerNumber}` : 'In diesem Browser gespeichert'}</p>
+            {this.state.savedOutfits.length === 0 ? (
+              <p className="pf-saved-empty">Noch keine Outfits. Lass dir in der Smart Search eine Ausrüstung mit KI zeigen, sie landet automatisch hier.</p>
+            ) : (
+              <div className="pf-saved-grid">
+                {this.state.savedOutfits.map(entry => (
+                  <div key={entry.hash} className="pf-saved-card">
+                    <button type="button" className="pf-saved-open" onClick={() => this.openSavedOutfit(entry)} title="Outfit öffnen">
+                      <img src={outfitImageUrl(entry.hash)} alt={entry.query || 'KI-Outfit'} loading="lazy" className={entry.background === 'studio' ? '' : 'transparent'} />
+                      <span className="pf-saved-meta">
+                        <span className="pf-saved-query">{entry.query || 'KI-Outfit'}</span>
+                        <span className="pf-saved-date">{entry.created_at ? new Date(entry.created_at).toLocaleDateString('de-AT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                      </span>
+                    </button>
+                    <button type="button" className="pf-saved-delete" onClick={() => this.deleteSavedOutfit(entry.hash)} aria-label="Outfit löschen" title="Löschen">×</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </aside>
+        )}
         {/* Smart Search im Hintergrund: animierte Pille, Ergebnis auf Klick */}
         {this.state.smartJob && (() => {
           const job = this.state.smartJob!;

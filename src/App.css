@@ -2655,7 +2655,8 @@ body {
 /* Header-Knoepfe nur als Symbol (owner 2026-10-23): gleich breit, Text im Tooltip */
 .pf-header-actions .pf-header-full-mode-btn,
 .pf-header-actions .pf-header-dealer-btn,
-.pf-header-actions .pf-header-ai-btn {
+.pf-header-actions .pf-header-ai-btn,
+.pf-header-actions .pf-header-saved-btn {
   width: 36px; min-width: 36px; padding: 0 !important;
   display: inline-flex; align-items: center; justify-content: center;
 }
@@ -2730,3 +2731,39 @@ body {
 .pf-ai-filter-chip .pf-search-filter-chip-icon { color: #ff7a45; display: inline-flex; }
 /* Laufende Smart Search: eine Zeile, Rest mit Ellipse */
 .pf-smart-pill > span:not(.pf-smart-pill-icon) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+
+/* Meine Outfits (owner 2026-10-23): Seitenfenster rechts */
+.pf-saved-panel {
+  position: fixed; top: 48px; right: 0; bottom: 0; width: min(380px, 100vw); z-index: 80;
+  background: #111113; color: #fff; border-left: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: -18px 0 50px rgba(0, 0, 0, 0.35); padding: 18px 18px 24px; overflow-y: auto;
+  font-family: system-ui, sans-serif; animation: pf-saved-in 0.22s ease-out;
+}
+@keyframes pf-saved-in { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+.pf-saved-head { display: flex; align-items: center; justify-content: space-between; }
+.pf-saved-head h2 { margin: 0; font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; }
+.pf-saved-close, .pf-saved-delete {
+  all: unset; cursor: pointer; width: 26px; height: 26px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 17px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.pf-saved-owner { margin: 4px 0 14px; font-size: 11px; opacity: 0.55; }
+.pf-saved-empty { font-size: 13px; line-height: 1.5; opacity: 0.75; }
+.pf-saved-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.pf-saved-card { position: relative; }
+.pf-saved-open {
+  all: unset; cursor: pointer; display: flex; flex-direction: column; width: 100%;
+  border-radius: 12px; overflow: hidden; background: #1c1c1f; border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.pf-saved-open:hover { border-color: #ff5a1f; }
+.pf-saved-open img { width: 100%; aspect-ratio: 4 / 5; object-fit: cover; display: block; background: #0b0b0d; }
+.pf-saved-open img.transparent { object-fit: contain; background: #f3f4f6; }
+.pf-saved-meta { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; }
+.pf-saved-query { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pf-saved-date { font-size: 10.5px; opacity: 0.55; }
+.pf-saved-delete { position: absolute; top: 6px; right: 6px; background: rgba(0, 0, 0, 0.55); width: 22px; height: 22px; font-size: 15px; }
+.pf-header-saved-btn { position: relative; }
+.pf-header-saved-btn .pf-header-cart-count {
+  position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 4px;
+  font-size: 10px; line-height: 16px; border-radius: 999px; box-sizing: border-box;
+}
