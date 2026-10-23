@@ -34,6 +34,8 @@ import { scoreDimensions } from './scorer';
 const SMALL_LEVEL_MAX = 12;
 /** Von Hand waehlbare Dimension: hoechstens so viele Gruppen. */
 const MANUAL_MAX_GROUPS = 40;
+/** Bei gleicher Gruppierung gewinnt die Dimension weiter vorne. */
+const PARTITION_PREFERENCE = ['product_line', 'design_group', 'color_base'];
 
 // ============================================================================
 // GPANE Engine
@@ -194,10 +196,41 @@ export class GPANEEngine {
     return this._scoredDimensions.filter(d => this.splitsProducts(d.key, products));
   }
 
-  /** Dimensionen, die der Nutzer von Hand waehlen kann (lockerer als die Automatik). */
+  /**
+   * Dimensionen, die der Nutzer von Hand waehlen kann (lockerer als die
+   * Automatik). Bilden zwei Dimensionen auf dieser Ebene genau dieselben
+   * Gruppen (Design = Produktlinie bei Stiefeln), steht nur eine im Menue,
+   * bevorzugt die vorne in PARTITION_PREFERENCE (owner 2026-10-23).
+   */
   get selectableDimensions(): ScoredDimension[] {
     const products = this._getVisibleProducts();
-    return this._scoredDimensions.filter(d => this.splitsProducts(d.key, products, true));
+    const candidates = this._scoredDimensions.filter(d => this.splitsProducts(d.key, products, true));
+    const rank = (key: string) => {
+      const i = PARTITION_PREFERENCE.indexOf(key);
+      return i === -1 ? PARTITION_PREFERENCE.length : i;
+    };
+    const ordered = [...candidates].sort((a, b) => rank(a.key) - rank(b.key));
+    const seen = new Set<string>();
+    const keep = new Set<string>();
+    for (const dim of ordered) {
+      const signature = this._partitionSignature(dim.key, products);
+      if (signature && seen.has(signature)) continue;
+      if (signature) seen.add(signature);
+      keep.add(dim.key);
+    }
+    return candidates.filter(d => keep.has(d.key));
+  }
+
+  /** Welche Produkte zusammen in einer Gruppe landen, unabhaengig von den Namen. */
+  private _partitionSignature(key: string, products: Product[]): string {
+    const scored = this._scoredDimensions.find(d => d.key === key);
+    if (!scored || scored.dataType === 'multi_value') return '';
+    const groups = new Map<string, string[]>();
+    for (const bucket of buildBuckets(products, scored, this._config)) {
+      if (bucket.isUnknown) continue;
+      groups.set(bucket.label, [...bucket.objectIds].map(String).sort());
+    }
+    return [...groups.values()].map(ids => ids.join(',')).sort().join('|');
   }
 
   private _prescribedDimension(products: Product[]): ScoredDimension | null {

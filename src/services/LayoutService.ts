@@ -163,7 +163,8 @@ export class LayoutService {
         product_line: { label: 'Produktlinie', dataType: 'categorical' },
         color_base: { label: 'Farbe', dataType: 'categorical' },
         garment_type: { label: 'Typ', dataType: 'categorical' },
-        color_name: { label: 'Farbton', dataType: 'categorical' },
+        // Farbton (voller Farbname) neben Farbe war doppelt (owner 2026-10-23)
+        color_name: { hidden: true },
         is_spare: { label: 'Ersatzteil' },
         model_year: { label: 'Jahrgang', dataType: 'numeric_discrete' },
         // Lieferbarkeit als waehlbare Gruppierung (owner 2026-10-21). Niedrige
