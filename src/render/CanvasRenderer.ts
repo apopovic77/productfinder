@@ -17,6 +17,8 @@ import { ProductLabelRenderer } from './ProductLabelRenderer';
 import { categoryMediaService } from '../services/CategoryMediaService';
 import { BUCKET_BUTTON_CONFIG } from '../config/BucketButtonConfig';
 import { calculateSelectedProductGlow } from './SelectedProductGlow';
+import { facetIconImage } from '../components/FacetIcon';
+import { valueIconKey } from '../config/facetIcons';
 
 type LoadTask = {
   nodeId: string;
@@ -1803,15 +1805,27 @@ export class CanvasRenderer<T> {
       // (Zeile ~1322) — manuelles Einrechnen transformierte doppelt, die
       // Header liefen beim Zoomen schneller als die Produkte (media
       // 120651/120652). So zoomen und schieben sie exakt mit dem Canvas.
+      const posterDimension = String(this.getPivotDimension() ?? '');
       for (const header of this.posterHeaderProvider()) {
         this.ctx.font = `800 18px 'ITC Avant Garde Gothic', system-ui, sans-serif`;
         this.ctx.fillStyle = 'rgba(17, 17, 17, 0.88)';
         this.ctx.textAlign = 'left';
         this.ctx.textBaseline = 'alphabetic';
+        // Wert-Icon vor dem Gruppenkopf (owner 2026-10-23, Post #5627);
+        // nicht beim Titel der flachen Uebersicht
+        let textX = header.x;
+        let maxWidth = (header as any).maxWidth as number | undefined;
+        const iconKey = (header as any).static ? null : valueIconKey(posterDimension, (header as any).raw ?? header.text);
+        const icon = iconKey ? facetIconImage(iconKey, 'rgba(17, 17, 17, 0.88)') : null;
+        if (icon) {
+          this.ctx.drawImage(icon, header.x, header.y - 17, 20, 20);
+          textX += 26;
+          if (maxWidth) maxWidth = Math.max(20, maxWidth - 26);
+        }
         // maxWidth staucht statt zu ueberlappen; harte Kappung via Ellipsis
         // waere teurer und der Poster-Stil vertraegt condensed Versalien.
-        if ((header as any).maxWidth) this.ctx.fillText(header.text, header.x, header.y, (header as any).maxWidth);
-        else this.ctx.fillText(header.text, header.x, header.y);
+        if (maxWidth) this.ctx.fillText(header.text, textX, header.y, maxWidth);
+        else this.ctx.fillText(header.text, textX, header.y);
       }
     }
 
@@ -2093,6 +2107,17 @@ export class CanvasRenderer<T> {
         // die Blockoberkante. Ohne den halben Zeilenabstand sass jedes Label
         // eine halbe Zeile zu hoch (owner 2026-08-27, media 120881).
         const baselineShift = this.ctx.textBaseline === 'middle' ? lineHeight / 2 : 0;
+        // Wert-Icon vor dem Spaltenkopf (owner 2026-10-23, Post #5627)
+        const headerIconKey = valueIconKey(String(currentDimension ?? ''), header.label);
+        const headerIcon = headerIconKey && textAlign === 'left'
+          ? facetIconImage(headerIconKey, String(this.ctx.fillStyle))
+          : null;
+        if (headerIcon && transformedLines.length) {
+          const iconSize = Math.round(fontSize * 1.25);
+          const firstCenter = startY + lineHeight / 2;
+          this.ctx.drawImage(headerIcon, textX, firstCenter - iconSize / 2, iconSize, iconSize);
+          textX += iconSize + Math.round(fontSize * 0.45);
+        }
         transformedLines.forEach((line, index) => {
           const lineY = startY + baselineShift + index * lineHeight;
           this.ctx.fillText(line, textX, lineY);

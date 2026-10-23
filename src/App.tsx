@@ -76,6 +76,8 @@ import { SeriesSelectionGate, type SeriesGateEntry } from './components/SeriesSe
 import { FullModeIcon, fullModeHref, fullModeLabel, isFullFinderMode } from './components/FullModeToggle';
 import { resolveCatalogFlow, resolveVoiceModel } from './config/CatalogEntryConfig';
 import { initPfTrace } from './utils/pfTrace';
+import { FacetIcon } from './components/FacetIcon';
+import { dimensionIconKey } from './config/facetIcons';
 import {
   buildProductFinderCartContext,
   resolveProductPriceEur,
@@ -3413,11 +3415,12 @@ export default class App extends React.Component<Props, State> {
                       ...(!pivotDimensions
                         .filter(dim => availableDimsNow.includes(dim))
                         .includes(pivotDimension)
-                        ? [{ value: pivotDimension, label: getDimensionLabel(pivotDimension) }]
+                        ? [{ value: pivotDimension, label: getDimensionLabel(pivotDimension), icon: <FacetIcon iconKey={dimensionIconKey(pivotDimension)} /> }]
                         : []),
                       ...pivotDimensions
                         .filter(dim => availableDimsNow.includes(dim))
-                        .map(dim => ({ value: dim, label: getDimensionLabel(dim) })),
+                        // Icon je Dimension (Post #5627); ohne Icon ein leerer Platz, damit die Texte buendig stehen
+                        .map(dim => ({ value: dim, label: getDimensionLabel(dim), icon: <FacetIcon iconKey={dimensionIconKey(dim)} /> })),
                     ]}
                   />
                 </div>

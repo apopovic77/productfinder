@@ -5,6 +5,8 @@ import './CustomSelect.css';
 type Option = {
   value: string;
   label: string;
+  /** Symbol vor dem Eintrag (Gruppieren-Menue, owner 2026-10-23) */
+  icon?: React.ReactNode;
 };
 
 type CustomSelectProps = {
@@ -146,6 +148,7 @@ export const CustomSelect: React.FC<CustomSelectProps> = ({
                     <polyline points="3 8 6 11 13 4" />
                   </svg>
                 )}
+                {option.icon}
                 {option.label}
               </li>
             ))}
