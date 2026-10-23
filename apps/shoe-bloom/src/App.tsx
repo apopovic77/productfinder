@@ -1,32 +1,28 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { BloomScene, type Petal, type Phase } from './BloomScene';
-import { BandScene } from './BandScene';
+import { EngineScene, type EngineView } from './engine/EngineScene';
 import { loadDesigns, type Design, type Shoe } from './data';
 
-type View = 'bloom' | 'band';
-const BAND_MIN_ITEMS = 27;
+const WALL_COUNT = 196;
 
 /**
- * Blüte: Ebene 1 je Design ein Blatt, Ebene 2 die Farben eines Designs, Klick auf eine Farbe: Fokus.
- * Band: alle Stiefel (oder die Farben eines Designs) in Reihen, wischen, Klick: Fokus.
+ * Alles über die Wave-Engine (ein instanziertes Morph-Partikel je Kachel):
+ * Blüte: Ebene 1 je Design ein Blatt, Ebene 2 die Farben eines Designs, Klick: Fokus.
+ * Fläche: alle Stiefel auf dem Flächen-Layout der Engine, Kamera auf fester Achse, wischen.
  */
 export function App() {
   const [designs, setDesigns] = useState<Design[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [design, setDesign] = useState<Design | null>(null);
-  const [phase, setPhase] = useState<Phase>('bud');
   const [focus, setFocus] = useState(-1);
+  const [current, setCurrent] = useState(-1);
+  const [view, setView] = useState<EngineView>(() =>
+    ['wall', 'band'].includes(new URLSearchParams(window.location.search).get('view') ?? '') ? 'wall' : 'bloom');
   const timer = useRef<number | undefined>(undefined);
-  const [view, setView] = useState<View>(() =>
-    new URLSearchParams(window.location.search).get('view') === 'band' ? 'band' : 'bloom');
-  const [bandFocus, setBandFocus] = useState(-1);
-  const [bandCurrent, setBandCurrent] = useState(-1);
 
   useEffect(() => {
     loadDesigns().then((all) => {
       setDesigns(all);
-      // Direktlink: ?design=<Name>
       const wanted = new URLSearchParams(window.location.search).get('design');
       const hit = wanted ? all.find((d) => d.name.toLowerCase() === wanted.toLowerCase()) : undefined;
       if (hit) setDesign(hit);
@@ -34,109 +30,89 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    if (!designs) return; // erst nach dem Laden, sonst geht der Direktlink verloren
+    if (!designs) return;
     const url = new URL(window.location.href);
     if (design) url.searchParams.set('design', design.name); else url.searchParams.delete('design');
-    if (view === 'band') url.searchParams.set('view', 'band'); else url.searchParams.delete('view');
+    if (view === 'wall') url.searchParams.set('view', 'wall'); else url.searchParams.delete('view');
     window.history.replaceState(null, '', url);
   }, [designs, design, view]);
 
-  // Band: Stiefel wiederholt, bis die Reihen voll wirken
-  const bandShoes: Shoe[] = useMemo(() => {
+  const shoes: Shoe[] = useMemo(() => (designs ?? []).flatMap((d) => d.shoes), [designs]);
+  const images = useMemo(() => shoes.map((s) => s.image), [shoes]);
+  // Instanz i < Anzahl Stiefel = der Stiefel selbst; danach Wiederholungen, gestreut
+  const instanceProduct = useMemo(() => {
+    const n = shoes.length;
+    if (!n) return [];
+    return Array.from({ length: Math.max(WALL_COUNT, n) }, (_, i) => (i < n ? i : (i * 7 + Math.floor(i / n) * 3) % n));
+  }, [shoes]);
+  const bloomProducts = useMemo(() => {
     if (!designs) return [];
-    const pool = design ? design.shoes : designs.flatMap((d) => d.shoes);
-    const out: Shoe[] = [];
-    while (out.length < Math.max(BAND_MIN_ITEMS, pool.length)) out.push(...pool);
-    return out.slice(0, Math.max(BAND_MIN_ITEMS, pool.length));
-  }, [designs, design]);
-  const bandItems: Petal[] = useMemo(() => bandShoes.map((s, i) => ({ key: `${s.id}-${i}`, image: s.image })), [bandShoes]);
-  useEffect(() => { setBandFocus(-1); }, [bandItems]);
-
-  const petals: Petal[] = useMemo(() => {
-    if (!designs) return [];
-    if (design) return design.shoes.map((s) => ({ key: s.id, image: s.image }));
-    return designs.map((d) => ({ key: d.name, image: d.shoes[0].image }));
-  }, [designs, design]);
-
-  // nach jedem Wechsel der Ebene aus der Knospe aufblühen
-  useEffect(() => {
-    if (!petals.length) return;
-    setPhase('bud');
-    const t = window.setTimeout(() => setPhase('open'), 350);
-    return () => window.clearTimeout(t);
-  }, [petals]);
+    if (design) return design.shoes.map((s) => shoes.indexOf(s));
+    return designs.map((d) => shoes.indexOf(d.shoes[0]));
+  }, [designs, design, shoes]);
 
   const switchTo = useCallback((next: Design | null) => {
     setFocus(-1);
-    setPhase('bud');
     window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => setDesign(next), 480);
+    setDesign(next);
   }, []);
 
-  const onPick = useCallback((i: number) => {
+  const onPick = useCallback((instance: number) => {
+    if (instance < 0) { setFocus(-1); return; }
+    if (view === 'wall') { setFocus((f) => (f === instance ? -1 : instance)); return; }
     if (!designs) return;
     if (!design) {
-      const d = designs[i];
-      if (d.shoes.length === 1) {
-        // ein Design mit nur einer Farbe: gleich in den Fokus
-        setDesign(d);
-        setTimeout(() => setFocus(0), 900);
-      } else switchTo(d);
+      const d = designs.find((x) => shoes.indexOf(x.shoes[0]) === instance);
+      if (!d) return;
+      switchTo(d);
+      if (d.shoes.length === 1) timer.current = window.setTimeout(() => setFocus(instance), 1900);
       return;
     }
-    setFocus((f) => (f === i ? -1 : i));
-  }, [designs, design, switchTo]);
+    setFocus((f) => (f === instance ? -1 : instance));
+  }, [designs, design, shoes, view, switchTo]);
 
-  const shoe = view === 'band'
-    ? (bandFocus >= 0 ? bandShoes[bandFocus] : null)
-    : (design && focus >= 0 ? design.shoes[focus] : null);
-  const front = view === 'band' && bandCurrent >= 0 ? bandShoes[bandCurrent] : null;
-  const swatchActive = (s: Shoe, i: number) => (view === 'band' ? shoe?.id === s.id : i === focus);
-  const pickSwatch = (s: Shoe, i: number) => {
-    if (view === 'bloom') { setFocus(i === focus ? -1 : i); return; }
-    if (shoe?.id === s.id) { setBandFocus(-1); return; }
-    // nächstgelegenes Vorkommen in der vorderen Reihe
-    setBandFocus(bandShoes.findIndex((b) => b.id === s.id));
-  };
+  const shoe = focus >= 0 ? shoes[instanceProduct[focus]] : null;
+  const front = view === 'wall' && current >= 0 ? shoes[instanceProduct[current]] : null;
 
   return (
     <div className="stage">
       <header className="caption">
         <div className="label">_MODEL:</div>
-        <div className="model">{front ? `${front.design} · ${front.color}` : design ? design.name : "O'NEAL BOOTS 2028"}</div>
+        <div className="model">{shoe ? `${shoe.design} · ${shoe.color}` : front ? `${front.design} · ${front.color}` : design ? design.name : "O'NEAL BOOTS 2028"}</div>
         <div className="label">_ACTION:</div>
-        <div className="action">{design || view === 'band' ? 'CUSTOMIZE' : 'CHOOSE'}</div>
+        <div className="action">{design || view === 'wall' ? 'CUSTOMIZE' : 'CHOOSE'}</div>
       </header>
 
       <div className="views" role="tablist">
-        <button className={view === 'bloom' ? 'on' : ''} onClick={() => { setView('bloom'); setBandFocus(-1); }}>Blüte</button>
-        <button className={view === 'band' ? 'on' : ''} onClick={() => { setView('band'); setFocus(-1); }}>Band</button>
+        <button className={view === 'bloom' ? 'on' : ''} onClick={() => { setFocus(-1); setView('bloom'); }}>Blüte</button>
+        <button className={view === 'wall' ? 'on' : ''} onClick={() => { setFocus(-1); setView('wall'); }}>Fläche</button>
       </div>
 
-      {design && (
+      {design && view === 'bloom' && (
         <button className="back" onClick={() => switchTo(null)}>← Alle Stiefel</button>
       )}
 
-      <Canvas camera={{ position: [0, 0, 9], fov: 35 }} dpr={[1, 2]}
-              onPointerMissed={() => { setFocus(-1); setBandFocus(-1); }}>
+      <Canvas camera={{ position: [0, 0, 9.5], fov: 35 }} dpr={[1, 2]} gl={{ antialias: true }}>
         <Suspense fallback={null}>
-          {view === 'bloom' && petals.length > 0 && <BloomScene petals={petals} phase={phase} focus={focus} onPick={onPick} />}
-          {view === 'band' && bandItems.length > 0 && (
-            <BandScene items={bandItems} focus={bandFocus} onCurrent={setBandCurrent}
-                       onPick={(i) => setBandFocus((f) => (f === i ? -1 : i))} />
+          {instanceProduct.length > 0 && (
+            <EngineScene images={images} instanceProduct={instanceProduct} view={view} bloomProducts={bloomProducts}
+                         focus={focus} onPick={onPick} onCurrent={setCurrent} />
           )}
         </Suspense>
       </Canvas>
 
-      {design && (
+      {design && view === 'bloom' && (
         <nav className="swatches">
-          {design.shoes.map((s, i) => (
-            <button key={s.id} className={swatchActive(s, i) ? 'swatch active' : 'swatch'} onClick={() => pickSwatch(s, i)}
-                    title={s.color}>
-              <img src={s.image.replace('width=640', 'width=120')} alt={s.color} />
-              <span>{s.color}</span>
-            </button>
-          ))}
+          {design.shoes.map((s) => {
+            const idx = shoes.indexOf(s);
+            return (
+              <button key={s.id} className={idx === focus ? 'swatch active' : 'swatch'} title={s.color}
+                      onClick={() => setFocus(idx === focus ? -1 : idx)}>
+                <img src={s.image.replace('width=640', 'width=120')} alt={s.color} />
+                <span>{s.color}</span>
+              </button>
+            );
+          })}
         </nav>
       )}
 
@@ -158,8 +134,8 @@ export function App() {
 
       {!designs && !error && <div className="loading">Lade Stiefel …</div>}
       {error && <div className="loading">{error}</div>}
-      {!design && designs && view === 'bloom' && <div className="hint-bottom">Tippe auf einen Stiefel, um seine Farben aufblühen zu lassen</div>}
-      {!design && designs && view === 'band' && !shoe && <div className="hint-bottom">Wischen zum Blättern, Tippen für Details</div>}
+      {designs && !shoe && view === 'bloom' && !design && <div className="hint-bottom">Tippe auf einen Stiefel, um seine Farben aufblühen zu lassen</div>}
+      {designs && !shoe && view === 'wall' && <div className="hint-bottom">Wischen fährt die Fläche entlang, Tippen holt einen Stiefel nach vorn</div>}
     </div>
   );
 }
