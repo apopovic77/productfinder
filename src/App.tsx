@@ -2960,11 +2960,22 @@ export default class App extends React.Component<Props, State> {
       if (this.state.outfitImage?.status === 'pending') return { error: 'laeuft_bereits' };
       // Outfit-Layout aktiv: die getragenen Teile, sonst die aktuelle Trefferliste
       const worn = this.controller.isOutfitActive() ? this.controller.getOutfitWornIds() : [];
+      const shown = this.controller.getDisplayOrder();
+      // Liste nach Produktart mischen: sonst sind die ersten 40 einer Ebene
+      // oft nur Helme und die Szene hat ein Teil ("nur 1 Teile", Test 16:34)
+      const byType = new Map<string, string[]>();
+      for (const p of shown) {
+        const type = p.getAttributeValue<string>('product_type') ?? '';
+        byType.set(type, [...(byType.get(type) ?? []), String(p.id)]);
+      }
+      const lanes = [...byType.values()];
+      const mixed: string[] = [];
+      for (let i = 0; mixed.length < shown.length; i++) lanes.forEach(lane => { if (lane[i]) mixed.push(lane[i]); });
       const ids = worn.length ? worn
         : this.state.aiFilterProductIds.length ? this.state.aiFilterProductIds
-        : this.controller.getDisplayOrder().map(p => String(p.id));
+        : mixed;
       if (!ids.length) return { error: 'keine_trefferliste' };
-      if (ids.length < 3) return { error: 'zu_wenige_teile' };
+      if (ids.length < 3 || (!worn.length && !this.state.aiFilterProductIds.length && byType.size < 3)) return { error: 'zu_wenige_teile' };
       this.outfitImageIds = ids.slice(0, 40);
       this.requestOutfitImage(this.outfitImageIds, ++this.outfitImageToken);
       return { started: true };
