@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import {
-  applyShaderToMaterial, computeLayout, computeRadialFan, createMorphGeometry, createMorphMesh, createUniforms, focusLayout,
+  EngineRuntime, applyShaderToMaterial, computeLayout, computeRadialFan, createMorphGeometry, createMorphMesh, createUniforms, focusLayout,
   morphTo,
   type LayoutResult,
 } from '@arkturian/wave-engine';
@@ -41,8 +41,7 @@ const SHUTTER = 1 / 24; // Belichtungszeit der Unschärfe in Sekunden
 const BLOOM_TILE = 2.7;
 /** Halbe Kantenlänge der Fläche je nach Anzahl: Kachelgröße bleibt etwa gleich (196 Kacheln ≈ 9). */
 const wallRadius = (count: number) => 0.65 * Math.sqrt(count);
-const FLOOR_ROW_GAP = 2.4; // Reihenabstand am Boden relativ zum Rasterabstand
-const FLOOR_SPREAD = 2.1; // Abstand nebeneinander am Boden relativ zum Rasterabstand
+const FLOOR_SPACING = 2.6; // Abstand der Rasterpunkte (Kachel = 1)
 
 function hidden(): LayoutResult {
   return {
@@ -85,8 +84,8 @@ export function EngineScene({ images, instanceProduct, view, bloomProducts, focu
   // Atlas aus den Produktbildern, UV-Kachel je Instanz
   useEffect(() => {
     let alive = true;
-    // Spitze im Atlas nach rechts: der Morph-Shader zeigt die Kachel gespiegelt, auf dem Bildschirm also nach links
-    buildImageAtlas(images, { face: 1 }).then((a) => {
+    // Spitze einheitlich nach links (Bilder ohne Seitenansicht werden gespiegelt)
+    buildImageAtlas(images, { face: -1 }).then((a) => {
       if (!alive) return;
       const uv = mesh.geometry.getAttribute('aUVOffset') as THREE.InstancedBufferAttribute;
       instanceProduct.forEach((p, i) => uv.setXYZW(i, ...a.uv(p)));
@@ -110,27 +109,19 @@ export function EngineScene({ images, instanceProduct, view, bloomProducts, focu
     const step = xs.length > 1 ? xs[1] - xs[0] : 1;
     return raw.map((r) => flatTile(r, step * 0.94));
   }, [count]);
-  // Fläche Perspektive: dasselbe Raster auf den Boden gelegt (Reihen nach hinten), die Kacheln stehen
-  // aufrecht mit der Unterkante auf y = 0; die Kamera blickt leicht schräg von oben darauf
+  // Fläche Perspektive: Flächen-Layouter der Engine ('plane_grid_a' = Layouters.planeGrid aus
+  // @arkturian/typescript-utils, Port der ModernLayouters aus 3dPresenter2): Raster auf der um 45° geneigten
+  // Fläche, Ausrichtung über die Runtime-Einstellungen: World Up (Objekte bleiben aufrecht), aligned,
+  // feste Abstände (margin). Keine eigene Positionsrechnung.
   const floor = useMemo(() => {
-    const ys = wall.map((r) => r.target.position.y);
-    const front = Math.max(...ys);
-    const rowYs = [...new Set(ys.map((y) => y.toFixed(3)))].map(Number).sort((a, b) => b - a);
-    const step = rowYs.length > 1 ? rowYs[0] - rowYs[1] : 1;
-    return wall.map((r) => {
-      const size = r.target.size.y;
-      // jede zweite Reihe um eine halbe Kachel versetzt: sonst bilden die Spalten Gassen zum Fluchtpunkt
-      const row = rowYs.findIndex((y) => Math.abs(y - r.target.position.y) < 1e-3);
-      const x = (r.target.position.x + (row % 2) * step * 0.5) * FLOOR_SPREAD;
-      const f: LayoutResult = {
-        target: { ...r.target, position: new THREE.Vector3(x, size / 2, -(front - r.target.position.y) * FLOOR_ROW_GAP),
-          quaternion: new THREE.Quaternion(), scale: r.target.scale.clone(), size: r.target.size.clone(),
-          trapezoid: r.target.trapezoid.clone(), morph: r.target.morph ? { ...r.target.morph } : undefined },
-        current: r.current,
-      };
-      return f;
-    });
-  }, [wall]);
+    const rt = EngineRuntime.getInstance();
+    rt.tileAspectMode = 'square'; // Atlas-Kacheln sind quadratisch, das Bild steht darin
+    rt.layoutUpMode = 'world';
+    rt.layoutOrientation = 'aligned';
+    rt.layoutSpacingMode = 'margin';
+    rt.layoutSpacing = FLOOR_SPACING;
+    return computeLayout('plane_grid_a', { count, options: { radius: 3, size: 1 } });
+  }, [count]);
   const wallBounds = useMemo(() => {
     const xs = wall.map((r) => r.target.position.x);
     return { min: Math.min(...xs), max: Math.max(...xs) };
@@ -157,7 +148,7 @@ export function EngineScene({ images, instanceProduct, view, bloomProducts, focu
     const base = view === 'wall' ? wall : view === 'floor' ? floor : bloom;
     const panX = camTarget.current.x;
     const focusPos = view === 'wall' ? { x: panX - 0.8, y: 0.1, z: 3.2 }
-      : view === 'floor' ? { x: panAxis.current, y: 1.25, z: 2.4 }
+      : view === 'floor' ? { x: panAxis.current, y: -2.2, z: 6.5 }
       : { x: 0, y: 0.15, z: 1.6 };
     const { results } = focusLayout(base, focus, {
       position: focusPos, scale: view === 'wall' ? 2.2 : view === 'floor' ? 1.5 : 1.35, recedeScale: view === 'bloom' ? 0.8 : 1,
@@ -251,8 +242,9 @@ export function EngineScene({ images, instanceProduct, view, bloomProducts, focu
         lookTarget.current.set(inertia.value, 0, 0);
       } else {
         // leicht schräg von oben auf den Boden, Blick in die Reihen hinein
-        camTarget.current.set(inertia.value, narrow ? 1.3 : 0.95, narrow ? 6.5 : 4.3);
-        lookTarget.current.set(inertia.value, 0.25, -8);
+        // Raster steigt nach hinten an (45°): Kamera davor, leicht erhöht gegenüber der vorderen Reihe
+        camTarget.current.set(inertia.value, narrow ? -1.8 : -2.4, narrow ? 11 : 8.5);
+        lookTarget.current.set(inertia.value, -0.6, 0);
       }
       panAxis.current = inertia.value;
     } else {
@@ -273,11 +265,12 @@ export function EngineScene({ images, instanceProduct, view, bloomProducts, focu
     // Wand: Welle in die Tiefe; Boden: die Schuhe heben und senken sich als Welle quer über die Reihen
     if (view === 'floor') uniforms.uWaveDir.value.set(0.45, 0.89, 0);
     else uniforms.uWaveDir.value.set(0.55, 0.1, 0.83);
+    const frontZ = Math.max(...floor.map((r) => r.target.position.z));
     if (view !== 'bloom' && onCurrent) {
       let best = -1, bestD = Infinity;
       (view === 'floor' ? floor : wall).forEach((r, i) => {
         const d = view === 'floor'
-          ? Math.abs(r.target.position.x - inertia.value) + Math.abs(r.target.position.z) * 10
+          ? Math.abs(r.target.position.x - inertia.value) + Math.abs(r.target.position.z - frontZ) * 10
           : Math.hypot(r.target.position.x - inertia.value, r.target.position.y);
         if (d < bestD) { bestD = d; best = i; }
       });
