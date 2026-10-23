@@ -165,6 +165,15 @@ export class LayoutService {
         garment_type: { label: 'Typ', dataType: 'categorical' },
         // Farbton (voller Farbname) neben Farbe war doppelt (owner 2026-10-23)
         color_name: { hidden: true },
+        // Groessentyp (Helmgroessen, Konfektionsgroessen ...) teilt wie der
+        // Produkttyp ein und sagt Haendlern nichts Eigenes (owner 2026-10-23)
+        size_type: { hidden: true },
+        // Eine Kategorie statt dreier gleicher (owner 2026-10-23): Produkttyp
+        // heisst jetzt Produktkategorie; die gleichlautende
+        // presentation_category und die englische LIUS-Kategorie entfallen
+        product_type: { label: 'Produktkategorie', dataType: 'categorical' },
+        presentation_category: { hidden: true },
+        category_primary: { hidden: true },
         is_spare: { label: 'Ersatzteil' },
         model_year: { label: 'Jahrgang', dataType: 'numeric_discrete' },
         // Lieferbarkeit als waehlbare Gruppierung (owner 2026-10-21). Niedrige
