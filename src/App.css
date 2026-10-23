@@ -255,8 +255,12 @@ body {
    AI and cart. Below ~1300 px the labels go first, then the search
    narrows to an icon-sized field; the breadcrumbs and the action buttons
    are never clipped. */
+/* Laptop-Breite (owner 2026-10-23): schmalere Gruppieren-Auswahl, damit die
+   Breadcrumb-Leiste lesbar bleibt */
+@media (max-width: 1600px) {
+  .pf-header-dimension-select { width: 130px; }
+}
 @media (max-width: 1300px) {
-  .pf-header-control-label { display: none; }
   .pf-header-search-inner { max-width: 220px; min-width: 120px; }
   .pf-header { padding: 0 16px; }
 }
@@ -361,6 +365,36 @@ body {
   align-items: center;
   gap: 8px;
   margin-left: 16px;
+  min-width: 0;
+  max-width: 46vw;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  white-space: nowrap;
+  cursor: grab;
+}
+.pf-header-breadcrumbs::-webkit-scrollbar { display: none; }
+@media (min-width: 1400px) {
+  /* Die aktuelle Ebene muss lesbar bleiben (Logo + ca. 170 px Leiste);
+     dafuer wird die Suche schmaler. Darunter darf die Leiste ganz
+     schrumpfen, sie scrollt ohnehin. Die Mindestbreite sitzt am Eltern-
+     element: an der Leiste selbst lief sie rechts ueber die Suche. */
+  .pf-header-left { min-width: 300px; }
+}
+@media (min-width: 1024px) and (max-width: 1600px) {
+  .pf-header .pf-header-search-inner { min-width: 96px; max-width: 200px; }
+}
+.pf-header-breadcrumbs > * { flex-shrink: 0; }
+/* Links ausblenden, sobald aeltere Ebenen verdeckt sind */
+.pf-header-breadcrumbs.pf-crumbs-scrolled {
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 18px);
+  mask-image: linear-gradient(to right, transparent 0, #000 18px);
+}
+/* Menue fest am Crumb positionieren (Leiste scrollt und wuerde abschneiden) */
+.pf-header-breadcrumbs .pf-crumb-menu {
+  position: fixed;
+  left: var(--crumb-x, auto);
+  top: var(--crumb-y, auto);
 }
 
 .pf-header-breadcrumb {
@@ -998,8 +1032,12 @@ body {
   display: flex;
   align-items: center;
   gap: 16px;
-  flex-shrink: 0; /* breadcrumbs are nowrap; shrinking them only overlaps them with the search */
+  /* Schrumpft, statt die Suche zu ueberlagern: die Breadcrumb-Leiste scrollt
+     dann waagrecht (owner 2026-10-23, media 132113) */
+  flex: 0 1 auto;
+  min-width: 0;
 }
+.pf-header-logo { flex-shrink: 0; }
 
 .pf-header-search {
   flex: 1;
@@ -1013,7 +1051,7 @@ body {
   min-width: 160px; /* two more header buttons since the side pane went; keep the field usable */
   max-width: 300px;
 }
-.pf-header-search { margin: 0 28px 0 12px; min-width: 0; }
+.pf-header-search { margin: 0 28px 0 12px; min-width: min-content; } /* nie schmaler als das Feld: es ragte sonst links ueber die Breadcrumbs (2026-10-23) */
 
 .pf-header-search-input {
   width: 100%;

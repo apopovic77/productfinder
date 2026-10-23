@@ -445,6 +445,8 @@ export default class App extends React.Component<Props, State> {
     initPfTrace(this.traceSnapshot);
     // Outfit-Bild fuer jedes Agenten-Ergebnis, auch aus der Sprach-Suche
     this.controller.onAgentProductsApplied = ids => this.startOutfitImage(ids);
+    window.addEventListener('resize', this.scrollCrumbsToEnd);
+    window.setTimeout(this.scrollCrumbsToEnd, 0);
     // Finder aktiv: der schwebende Vollmodus-Schalter der Gate-Seiten tritt
     // zurück, der Finder hat ihn im Header.
     document.body.classList.add('pf-finder-active');
@@ -552,6 +554,7 @@ export default class App extends React.Component<Props, State> {
   }
 
   componentWillUnmount(): void {
+    window.removeEventListener('resize', this.scrollCrumbsToEnd);
     document.body.classList.remove('pf-finder-active');
     this.controller.destroy();
     this.stopFPSCounter();
@@ -574,6 +577,9 @@ export default class App extends React.Component<Props, State> {
   private sheetObserver: ResizeObserver | null = null;
 
   componentDidUpdate(prevProps: Props, prevState: State): void {
+    if (prevState.pivotBreadcrumbs !== this.state.pivotBreadcrumbs || prevProps.categoryLabel !== this.props.categoryLabel) {
+      this.scrollCrumbsToEnd();
+    }
     if (prevProps.categoryLabel !== this.props.categoryLabel) this.controller.setEntryTitle(this.props.categoryLabel ?? '');
     // Benachrichtigungen mit der Haendler-Session laden bzw. leeren
     if (prevState.b2bSession?.token !== this.state.b2bSession?.token) this.loadRestockRequests();
@@ -1441,9 +1447,69 @@ export default class App extends React.Component<Props, State> {
    * pointerenter-Events jedes NICHT-Touch-Pointers (mouse/pen/Ray) das
    * Menue zusaetzlich per Klasse; Touch-Taps navigieren weiter direkt.
    */
+  /**
+   * Breadcrumb-Leiste bei wenig Breite (owner 2026-10-23, media 132113): sie
+   * ist begrenzt und scrollt waagrecht; die aktuelle Ebene steht rechts
+   * sichtbar, aeltere verschwinden links. Ziehen mit der Maus oder das
+   * Mausrad holt sie zurueck; ein Ziehen loest keinen Klick aus.
+   */
+  private crumbsRef = React.createRef<HTMLDivElement>();
+  private crumbDrag: { x: number; left: number; moved: boolean } | null = null;
+  private crumbDragged = false;
+
+  private updateCrumbFade = () => {
+    const el = this.crumbsRef.current;
+    if (el) el.classList.toggle('pf-crumbs-scrolled', el.scrollLeft > 2);
+  };
+
+  private scrollCrumbsToEnd = () => {
+    const el = this.crumbsRef.current;
+    if (!el) return;
+    el.scrollLeft = el.scrollWidth;
+    this.updateCrumbFade();
+  };
+
+  private crumbBarProps() {
+    return {
+      ref: this.crumbsRef,
+      onScroll: this.updateCrumbFade,
+      onWheel: (e: React.WheelEvent<HTMLDivElement>) => {
+        const el = e.currentTarget;
+        if (el.scrollWidth <= el.clientWidth) return;
+        el.scrollLeft += Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      },
+      onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => {
+        if (e.pointerType !== 'mouse' || e.button !== 0) return;
+        this.crumbDrag = { x: e.clientX, left: e.currentTarget.scrollLeft, moved: false };
+        this.crumbDragged = false;
+      },
+      onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => {
+        const drag = this.crumbDrag;
+        if (!drag) return;
+        const dx = e.clientX - drag.x;
+        if (!drag.moved && Math.abs(dx) < 5) return;
+        drag.moved = true;
+        e.currentTarget.scrollLeft = drag.left - dx;
+      },
+      onPointerUp: () => {
+        this.crumbDragged = !!this.crumbDrag?.moved;
+        this.crumbDrag = null;
+      },
+      onPointerLeave: () => { this.crumbDrag = null; },
+      // Nach einem Ziehen den Klick auf den Breadcrumb verschlucken
+      onClickCapture: (e: React.MouseEvent<HTMLDivElement>) => {
+        if (this.crumbDragged) { e.stopPropagation(); e.preventDefault(); this.crumbDragged = false; }
+      },
+    };
+  }
+
   private crumbWrapProps() {
     return {
       onPointerEnter: (e: React.PointerEvent<HTMLSpanElement>) => {
+        // Menue fest am Crumb: die scrollende Leiste wuerde es sonst abschneiden
+        const rect = e.currentTarget.getBoundingClientRect();
+        e.currentTarget.style.setProperty('--crumb-x', `${Math.round(rect.left - 6)}px`);
+        e.currentTarget.style.setProperty('--crumb-y', `${Math.round(rect.bottom)}px`);
         if (e.pointerType !== 'touch') e.currentTarget.classList.add('pf-crumb-open');
       },
       onPointerLeave: (e: React.PointerEvent<HTMLSpanElement>) => {
@@ -3016,7 +3082,7 @@ export default class App extends React.Component<Props, State> {
             <div className="pf-header-logo">
               <img src={logoUrl} alt="O'NEAL" height="25" />
             </div>
-            <div className="pf-header-breadcrumbs">
+            <div className="pf-header-breadcrumbs" {...this.crumbBarProps()}>
               <span
                 role="button"
                 tabIndex={0}
