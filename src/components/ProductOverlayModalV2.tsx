@@ -166,6 +166,11 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   /** Gewaehlter Hintergrundstil der Buehne, im Browser gemerkt */
   // Wahl per Punkt gilt fuer dieses Produkt; sonst waehlt die Rangfolge
   const [bgPick, setBgPick] = useState<{ id: string; style: string } | null>(null);
+  // Grosse Kacheln, deren Bild schon geladen ist: der kleine Platzhalter
+  // dahinter kommt dann weg. Als React-Zustand statt per DOM-Stil, denn ein
+  // spaeteres Rendern setzte den Platzhalter wieder und er schien groesser
+  // hinter dem Bild durch (Quest, owner 2026-11-03, media 132906).
+  const [loadedStageThumbs, setLoadedStageThumbs] = useState<Set<string>>(() => new Set());
   const chooseBgStyle = (id: string) => setBgPick({ id: String(product.id), style: id });
   // Hintergruende aus der Katalog-Registry, sonst die eingebaute Liste
   const [bgStyles, setBgStyles] = useState<StageBackgroundStyle[]>(STAGE_BACKGROUND_STYLES);
@@ -1416,7 +1421,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                     className={`pom-expanded-thumb ${isActive ? 'active' : ''}`}
                     // Kleines Vorschaubild als Platzhalter, bis die grosse Fassung
                     // da ist; darunter der Buehnen-Hintergrund wie im Entwurf
-                    style={{ backgroundImage: [img.storageId ? `url(${buildThumbUrl(img.storageId)})` : '', stageThumbBg].filter(Boolean).join(', ') || undefined }}
+                    style={{ backgroundImage: [img.storageId && !loadedStageThumbs.has(thumbnailUrl) ? `url(${buildThumbUrl(img.storageId)})` : '', stageThumbBg].filter(Boolean).join(', ') || 'none' }}
                     onClick={() => pickStageImage(idx)}
                   >
                     <img
@@ -1425,7 +1430,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                       // Platzhalter weg, sobald das grosse Bild da ist: bei
                       // freigestellten Bildern schien er sonst verschoben durch
                       // (owner 2026-10-21, media 131831)
-                      onLoad={e => { const btn = e.currentTarget.parentElement; if (btn) btn.style.backgroundImage = stageThumbBg || 'none'; }}
+                      onLoad={() => setLoadedStageThumbs(prev => (prev.has(thumbnailUrl) ? prev : new Set(prev).add(thumbnailUrl)))}
                     />
                   </button>
                 );
