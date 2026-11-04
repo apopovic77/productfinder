@@ -58,6 +58,7 @@ import { resolveProductTapStage } from './utils/ProductTapFlow';
 import QuickSearchCommandPalette from './components/QuickSearchCommandPalette';
 import { AiProductQueryService } from './services/AiProductQueryService';
 import { RecommendationService } from './services/RecommendationService';
+import { appTexts, uiDimLabel } from './i18n/ui';
 import { FavoriteProductService, OutfitImageService, SavedOutfitService, outfitImageUrl, outfitOwner, type OutfitBackground, type SavedOutfit } from './services/OutfitImageService';
 import { categoryMediaService } from './services/CategoryMediaService';
 import { FOOTER_CONFIG, type FooterPosition } from './config/FooterConfig';
@@ -3041,6 +3042,9 @@ export default class App extends React.Component<Props, State> {
     },
   };
 
+  /** Oberflaechentexte in der gewaehlten Sprache (owner 2026-11-04, media 132948) */
+  private get ui() { return appTexts(this.props.locale); }
+
   /** Lieblingsprodukt oeffnen: Merkliste im Finder zeigen, dann die Karte. */
   private openFavorite = (product: Product) => {
     this.showFavorites();
@@ -3130,13 +3134,13 @@ export default class App extends React.Component<Props, State> {
       const { productIds } = await AiProductQueryService.queryProducts(query, { brand: this.props.brand });
       if (token !== this.smartJobToken) return;
       if (!productIds.length) {
-        this.setState({ smartJob: { query, status: 'error', message: 'Keine passenden Produkte gefunden.' } });
+        this.setState({ smartJob: { query, status: 'error', message: this.ui.noMatchingProducts } });
         return;
       }
       this.setState({ smartJob: { query, status: 'done', productIds } });
     } catch (error) {
       if (token !== this.smartJobToken) return;
-      const message = error instanceof Error ? error.message : 'Die KI-Suche ist fehlgeschlagen.';
+      const message = error instanceof Error ? error.message : this.ui.aiSearchFailed;
       this.setState({ smartJob: { query, status: 'error', message } });
     }
   };
@@ -3147,7 +3151,7 @@ export default class App extends React.Component<Props, State> {
     this.lastOutfitQuery = job.query;
     const matchedIds = this.applyAiResult(job.productIds);
     if (!matchedIds.length) {
-      this.setState({ smartJob: { ...job, status: 'error', message: 'Die gefundenen Produkte sind nicht in dieser Marke.' } });
+      this.setState({ smartJob: { ...job, status: 'error', message: this.ui.notInBrand } });
       return;
     }
     const historyEntry = { query: job.query, productIds: matchedIds, resultCount: matchedIds.length };
@@ -3248,8 +3252,8 @@ export default class App extends React.Component<Props, State> {
     const ungrouped = this.controller.isPivotUngrouped();
     const getDimensionLabel = (dim: GroupDimension) => {
       // Ohne gewaehlte Dimension stand hier "Category" (owner 2026-10-22, RAINWEAR)
-      if (dim === '__taxonomy__') return ungrouped ? 'Gruppieren' : 'Kategorie';
-      return pivotDefinitions.find(d => d.key === dim)?.label ?? dim;
+      if (dim === '__taxonomy__') return ungrouped ? this.ui.group : this.ui.category;
+      return uiDimLabel(pivotDefinitions.find(d => d.key === dim)?.label ?? dim, this.props.locale);
     };
     const footerSearchResults = this.filterFooterSearchResults(footerSearchTerm);
 
@@ -3408,7 +3412,7 @@ export default class App extends React.Component<Props, State> {
                 role="button"
                 tabIndex={0}
                 className="pf-header-breadcrumb pf-catalog-breadcrumb"
-                title="Suche über den gesamten Katalog — Klick beendet die Suche"
+                title={this.ui.searchWholeCatalog}
                 onClick={this.clearSearchFilter}
                 onKeyDown={evt => { if (evt.key === 'Enter' || evt.key === ' ') { evt.preventDefault(); this.clearSearchFilter(); } }}
               >
@@ -3453,7 +3457,7 @@ export default class App extends React.Component<Props, State> {
                   <span className="pf-search-filter-chip-text">
                     KI · {aiFilterProductIds.length}{this.state.aiMissingCount > 0 ? ` (+${this.state.aiMissingCount} andere Marke)` : ''}
                   </span>
-                  <button type="button" className="pf-search-filter-chip-close" onClick={this.clearAiFilter} aria-label="KI-Filter zurücksetzen">×</button>
+                  <button type="button" className="pf-search-filter-chip-close" onClick={this.clearAiFilter} aria-label={this.ui.resetAiFilter}>×</button>
                 </span>
               )}
               {searchFilterTerm && (
@@ -3490,20 +3494,20 @@ export default class App extends React.Component<Props, State> {
                 const top = header ? Math.round(header.getBoundingClientRect().bottom) + 8 : 64;
                 const total = this.searchAllProducts(footerSearchTerm, 0).length;
                 return (
-                  <div className="pf-search-panel" style={{ top }} role="dialog" aria-label="Suchergebnis">
+                  <div className="pf-search-panel" style={{ top }} role="dialog" aria-label={this.ui.searchResult}>
                     <div className="pf-search-panel-head">
                       <span className="pf-search-panel-title">
-                        {total === 0 ? 'Keine Treffer' : `${total} Treffer`}
+                        {total === 0 ? this.ui.noHits : this.ui.hits(total)}
                         {total > footerSearchResults.length && <span className="pf-search-panel-sub"> · erste {footerSearchResults.length}</span>}
                         <span className="pf-search-panel-term"> für „{footerSearchTerm.trim()}"</span>
                       </span>
                       <div className="pf-search-panel-actions">
                         {total > 0 && (
-                          <button type="button" className="pf-search-panel-apply" onClick={() => this.applySearchFilter(footerSearchTerm)} title="Alle Treffer im Finder anzeigen (Enter)">
+                          <button type="button" className="pf-search-panel-apply" onClick={() => this.applySearchFilter(footerSearchTerm)} title={this.ui.showAllHits}>
                             Alle {total} im Finder zeigen
                           </button>
                         )}
-                        <button type="button" className="pf-search-panel-close" onClick={() => this.setState({ footerSearchTerm: '' })} aria-label="Schließen">×</button>
+                        <button type="button" className="pf-search-panel-close" onClick={() => this.setState({ footerSearchTerm: '' })} aria-label={this.ui.close}>×</button>
                       </div>
                     </div>
                     {total > 0 && (
@@ -3535,7 +3539,7 @@ export default class App extends React.Component<Props, State> {
                 <div className="pf-header-select-group">
                   <CustomSelect
                     className="pf-header-select pf-header-dimension-select"
-                    title="Gruppieren nach"
+                    title={this.ui.groupBy}
                     menuMinWidth={210}
                     icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/></svg>}
                     value={pivotDimension}
@@ -3558,7 +3562,7 @@ export default class App extends React.Component<Props, State> {
                 <div className="pf-header-select-group">
                   <CustomSelect
                     className="pf-header-select pf-header-sort-select"
-                    title="Sortieren"
+                    title={this.ui.sort}
                     menuMinWidth={180}
                     icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 4v16M3 16l4 4 4-4"/><path d="M17 20V4M13 8l4-4 4 4"/></svg>}
                     value={sortMode}
@@ -3571,15 +3575,15 @@ export default class App extends React.Component<Props, State> {
                     })}
                     options={[
                       // Without the "SORT" caption the field must name itself
-                      { value: 'none', label: 'Sort' },
-                      { value: 'name-asc', label: 'Name ↑' },
-                      { value: 'name-desc', label: 'Name ↓' },
-                      { value: 'price-asc', label: 'Price ↑' },
-                      { value: 'price-desc', label: 'Price ↓' },
-                      { value: 'weight-asc', label: 'Weight ↑' },
-                      { value: 'weight-desc', label: 'Weight ↓' },
-                      { value: 'color-asc', label: 'Color ↑' },
-                      { value: 'color-desc', label: 'Color ↓' },
+                      { value: 'none', label: this.ui.sort },
+                      { value: 'name-asc', label: `${this.ui.name} ↑` },
+                      { value: 'name-desc', label: `${this.ui.name} ↓` },
+                      { value: 'price-asc', label: `${this.ui.price} ↑` },
+                      { value: 'price-desc', label: `${this.ui.price} ↓` },
+                      { value: 'weight-asc', label: `${this.ui.weight} ↑` },
+                      { value: 'weight-desc', label: `${this.ui.weight} ↓` },
+                      { value: 'color-asc', label: `${this.ui.color} ↑` },
+                      { value: 'color-desc', label: `${this.ui.color} ↓` },
                     ]}
                   />
                 </div>
@@ -3587,7 +3591,7 @@ export default class App extends React.Component<Props, State> {
             )}
             {(() => { const grouped = this.controller.isHeroRootOverview();
             return (
-            <div className="pf-view-switch" role="group" aria-label="Ansicht">
+            <div className="pf-view-switch" role="group" aria-label={this.ui.view}>
               <button
                 type="button"
                 className={`pf-header-btn ${!grouped ? 'active' : ''}`}
@@ -3651,8 +3655,8 @@ export default class App extends React.Component<Props, State> {
                 : this.setState({ b2bLoginOpen: true }))}
               title={this.state.b2bSession
                 ? `Händlerkonto: Kunde ${this.state.b2bSession.customerNumber}${this.state.b2bSession.customerClass ? ` · ${this.state.b2bSession.customerClass}` : ''}`
-                : 'Händler-Login (B2B-Shop)'}
-              aria-label={this.state.b2bSession ? 'Händlerkonto' : 'Händler-Login'}
+                : this.ui.dealerLoginShop}
+              aria-label={this.state.b2bSession ? this.ui.dealerAccount : this.ui.dealerLogin}
             >
               <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l1-5h16l1 5"/><path d="M3 9a3 3 0 0 0 6 0 3 3 0 0 0 6 0 3 3 0 0 0 6 0"/><path d="M5 12v8h14v-8"/><path d="M10 20v-5h4v5"/></svg>
             </button>
@@ -3699,8 +3703,8 @@ export default class App extends React.Component<Props, State> {
                   type="button"
                   className={`pf-header-btn pf-header-saved-btn ${this.state.savedOutfitsOpen ? 'active' : ''}`}
                   onClick={() => this.setState(prev => ({ savedOutfitsOpen: !prev.savedOutfitsOpen }))}
-                  title={`Meine Auswahl: ${this.state.savedOutfits.length} Outfits, ${this.state.favoriteIds.length} Lieblingsprodukte`}
-                  aria-label="Meine Auswahl"
+                  title={`${this.ui.mySelection}: ${this.state.savedOutfits.length} ${this.ui.outfits}, ${this.state.favoriteIds.length} ♥`}
+                  aria-label={this.ui.mySelection}
                 >
                   <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
                   {this.state.savedOutfits.length + this.state.favoriteIds.length > 0 && <span className="pf-header-cart-count">{this.state.savedOutfits.length + this.state.favoriteIds.length}</span>}
@@ -3709,7 +3713,7 @@ export default class App extends React.Component<Props, State> {
                   type="button"
                   className={`pf-header-btn pf-header-cart-btn ${cartItems.length ? 'has-items' : ''}`}
                   onClick={() => this.setState({ cartPanelOpen: true })}
-                  title={cartItems.length ? `${cartItems.length} ${cartItems.length === 1 ? 'Position' : 'Positionen'}` : 'Warenkorb leer'}
+                  title={cartItems.length ? this.ui.positions(cartItems.length) : this.ui.cartEmpty}
                 >
                   <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/></svg>
                   {/* Stueckzahl statt Positionen: jedes Add to Cart zaehlt sichtbar hoch */}
@@ -3731,7 +3735,7 @@ export default class App extends React.Component<Props, State> {
             <button
               type="button"
               className={`pf-mobile-icon-btn pf-mobile-cart-btn ${cartItems.length > 0 ? 'has-items' : ''}`}
-              aria-label={cartItems.length ? `Bestellübersicht, ${cartItems.length} Positionen` : 'Bestellübersicht'}
+              aria-label={cartItems.length ? `${this.ui.orderOverview}, ${this.ui.positions(cartItems.length)}` : this.ui.orderOverview}
               onClick={() => this.setState({ cartPanelOpen: true, mobilePivotOpen: false })}
             >
               <i className="fa-solid fa-cart-shopping"></i>
@@ -3818,7 +3822,7 @@ export default class App extends React.Component<Props, State> {
             </>}
             {this.controller.isGlobalSearchActive() && <>
             <span className="pf-header-breadcrumb-sep">›</span>
-            <span role="button" tabIndex={0} className="pf-header-breadcrumb pf-catalog-breadcrumb" onClick={this.clearSearchFilter}>Alle Produkte</span>
+            <span role="button" tabIndex={0} className="pf-header-breadcrumb pf-catalog-breadcrumb" onClick={this.clearSearchFilter}>{this.ui.allProducts}</span>
             </>}
             {pivotBreadcrumbs.slice(1).map((crumb, j) => { const i = j + 1; return (
               <React.Fragment key={`mobile-header-${crumb}-${i}`}>
@@ -3857,11 +3861,11 @@ export default class App extends React.Component<Props, State> {
         {/* Mobile Pivot Overlay */}
         {this.state.mobilePivotOpen && (
           <div className="pf-mobile-pivot-overlay" onClick={(e) => { if (e.target === e.currentTarget) this.setState({ mobilePivotOpen: false }); }}>
-           <div className="pf-mobile-sheet" role="dialog" aria-label="Menü">
+           <div className="pf-mobile-sheet" role="dialog" aria-label={this.ui.menu}>
             <div className="pf-mobile-sheet-handle" aria-hidden="true" />
             <div className="pf-mobile-pivot-header">
-              <span>Menü</span>
-              <button type="button" className="pf-mobile-search-close" aria-label="Schließen" onClick={() => this.setState({ mobilePivotOpen: false })}>
+              <span>{this.ui.menu}</span>
+              <button type="button" className="pf-mobile-search-close" aria-label={this.ui.close} onClick={() => this.setState({ mobilePivotOpen: false })}>
                 <i className="fa-solid fa-xmark"></i>
               </button>
             </div>
@@ -3893,7 +3897,7 @@ export default class App extends React.Component<Props, State> {
                 : this.setState({ b2bLoginOpen: true, mobilePivotOpen: false }))}
             >
               <i className="fa-solid fa-store" aria-hidden="true"></i>
-              <span>{this.state.b2bSession ? `Kunde ${this.state.b2bSession.customerNumber}` : 'Händler-Login'}</span>
+              <span>{this.state.b2bSession ? this.ui.customer(String(this.state.b2bSession.customerNumber)) : this.ui.dealerLogin}</span>
               <span className="pf-mobile-sheet-row-meta">{this.state.b2bSession ? 'Abmelden' : 'B2B-Shop'}</span>
             </button>
             <button
@@ -3902,7 +3906,7 @@ export default class App extends React.Component<Props, State> {
               onClick={() => this.setState({ cartPanelOpen: true, mobilePivotOpen: false })}
             >
               <i className="fa-solid fa-cart-shopping" aria-hidden="true"></i>
-              <span>Bestellübersicht</span>
+              <span>{this.ui.orderOverview}</span>
               <span className="pf-mobile-sheet-row-meta">{cartItems.length ? `${cartItems.length} ${cartItems.length === 1 ? 'Position' : 'Positionen'}` : 'leer'}</span>
             </button>
             <div className="pf-mobile-pivot-label">Ansicht</div>
@@ -3936,7 +3940,7 @@ export default class App extends React.Component<Props, State> {
             </div>
 
             {/* Sortierung: gleiche Optionen wie das Desktop-SORT-Dropdown */}
-            <div className="pf-mobile-pivot-label">Sortierung</div>
+            <div className="pf-mobile-pivot-label">{this.ui.sortNone}</div>
             <div className="pf-mobile-pivot-dims" style={{ marginBottom: 20 }}>
               {([
                 ['none', 'Standard'],
@@ -4030,10 +4034,10 @@ export default class App extends React.Component<Props, State> {
               {/* Auf dem ersten Produkt führt „‹“ zurück zur vorigen Übersicht
                   statt ins Leere (owner 2026-09-22, media 125867). */}
               <button type="button" className="pf-hero-arrow pf-hero-arrow-prev"
-                aria-label={(this.state.heroPosition?.index ?? 0) === 0 ? 'Zurück zur Übersicht' : 'Vorheriges Produkt'}
-                title={(this.state.heroPosition?.index ?? 0) === 0 ? 'Zurück zur Übersicht' : undefined}
+                aria-label={(this.state.heroPosition?.index ?? 0) === 0 ? this.ui.backToOverview : this.ui.prevProduct}
+                title={(this.state.heroPosition?.index ?? 0) === 0 ? this.ui.backToOverview : undefined}
                 onClick={() => this.stepHeroRow(-1)}>‹</button>
-              <button type="button" className="pf-hero-arrow pf-hero-arrow-next" aria-label="Nächstes Produkt"
+              <button type="button" className="pf-hero-arrow pf-hero-arrow-next" aria-label={this.ui.nextProduct}
                 onClick={() => this.stepHeroRow(1)}>›</button>
               {/* "01 / 04" — position within the hero row, desktop only; the
                   phone has no room below the product for it. */}
@@ -4074,10 +4078,10 @@ export default class App extends React.Component<Props, State> {
               hero arrows above already cover this. */}
           {selectedProduct && !this.state.shouldShowV4Dialog && (!this.state.isPivotHeroMode || this.controller.isHeroRootOverview()) && this.state.modalSequence.length > 1 && (
             <>
-              <button type="button" className="pf-hero-arrow pf-hero-arrow-prev" aria-label="Vorheriges Produkt"
+              <button type="button" className="pf-hero-arrow pf-hero-arrow-prev" aria-label={this.ui.prevProduct}
                 disabled={this.state.selectedIndex <= 0}
                 onClick={() => this.showRelativeProduct(-1)}>‹</button>
-              <button type="button" className="pf-hero-arrow pf-hero-arrow-next" aria-label="Nächstes Produkt"
+              <button type="button" className="pf-hero-arrow pf-hero-arrow-next" aria-label={this.ui.nextProduct}
                 disabled={this.state.selectedIndex >= this.state.modalSequence.length - 1}
                 onClick={() => this.showRelativeProduct(1)}>›</button>
               {!this.isMobileLayout() && (
@@ -4172,7 +4176,7 @@ export default class App extends React.Component<Props, State> {
               Smart Search
             </button>
             {this.state.aiFilterProductIds.length > 0 && (
-              <button type="button" className="pf-ai-clear-btn" onClick={this.clearAiFilter} title="Filter zurücksetzen">
+              <button type="button" className="pf-ai-clear-btn" onClick={this.clearAiFilter} title={this.ui.resetFilter}>
                 {this.state.aiLastResultCount} Treffer &times;
               </button>
             )}
@@ -4220,7 +4224,7 @@ export default class App extends React.Component<Props, State> {
                   <circle cx="20" cy="21" r="1"></circle>
                   <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
                 </svg>
-                {cartItems.length === 0 ? 'Warenkorb leer' : `${cartItems.length} ${cartItems.length === 1 ? 'Position' : 'Positionen'}`}
+                {cartItems.length === 0 ? this.ui.cartEmpty : this.ui.positions(cartItems.length)}
               </span>
               {totalCartQuantity > 0 && (
                 <span style={{
@@ -4520,8 +4524,8 @@ export default class App extends React.Component<Props, State> {
           <div className="pf-b2b-menu-backdrop" onClick={() => this.setState({ b2bMenuOpen: false })}>
             <div className="pf-b2b-menu" role="menu" onClick={e => e.stopPropagation()}>
               <div className="pf-b2b-menu-head">Kunde <strong>{this.state.b2bSession.customerNumber}</strong>{this.state.b2bSession.customerClass ? ` · ${this.state.b2bSession.customerClass}` : ''}</div>
-              <button type="button" className="pf-b2b-menu-item" onClick={() => this.setState({ b2bMenuOpen: false, cartPanelOpen: true, b2bOrdersOpen: false })}>Bestellübersicht</button>
-              <button type="button" className="pf-b2b-menu-item" onClick={() => this.setState({ b2bMenuOpen: false, cartPanelOpen: true, b2bOrdersOpen: true })}>Meine Bestellungen</button>
+              <button type="button" className="pf-b2b-menu-item" onClick={() => this.setState({ b2bMenuOpen: false, cartPanelOpen: true, b2bOrdersOpen: false })}>{this.ui.orderOverview}</button>
+              <button type="button" className="pf-b2b-menu-item" onClick={() => this.setState({ b2bMenuOpen: false, cartPanelOpen: true, b2bOrdersOpen: true })}>{this.ui.myOrders}</button>
               <button type="button" className="pf-b2b-menu-item pf-b2b-menu-danger" onClick={() => { this.setState({ b2bMenuOpen: false }); void this.handleB2BLogout(); }}>Abmelden</button>
             </div>
           </div>
@@ -4559,10 +4563,10 @@ export default class App extends React.Component<Props, State> {
 
         {/* Meine Outfits: Seitenfenster mit den gespeicherten KI-Outfits */}
         {this.state.savedOutfitsOpen && (
-          <aside className="pf-saved-panel" aria-label="Meine Auswahl">
+          <aside className="pf-saved-panel" aria-label={this.ui.mySelection}>
             <div className="pf-saved-head">
-              <h2>Meine Auswahl</h2>
-              <button type="button" className="pf-saved-close" onClick={() => this.setState({ savedOutfitsOpen: false })} aria-label="Schließen">×</button>
+              <h2>{this.ui.mySelection}</h2>
+              <button type="button" className="pf-saved-close" onClick={() => this.setState({ savedOutfitsOpen: false })} aria-label={this.ui.close}>×</button>
             </div>
             <p className="pf-saved-owner">{this.state.b2bSession ? `Händlerkonto ${this.state.b2bSession.customerNumber}` : 'In diesem Browser gespeichert'}</p>
             {(() => {
@@ -4572,10 +4576,10 @@ export default class App extends React.Component<Props, State> {
                 <section className="pf-saved-section">
                   <div className="pf-saved-subhead">
                     <h3>Lieblingsprodukte <span>{liked.length}</span></h3>
-                    {liked.length > 0 && <button type="button" className="pf-saved-showall" onClick={this.showFavorites}>Alle zeigen</button>}
+                    {liked.length > 0 && <button type="button" className="pf-saved-showall" onClick={this.showFavorites}>{this.ui.showAll}</button>}
                   </div>
                   {liked.length === 0 ? (
-                    <p className="pf-saved-empty">Noch keine. Tipp in der Produktkarte auf das Herz, dann landet das Produkt hier.</p>
+                    <p className="pf-saved-empty">{this.ui.favoritesEmpty}</p>
                   ) : (
                     <div className="pf-fav-grid">
                       {liked.map(p => (
@@ -4586,7 +4590,7 @@ export default class App extends React.Component<Props, State> {
                               : <span className="pf-fav-noimg" />}
                             <span className="pf-saved-meta"><span className="pf-saved-query">{p.name}</span></span>
                           </button>
-                          <button type="button" className="pf-saved-delete" onClick={() => this.toggleFavorite(String(p.id))} aria-label="Von der Merkliste entfernen" title="Entfernen">×</button>
+                          <button type="button" className="pf-saved-delete" onClick={() => this.toggleFavorite(String(p.id))} aria-label={this.ui.removeFavorite} title={this.ui.remove}>×</button>
                         </div>
                       ))}
                     </div>
@@ -4594,21 +4598,21 @@ export default class App extends React.Component<Props, State> {
                 </section>
               );
             })()}
-            <div className="pf-saved-subhead"><h3>Outfits <span>{this.state.savedOutfits.length}</span></h3></div>
+            <div className="pf-saved-subhead"><h3>{this.ui.outfits} <span>{this.state.savedOutfits.length}</span></h3></div>
             {this.state.savedOutfits.length === 0 ? (
-              <p className="pf-saved-empty">Noch keine Outfits. Lass dir in der Smart Search eine Ausrüstung mit KI zeigen, sie landet automatisch hier.</p>
+              <p className="pf-saved-empty">{this.ui.outfitsEmpty}</p>
             ) : (
               <div className="pf-saved-grid">
                 {this.state.savedOutfits.map(entry => (
                   <div key={entry.hash} className="pf-saved-card">
-                    <button type="button" className="pf-saved-open" onClick={() => this.openSavedOutfit(entry)} title="Outfit öffnen">
-                      <img src={outfitImageUrl(entry.hash)} alt={entry.query || 'KI-Outfit'} loading="lazy" className={entry.background === 'studio' ? '' : 'transparent'} />
+                    <button type="button" className="pf-saved-open" onClick={() => this.openSavedOutfit(entry)} title={this.ui.openOutfit}>
+                      <img src={outfitImageUrl(entry.hash)} alt={entry.query || this.ui.aiOutfit} loading="lazy" className={entry.background === 'studio' ? '' : 'transparent'} />
                       <span className="pf-saved-meta">
-                        <span className="pf-saved-query">{entry.query || 'KI-Outfit'}</span>
+                        <span className="pf-saved-query">{entry.query || this.ui.aiOutfit}</span>
                         <span className="pf-saved-date">{entry.created_at ? new Date(entry.created_at).toLocaleDateString('de-AT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}</span>
                       </span>
                     </button>
-                    <button type="button" className="pf-saved-delete" onClick={() => this.deleteSavedOutfit(entry.hash)} aria-label="Outfit löschen" title="Löschen">×</button>
+                    <button type="button" className="pf-saved-delete" onClick={() => this.deleteSavedOutfit(entry.hash)} aria-label={this.ui.deleteOutfit} title={this.ui.delete}>×</button>
                   </div>
                 ))}
               </div>
@@ -4628,11 +4632,11 @@ export default class App extends React.Component<Props, State> {
               {job.status === 'running' && <span>Smart Search: »{short}« läuft …</span>}
               {job.status === 'done' && (
                 <button type="button" className="pf-smart-pill-action" onClick={this.applySmartJob}>
-                  {count} {count === 1 ? 'Treffer' : 'Treffer'} für »{short}« – anzeigen
+                  {this.ui.hitsFor(count, short)}
                 </button>
               )}
               {job.status === 'error' && <span>Smart Search: {job.message}</span>}
-              <button type="button" className="pf-smart-pill-close" onClick={this.dismissSmartJob} aria-label={job.status === 'running' ? 'Suche abbrechen' : 'Schließen'} title={job.status === 'running' ? 'Suche abbrechen' : 'Schließen'}>×</button>
+              <button type="button" className="pf-smart-pill-close" onClick={this.dismissSmartJob} aria-label={job.status === 'running' ? this.ui.cancelSearch : this.ui.close} title={job.status === 'running' ? this.ui.cancelSearch : this.ui.close}>×</button>
             </div>
           );
         })()}
@@ -4670,12 +4674,12 @@ export default class App extends React.Component<Props, State> {
           if (outfit.status === 'idle' || outfit.status === 'failed') {
             return (
               <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 60 }}>
-                {splitPill(outfit.status === 'failed' ? 'KI-Bild fehlgeschlagen – nochmal versuchen' : 'Ausrüstung mit KI zeigen', this.requestCurrentOutfitImage, true)}
+                {splitPill(outfit.status === 'failed' ? this.ui.aiImageFailed : this.ui.showGearWithAi, this.requestCurrentOutfitImage, true)}
               </div>
             );
           }
           if (outfit.status === 'pending') {
-            return <div className="pf-outfit-pending" style={pill}>KI-Bild des Outfits wird erzeugt … ca. 1–2 Min.</div>;
+            return <div className="pf-outfit-pending" style={pill}>{this.ui.aiImagePending}</div>;
           }
           if (outfit.status !== 'done' || !outfit.url) return null;
           if (!outfit.show) {
@@ -4695,7 +4699,7 @@ export default class App extends React.Component<Props, State> {
                 </div>
               </div>
               <div style={{ position: 'absolute', bottom: 24, left: '50%', transform: 'translateX(-50%)' }}>
-                {splitPill('Produkte anzeigen', () => this.setState({ outfitImage: { ...outfit, show: false }, outfitSettingsOpen: false }), false)}
+                {splitPill(this.ui.showProducts, () => this.setState({ outfitImage: { ...outfit, show: false }, outfitSettingsOpen: false }), false)}
               </div>
             </div>
           );
