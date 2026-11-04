@@ -460,7 +460,10 @@ const GROUP_LABELS: Record<string, Record<string, string>> = {
 
 export function uiGroupLabel(label: string, locale?: string | null): string {
   const lang = uiLang(locale);
-  if (lang === 'de' || !label) return label;
+  if (!label) return label;
+  // Farbgruppen (Dimension Farbe) in jeder Sprache, auch Deutsch
+  if (isColorName(label)) return uiColor(label, locale);
+  if (lang === 'de') return label;
   const hit = GROUP_LABELS[label.trim().toLowerCase()];
   const t = hit?.[lang] ?? (lang !== 'en' ? undefined : undefined);
   if (!t) return label;
@@ -472,3 +475,90 @@ export function uiGroupLabel(label: string, locale?: string | null): string {
 let displayLocale = 'de';
 export function setDisplayLocale(locale?: string | null): void { displayLocale = uiLang(locale); }
 export function displayGroupLabel(label: string): string { return uiGroupLabel(label, displayLocale); }
+
+/**
+ * Farbnamen aus dem Artikelstamm (englisch, teils deutsch) je Sprache
+ * (owner 2026-11-04). Mehrfarbige Namen werden je Teil uebersetzt
+ * ("black/gray/red" -> "schwarz/grau/rot"); Unbekanntes bleibt stehen.
+ * Reihenfolge der Felder: de, en, fr, it.
+ */
+const COLOR_ROWS: Array<[string[], string, string, string, string]> = [
+  [['black', 'schwarz'], 'schwarz', 'black', 'noir', 'nero'],
+  [['white', 'weiß', 'weiss'], 'weiß', 'white', 'blanc', 'bianco'],
+  [['gray', 'grey', 'grau'], 'grau', 'gray', 'gris', 'grigio'],
+  [['red', 'rot'], 'rot', 'red', 'rouge', 'rosso'],
+  [['blue', 'blau'], 'blau', 'blue', 'bleu', 'blu'],
+  [['green', 'grün'], 'grün', 'green', 'vert', 'verde'],
+  [['yellow', 'gelb'], 'gelb', 'yellow', 'jaune', 'giallo'],
+  [['orange'], 'orange', 'orange', 'orange', 'arancione'],
+  [['pink'], 'pink', 'pink', 'rose', 'rosa'],
+  [['purple', 'violett', 'violet'], 'violett', 'purple', 'violet', 'viola'],
+  [['brown', 'braun'], 'braun', 'brown', 'marron', 'marrone'],
+  [['beige'], 'beige', 'beige', 'beige', 'beige'],
+  [['gold'], 'gold', 'gold', 'or', 'oro'],
+  [['silver', 'silber'], 'silber', 'silver', 'argent', 'argento'],
+  [['copper', 'kupfer'], 'kupfer', 'copper', 'cuivre', 'rame'],
+  [['clear', 'klar'], 'klar', 'clear', 'transparent', 'trasparente'],
+  [['multi'], 'bunt', 'multi', 'multicolore', 'multicolore'],
+  [['neon'], 'neon', 'neon', 'fluo', 'fluo'],
+  [['neon yellow', 'neon gelb'], 'neongelb', 'neon yellow', 'jaune fluo', 'giallo fluo'],
+  [['neon pink'], 'neonpink', 'neon pink', 'rose fluo', 'rosa fluo'],
+  [['neon tiger'], 'neon tiger', 'neon tiger', 'tigre fluo', 'tigre fluo'],
+  [['anthracite', 'anthrazit'], 'anthrazit', 'anthracite', 'anthracite', 'antracite'],
+  [['charcoal'], 'kohlegrau', 'charcoal', 'charbon', 'antracite scuro'],
+  [['navy'], 'marineblau', 'navy', 'bleu marine', 'blu navy'],
+  [['teal'], 'petrol', 'teal', 'bleu canard', 'verde acqua'],
+  [['mint'], 'mint', 'mint', 'menthe', 'menta'],
+  [['olive'], 'oliv', 'olive', 'olive', 'oliva'],
+  [['khaki'], 'khaki', 'khaki', 'kaki', 'kaki'],
+  [['sand'], 'sand', 'sand', 'sable', 'sabbia'],
+  [['cream'], 'creme', 'cream', 'crème', 'crema'],
+  [['ecru'], 'ecru', 'ecru', 'écru', 'écru'],
+  [['indigo'], 'indigo', 'indigo', 'indigo', 'indaco'],
+  [['cardinal'], 'kardinalrot', 'cardinal', 'cardinal', 'rosso cardinale'],
+  [['light blue'], 'hellblau', 'light blue', 'bleu clair', 'azzurro'],
+  [['light gray'], 'hellgrau', 'light gray', 'gris clair', 'grigio chiaro'],
+  [['slate gray'], 'schiefergrau', 'slate gray', 'gris ardoise', 'grigio ardesia'],
+  [['stone gray'], 'steingrau', 'stone gray', 'gris pierre', 'grigio pietra'],
+  [['military green'], 'militärgrün', 'military green', 'vert militaire', 'verde militare'],
+  [['cobalt blue'], 'kobaltblau', 'cobalt blue', 'bleu cobalt', 'blu cobalto'],
+  [['radium blue'], 'radiumblau', 'radium blue', 'bleu radium', 'blu radium'],
+  [['electric red'], 'leuchtrot', 'electric red', 'rouge électrique', 'rosso elettrico'],
+  [['desert red'], 'wüstenrot', 'desert red', 'rouge désert', 'rosso deserto'],
+  [['miami white'], 'miami-weiß', 'miami white', 'blanc miami', 'bianco miami'],
+  [['black onyx'], 'onyxschwarz', 'black onyx', 'noir onyx', 'nero onice'],
+  [['black smoke'], 'rauchschwarz', 'black smoke', 'noir fumé', 'nero fumé'],
+  [['dark smoke'], 'dunkel getönt', 'dark smoke', 'fumé foncé', 'fumé scuro'],
+  [['iridium gold'], 'iridium gold', 'iridium gold', 'iridium or', 'iridio oro'],
+];
+const LANG_COL: Record<string, number> = { de: 1, en: 2, fr: 3, it: 4 };
+const COLOR_MAP = new Map<string, [string, string, string, string, string]>();
+for (const row of COLOR_ROWS) for (const k of row[0]) COLOR_MAP.set(k, row);
+
+function colorWord(token: string, lang: string): string | null {
+  const row = COLOR_MAP.get(token.trim().toLowerCase());
+  if (!row) return null;
+  return row[LANG_COL[lang] ?? 2];
+}
+
+/** "black/gray/red" -> "schwarz/grau/rot"; behaelt Gross-/Kleinschreibung und Trenner. */
+export function uiColor(name: string, locale?: string | null): string {
+  if (!name) return name;
+  const lang = uiLang(locale);
+  const out = name.split(/(\s*\/\s*)/).map(part => {
+    if (/^\s*\/\s*$/.test(part)) return part;
+    const t = colorWord(part, lang);
+    if (!t) return part;
+    if (part === part.toUpperCase() && /[A-Z]/.test(part)) return t.toUpperCase();
+    if (part[0] && part[0] === part[0].toUpperCase() && /[A-Z]/.test(part[0])) return t[0].toUpperCase() + t.slice(1);
+    return t;
+  });
+  return out.join('');
+}
+
+/** Ist der ganze Text ein (mehrteiliger) Farbname? */
+export function isColorName(name: string): boolean {
+  const parts = name.split(/\s*\/\s*/).filter(Boolean);
+  return parts.length > 0 && parts.every(p => COLOR_MAP.has(p.trim().toLowerCase()));
+}
+export function displayColor(name: string): string { return uiColor(name, displayLocale); }

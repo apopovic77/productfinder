@@ -1,3 +1,4 @@
+import { displayColor } from '../../i18n/ui';
 /**
  * CartView — Tabellarischer Warenkorb mit Größen-Matrix
  *
@@ -257,11 +258,11 @@ export function CartView({
                         className="cart-color-select"
                       >
                         {item.availableColors.map(c => (
-                          <option key={c} value={c}>{c}</option>
+                          <option key={c} value={c}>{displayColor(c)}</option>
                         ))}
                       </select>
                     ) : (
-                      <span>{item.color}</span>
+                      <span>{displayColor(String(item.color))}</span>
                     )}
                   </td>
                   {allSizes.map(size => {
@@ -365,7 +366,7 @@ export function CartView({
                     <div className="cart-search-name">{result.name}</div>
                     <div className="cart-search-meta">
                       {result.articleNumber}
-                      {result.color && ` · ${result.color}`}
+                      {result.color && ` · ${displayColor(String(result.color))}`}
                     </div>
                   </div>
                   <div className="cart-search-add">+</div>

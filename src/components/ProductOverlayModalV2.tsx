@@ -20,7 +20,7 @@ import { DEFAULT_STAGE_BACKGROUND, STAGE_BACKGROUND_BASE, STAGE_BACKGROUND_STYLE
 import { CATALOG_PRODUCTS_BASE, CATALOG_PRODUCTS_KEY } from '../config/apiConfig';
 import { flyToCart } from '../utils/flyToCart';
 import type { RecommendationGroup } from '../services/RecommendationService';
-import { uiTexts, uiValue } from '../i18n/ui';
+import { uiColor, uiTexts, uiValue } from '../i18n/ui';
 import { fetchSizeChart, type SizeChart } from '../services/SizeChartService';
 import { OUTFIT_SLOTS, outfitSlotFrom } from '../layout/OutfitLayouter';
 
@@ -1579,7 +1579,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
             <div className="pom-hero-colour">
               {heroTitle.colour.split('/').map((c, i, arr) => (
                 <span key={i} className={i === arr.length - 1 && arr.length > 1 ? 'accent' : ''}>
-                  {c.trim()}{i < arr.length - 1 ? <span className="sep"> / </span> : null}
+                  {uiColor(c.trim(), locale)}{i < arr.length - 1 ? <span className="sep"> / </span> : null}
                 </span>
               ))}
             </div>
@@ -1754,7 +1754,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         return (
           <div style={{ flex: '0 1 auto', minWidth: 0 }}>
             <div style={{ fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.8, marginBottom: '6px' }}>
-              {t.color}: <span style={{ opacity: 1 }}>{currentColor}</span>
+              {t.color}: <span style={{ opacity: 1 }}>{uiColor(String(currentColor || ''), locale)}</span>
             </div>
             {/* Grosser Dialog: hoechstens drei Farben je Zeile, sonst liefen
                 sieben Farben quer ueber die Seite (owner 2026-10-22, media 132036) */}
@@ -1802,12 +1802,12 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                       transition: 'all 0.15s ease',
                     }}
                     className={thumb ? 'pom-color-thumb' : undefined}
-                    title={opt.color_name}
-                    aria-label={opt.color_name}
+                    title={uiColor(String(opt.color_name || ''), locale)}
+                    aria-label={uiColor(String(opt.color_name || ''), locale)}
                   >
                     {thumb
                       ? <img src={thumb} alt={opt.color_name} loading="lazy" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
-                      : opt.color_name}
+                      : uiColor(String(opt.color_name || ''), locale)}
                   </button>
                 );
               })}
@@ -2001,7 +2001,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         if (attr('target_group')) info.push([t.targetGroup, uiValue(String(attr('target_group')), locale)]);
         if (attr('product_line')) info.push([t.productLine, String(attr('product_line'))]);
         if (attr('product_type')) info.push([t.productType, uiValue(String(attr('product_type')), locale)]);
-        if (raw?.color_name) info.push([t.color, String(raw.color_name)]);
+        if (raw?.color_name) info.push([t.color, uiColor(String(raw.color_name), locale)]);
         if (sizeRange) info.push([t.sizes, sizeRange]);
         const article: Array<[string, string]> = [];
         if ((activeVariant as any)?.material) article.push([t.material, String((activeVariant as any).material)]);

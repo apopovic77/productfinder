@@ -1,3 +1,4 @@
+import { displayColor } from '../../i18n/ui';
 /**
  * CheckoutPanel — eigener Übergabe-Schritt vor dem B2B-Shop (owner 2026-09-11,
  * Post #4969): Wunschliefertermin, Bemerkung, eigene Bestellnummer, frachtfrei,
@@ -159,7 +160,7 @@ export function CheckoutPanel({ customerNumber, testMode, positions, pieces, dea
                     <div className="co-line-img">{line.imageUrl ? <img src={line.imageUrl} alt="" loading="lazy" /> : null}</div>
                     <div className="co-line-body">
                       <strong className="co-line-name">{line.name}</strong>
-                      {line.color && <span className="co-line-color">{line.color}</span>}
+                      {line.color && <span className="co-line-color">{displayColor(String(line.color))}</span>}
                       <div className="co-chips">
                         {Object.entries(line.sizes).filter(([, q]) => q > 0).map(([size, q]) => (
                           <span key={size} className="co-chip">{size} × {q}</span>
