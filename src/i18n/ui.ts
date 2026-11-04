@@ -532,13 +532,13 @@ const COLOR_ROWS: Array<[string[], string, string, string, string]> = [
   [['iridium gold'], 'iridium gold', 'iridium gold', 'iridium or', 'iridio oro'],
 ];
 const LANG_COL: Record<string, number> = { de: 1, en: 2, fr: 3, it: 4 };
-const COLOR_MAP = new Map<string, [string, string, string, string, string]>();
+const COLOR_MAP = new Map<string, [string[], string, string, string, string]>();
 for (const row of COLOR_ROWS) for (const k of row[0]) COLOR_MAP.set(k, row);
 
 function colorWord(token: string, lang: string): string | null {
   const row = COLOR_MAP.get(token.trim().toLowerCase());
   if (!row) return null;
-  return row[LANG_COL[lang] ?? 2];
+  return row[(LANG_COL[lang] ?? 2) as 1 | 2 | 3 | 4];
 }
 
 /** "black/gray/red" -> "schwarz/grau/rot"; behaelt Gross-/Kleinschreibung und Trenner. */
