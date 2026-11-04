@@ -50,6 +50,8 @@ const de = {
   productType: 'Produkttyp',
   material: 'Material',
   articleNumber: 'Artikelnummer',
+  sizeChart: 'Größentabelle',
+  reset: 'zurücksetzen',
 };
 export type UiTexts = typeof de;
 
@@ -97,6 +99,8 @@ const en: UiTexts = {
   productType: 'Product type',
   material: 'Material',
   articleNumber: 'Article number',
+  sizeChart: 'Size chart',
+  reset: 'reset',
 };
 
 const fr: UiTexts = {
@@ -143,6 +147,8 @@ const fr: UiTexts = {
   productType: 'Type de produit',
   material: 'Matière',
   articleNumber: "Numéro d'article",
+  sizeChart: 'Guide des tailles',
+  reset: 'réinitialiser',
 };
 
 const it: UiTexts = {
@@ -189,6 +195,8 @@ const it: UiTexts = {
   productType: 'Tipo di prodotto',
   material: 'Materiale',
   articleNumber: 'Codice articolo',
+  sizeChart: 'Tabella taglie',
+  reset: 'azzera',
 };
 
 const TEXTS: Record<string, UiTexts> = { de, en, fr, it };

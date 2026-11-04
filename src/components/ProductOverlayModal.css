@@ -1212,3 +1212,12 @@
 .pom-stage-bgdot.pom-stage-bgdot-clear {
   background: repeating-conic-gradient(#3a3a3e 0% 25%, #1f1f22 0% 50%) 50% / 10px 10px;
 }
+
+/* Groessentabelle (owner 2026-11-04, wie im B2B-Shop) */
+.pom-sizechart-btn { display: inline-flex; align-items: center; gap: 6px; margin-left: 10px; padding: 2px 9px 2px 3px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.18); background: transparent; color: rgba(255,255,255,0.8); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; cursor: pointer; text-transform: none; }
+.pom-sizechart-btn span { display: inline-flex; width: 16px; height: 16px; border-radius: 50%; align-items: center; justify-content: center; background: #ff5a1f; color: #fff; font-size: 10px; font-style: italic; font-family: Georgia, serif; }
+.pom-sizechart-btn:hover { border-color: #ff5a1f; color: #fff; }
+.pom-sizechart-overlay { position: fixed; inset: 0; z-index: 20050; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; padding: 24px; }
+.pom-sizechart-box { position: relative; max-width: min(900px, 94vw); max-height: 90vh; background: #fff; border-radius: 14px; padding: 16px; overflow: auto; }
+.pom-sizechart-box img { display: block; max-width: 100%; max-height: calc(90vh - 32px); object-fit: contain; margin: 0 auto; }
+.pom-sizechart-close { position: absolute; top: 8px; right: 8px; width: 34px; height: 34px; border-radius: 50%; border: 0; background: rgba(20,20,22,0.75); color: #fff; font-size: 20px; cursor: pointer; padding: 0; }

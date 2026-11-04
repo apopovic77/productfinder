@@ -21,6 +21,7 @@ import { CATALOG_PRODUCTS_BASE, CATALOG_PRODUCTS_KEY } from '../config/apiConfig
 import { flyToCart } from '../utils/flyToCart';
 import type { RecommendationGroup } from '../services/RecommendationService';
 import { uiTexts, uiValue } from '../i18n/ui';
+import { fetchSizeChart, type SizeChart } from '../services/SizeChartService';
 import { OUTFIT_SLOTS, outfitSlotFrom } from '../layout/OutfitLayouter';
 
 /**
@@ -185,6 +186,18 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   const t = uiTexts(locale);
   const [recGroups, setRecGroups] = useState<{ id: string; groups: RecommendationGroup[] } | null>(null);
   const [spareGroups, setSpareGroups] = useState<{ id: string; groups: RecommendationGroup[] } | null>(null);
+  // Groessentabelle (Info-Punkt neben den Groessen, wie im B2B-Shop, #2646)
+  const [sizeChart, setSizeChart] = useState<{ id: string; chart: SizeChart | null } | null>(null);
+  const [sizeChartOpen, setSizeChartOpen] = useState(false);
+  useEffect(() => {
+    if (!expanded) return;
+    let alive = true;
+    const id = String(product.id);
+    setSizeChartOpen(false);
+    fetchSizeChart(id).then(chart => { if (alive) setSizeChart({ id, chart }); });
+    return () => { alive = false; };
+  }, [product.id, expanded]);
+  const activeSizeChart = sizeChart && sizeChart.id === String(product.id) ? sizeChart.chart : null;
   useEffect(() => {
     if (!expanded || !recommendations) return;
     let alive = true;
@@ -1802,8 +1815,13 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         <div className="pom-size-qty" aria-label={t.quantityPerSize}>
           <div className="pom-size-qty-head">
             <span>{showExpandedContent ? t.sizesAndQuantities : t.quantityPerSize}</span>
+            {showExpandedContent && activeSizeChart && (
+              <button type="button" className="pom-sizechart-btn" onClick={() => setSizeChartOpen(true)} title={activeSizeChart.title || t.sizeChart}>
+                <span aria-hidden="true">i</span>{t.sizeChart}
+              </button>
+            )}
             {sizeQtyTotal > 0 && (
-              <button type="button" className="pom-size-qty-clear" onClick={() => setSizeQty({})}>zurücksetzen</button>
+              <button type="button" className="pom-size-qty-clear" onClick={() => setSizeQty({})}>{t.reset}</button>
             )}
           </div>
           <div className="pom-size-qty-grid">
@@ -2181,6 +2199,15 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
             </button>
           )}
         </div>
+      )}
+      {sizeChartOpen && activeSizeChart && createPortal(
+        <div className="pom-sizechart-overlay" role="dialog" aria-label={activeSizeChart.title || t.sizeChart} onClick={() => setSizeChartOpen(false)}>
+          <div className="pom-sizechart-box" onClick={e => e.stopPropagation()}>
+            <button type="button" className="pom-sizechart-close" aria-label={t.close} onClick={() => setSizeChartOpen(false)}>×</button>
+            <img src={activeSizeChart.url} alt={activeSizeChart.title || t.sizeChart} />
+          </div>
+        </div>,
+        document.body,
       )}
     </motion.div>
   );
