@@ -3001,20 +3001,40 @@ export default class App extends React.Component<Props, State> {
    * zeigt das Ausgangsprodukt mit seiner Empfehlungsgruppe im Finder (wie ein
    * Suchergebnis) und oeffnet das gewaehlte Produkt.
    */
+  /** Empfohlene Produkte ausserhalb des geladenen Katalogs (Ersatzteile, A**-Artikel) */
+  private recommendationExtras = new Map<string, Product>();
+
   private recommendationPort = {
-    load: (product: Product) => RecommendationService.load(
-      product,
-      (this.props.locale || 'de').toLowerCase().slice(0, 2) === 'en' ? 'en' : 'de',
-      this.controller.getCatalogAllProducts(),
-    ),
-    resolve: (id: string) => this.controller.getCatalogAllProducts().find(p => String(p.id) === id),
+    load: async (product: Product) => {
+      const groups = await RecommendationService.load(
+        product,
+        (this.props.locale || 'de').toLowerCase().slice(0, 2) === 'en' ? 'en' : 'de',
+        this.controller.getCatalogAllProducts(),
+      );
+      // Ersatzteile stehen meist nicht in Katalog 2028: einzeln nachladen,
+      // sonst fielen sie in der Karte still weg (owner 2026-11-04, media 132941)
+      const catalog = new Set(this.controller.getCatalogAllProducts().map(p => String(p.id)));
+      const missing = [...new Set(groups.flatMap(g => g.items.map(i => i.id)))]
+        .filter(id => !catalog.has(id) && !this.recommendationExtras.has(id))
+        .slice(0, 24);
+      const fetched = await Promise.all(missing.map(id => fetchProductById(id).catch(() => null)));
+      fetched.forEach((p, i) => { if (p) this.recommendationExtras.set(missing[i], p); });
+      return groups;
+    },
+    resolve: (id: string) => this.controller.getCatalogAllProducts().find(p => String(p.id) === id) ?? this.recommendationExtras.get(id),
     open: (id: string, groupIds: string[]) => {
+      const inCatalog = this.controller.getCatalogAllProducts().find(p => String(p.id) === id);
+      if (!inCatalog) {
+        // Nicht im Finder (Ersatzteil): direkt die grosse Karte zeigen
+        const extra = this.recommendationExtras.get(id);
+        if (extra) this.setState({ selectedProduct: extra, selectedVariant: null, shouldShowV4Dialog: true });
+        return;
+      }
       const anchor = this.state.selectedProduct ? String(this.state.selectedProduct.id) : null;
       const ids = [...new Set([...(anchor ? [anchor] : []), ...groupIds])];
       const matched = this.applyAiResult(ids);
       this.setState({ aiFilterProductIds: matched, aiLastResultCount: matched.length });
-      const target = this.controller.getCatalogAllProducts().find(p => String(p.id) === id);
-      if (target) window.setTimeout(() => this.openProductDetails(target), 60);
+      window.setTimeout(() => this.openProductDetails(inCatalog), 60);
     },
   };
 
