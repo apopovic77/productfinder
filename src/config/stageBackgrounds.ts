@@ -19,7 +19,10 @@ export type StageBackgroundStyle = {
 };
 
 export const STAGE_BACKGROUND_STYLES: StageBackgroundStyle[] = [
-  { id: 'none', label: 'Ohne', storageIds: [] },
+  // Transparent: Produkt auf dem dunklen Dialoggrund wie die Vorschaubilder;
+  // Weiss: weisse Buehne und weisse Vorschaubilder (owner 2026-11-04, media 132946)
+  { id: 'clear', label: 'Transparent', storageIds: [] },
+  { id: 'none', label: 'Weiß', storageIds: [] },
   { id: 'BG01', label: 'Clean Studio', storageIds: [131859], light: true },
   { id: 'BG02', label: 'Dark Studio', storageIds: [131858] },
   { id: 'BG03', label: 'Action Dust', storageIds: [131852, 131853, 131857, 131855, 131856] },
@@ -70,7 +73,7 @@ export function fetchStageBackgrounds(productId: string | number, base: string, 
           style.storageIds.push(bg.storage_id);
           byStyle.set(bg.style, style);
         }
-        return [STAGE_BACKGROUND_STYLES[0], ...Array.from(byStyle.values()).sort((a, b) => a.id.localeCompare(b.id))];
+        return [STAGE_BACKGROUND_STYLES[0], STAGE_BACKGROUND_STYLES[1], ...Array.from(byStyle.values()).sort((a, b) => a.id.localeCompare(b.id))];
       })
       .catch(() => null));
   }

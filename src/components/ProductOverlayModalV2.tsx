@@ -1382,7 +1382,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
             }}
           >
             <div
-              className="pom-stage-main"
+              className={`pom-stage-main ${!stageBgUrl && bgStyle === 'clear' ? 'pom-stage-clear' : ''}`}
               // Hintergrundbild hinter dem freigestellten Produkt (Hintergrund-
               // Matrix BG01-BG11, owner 2026-10-21); ohne Bild die weisse Karte
               style={stageBgUrl ? { backgroundImage: `url(${stageBgUrl})` } : undefined}
@@ -1390,7 +1390,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
             <div className="pom-stage-bgpick" role="group" aria-label="Hintergrund">
               {bgStyles.map(st => (
                 <button key={st.id} type="button" title={st.label}
-                  className={`pom-stage-bgdot ${bgStyle === st.id ? 'active' : ''}`}
+                  className={`pom-stage-bgdot ${st.id === 'clear' ? 'pom-stage-bgdot-clear' : ''} ${bgStyle === st.id ? 'active' : ''}`}
                   style={st.storageIds[0] ? { backgroundImage: `url(${STAGE_BACKGROUND_BASE}/storage/media/${st.storageIds[0]}?width=60&format=webp&quality=60)` } : undefined}
                   onClick={() => chooseBgStyle(st.id)} />
               ))}
@@ -1418,7 +1418,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
               </>
             )}
             </div>
-            <div className="pom-expanded-hero-thumbs">
+            <div className={`pom-expanded-hero-thumbs ${!stageBgUrl && bgStyle !== 'clear' ? 'pom-thumbs-white' : ''}`}>
               {stageVideoIds.map(id => (
                 <button
                   key={`video-${id}`}

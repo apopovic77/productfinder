@@ -1205,3 +1205,10 @@
 /* Reiter Ersatzteile (wie im B2B-Shop, owner 2026-11-04) */
 .pom-spares-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
 .pom-spares-grid .pom-rec { flex: none; }
+
+/* Buehne transparent / weiss (owner 2026-11-04, media 132946) */
+.pom-stage-flow .pom-stage-main.pom-stage-clear { background: #1f1f22; }
+.pom-stage-flow .pom-thumbs-white .pom-expanded-thumb:not(.pom-expanded-thumb-video) { background-color: #fff; }
+.pom-stage-bgdot.pom-stage-bgdot-clear {
+  background: repeating-conic-gradient(#3a3a3e 0% 25%, #1f1f22 0% 50%) 50% / 10px 10px;
+}
