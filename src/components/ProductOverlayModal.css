@@ -1179,6 +1179,7 @@
 .pom-recs { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 16px; }
 .pom-recs-heading { font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.75); }
 .pom-recs-title { font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.6); margin-bottom: 6px; }
+.pom-recs-why { font-size: 10px; line-height: 1.3; color: rgba(255,255,255,0.45); margin: -3px 0 6px; }
 .pom-recs-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
 .pom-rec {
   flex: 0 0 104px; display: flex; flex-direction: column; gap: 4px; padding: 6px;

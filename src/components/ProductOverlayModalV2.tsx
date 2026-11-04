@@ -28,6 +28,10 @@ import { OUTFIT_SLOTS, outfitSlotFrom } from '../layout/OutfitLayouter';
  * im Repo und stammen aus der eigenen Lieferung (nur Pfade, kein Skript).
  */
 // Bei Bedarf geladen (je ~10 KB), nicht im Hauptpaket
+/** Reihenfolge der Empfehlungsgruppen in der Karte; unbekannte ans Ende. */
+const REC_GROUP_ORDER = ['same_design', 'complementary_equipment', 'color_match', 'alternatives'];
+const recGroupRank = (id: string) => { const i = REC_GROUP_ORDER.indexOf(id); return i < 0 ? REC_GROUP_ORDER.length : i; };
+
 const FEATURE_ICON_LOADERS = import.meta.glob('../assets/feature-icons/*.svg', { query: '?raw', import: 'default' }) as Record<string, () => Promise<string>>;
 const FEATURE_ICON_CACHE = new Map<string, string>();
 function FeatureIcon({ iconKey }: { iconKey: string }) {
@@ -2008,22 +2012,27 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
             {recommendations && recGroups && recGroups.id === String(product.id) && recGroups.groups.length > 0 && (
               <div className="pom-recs" aria-label="Passt dazu">
                 <div className="pom-recs-heading">{locale === 'en' ? 'Goes well with' : 'Passt dazu'}</div>
-                {recGroups.groups.map(group => {
+                {/* Zusaetze vor Alternativen: der EICMA-Befund war vor allem das
+                    fehlende Upselling (owner 2026-11-04) */}
+                {[...recGroups.groups].sort((a, b) => recGroupRank(a.group_id) - recGroupRank(b.group_id)).map(group => {
                   const items = group.items
                     .map(item => ({ item, p: recommendations.resolve(item.id) }))
                     .filter((x): x is { item: typeof x.item; p: Product } => !!x.p);
                   if (!items.length) return null;
                   const ids = items.map(x => String(x.p.id));
+                  // Gleiche Begruendung fuer alle: einmal unter dem Titel statt je Kachel
+                  const shared = items.every(x => x.item.reason === items[0].item.reason) ? items[0].item.reason : '';
                   return (
                     <div key={group.group_id} className="pom-recs-group">
                       <div className="pom-recs-title">{group.title}</div>
+                      {shared && <div className="pom-recs-why">{shared}</div>}
                       <div className="pom-recs-row">
                         {items.map(({ item, p }) => (
                           <button key={item.id} type="button" className="pom-rec" title={item.reason ? `${p.name}: ${item.reason}` : p.name}
                             onClick={() => recommendations.open(String(p.id), ids)}>
                             <span className="pom-rec-img"><img src={p.imageUrl} alt="" loading="lazy" /></span>
                             <span className="pom-rec-name">{p.name}</span>
-                            {item.reason && <span className="pom-rec-reason">{item.reason}</span>}
+                            {item.reason && !shared && <span className="pom-rec-reason">{item.reason}</span>}
                           </button>
                         ))}
                       </div>
