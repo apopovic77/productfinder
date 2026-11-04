@@ -4019,7 +4019,10 @@ export default class App extends React.Component<Props, State> {
           {/* Hero mode on phones: previous/next arrows. Swiping works too, but
               a flick between bildfüllend products is easy to overshoot; the
               arrows share the snap targets with the swipe (stepHeroProduct). */}
+          {/* Bei offener grosser Karte keine Pfeile und kein Zaehler dahinter:
+              sie schauten am Rand hervor (owner 2026-11-04, media 132944) */}
           {this.state.isPivotHeroMode && (!this.isMobileLayout() || this.state.selectedProduct)
+            && !this.state.shouldShowV4Dialog
             && !this.controller.isHeroRootOverview()
             && (this.state.heroPosition?.count ?? this.controller.getDisplayOrder().length) > 1 && (
             <>
@@ -4068,7 +4071,7 @@ export default class App extends React.Component<Props, State> {
               old centre-right squares only swapped the card content without
               moving the viewport, which read as broken. In hero mode the
               hero arrows above already cover this. */}
-          {selectedProduct && (!this.state.isPivotHeroMode || this.controller.isHeroRootOverview()) && this.state.modalSequence.length > 1 && (
+          {selectedProduct && !this.state.shouldShowV4Dialog && (!this.state.isPivotHeroMode || this.controller.isHeroRootOverview()) && this.state.modalSequence.length > 1 && (
             <>
               <button type="button" className="pf-hero-arrow pf-hero-arrow-prev" aria-label="Vorheriges Produkt"
                 disabled={this.state.selectedIndex <= 0}

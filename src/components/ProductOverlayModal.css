@@ -1073,9 +1073,20 @@
     background: rgba(20, 20, 22, 0.65); color: #fff; font-size: 26px; line-height: 1;
     display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 2;
   }
-  .pom-stage-arrow.prev { left: 14px; }
-  .pom-stage-arrow.next { right: 14px; }
+  .pom-stage-arrow.prev { left: 8px; }
+  .pom-stage-arrow.next { right: 8px; }
   .pom-stage-arrow:hover { background: rgba(255, 90, 31, 0.85); }
+  /* Pfeile lagen sichtbar auf dem Produkt (owner 2026-11-04, media 132945):
+     mit Maus erst beim Ueberfahren des Bildes, kleiner und am Rand; per
+     Tastatur sichtbar sobald fokussiert; auf Touch dezent */
+  .pom-stage-arrow { width: 34px; height: 34px; font-size: 22px; transition: opacity 0.18s ease, background 0.18s ease; }
+  @media (hover: hover) {
+    .pom-stage-arrow { opacity: 0; }
+    .pom-stage-main:hover .pom-stage-arrow, .pom-stage-arrow:focus-visible { opacity: 1; }
+  }
+  @media (hover: none) {
+    .pom-stage-arrow { opacity: 0.55; background: rgba(20, 20, 22, 0.45); }
+  }
   .pom-stage-arrow:focus:not(:focus-visible) { outline: none; }
   /* Hintergrund-Wahl: kleine Vorschaupunkte unten links */
   .pom-stage-bgpick { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 6px; z-index: 2; padding: 5px; border-radius: 999px; background: rgba(20, 20, 22, 0.55); }
