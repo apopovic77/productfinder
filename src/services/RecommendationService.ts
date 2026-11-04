@@ -1,4 +1,4 @@
-import { ONEAL_API_BASE, ONEAL_API_KEY } from '../config/apiConfig';
+import { ONEAL_API_KEY, RECOMMENDATIONS_BASE } from '../config/apiConfig';
 import type { Product } from '../types/Product';
 
 /**
@@ -73,7 +73,7 @@ export class RecommendationService {
     if (!cache.has(key)) {
       const request = RecommendationService.mockMode()
         ? Promise.resolve(mockGroups(anchor, all, lang))
-        : fetch(`${ONEAL_API_BASE}/recommendations?product_id=${encodeURIComponent(String(anchor.id))}&lang=${encodeURIComponent(lang)}&limit=${limit}`, {
+        : fetch(`${RECOMMENDATIONS_BASE}/recommendations?product_id=${encodeURIComponent(String(anchor.id))}&lang=${encodeURIComponent(lang)}&limit=${limit}`, {
             headers: { 'X-API-Key': ONEAL_API_KEY },
           })
             .then(r => (r.ok ? r.json() : null))

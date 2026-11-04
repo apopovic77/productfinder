@@ -23,6 +23,11 @@ export const ONEAL_API_KEY: string =
  * aus oneal-api-v2 (Stufe 4, Test-Instanz /next/). Leer = bisheriger Weg; B2B,
  * Medien und Sprachberater bleiben in jedem Fall bei ONEAL_API_BASE.
  */
+/**
+ * Empfehlungen "Passt dazu" (Post #5768): eigener Basis-Pfad nur fuer die
+ * Vorschau gegen den Prolog-Testdienst; sonst die normale oneal-api.
+ */
+export const RECOMMENDATIONS_BASE: string = import.meta.env.VITE_RECOMMENDATIONS_BASE || ONEAL_API_BASE;
 export const CATALOG_PRODUCTS_BASE: string = import.meta.env.VITE_CATALOG_PRODUCTS_BASE || '';
 export const CATALOG_PRODUCTS_KEY: string = import.meta.env.VITE_CATALOG_PRODUCTS_KEY || '';
 

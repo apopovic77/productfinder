@@ -29,7 +29,7 @@ import { OUTFIT_SLOTS, outfitSlotFrom } from '../layout/OutfitLayouter';
  */
 // Bei Bedarf geladen (je ~10 KB), nicht im Hauptpaket
 /** Reihenfolge der Empfehlungsgruppen in der Karte; unbekannte ans Ende. */
-const REC_GROUP_ORDER = ['same_design', 'complementary_equipment', 'color_match', 'alternatives'];
+const REC_GROUP_ORDER = ['same_design', 'complementary_equipment', 'spare_parts', 'color_match', 'alternatives'];
 const recGroupRank = (id: string) => { const i = REC_GROUP_ORDER.indexOf(id); return i < 0 ? REC_GROUP_ORDER.length : i; };
 
 const FEATURE_ICON_LOADERS = import.meta.glob('../assets/feature-icons/*.svg', { query: '?raw', import: 'default' }) as Record<string, () => Promise<string>>;
