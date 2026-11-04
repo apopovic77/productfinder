@@ -537,6 +537,10 @@ export class LayoutService {
   /** Mindestens eine Gruppe der Ebene enthaelt mehr als ein Produkt. */
   groupsWorthwhile(): boolean {
     const buckets = this.drillDownService.getCurrentBuckets().filter(b => !b.isUnknown);
+    // Selbst gewaehlte Dimension mit mindestens zwei Gruppen zeigt ihre
+    // Ueberschriften auch, wenn jede Gruppe nur ein Produkt hat (2SRS >
+    // Helmet VECTOR nach Farbe, owner 2026-11-04, media 132939/132940).
+    if (this.drillDownService.isUserSelectedDimension() && buckets.length > 1) return true;
     return buckets.some(b => (b.objectIds?.length ?? 0) > 1);
   }
 

@@ -176,6 +176,11 @@ export class GpanePivotService {
     return this.engine.activeDimension?.key || '__taxonomy__';
   }
 
+  /** Hat der Nutzer die Dimension dieser Ebene selbst gewaehlt? */
+  isUserSelectedDimension(): boolean {
+    return this._userSelectedDimension;
+  }
+
   /** Keine Kategorie-Ebene und keine Dimension gewaehlt (flache Uebersicht). */
   isUngrouped(): boolean {
     return this.engine.mode !== 'taxonomy' && !this.engine.activeDimension;
