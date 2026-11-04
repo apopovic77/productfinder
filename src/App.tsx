@@ -3008,7 +3008,8 @@ export default class App extends React.Component<Props, State> {
     load: async (product: Product, group?: 'spare_parts') => {
       const groups = await RecommendationService.load(
         product,
-        (this.props.locale || 'de').toLowerCase().slice(0, 2) === 'en' ? 'en' : 'de',
+        // Empfehlungstexte gibt es auf de/en; fr/it bekommen Englisch statt Deutsch
+        (this.props.locale || 'de').toLowerCase().startsWith('de') ? 'de' : 'en',
         this.controller.getCatalogAllProducts(),
         group ? 40 : 16,
         group,

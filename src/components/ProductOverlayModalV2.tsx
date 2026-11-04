@@ -20,6 +20,7 @@ import { DEFAULT_STAGE_BACKGROUND, STAGE_BACKGROUND_BASE, STAGE_BACKGROUND_STYLE
 import { CATALOG_PRODUCTS_BASE, CATALOG_PRODUCTS_KEY } from '../config/apiConfig';
 import { flyToCart } from '../utils/flyToCart';
 import type { RecommendationGroup } from '../services/RecommendationService';
+import { uiTexts, uiValue } from '../i18n/ui';
 import { OUTFIT_SLOTS, outfitSlotFrom } from '../layout/OutfitLayouter';
 
 /**
@@ -180,6 +181,8 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   /** Gewaehlter Hintergrundstil der Buehne, im Browser gemerkt */
   // Wahl per Punkt gilt fuer dieses Produkt; sonst waehlt die Rangfolge
   const [bgPick, setBgPick] = useState<{ id: string; style: string } | null>(null);
+  // Oberflaechentexte in der gewaehlten Sprache (owner 2026-11-04, media 132948)
+  const t = uiTexts(locale);
   const [recGroups, setRecGroups] = useState<{ id: string; groups: RecommendationGroup[] } | null>(null);
   const [spareGroups, setSpareGroups] = useState<{ id: string; groups: RecommendationGroup[] } | null>(null);
   useEffect(() => {
@@ -868,12 +871,12 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     if (qtySizes.length > 1) {
       if (sizesInStock === 0) {
         const restock = formatRestock(dealer?.expectedDeliveryDate);
-        return restock ? `Nicht lieferbar · ab ${restock}` : 'Nicht lieferbar';
+        return restock ? t.notDeliverableUntil(restock) : t.notDeliverable;
       }
-      if (sizesInStock >= qtySizes.length) return 'Alle Größen lieferbar';
-      return `${sizesInStock} von ${qtySizes.length} Größen lieferbar`;
+      if (sizesInStock >= qtySizes.length) return t.allSizesDeliverable;
+      return t.sizesDeliverable(sizesInStock, qtySizes.length);
     }
-    return stockAvailable !== null && stockAvailable > 0 ? `Lieferbar · ${stockAvailable}` : 'Nicht lieferbar';
+    return stockAvailable !== null && stockAvailable > 0 ? t.deliverable(stockAvailable) : t.notDeliverable;
   })();
   // gruen = alles lieferbar, gelb = teilweise, rot = nichts
   const stockBadgeColor = stockAvailable === null && qtySizes.length <= 1
@@ -1295,7 +1298,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
           thumbs below it; the outer mini strip hides via CSS. */}
       {showExpandedContent && allImages.length === 0 && !thumbnailsLoading && (
         <div className="pom-expanded-hero pom-expanded-hero-empty">
-          <span>Kein Produktbild verfügbar</span>
+          <span>{t.noImage}</span>
         </div>
       )}
       {showExpandedContent && allImages.length > 0 && (() => {
@@ -1387,7 +1390,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
               // Matrix BG01-BG11, owner 2026-10-21); ohne Bild die weisse Karte
               style={stageBgUrl ? { backgroundImage: `url(${stageBgUrl})` } : undefined}
             >
-            <div className="pom-stage-bgpick" role="group" aria-label="Hintergrund">
+            <div className="pom-stage-bgpick" role="group" aria-label={t.background}>
               {bgStyles.map(st => (
                 <button key={st.id} type="button" title={st.label}
                   className={`pom-stage-bgdot ${st.id === 'clear' ? 'pom-stage-bgdot-clear' : ''} ${bgStyle === st.id ? 'active' : ''}`}
@@ -1732,7 +1735,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         return (
           <div style={{ flex: '0 1 auto', minWidth: 0 }}>
             <div style={{ fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.8, marginBottom: '6px' }}>
-              {showExpandedContent ? 'Farbe' : 'Color'}: <span style={{ opacity: 1 }}>{currentColor}</span>
+              {t.color}: <span style={{ opacity: 1 }}>{currentColor}</span>
             </div>
             {/* Grosser Dialog: hoechstens drei Farben je Zeile, sonst liefen
                 sieben Farben quer ueber die Seite (owner 2026-10-22, media 132036) */}
@@ -1796,9 +1799,9 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
 
       {/* Grosser Dialog: Groessen & Mengen neben der Farbe (owner 2026-10-21, media 131808) */}
       {showExpandedContent && matrixSizes.length > 0 && (
-        <div className="pom-size-qty" aria-label="Menge je Größe">
+        <div className="pom-size-qty" aria-label={t.quantityPerSize}>
           <div className="pom-size-qty-head">
-            <span>{showExpandedContent ? 'Größen & Mengen' : 'Menge je Größe'}</span>
+            <span>{showExpandedContent ? t.sizesAndQuantities : t.quantityPerSize}</span>
             {sizeQtyTotal > 0 && (
               <button type="button" className="pom-size-qty-clear" onClick={() => setSizeQty({})}>zurücksetzen</button>
             )}
@@ -1823,7 +1826,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                   {sizesPending ? (
                     <span className="pom-size-qty-stock none">…</span>
                   ) : stock !== null && (
-                    <span className={`pom-size-qty-stock ${stock > 0 ? 'ok' : 'none'}`}>{stock > 0 ? `${stock} verfügbar` : 'nicht verfügbar'}</span>
+                    <span className={`pom-size-qty-stock ${stock > 0 ? 'ok' : 'none'}`}>{stock > 0 ? t.available(stock) : t.notAvailable}</span>
                   )}
                   {(cartSizes[shortSize(size)] || 0) > 0 && (
                     <span className="pom-size-qty-incart">✓ {cartSizes[shortSize(size)]} im Warenkorb</span>
@@ -1860,7 +1863,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       {shownSizes.length > 0 && !(showExpandedContent && matrixSizes.length > 0) && (
         <div className="pom-size-block" style={{ flex: '0 1 auto', minWidth: 0 }}>
           <div style={{ fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.8, marginBottom: '6px' }}>
-            Size: <span style={{ opacity: 1, color: sizeHint ? '#ff7a45' : undefined }}>{selectedSize || (sizeHint ? 'bitte zuerst wählen' : 'bitte wählen')}</span>
+            {t.size}: <span style={{ opacity: 1, color: sizeHint ? '#ff7a45' : undefined }}>{selectedSize || (sizeHint ? t.sizeChooseFirst : t.sizeChoose)}</span>
           </div>
           <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
             {shownSizes.map(size => {
@@ -1892,7 +1895,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                   {(() => { const d = dealerForSize(size); const c = d ? availabilityDot(d.availabilityCode, d.unknown) : null; return c ? <span aria-hidden="true" style={{ display: 'inline-block', width: 7, height: 7, borderRadius: 4, background: c, marginRight: 6, verticalAlign: 'middle' }} /> : null; })()}
                   {size}
                   {(cartSizes[shortSize(size)] || 0) > 0 && (
-                    <span className="pom-size-cart-qty" title="im Warenkorb">{cartSizes[shortSize(size)]}</span>
+                    <span className="pom-size-cart-qty" title={t.inCart}>{cartSizes[shortSize(size)]}</span>
                   )}
                 </button>
               );
@@ -1947,7 +1950,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         <aside className="pom-hero-badges" aria-label="Produktdaten">
           {heroBadges.map(b => (
             <div key={b.label} className="pom-hero-badge">
-              <span className="pom-hero-badge-label">{b.label}</span>
+              <span className="pom-hero-badge-label">{({ Gewicht: t.weight, 'Größen': t.sizes, 'Größe': t.size } as Record<string, string>)[b.label] ?? b.label}</span>
               <span className="pom-hero-badge-value">{b.value}</span>
             </div>
           ))}
@@ -1965,20 +1968,20 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         // Kennzahlen oben, darunter ein Datenblatt in Zeilen (owner 2026-10-21,
         // Entwurf media 131801) statt vieler gleich gewichteter Kacheln.
         const keyFigures: Array<[string, string]> = [];
-        if (badge('Gewicht')) keyFigures.push(['Gewicht', badge('Gewicht')!]);
-        if (raw?.model_year) keyFigures.push(['Modelljahr', String(raw.model_year)]);
+        if (badge('Gewicht')) keyFigures.push([t.weight, badge('Gewicht')!]);
+        if (raw?.model_year) keyFigures.push([t.modelYear, String(raw.model_year)]);
         const sizeRange = badge('Größen') || badge('Größe');
-        if (sizeRange) keyFigures.push(['Größen', sizeRange]);
+        if (sizeRange) keyFigures.push([t.sizes, sizeRange]);
         const info: Array<[string, string]> = [];
-        if (attr('sport')) info.push(['Sportart', String(Array.isArray(attr('sport')) ? attr('sport').join(', ') : attr('sport'))]);
-        if (attr('target_group')) info.push(['Zielgruppe', String(attr('target_group'))]);
-        if (attr('product_line')) info.push(['Produktlinie', String(attr('product_line'))]);
-        if (attr('product_type')) info.push(['Produkttyp', String(attr('product_type'))]);
-        if (raw?.color_name) info.push(['Farbe', String(raw.color_name)]);
-        if (sizeRange) info.push(['Größen', sizeRange]);
+        if (attr('sport')) info.push([t.sport, String(Array.isArray(attr('sport')) ? attr('sport').join(', ') : attr('sport'))]);
+        if (attr('target_group')) info.push([t.targetGroup, uiValue(String(attr('target_group')), locale)]);
+        if (attr('product_line')) info.push([t.productLine, String(attr('product_line'))]);
+        if (attr('product_type')) info.push([t.productType, uiValue(String(attr('product_type')), locale)]);
+        if (raw?.color_name) info.push([t.color, String(raw.color_name)]);
+        if (sizeRange) info.push([t.sizes, sizeRange]);
         const article: Array<[string, string]> = [];
-        if ((activeVariant as any)?.material) article.push(['Material', String((activeVariant as any).material)]);
-        if (raw?.product_code) article.push(['Artikelnummer', String(raw.product_code)]);
+        if ((activeVariant as any)?.material) article.push([t.material, String((activeVariant as any).material)]);
+        if (raw?.product_code) article.push([t.articleNumber, String(raw.product_code)]);
         if (activeVariant?.sku) article.push(['SKU', String(activeVariant.sku)]);
         if (activeVariant?.ean) article.push(['EAN', String(activeVariant.ean)]);
         const lines = descText.split(/<br\s*\/?>|\n/i)
@@ -2012,8 +2015,8 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         return (
           <div className="pom-expanded-extra">
             {recommendations && recGroups && recGroups.id === String(product.id) && recGroups.groups.length > 0 && (
-              <div className="pom-recs" aria-label="Passt dazu">
-                <div className="pom-recs-heading">{locale === 'en' ? 'Goes well with' : 'Passt dazu'}</div>
+              <div className="pom-recs" aria-label={t.goesWellWith}>
+                <div className="pom-recs-heading">{t.goesWellWith}</div>
                 {/* Zusaetze vor Alternativen: der EICMA-Befund war vor allem das
                     fehlende Upselling (owner 2026-11-04) */}
                 {[...recGroups.groups].sort((a, b) => recGroupRank(a.group_id) - recGroupRank(b.group_id)).map(group => {
@@ -2043,7 +2046,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                 })}
               </div>
             )}
-            {points.length + norms.length > 0 && section('details', 'Produktdetails', 'Material, Passform und Besonderheiten',
+            {points.length + norms.length > 0 && section('details', t.productDetails, 'Material, Passform und Besonderheiten',
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h16M4 12h16M4 17h10" /></svg>,
               <div className="pom-expanded-desc">
                 {/* Merkmalskarten aus dem Katalog: Icon, Titel, belegender Satz
@@ -2077,7 +2080,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                 )}
               </div>,
             )}
-            {(keyFigures.length + info.length + article.length) > 0 && section('tech', 'Technische Daten', 'Spezifikationen und Artikeldaten',
+            {(keyFigures.length + info.length + article.length) > 0 && section('tech', t.technicalData, 'Spezifikationen und Artikeldaten',
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" /><circle cx="16" cy="6" r="2" /><circle cx="10" cy="12" r="2" /><circle cx="18" cy="18" r="2" /></svg>,
               <div className="pom-sheet">
                 {keyFigures.length > 0 && (
@@ -2087,8 +2090,8 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                     ))}
                   </div>
                 )}
-                {rows('Produktinformationen', info)}
-                {rows('Artikeldaten', article)}
+                {rows(t.productInfo, info)}
+                {rows(t.articleData, article)}
               </div>,
             )}
             {(() => {
@@ -2101,7 +2104,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
               if (!items.length) return null;
               const ids = items.map(x => String(x.p.id));
               const why = spareGroups.groups[0]?.items[0]?.reason;
-              section('spare', locale === 'en' ? 'Spare parts' : 'Ersatzteile', '',
+              section('spare', t.spareParts, '',
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z" /></svg>,
                 <div className="pom-spares">
                   {why && <div className="pom-recs-why">{why}</div>}
@@ -2148,11 +2151,11 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       {(!isMobilePortrait || heroSheet) && (
         <div className="pom-actions" style={{ gap: '6px' }}>
           <button ref={addToCartRef} className="pom-button pom-button-primary" onClick={handleAddToCart} style={{ fontSize: '11px', padding: '8px 12px' }}>
-            {showExpandedContent && justAdded ? '✓ Im Warenkorb' : showExpandedContent && sizeQtyTotal > 0 ? `Add to Cart · ${sizeQtyTotal} Stk.` : 'Add to Cart'}
+            {showExpandedContent && justAdded ? t.inCartDone : showExpandedContent && sizeQtyTotal > 0 ? t.addToCartQty(sizeQtyTotal) : t.addToCart}
           </button>
           {(onShowDetails || onCollapse) && !showExpandedContent && (
             <button className="pom-button" onClick={expanded ? onCollapse : onShowDetails} style={{ fontSize: '11px', padding: '8px 12px' }}>
-              {expanded ? 'Weniger' : 'Mehr Details'}
+              {expanded ? t.less : t.moreDetails}
             </button>
           )}
           {productUrl && !showExpandedContent && (
@@ -2166,15 +2169,15 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
             <button type="button" className={`pom-button pom-restock ${restockState}`} onClick={onToggleRestock}>
               <span aria-hidden="true">🔔</span>
               <span>
-                <strong>{restockState === 'open' ? 'Benachrichtigung aktiv' : restockState === 'fulfilled' ? 'Wieder verfügbar' : 'Benachrichtigen'}</strong>
-                <small>{restockState === 'open' ? 'Klick zum Abbestellen' : restockState === 'fulfilled' ? 'Bestand ist zurück' : 'wenn wieder verfügbar'}</small>
+                <strong>{restockState === 'open' ? t.notifyActive : restockState === 'fulfilled' ? t.backInStock : t.notify}</strong>
+                <small>{restockState === 'open' ? t.notifyActiveHint : restockState === 'fulfilled' ? t.backInStockHint : t.notifyHint}</small>
               </span>
             </button>
           )}
           {/* Grosser Dialog: ein Hauptknopf, geschlossen wird oben rechts */}
           {!showExpandedContent && (
             <button className="pom-button pom-button-secondary" onClick={onClose} style={{ fontSize: '11px', padding: '8px 12px' }}>
-              Close
+              {t.close}
             </button>
           )}
         </div>
