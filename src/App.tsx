@@ -57,6 +57,7 @@ import { soundService } from './services/SoundService';
 import { resolveProductTapStage } from './utils/ProductTapFlow';
 import QuickSearchCommandPalette from './components/QuickSearchCommandPalette';
 import { AiProductQueryService } from './services/AiProductQueryService';
+import { RecommendationService } from './services/RecommendationService';
 import { FavoriteProductService, OutfitImageService, SavedOutfitService, outfitImageUrl, outfitOwner, type OutfitBackground, type SavedOutfit } from './services/OutfitImageService';
 import { categoryMediaService } from './services/CategoryMediaService';
 import { FOOTER_CONFIG, type FooterPosition } from './config/FooterConfig';
@@ -2995,6 +2996,28 @@ export default class App extends React.Component<Props, State> {
     void call.then(ids => { if (ids) this.setState({ favoriteIds: ids }); });
   };
 
+  /**
+   * "Passt dazu" in der Produktkarte (owner 2026-11-04, Post #5768): Klick
+   * zeigt das Ausgangsprodukt mit seiner Empfehlungsgruppe im Finder (wie ein
+   * Suchergebnis) und oeffnet das gewaehlte Produkt.
+   */
+  private recommendationPort = {
+    load: (product: Product) => RecommendationService.load(
+      product,
+      (this.props.locale || 'de').toLowerCase().slice(0, 2) === 'en' ? 'en' : 'de',
+      this.controller.getCatalogAllProducts(),
+    ),
+    resolve: (id: string) => this.controller.getCatalogAllProducts().find(p => String(p.id) === id),
+    open: (id: string, groupIds: string[]) => {
+      const anchor = this.state.selectedProduct ? String(this.state.selectedProduct.id) : null;
+      const ids = [...new Set([...(anchor ? [anchor] : []), ...groupIds])];
+      const matched = this.applyAiResult(ids);
+      this.setState({ aiFilterProductIds: matched, aiLastResultCount: matched.length });
+      const target = this.controller.getCatalogAllProducts().find(p => String(p.id) === id);
+      if (target) window.setTimeout(() => this.openProductDetails(target), 60);
+    },
+  };
+
   /** Lieblingsprodukt oeffnen: Merkliste im Finder zeigen, dann die Karte. */
   private openFavorite = (product: Product) => {
     this.showFavorites();
@@ -4412,6 +4435,7 @@ export default class App extends React.Component<Props, State> {
                 heroDock={this.usesHeroDock() || this.isMobileLayout()}
                 expanded={this.state.shouldShowV4Dialog}
                 locale={this.props.locale}
+                recommendations={this.recommendationPort}
                 onCollapse={() => this.setState({ shouldShowV4Dialog: false })}
                 onClose={this.handleProductDialogClose}
                 onPositionChange={this.handleDialogPositionChange}

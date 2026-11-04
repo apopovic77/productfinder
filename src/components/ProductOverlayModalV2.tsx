@@ -19,6 +19,7 @@ const STORAGE_API_URL = STORAGE_API_BASE;
 import { DEFAULT_STAGE_BACKGROUND, STAGE_BACKGROUND_BASE, STAGE_BACKGROUND_STYLES, fetchStageBackgrounds, rankStageBackgrounds, stageBackgroundUrl, type StageBackgroundStyle } from '../config/stageBackgrounds';
 import { CATALOG_PRODUCTS_BASE, CATALOG_PRODUCTS_KEY } from '../config/apiConfig';
 import { flyToCart } from '../utils/flyToCart';
+import type { RecommendationGroup } from '../services/RecommendationService';
 import { OUTFIT_SLOTS, outfitSlotFrom } from '../layout/OutfitLayouter';
 
 /**
@@ -100,6 +101,15 @@ type Props = {
   colorOptions?: Array<{ id: string | number; colorName: string; storageId?: number }>;
   /** Benachrichtigen, wenn wieder verfuegbar: Zustand und Umschalter */
   restockState?: 'none' | 'open' | 'fulfilled';
+  /**
+   * "Passt dazu" (owner 2026-11-04, Post #5768): Empfehlungen laden, ids in
+   * Produkte aufloesen, Klick oeffnet das Produkt (mit den Nachbarn der Gruppe).
+   */
+  recommendations?: {
+    load: (product: Product) => Promise<RecommendationGroup[]>;
+    resolve: (id: string) => Product | undefined;
+    open: (id: string, groupIds: string[]) => void;
+  };
   /** Merkliste: Herz in der Karte (owner 2026-10-23) */
   isFavorite?: boolean;
   onToggleFavorite?: () => void;
@@ -149,7 +159,7 @@ interface ParsedFeature {
  * Product Overlay Modal V2 - HALF WIDTH VERSION (240px)
  * Same design as V1, but with compact half-width layout
  */
-export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady, onShowDetails, expanded = false, onCollapse, locale, onSiblingSelect, colorOptions, stageBackground, restockState = 'none', onToggleRestock, isFavorite = false, onToggleFavorite, onStepProduct, stepPosition, dealerPrices, dealerActive = false, dealerPricesPending = false, cartLines = [] }) => {
+export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady, onShowDetails, expanded = false, onCollapse, locale, onSiblingSelect, colorOptions, stageBackground, restockState = 'none', onToggleRestock, isFavorite = false, onToggleFavorite, onStepProduct, stepPosition, dealerPrices, dealerActive = false, dealerPricesPending = false, cartLines = [], recommendations }) => {
   const isMobilePortrait = window.innerWidth <= 768 && window.innerHeight > window.innerWidth;
   // Phone: the dark hero card as a full-width bottom sheet (owner 2026-08-23,
   // "die Karte auch im Desktop-Style"). Same markup as the desktop dock,
@@ -166,6 +176,15 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   /** Gewaehlter Hintergrundstil der Buehne, im Browser gemerkt */
   // Wahl per Punkt gilt fuer dieses Produkt; sonst waehlt die Rangfolge
   const [bgPick, setBgPick] = useState<{ id: string; style: string } | null>(null);
+  const [recGroups, setRecGroups] = useState<{ id: string; groups: RecommendationGroup[] } | null>(null);
+  useEffect(() => {
+    if (!expanded || !recommendations) return;
+    let alive = true;
+    const id = String(product.id);
+    recommendations.load(product).then(groups => { if (alive) setRecGroups({ id, groups }); });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product.id, expanded]);
   // Grosse Kacheln, deren Bild schon geladen ist: der kleine Platzhalter
   // dahinter kommt dann weg. Als React-Zustand statt per DOM-Stil, denn ein
   // spaeteres Rendern setzte den Platzhalter wieder und er schien groesser
@@ -1986,6 +2005,33 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         );
         return (
           <div className="pom-expanded-extra">
+            {recommendations && recGroups && recGroups.id === String(product.id) && recGroups.groups.length > 0 && (
+              <div className="pom-recs" aria-label="Passt dazu">
+                <div className="pom-recs-heading">{locale === 'en' ? 'Goes well with' : 'Passt dazu'}</div>
+                {recGroups.groups.map(group => {
+                  const items = group.items
+                    .map(item => ({ item, p: recommendations.resolve(item.id) }))
+                    .filter((x): x is { item: typeof x.item; p: Product } => !!x.p);
+                  if (!items.length) return null;
+                  const ids = items.map(x => String(x.p.id));
+                  return (
+                    <div key={group.group_id} className="pom-recs-group">
+                      <div className="pom-recs-title">{group.title}</div>
+                      <div className="pom-recs-row">
+                        {items.map(({ item, p }) => (
+                          <button key={item.id} type="button" className="pom-rec" title={item.reason ? `${p.name}: ${item.reason}` : p.name}
+                            onClick={() => recommendations.open(String(p.id), ids)}>
+                            <span className="pom-rec-img"><img src={p.imageUrl} alt="" loading="lazy" /></span>
+                            <span className="pom-rec-name">{p.name}</span>
+                            {item.reason && <span className="pom-rec-reason">{item.reason}</span>}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             {points.length + norms.length > 0 && section('details', 'Produktdetails', 'Material, Passform und Besonderheiten',
               <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h16M4 12h16M4 17h10" /></svg>,
               <div className="pom-expanded-desc">

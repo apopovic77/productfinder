@@ -1173,3 +1173,20 @@
 .pom-fav.on svg { fill: currentColor; }
 .pom-hero-dock .pom-fav { background: rgba(255, 255, 255, 0.1); }
 .pom-hero-sheet .pom-fav { background: rgba(60, 60, 64, 0.9); }
+
+/* "Passt dazu" (owner 2026-11-04, Post #5768): Empfehlungen je Gruppe als
+   kleine Kacheln, waagerecht scrollbar */
+.pom-recs { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 16px; }
+.pom-recs-heading { font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.75); }
+.pom-recs-title { font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.6); margin-bottom: 6px; }
+.pom-recs-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.pom-rec {
+  flex: 0 0 104px; display: flex; flex-direction: column; gap: 4px; padding: 6px;
+  border-radius: 10px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.05);
+  color: inherit; text-align: left; cursor: pointer;
+}
+.pom-rec:hover { border-color: rgba(255, 90, 31, 0.55); background: rgba(255,255,255,0.09); }
+.pom-rec-img { display: block; width: 100%; aspect-ratio: 1 / 1; border-radius: 7px; background: #fff; overflow: hidden; }
+.pom-rec-img img { width: 100%; height: 100%; object-fit: contain; }
+.pom-rec-name { font-size: 11px; font-weight: 700; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.pom-rec-reason { font-size: 10px; line-height: 1.2; color: rgba(255,255,255,0.55); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
