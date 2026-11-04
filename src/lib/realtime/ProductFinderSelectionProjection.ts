@@ -1,3 +1,4 @@
+import { agentResultIntent } from './AgentResultIntent';
 import type { ProductSummary } from 'arkturian-oneal-sdk';
 import type { ProductFinderController } from '../../controller/ProductFinderController';
 import type { Product } from '../../types/Product';
@@ -35,7 +36,7 @@ export class ProductFinderSelectionProjection implements ProductSelectionProject
       throw new Error('Server selection contains an invalid product summary');
     }
     const products = ordered as Product[];
-    this.options.controller.applyAgentProducts(products);
+    this.options.controller.applyAgentProducts(products, { outfit: agentResultIntent() !== 'selection' });
     await this.options.onSelectionProjected?.(products[0], products.length);
   }
 }

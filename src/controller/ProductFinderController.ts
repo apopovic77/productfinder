@@ -1199,8 +1199,10 @@ export class ProductFinderController {
   /** Nach jedem Agenten-Ergebnis (Smart Search getippt oder gesprochen). */
   onAgentProductsApplied?: (productIds: string[]) => void;
 
-  applyAgentProducts(products: Product[]): void {
-    this.setGlobalSearchProducts(products, { outfit: true });
+  applyAgentProducts(products: Product[], options: { outfit?: boolean } = {}): void {
+    // Konfigurator nur, wenn der Berater ein Outfit zusammenstellt; eine reine
+    // Auswahl kommt in die Gruppen-/Pivot-Sicht (owner 2026-11-04)
+    this.setGlobalSearchProducts(products, { outfit: options.outfit ?? true });
     if (products.length > 1) {
       this.exitHeroPresentation();
       this.setViewOverride('grouped');

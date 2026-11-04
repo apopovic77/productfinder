@@ -31,7 +31,7 @@ describe('ProductFinderSelectionProjection', () => {
 
     await projection.showSelection('st_opaque');
 
-    expect(applyAgentProducts).toHaveBeenCalledWith([mapped, loaded]);
+    expect(applyAgentProducts).toHaveBeenCalledWith([mapped, loaded], { outfit: true });
     expect(onSelectionProjected).toHaveBeenCalledWith(mapped, 2);
   });
 

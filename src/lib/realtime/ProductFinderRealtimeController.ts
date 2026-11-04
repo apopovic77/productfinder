@@ -1,4 +1,5 @@
 import { isFinderUiTool, runFinderUiTool, type FinderUiToolPort } from './FinderUiTools';
+import { takeAgentPresentation } from './AgentResultIntent';
 import {
   CART_DETAILS_FUNCTION_OUTPUT_KIND,
   PRODUCT_DETAILS_FUNCTION_OUTPUT_KIND,
@@ -136,9 +137,12 @@ export class ProductFinderRealtimeController {
     this.session = new RealtimeBrowserSession(this.adapter.core, {
       mintSession: context => options.server.mintSession(context),
       // UI-Werkzeuge laufen lokal und gehen nie an den BFF (Post #5634).
-      executeTool: call => (isFinderUiTool(call.name)
-        ? runFinderUiTool(options.uiTools?.() ?? null, call.name, call.args)
-        : options.server.executeTool(call)),
+      executeTool: rawCall => {
+        if (isFinderUiTool(rawCall.name)) return runFinderUiTool(options.uiTools?.() ?? null, rawCall.name, rawCall.args);
+        // presentation (outfit | selection) bleibt im Finder, der BFF kennt es nicht
+        const call = { ...rawCall, args: takeAgentPresentation(rawCall.name, rawCall.args) };
+        return options.server.executeTool(call);
+      },
       replaceableToolOutputs: {
         product_details: PRODUCT_DETAILS_FUNCTION_OUTPUT_KIND,
         cart_details: CART_DETAILS_FUNCTION_OUTPUT_KIND,
