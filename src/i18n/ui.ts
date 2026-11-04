@@ -52,6 +52,8 @@ const de = {
   articleNumber: 'Artikelnummer',
   sizeChart: 'Größentabelle',
   reset: 'zurücksetzen',
+  inStockShort: 'verfügbar',
+  fewLeft: 'nur noch wenige',
 };
 export type UiTexts = typeof de;
 
@@ -101,6 +103,8 @@ const en: UiTexts = {
   articleNumber: 'Article number',
   sizeChart: 'Size chart',
   reset: 'reset',
+  inStockShort: 'available',
+  fewLeft: 'only a few left',
 };
 
 const fr: UiTexts = {
@@ -149,6 +153,8 @@ const fr: UiTexts = {
   articleNumber: "Numéro d'article",
   sizeChart: 'Guide des tailles',
   reset: 'réinitialiser',
+  inStockShort: 'disponible',
+  fewLeft: 'plus que quelques-uns',
 };
 
 const it: UiTexts = {
@@ -197,6 +203,8 @@ const it: UiTexts = {
   articleNumber: 'Codice articolo',
   sizeChart: 'Tabella taglie',
   reset: 'azzera',
+  inStockShort: 'disponibile',
+  fewLeft: 'solo pochi pezzi',
 };
 
 const TEXTS: Record<string, UiTexts> = { de, en, fr, it };

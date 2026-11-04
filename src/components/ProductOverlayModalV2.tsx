@@ -774,7 +774,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
     : stockAvailable > 0 ? 'Auf Lager' : 'Nicht auf Lager';
   const stockTitle = stockAvailable === null
     ? 'Für diese Variante liegt kein Bestand vor'
-    : `${stockAvailable > 0 ? stockAvailable : 0} Stück verfügbar (Lager ${activeVariant?.stock_on_hand ?? '–'}, reserviert ${activeVariant?.stock_reserved ?? '–'}, Stand letzte Nacht)`;
+    : stockAvailable > 0 ? t.inStockShort : t.notAvailable;
 
   // Get product URL
   const productUrl = activeVariant?.url || (product as any).meta?.product_url;
@@ -782,6 +782,12 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   const variantLabel = [selectedColor, selectedSize].filter(Boolean).join(' / ');
   // Händlerpreis + Veloconnect-Verfügbarkeit (nur angemeldet)
   const dealer = dealerPrices && activeVariant?.sku ? dealerPrices[activeVariant.sku] : undefined;
+  // Genaue Stueckzahlen nur fuer angemeldete Haendler, denen der B2B-Shop
+  // Mengen liefert (Kundeneinstellung im Shop); sonst "verfuegbar" bzw. unter
+  // 10 "nur noch wenige" (owner 2026-11-04, media 132951)
+  const exactStockAllowed = dealerActive && !!dealerPrices
+    && Object.values(dealerPrices).some(d => d && d.availableQuantity !== null && d.availableQuantity !== undefined);
+  const stockText = (n: number) => (exactStockAllowed ? t.available(n) : n < 10 ? t.fewLeft : t.inStockShort);
   // Liefertermin aus dem B2B-Shop (Sonja Goldmann 2026-10-21: "wann ist es
   // wieder verfuegbar"). Ein Termin in der Vergangenheit sagt nichts mehr.
   const formatRestock = (iso?: string | null): string | null => {
@@ -889,7 +895,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
       if (sizesInStock >= qtySizes.length) return t.allSizesDeliverable;
       return t.sizesDeliverable(sizesInStock, qtySizes.length);
     }
-    return stockAvailable !== null && stockAvailable > 0 ? t.deliverable(stockAvailable) : t.notDeliverable;
+    return stockAvailable !== null && stockAvailable > 0 ? (exactStockAllowed ? t.deliverable(stockAvailable) : stockText(stockAvailable)) : t.notDeliverable;
   })();
   // gruen = alles lieferbar, gelb = teilweise, rot = nichts
   const stockBadgeColor = stockAvailable === null && qtySizes.length <= 1
@@ -1844,7 +1850,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                   {sizesPending ? (
                     <span className="pom-size-qty-stock none">…</span>
                   ) : stock !== null && (
-                    <span className={`pom-size-qty-stock ${stock > 0 ? 'ok' : 'none'}`}>{stock > 0 ? t.available(stock) : t.notAvailable}</span>
+                    <span className={`pom-size-qty-stock ${stock > 0 ? 'ok' : 'none'}`}>{stock > 0 ? stockText(stock) : t.notAvailable}</span>
                   )}
                   {(cartSizes[shortSize(size)] || 0) > 0 && (
                     <span className="pom-size-qty-incart">✓ {cartSizes[shortSize(size)]} im Warenkorb</span>
@@ -1897,7 +1903,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                   key={size}
                   type="button"
                   onClick={() => setSelectedSize(size)}
-                  title={stock === null ? size : inStock ? `${size}: ${stock} lieferbar` : `${size}: nicht lieferbar`}
+                  title={stock === null ? size : inStock ? `${size}: ${stockText(stock!)}` : `${size}: ${t.notAvailable}`}
                   style={{
                     padding: '5px 10px', fontSize: '11px', borderRadius: '6px',
                     border: isActive ? '2px solid #ff6b00' : inStock ? '1px solid rgba(63,191,111,0.7)' : '1px solid rgba(255,255,255,0.18)',
