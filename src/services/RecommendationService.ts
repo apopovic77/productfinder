@@ -8,6 +8,8 @@ import type { Product } from '../types/Product';
  *   GET /v1/recommendations?product_id=…&lang=de|en&limit=…
  *   -> {groups:[{group_id,title,items:[{id,rule_id,reason,score}]}]}
  * Gruppen: alternatives | same_design | color_match | complementary_equipment.
+ * Ersatzteile (LIUS tblArtikelErsatzteile, Issue #2644) kommen nur mit
+ * group=spare_parts und stehen in der Karte als eigener Reiter.
  * Fehler oder fehlender Endpunkt -> keine Gruppen, der Abschnitt bleibt weg.
  */
 export type RecommendationItem = { id: string; rule_id: string; reason: string; score: number };
@@ -68,12 +70,12 @@ export class RecommendationService {
     return RecommendationService.MOCK;
   }
 
-  static load(anchor: Product, lang: string, all: Product[], limit = 16): Promise<RecommendationGroup[]> {
-    const key = `${anchor.id}|${lang}|${limit}`;
+  static load(anchor: Product, lang: string, all: Product[], limit = 16, group?: string): Promise<RecommendationGroup[]> {
+    const key = `${anchor.id}|${lang}|${limit}|${group ?? ''}`;
     if (!cache.has(key)) {
       const request = RecommendationService.mockMode()
-        ? Promise.resolve(mockGroups(anchor, all, lang))
-        : fetch(`${RECOMMENDATIONS_BASE}/recommendations?product_id=${encodeURIComponent(String(anchor.id))}&lang=${encodeURIComponent(lang)}&limit=${limit}`, {
+        ? Promise.resolve(group ? [] : mockGroups(anchor, all, lang))
+        : fetch(`${RECOMMENDATIONS_BASE}/recommendations?product_id=${encodeURIComponent(String(anchor.id))}&lang=${encodeURIComponent(lang)}&limit=${limit}${group ? `&group=${encodeURIComponent(group)}` : ''}`, {
             headers: { 'X-API-Key': ONEAL_API_KEY },
           })
             .then(r => (r.ok ? r.json() : null))

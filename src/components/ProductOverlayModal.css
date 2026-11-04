@@ -1191,3 +1191,6 @@
 .pom-rec-img img { width: 100%; height: 100%; object-fit: contain; }
 .pom-rec-name { font-size: 11px; font-weight: 700; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .pom-rec-reason { font-size: 10px; line-height: 1.2; color: rgba(255,255,255,0.55); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* Reiter Ersatzteile (wie im B2B-Shop, owner 2026-11-04) */
+.pom-spares-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+.pom-spares-grid .pom-rec { flex: none; }

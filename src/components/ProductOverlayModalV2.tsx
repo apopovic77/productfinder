@@ -110,7 +110,7 @@ type Props = {
    * Produkte aufloesen, Klick oeffnet das Produkt (mit den Nachbarn der Gruppe).
    */
   recommendations?: {
-    load: (product: Product) => Promise<RecommendationGroup[]>;
+    load: (product: Product, group?: 'spare_parts') => Promise<RecommendationGroup[]>;
     resolve: (id: string) => Product | undefined;
     open: (id: string, groupIds: string[]) => void;
   };
@@ -176,16 +176,18 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [isSiblingView, setIsSiblingView] = useState(false);
   /** Aufgeklappter Bereich im grossen Dialog (Produktdetails / Technische Daten). */
-  const [openSection, setOpenSection] = useState<'details' | 'tech' | null>(null);
+  const [openSection, setOpenSection] = useState<'details' | 'tech' | 'spare' | null>(null);
   /** Gewaehlter Hintergrundstil der Buehne, im Browser gemerkt */
   // Wahl per Punkt gilt fuer dieses Produkt; sonst waehlt die Rangfolge
   const [bgPick, setBgPick] = useState<{ id: string; style: string } | null>(null);
   const [recGroups, setRecGroups] = useState<{ id: string; groups: RecommendationGroup[] } | null>(null);
+  const [spareGroups, setSpareGroups] = useState<{ id: string; groups: RecommendationGroup[] } | null>(null);
   useEffect(() => {
     if (!expanded || !recommendations) return;
     let alive = true;
     const id = String(product.id);
     recommendations.load(product).then(groups => { if (alive) setRecGroups({ id, groups }); });
+    recommendations.load(product, 'spare_parts').then(groups => { if (alive) setSpareGroups({ id, groups }); });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product.id, expanded]);
@@ -1994,8 +1996,8 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         // Tabs statt aufklappbarer Bereiche: nebeneinander aufgeklappt wirkte es
         // schief (owner 2026-10-21, media 131817). Die Inhalte werden hier
         // gesammelt und unten als Reiter mit einer Flaeche gezeigt.
-        const tabs: Array<{ key: 'details' | 'tech'; title: string; icon: React.ReactNode; body: React.ReactNode }> = [];
-        const section = (key: 'details' | 'tech', title: string, _subtitle: string, icon: React.ReactNode, body: React.ReactNode) => {
+        const tabs: Array<{ key: 'details' | 'tech' | 'spare'; title: string; icon: React.ReactNode; body: React.ReactNode }> = [];
+        const section = (key: 'details' | 'tech' | 'spare', title: string, _subtitle: string, icon: React.ReactNode, body: React.ReactNode) => {
           tabs.push({ key, title, icon, body });
           return null;
         };
@@ -2089,6 +2091,32 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
                 {rows('Artikeldaten', article)}
               </div>,
             )}
+            {(() => {
+              // Reiter Ersatzteile wie im B2B-Shop (owner 2026-11-04, media 132941):
+              // vollstaendige Zuordnung aus dem LIUS-Artikelstamm
+              if (!recommendations || !spareGroups || spareGroups.id !== String(product.id)) return null;
+              const items = spareGroups.groups.flatMap(g => g.items)
+                .map(item => ({ item, p: recommendations.resolve(item.id) }))
+                .filter((x): x is { item: typeof x.item; p: Product } => !!x.p);
+              if (!items.length) return null;
+              const ids = items.map(x => String(x.p.id));
+              const why = spareGroups.groups[0]?.items[0]?.reason;
+              section('spare', locale === 'en' ? 'Spare parts' : 'Ersatzteile', '',
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z" /></svg>,
+                <div className="pom-spares">
+                  {why && <div className="pom-recs-why">{why}</div>}
+                  <div className="pom-spares-grid">
+                    {items.map(({ item, p }) => (
+                      <button key={item.id} type="button" className="pom-rec" title={p.name} onClick={() => recommendations.open(String(p.id), ids)}>
+                        <span className="pom-rec-img"><img src={p.imageUrl} alt="" loading="lazy" /></span>
+                        <span className="pom-rec-name">{p.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>,
+              );
+              return null;
+            })()}
             {tabs.length > 0 && (() => {
               const current = tabs.find(t => t.key === openSection) ?? tabs[0];
               return (

@@ -3005,18 +3005,20 @@ export default class App extends React.Component<Props, State> {
   private recommendationExtras = new Map<string, Product>();
 
   private recommendationPort = {
-    load: async (product: Product) => {
+    load: async (product: Product, group?: 'spare_parts') => {
       const groups = await RecommendationService.load(
         product,
         (this.props.locale || 'de').toLowerCase().slice(0, 2) === 'en' ? 'en' : 'de',
         this.controller.getCatalogAllProducts(),
+        group ? 40 : 16,
+        group,
       );
       // Ersatzteile stehen meist nicht in Katalog 2028: einzeln nachladen,
       // sonst fielen sie in der Karte still weg (owner 2026-11-04, media 132941)
       const catalog = new Set(this.controller.getCatalogAllProducts().map(p => String(p.id)));
       const missing = [...new Set(groups.flatMap(g => g.items.map(i => i.id)))]
         .filter(id => !catalog.has(id) && !this.recommendationExtras.has(id))
-        .slice(0, 24);
+        .slice(0, 40);
       const fetched = await Promise.all(missing.map(id => fetchProductById(id).catch(() => null)));
       fetched.forEach((p, i) => { if (p) this.recommendationExtras.set(missing[i], p); });
       return groups;
