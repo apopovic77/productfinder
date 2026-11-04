@@ -37,9 +37,16 @@ export function expandedDialogGeometry(
   // Breite: 75 % der Flaeche zwischen den 150-px-Raendern, mindestens 760 px;
   // ganz breit verlor sich der Inhalt (owner 2026-10-21).
   const baseMarginX = Math.max(16, Math.min(EXPANDED_MARGIN, Math.floor((viewportWidth - 760) / 2)));
-  const width = Math.min(viewportWidth - baseMarginX * 2, Math.max(760, Math.round((viewportWidth - baseMarginX * 2) * 0.75)));
+  const roomy = Math.min(viewportWidth - baseMarginX * 2, Math.max(760, Math.round((viewportWidth - baseMarginX * 2) * 0.75)));
+  // Laptop-Breiten (owner 2026-11-04, media 132942): bei 1440 px blieben
+  // 855 px Dialog und ein Hauptbild von 250 px. Bis 1280 px Dialog duerfen
+  // es 88 % der Bildschirmbreite sein; grosse Bildschirme bleiben wie oben.
+  const laptop = Math.min(1280, Math.round(viewportWidth * 0.88));
+  const width = Math.min(viewportWidth - 32, Math.max(roomy, laptop));
   const marginX = Math.round((viewportWidth - width) / 2);
-  const marginY = Math.max(16, Math.min(EXPANDED_MARGIN, Math.floor((viewportHeight - 480) / 2)));
+  // Oben 10 % der Hoehe statt bis zu 150 px: auf 718 px Hoehe kostete der
+  // Rand 119 px Bild (owner 2026-11-04)
+  const marginY = Math.max(64, Math.min(EXPANDED_MARGIN, Math.round(viewportHeight * 0.1)));
   // Unten buendig am Bildschirmrand, Rand nur oben (owner 2026-10-21)
   const height = viewportHeight - marginY;
   return { width, height, marginX, marginY, stageWidth: Math.min(760, Math.round(width * 0.46)) };
