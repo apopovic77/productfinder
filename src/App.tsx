@@ -58,7 +58,7 @@ import { resolveProductTapStage } from './utils/ProductTapFlow';
 import QuickSearchCommandPalette from './components/QuickSearchCommandPalette';
 import { AiProductQueryService } from './services/AiProductQueryService';
 import { RecommendationService } from './services/RecommendationService';
-import { appTexts, uiDimLabel } from './i18n/ui';
+import { appTexts, setDisplayLocale, uiDimLabel, uiGroupLabel } from './i18n/ui';
 import { FavoriteProductService, OutfitImageService, SavedOutfitService, outfitImageUrl, outfitOwner, type OutfitBackground, type SavedOutfit } from './services/OutfitImageService';
 import { categoryMediaService } from './services/CategoryMediaService';
 import { FOOTER_CONFIG, type FooterPosition } from './config/FooterConfig';
@@ -1558,7 +1558,7 @@ export default class App extends React.Component<Props, State> {
             className={`pf-crumb-menu-item ${item.active ? 'active' : ''}`}
             onClick={item.onSelect}
           >
-            {item.label}
+            {uiGroupLabel(item.label, this.props.locale)}
           </button>
         ))}
       </div>
@@ -3043,7 +3043,7 @@ export default class App extends React.Component<Props, State> {
   };
 
   /** Oberflaechentexte in der gewaehlten Sprache (owner 2026-11-04, media 132948) */
-  private get ui() { return appTexts(this.props.locale); }
+  private get ui() { setDisplayLocale(this.props.locale); return appTexts(this.props.locale); }
 
   /** Lieblingsprodukt oeffnen: Merkliste im Finder zeigen, dann die Karte. */
   private openFavorite = (product: Product) => {
@@ -3438,7 +3438,7 @@ export default class App extends React.Component<Props, State> {
                       }
                     }}
                   >
-                    {crumb}
+                    {uiGroupLabel(crumb, this.props.locale)}
                   </span>
                   {this.renderCrumbMenu(rawSiblings.map(label => ({
                     label,
@@ -3839,7 +3839,7 @@ export default class App extends React.Component<Props, State> {
                     }
                   }}
                 >
-                  {crumb}
+                  {uiGroupLabel(crumb, this.props.locale)}
                 </span>
               </React.Fragment>
             ); })}
@@ -3964,7 +3964,7 @@ export default class App extends React.Component<Props, State> {
                 <button type="button" key={`mobile-crumb-${crumb}-${i}`}
                   className={`pf-mobile-pivot-crumb ${i === pivotBreadcrumbs.length - 1 ? 'active' : ''}`}
                   onClick={() => { this.handleBreadcrumbClick(i); this.setState({ mobilePivotOpen: false }); }}>
-                  {crumb}
+                  {uiGroupLabel(crumb, this.props.locale)}
                 </button>
               ))}
             </div>
@@ -4374,7 +4374,7 @@ export default class App extends React.Component<Props, State> {
                           }
                         }}
                       >
-                        {crumb}
+                        {uiGroupLabel(crumb, this.props.locale)}
                       </span>
                     </React.Fragment>
                   ))}

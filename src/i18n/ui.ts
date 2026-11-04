@@ -388,3 +388,87 @@ export function uiDimLabel(label: string, locale?: string | null): string {
   const lang = uiLang(locale);
   return lang === 'de' ? label : DIM_LABELS[label]?.[lang] ?? DIM_LABELS[label]?.en ?? label;
 }
+
+/**
+ * Gruppennamen auf der Flaeche und in der Brotkrumen-Leiste (Kategorien-
+ * Taxonomie, Familien, Werte). Nur Anzeige: Drill-Schluessel bleiben deutsch.
+ * Grossschreibung des Originals bleibt erhalten (Poster in Versalien).
+ */
+const GROUP_LABELS: Record<string, Record<string, string>> = {
+  'alle produkte': { en: 'All products', fr: 'Tous les produits', it: 'Tutti i prodotti' },
+  alle: { en: 'All', fr: 'Tout', it: 'Tutti' },
+  helme: { en: 'Helmets', fr: 'Casques', it: 'Caschi' },
+  brillen: { en: 'Goggles', fr: 'Masques', it: 'Maschere' },
+  kleidung: { en: 'Apparel', fr: 'Vêtements', it: 'Abbigliamento' },
+  protektoren: { en: 'Protection', fr: 'Protections', it: 'Protezioni' },
+  stiefel: { en: 'Boots', fr: 'Bottes', it: 'Stivali' },
+  schuhe: { en: 'Shoes', fr: 'Chaussures', it: 'Scarpe' },
+  'schuhe & stiefel': { en: 'Shoes & boots', fr: 'Chaussures & bottes', it: 'Scarpe e stivali' },
+  accessories: { en: 'Accessories', fr: 'Accessoires', it: 'Accessori' },
+  accessoires: { en: 'Accessories', fr: 'Accessoires', it: 'Accessori' },
+  ersatzteile: { en: 'Spare parts', fr: 'Pièces détachées', it: 'Ricambi' },
+  frauen: { en: 'Women', fr: 'Femmes', it: 'Donna' },
+  'frauen mx': { en: 'Women MX', fr: 'Femmes MX', it: 'Donna MX' },
+  'frauen mtb': { en: 'Women MTB', fr: 'Femmes VTT', it: 'Donna MTB' },
+  kinder: { en: 'Kids', fr: 'Enfants', it: 'Bambini' },
+  'kinder mx': { en: 'Kids MX', fr: 'Enfants MX', it: 'Bambini MX' },
+  'kinder mtb': { en: 'Kids MTB', fr: 'Enfants VTT', it: 'Bambini MTB' },
+  mtb: { fr: 'VTT' },
+  'full face helme': { en: 'Full face helmets', fr: 'Casques intégraux', it: 'Caschi integrali' },
+  'open face helme': { en: 'Open face helmets', fr: 'Casques jet', it: 'Caschi jet' },
+  handschuhe: { en: 'Gloves', fr: 'Gants', it: 'Guanti' },
+  hosen: { en: 'Pants', fr: 'Pantalons', it: 'Pantaloni' },
+  jacken: { en: 'Jackets', fr: 'Vestes', it: 'Giacche' },
+  jerseys: { fr: 'Maillots', it: 'Maglie' },
+  shorts: { it: 'Pantaloncini' },
+  socken: { en: 'Socks', fr: 'Chaussettes', it: 'Calze' },
+  regenkleidung: { en: 'Rainwear', fr: 'Vêtements de pluie', it: 'Abbigliamento antipioggia' },
+  'oberkörper': { en: 'Upper body', fr: 'Haut du corps', it: 'Parte superiore' },
+  ellenbogen: { en: 'Elbow', fr: 'Coudes', it: 'Gomiti' },
+  knie: { en: 'Knee', fr: 'Genoux', it: 'Ginocchia' },
+  'knie & beine': { en: 'Knee & legs', fr: 'Genoux & jambes', it: 'Ginocchia e gambe' },
+  nackenschutz: { en: 'Neck protection', fr: 'Protection du cou', it: 'Protezione collo' },
+  'zubehör': { en: 'Accessories', fr: 'Accessoires', it: 'Accessori' },
+  weitere: { en: 'More', fr: 'Autres', it: 'Altri' },
+  sonstige: { en: 'Other', fr: 'Autres', it: 'Altro' },
+  'alle größen lieferbar': { en: 'All sizes available', fr: 'Toutes les tailles disponibles', it: 'Tutte le taglie disponibili' },
+  'teilweise lieferbar': { en: 'Partly available', fr: 'Partiellement disponible', it: 'Parzialmente disponibile' },
+  'nicht lieferbar': { en: 'Not available', fr: 'Indisponible', it: 'Non disponibile' },
+  erwachsene: { en: 'Adults', fr: 'Adultes', it: 'Adulti' },
+  jugendliche: { en: 'Youth', fr: 'Enfants', it: 'Ragazzi' },
+  helm: { en: 'Helmet', fr: 'Casque', it: 'Casco' },
+  hose: { en: 'Pants', fr: 'Pantalon', it: 'Pantaloni' },
+  handschuh: { en: 'Gloves', fr: 'Gants', it: 'Guanti' },
+  protektor: { en: 'Protector', fr: 'Protection', it: 'Protezione' },
+  brille: { en: 'Goggles', fr: 'Masque', it: 'Maschera' },
+  jacke: { en: 'Jacket', fr: 'Veste', it: 'Giacca' },
+  socke: { en: 'Socks', fr: 'Chaussettes', it: 'Calze' },
+  kappe: { en: 'Cap', fr: 'Casquette', it: 'Cappellino' },
+  tasche: { en: 'Bag', fr: 'Sac', it: 'Borsa' },
+  rucksack: { en: 'Backpack', fr: 'Sac à dos', it: 'Zaino' },
+  zelt: { en: 'Tent', fr: 'Tente', it: 'Tenda' },
+  aufkleber: { en: 'Stickers', fr: 'Autocollants', it: 'Adesivi' },
+  regenbekleidung: { en: 'Rainwear', fr: 'Vêtements de pluie', it: 'Abbigliamento antipioggia' },
+  freizeit: { en: 'Leisure', fr: 'Loisirs', it: 'Tempo libero' },
+  kopf: { en: 'Head', fr: 'Tête', it: 'Testa' },
+  augen: { en: 'Eyes', fr: 'Yeux', it: 'Occhi' },
+  hand: { en: 'Hand', fr: 'Main', it: 'Mano' },
+  füße: { en: 'Feet', fr: 'Pieds', it: 'Piedi' },
+  beine: { en: 'Legs', fr: 'Jambes', it: 'Gambe' },
+  uni: { en: 'One size', fr: 'Taille unique', it: 'Taglia unica' },
+};
+
+export function uiGroupLabel(label: string, locale?: string | null): string {
+  const lang = uiLang(locale);
+  if (lang === 'de' || !label) return label;
+  const hit = GROUP_LABELS[label.trim().toLowerCase()];
+  const t = hit?.[lang] ?? (lang !== 'en' ? undefined : undefined);
+  if (!t) return label;
+  const upper = label === label.toUpperCase() && /[A-ZÄÖÜ]/.test(label);
+  return upper ? t.toUpperCase() : t;
+}
+
+/** Anzeigesprache fuer Teile ohne React-Props (Canvas-Renderer) */
+let displayLocale = 'de';
+export function setDisplayLocale(locale?: string | null): void { displayLocale = uiLang(locale); }
+export function displayGroupLabel(label: string): string { return uiGroupLabel(label, displayLocale); }

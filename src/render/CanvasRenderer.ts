@@ -1,3 +1,4 @@
+import { displayGroupLabel } from '../i18n/ui';
 import { LayoutNode } from '../layout/LayoutNode';
 import { ViewportTransform } from '../utils/ViewportTransform';
 import type { Product } from '../types/Product';
@@ -943,7 +944,7 @@ export class CanvasRenderer<T> {
   private headerDisplayLabel(label: string): string {
     // "N/A" ist Technik-Sprache; fuer Haendler ist das der Rest (owner
     // 2026-09-28, media 128367). Nur Anzeige — Drill-Werte bleiben "N/A".
-    if (label === 'N/A') return 'Weitere';
+    if (label === 'N/A') return displayGroupLabel('Weitere');
     let t = label;
     const parent = this.headerParentLabel;
     if (parent && t.toLowerCase().startsWith(parent.toLowerCase() + ' ')) t = t.slice(parent.length).trim();
@@ -955,7 +956,7 @@ export class CanvasRenderer<T> {
     if (this.headerStripNoise && noiseDimension) {
       t = t.replace(/\b(Helmet|Helm|Youth|Glove|Gloves|Jersey|Pants|Pant|Boot|Boots|Goggle|Jacket|Polyacrylite|Hyperlite|Fidlock®?)\b/gi, ' ').replace(/\s+/g, ' ').trim();
     }
-    return t || label;
+    return displayGroupLabel(t || label);
   }
 
   /** Strip product-name noise words from column headers — only for design/series dimensions. */
@@ -1824,8 +1825,9 @@ export class CanvasRenderer<T> {
         }
         // maxWidth staucht statt zu ueberlappen; harte Kappung via Ellipsis
         // waere teurer und der Poster-Stil vertraegt condensed Versalien.
-        if (maxWidth) this.ctx.fillText(header.text, textX, header.y, maxWidth);
-        else this.ctx.fillText(header.text, textX, header.y);
+        const headerText = displayGroupLabel(header.text);
+        if (maxWidth) this.ctx.fillText(headerText, textX, header.y, maxWidth);
+        else this.ctx.fillText(headerText, textX, header.y);
       }
     }
 
@@ -2004,13 +2006,20 @@ export class CanvasRenderer<T> {
         const paddingBottom = BUCKET_BUTTON_CONFIG.spacing.paddingBottom * headerScale;
         const paddingLeft = BUCKET_BUTTON_CONFIG.spacing.paddingLeft * headerScale;
 
-        const maxTextWidth = header.width - paddingLeft - paddingRight;
+        const maxFontSize = (isHovered ? BUCKET_BUTTON_CONFIG.font.sizeHover : BUCKET_BUTTON_CONFIG.font.sizeNormal) * mobileFontScale;
+        // Gemessen wird, was gezeichnet wird: Versalien und das Wert-Icon
+        // davor. Vorher passten nur die gemischt geschriebenen Namen, die
+        // laengeren franzoesischen ("PIÈCES DÉTACHÉES") liefen ueber den Rand
+        // (owner 2026-11-04).
+        const fitIconSpace = (isMobileCanvas || BUCKET_BUTTON_CONFIG.font.alignHorizontal === 'left')
+          && valueIconKey(String(currentDimension ?? ''), header.label) ? maxFontSize * 1.7 : 0;
+        const maxTextWidth = header.width - paddingLeft - paddingRight - fitIconSpace;
         const maxTextHeight = header.height - paddingTop - paddingBottom;
 
-        const maxFontSize = (isHovered ? BUCKET_BUTTON_CONFIG.font.sizeHover : BUCKET_BUTTON_CONFIG.font.sizeNormal) * mobileFontScale;
         const minFontSize = 4; // Minimum readable size
+        const fitLabel = this.headerDisplayLabel(header.label);
         const { fontSize, lines } = this.calculateOptimalTextLayout(
-          this.headerDisplayLabel(header.label),
+          BUCKET_BUTTON_CONFIG.font.textTransform === 'uppercase' ? fitLabel.toUpperCase() : fitLabel,
           maxTextWidth,
           maxTextHeight,
           maxFontSize,
