@@ -17,7 +17,10 @@ import { DISPATCH_BASE } from '../config/apiConfig';
 
 const DEFAULT_DISPATCH_BASE = DISPATCH_BASE;
 
-const DEFAULT_TIMEOUT_MS = 90_000;
+// 240 s statt 90 s (owner 2026-11-05): OnealProductSearch (Codex, GPT-6.1-Sol)
+// brauchte fuer "alle blauen MX-Produkte" knapp 2 Minuten, und eine laufende
+// Outfit-Bild-Erzeugung (ca. 2 Min.) in derselben Warteschlange kommt davor.
+const DEFAULT_TIMEOUT_MS = 240_000;
 
 export class AgentDispatchError extends Error {}
 
@@ -84,7 +87,7 @@ export class AgentDispatchService {
       }, timeoutMs);
 
       es.onmessage = (event) => {
-        let payload: { status?: string; response?: string; message?: string };
+        let payload: { status?: string; response?: string; message?: string; error?: string };
         try {
           payload = JSON.parse(event.data);
         } catch {
@@ -97,7 +100,7 @@ export class AgentDispatchService {
         } else if (payload.status === 'error') {
           clearTimeout(timeout);
           es.close();
-          reject(new AgentDispatchError(payload.message || 'Agent reported error'));
+          reject(new AgentDispatchError(payload.error || payload.message || 'Agent reported error'));
         }
       };
 
