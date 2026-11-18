@@ -28,7 +28,7 @@ jobs:
         run: npm ci --production=false
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
 
       - name: Run all tests
         env:
