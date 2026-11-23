@@ -46,6 +46,9 @@ export interface CartB2BState {
   unitPrices: Record<string, { unit: number | null; currency: string; unknown: boolean }>;
   pricesPending: boolean;
   dealerTotal: number | null;
+  /** Händlerpreise ausblenden (Kundenansicht, owner 2026-11-23). */
+  hideDealerPrices?: boolean;
+  hiddenHint?: string;
   /** true = Übergabe als Testbestellung (IsTest), sichtbar markiert. */
   testMode?: boolean;
   onLogin: (customerNumber: string, password: string) => void;
@@ -101,7 +104,7 @@ function B2BLoginBar({ b2b }: { b2b: CartB2BState }) {
     return (
       <div className="cart-b2b-bar cart-b2b-active">
         <span className="cart-b2b-label">
-          Kunde <strong>{b2b.customerNumber}</strong> · Händlerpreise{b2b.pricesPending ? ' werden geladen …' : ' aktiv'}
+          Kunde <strong>{b2b.customerNumber}</strong> · {b2b.hideDealerPrices ? (b2b.hiddenHint ?? 'Händlerpreise ausgeblendet') : <>Händlerpreise{b2b.pricesPending ? ' werden geladen …' : ' aktiv'}</>}
           {b2b.testMode && <span className="cart-b2b-testbadge" title="Bestellungen gehen als Testbestellung (IsTest) an den B2B-Shop">TESTMODUS</span>}
         </span>
       </div>
@@ -123,6 +126,7 @@ export function CartView({
   b2b,
 }: CartViewProps) {
   const b2bActive = Boolean(b2b?.customerNumber);
+  const showEk = b2bActive && !b2b?.hideDealerPrices;
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   useEffect(() => { if (!b2bActive) setCheckoutOpen(false); }, [b2bActive]);
   // Compute union of all sizes across all items (column headers)
@@ -201,7 +205,7 @@ export function CartView({
           testMode={!!b2b.testMode}
           positions={items.length}
           pieces={grandTotal}
-          dealerTotal={b2b.dealerTotal}
+          dealerTotal={b2b.hideDealerPrices ? null : b2b.dealerTotal}
           lines={items.map(item => ({
             id: item.id,
             name: item.productName,
@@ -236,7 +240,7 @@ export function CartView({
                   <th key={size} className="cart-col-size">{size}</th>
                 ))}
                 <th className="cart-col-total">Σ</th>
-                {b2bActive && <th className="cart-col-ek" title="Händler-Einkaufspreis je Stück">EK</th>}
+                {showEk && <th className="cart-col-ek" title="Händler-Einkaufspreis je Stück">EK</th>}
                 <th className="cart-col-actions"></th>
               </tr>
             </thead>
@@ -306,7 +310,7 @@ export function CartView({
                     );
                   })}
                   <td className="cart-cell-total">{rowTotal(item)}</td>
-                  {b2bActive && (() => {
+                  {showEk && (() => {
                     const up = b2b?.unitPrices[item.id];
                     const cls = `cart-cell-ek${up?.unknown ? ' is-unknown' : ''}`;
                     return (
@@ -329,7 +333,7 @@ export function CartView({
               <tr>
                 <td colSpan={3 + allSizes.length} className="cart-foot-label">Gesamt</td>
                 <td className="cart-foot-total">{grandTotal}</td>
-                {b2bActive && (
+                {showEk && (
                   <td className="cart-foot-ek">{b2b?.dealerTotal !== null && b2b?.dealerTotal !== undefined ? formatMoney(b2b.dealerTotal, 'EUR') : '–'}</td>
                 )}
                 <td></td>
@@ -394,7 +398,9 @@ export function CartView({
             {b2b!.notOrderable!.length === 1 ? '1 Position ist' : `${b2b!.notOrderable!.length} Positionen sind`} derzeit nicht über den B2B-Shop bestellbar — bitte vor der Übergabe entfernen.
           </div>
         )}
-        {b2bActive ? (
+        {b2bActive && b2b?.hideDealerPrices ? (
+          <div className="cart-footer-hint">{b2b.hiddenHint ?? 'Händlerpreise ausgeblendet'}</div>
+        ) : b2bActive ? (
           <div className="cart-footer-summary">
             Summe Händler-EK: <strong>{b2b?.dealerTotal !== null && b2b?.dealerTotal !== undefined ? formatMoney(b2b.dealerTotal, 'EUR') : '–'}</strong>
           </div>

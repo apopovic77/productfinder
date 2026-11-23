@@ -137,6 +137,8 @@ type Props = {
   dealerActive?: boolean;
   /** Haendlerpreise werden gerade geladen. */
   dealerPricesPending?: boolean;
+  /** Händlerpreise ausblenden (Kundenansicht). Verfügbarkeit bleibt sichtbar. */
+  hideDealerPrices?: boolean;
   /**
    * Was von diesem Produkt schon im Warenkorb liegt, je Farbe die Menge je
    * Groesse. Die Karte zeigt es an den Groessen-Chips (owner 2026-10-21,
@@ -165,7 +167,7 @@ interface ParsedFeature {
  * Product Overlay Modal V2 - HALF WIDTH VERSION (240px)
  * Same design as V1, but with compact half-width layout
  */
-export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady, onShowDetails, expanded = false, onCollapse, locale, onSiblingSelect, colorOptions, stageBackground, restockState = 'none', onToggleRestock, isFavorite = false, onToggleFavorite, onStepProduct, stepPosition, dealerPrices, dealerActive = false, dealerPricesPending = false, cartLines = [], recommendations }) => {
+export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady, onShowDetails, expanded = false, onCollapse, locale, onSiblingSelect, colorOptions, stageBackground, restockState = 'none', onToggleRestock, isFavorite = false, onToggleFavorite, onStepProduct, stepPosition, dealerPrices, dealerActive = false, dealerPricesPending, hideDealerPrices = false, cartLines = [], recommendations }) => {
   const isMobilePortrait = window.innerWidth <= 768 && window.innerHeight > window.innerWidth;
   // Phone: the dark hero card as a full-width bottom sheet (owner 2026-08-23,
   // "die Karte auch im Desktop-Style"). Same markup as the desktop dock,
@@ -1681,7 +1683,7 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
         )}
         {/* HEK nur zeigen, wenn es wirklich einen Preis gibt — sonst stand dort nur
             ein Strich (owner 2026-09-16, media 125394). */}
-        {dealer && !dealer.unknown && dealer.dealerPrice !== null && dealer.dealerPrice !== undefined && (
+        {!hideDealerPrices && dealer && !dealer.unknown && dealer.dealerPrice !== null && dealer.dealerPrice !== undefined && (
           <div className="pom-dealer-price" title="Dein Händler-Einkaufspreis (netto, laut B2B-Shop)" style={{ fontSize: '12px', fontWeight: 700, padding: '4px 8px', borderRadius: '6px', background: 'rgba(63,185,80,0.18)', color: '#9be59b' }}>
             HEK {formatDealer(dealer.dealerPrice, dealer.currency)}
           </div>

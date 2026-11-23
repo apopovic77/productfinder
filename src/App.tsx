@@ -249,6 +249,8 @@ type State = {
   restockRequests: RestockRequest[];
   /** Kleines Konto-Menü unter dem Header-Icon (nur angemeldet). */
   b2bMenuOpen: boolean;
+  /** Händlerpreise ausblenden (Kundenansicht, wie „Händlerpreise Aus“ im B2B-Shop; owner 2026-11-23). */
+  hideDealerPrices: boolean;
   /** Letzte Übergabe an den B2B-Shop (Bestätigungsansicht). */
   orderConfirmation: OrderConfirmation | null;
   cartPanelOpen: boolean;
@@ -375,6 +377,7 @@ const createInitialState = (): State => {
     b2bLoginOpen: false,
     restockRequests: [],
     b2bMenuOpen: false,
+    hideDealerPrices: (() => { try { return localStorage.getItem('pf.hideDealerPrices') === '1'; } catch { return false; } })(),
     orderConfirmation: null,
     cartPanelOpen: false,
     b2bOrdersOpen: false,
@@ -2206,6 +2209,12 @@ export default class App extends React.Component<Props, State> {
     }
   };
 
+  private toggleHideDealerPrices = () => {
+    const next = !this.state.hideDealerPrices;
+    try { localStorage.setItem('pf.hideDealerPrices', next ? '1' : '0'); } catch { /* privat: nur diese Sitzung */ }
+    this.setState({ hideDealerPrices: next, b2bMenuOpen: false });
+  };
+
   private handleB2BLogin = async (customerNumber: string, password: string) => {
     if (this.state.b2bLoginPending) return;
     this.setState({ b2bLoginPending: true, b2bLoginError: null });
@@ -2287,6 +2296,8 @@ export default class App extends React.Component<Props, State> {
       unitPrices,
       pricesPending: this.state.b2bPricesPending,
       dealerTotal: lines.length ? dealerTotal : null,
+      hideDealerPrices: this.state.hideDealerPrices,
+      hiddenHint: this.ui.dealerPricesHiddenHint,
       testMode: !B2B_LIVE_ORDERS,
       onLogin: (c, pw) => { void this.handleB2BLogin(c, pw); },
       onLogout: () => { void this.handleB2BLogout(); },
@@ -4515,6 +4526,7 @@ export default class App extends React.Component<Props, State> {
                 dealerPrices={this.state.b2bSession ? this.state.b2bPrices : undefined}
                 dealerActive={!!this.state.b2bSession}
                 dealerPricesPending={this.state.b2bPricesPending}
+                hideDealerPrices={this.state.hideDealerPrices}
               />,
             ];
           })()}
@@ -4526,6 +4538,7 @@ export default class App extends React.Component<Props, State> {
               <div className="pf-b2b-menu-head">Kunde <strong>{this.state.b2bSession.customerNumber}</strong>{this.state.b2bSession.customerClass ? ` · ${this.state.b2bSession.customerClass}` : ''}</div>
               <button type="button" className="pf-b2b-menu-item" onClick={() => this.setState({ b2bMenuOpen: false, cartPanelOpen: true, b2bOrdersOpen: false })}>{this.ui.orderOverview}</button>
               <button type="button" className="pf-b2b-menu-item" onClick={() => this.setState({ b2bMenuOpen: false, cartPanelOpen: true, b2bOrdersOpen: true })}>{this.ui.myOrders}</button>
+              <button type="button" className="pf-b2b-menu-item" role="menuitemcheckbox" aria-checked={this.state.hideDealerPrices} onClick={this.toggleHideDealerPrices}>{this.state.hideDealerPrices ? this.ui.showDealerPrices : this.ui.hideDealerPrices}</button>
               <button type="button" className="pf-b2b-menu-item pf-b2b-menu-danger" onClick={() => { this.setState({ b2bMenuOpen: false }); void this.handleB2BLogout(); }}>Abmelden</button>
             </div>
           </div>
