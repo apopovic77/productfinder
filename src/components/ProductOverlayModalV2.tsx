@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import { b2bShopTexts, shopDate } from '../i18n/b2bShop';
 import { AnimatePresence, motion, useIsPresent } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import type { Product } from '../types/Product';
@@ -139,6 +140,8 @@ type Props = {
   dealerPricesPending?: boolean;
   /** Händlerpreise ausblenden (Kundenansicht). Verfügbarkeit bleibt sichtbar. */
   hideDealerPrices?: boolean;
+  /** Sonderangebot / Neu eingetroffen je SKU aus LIUS (nur mit Händler-Session, Alex 26.11.2026). */
+  shopFlags?: Record<string, { specialPrice: number | null; specialUntil: string | null; lastArrivalAt: string | null }>;
   /**
    * Was von diesem Produkt schon im Warenkorb liegt, je Farbe die Menge je
    * Groesse. Die Karte zeigt es an den Groessen-Chips (owner 2026-10-21,
@@ -167,7 +170,7 @@ interface ParsedFeature {
  * Product Overlay Modal V2 - HALF WIDTH VERSION (240px)
  * Same design as V1, but with compact half-width layout
  */
-export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady, onShowDetails, expanded = false, onCollapse, locale, onSiblingSelect, colorOptions, stageBackground, restockState = 'none', onToggleRestock, isFavorite = false, onToggleFavorite, onStepProduct, stepPosition, dealerPrices, dealerActive = false, dealerPricesPending, hideDealerPrices = false, cartLines = [], recommendations }) => {
+export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, position, onPositionChange, onVariantChange, onImageSelect, onBuy, heroDock = false, isHiResReady, onShowDetails, expanded = false, onCollapse, locale, onSiblingSelect, colorOptions, stageBackground, restockState = 'none', onToggleRestock, isFavorite = false, onToggleFavorite, onStepProduct, stepPosition, dealerPrices, dealerActive = false, dealerPricesPending, hideDealerPrices = false, shopFlags, cartLines = [], recommendations }) => {
   const isMobilePortrait = window.innerWidth <= 768 && window.innerHeight > window.innerWidth;
   // Phone: the dark hero card as a full-width bottom sheet (owner 2026-08-23,
   // "die Karte auch im Desktop-Style"). Same markup as the desktop dock,
@@ -1688,6 +1691,30 @@ export const ProductOverlayModalV2: React.FC<Props> = ({ product, onClose, posit
             HEK {formatDealer(dealer.dealerPrice, dealer.currency)}
           </div>
         )}
+        {(() => {
+          // Sonderpreis der gewählten Variante, sonst der günstigste des Produkts
+          if (!shopFlags) return null;
+          const shopT = b2bShopTexts(locale);
+          const own = activeVariant?.sku ? shopFlags[activeVariant.sku] : undefined;
+          const all = (product.variants || []).map((v: any) => (v?.sku ? shopFlags[v.sku] : undefined)).filter(Boolean) as Array<{ specialPrice: number | null; specialUntil: string | null; lastArrivalAt: string | null }>;
+          const specials = all.map(f => f.specialPrice).filter((x): x is number => x !== null);
+          const special = own?.specialPrice ?? (specials.length ? Math.min(...specials) : null);
+          const arrived = own?.lastArrivalAt ?? all.map(f => f.lastArrivalAt).filter((x): x is string => !!x).sort().pop() ?? null;
+          return (
+            <>
+              {special !== null && !hideDealerPrices && (
+                <div className="pom-special-price" title={shopT.specialHint} style={{ fontSize: '12px', fontWeight: 700, padding: '4px 8px', borderRadius: '6px', background: 'rgba(230,51,18,0.22)', color: '#ff9b85' }}>
+                  {shopT.specialPrice} {own?.specialPrice == null && specials.length > 1 ? '≥ ' : ''}{formatDealer(special, 'EUR')}
+                </div>
+              )}
+              {arrived && (
+                <div className="pom-new-arrival" style={{ fontSize: '11px', fontWeight: 700, padding: '4px 8px', borderRadius: '6px', background: 'rgba(88,166,255,0.18)', color: '#9ecbff' }}>
+                  {shopT.newArrival(shopDate(arrived, locale))}
+                </div>
+              )}
+            </>
+          );
+        })()}
         {dealer && availabilityDot(dealer.availabilityCode, dealer.unknown) && (
           <div title={dealer.availableQuantity !== null ? `Verfügbar: ${dealer.availableQuantity}` : 'Verfügbarkeit laut B2B-Shop'} style={{ fontSize: '10px', fontWeight: 600, color: availabilityDot(dealer.availabilityCode, dealer.unknown) as string, padding: '4px 8px', background: 'rgba(255,255,255,0.2)', borderRadius: '6px' }}>
             {dealer.unknown ? 'derzeit nicht über den Shop bestellbar' : /^(available|instock|in_stock|lieferbar)$/i.test(dealer.availabilityCode || '') ? 'Lieferbar' : /expect/i.test(dealer.availabilityCode || '') ? (formatRestock(dealer.expectedDeliveryDate) ? `Wieder lieferbar ab ${formatRestock(dealer.expectedDeliveryDate)}` : 'Nachlieferung erwartet') : (dealer.availabilityCode || '')}

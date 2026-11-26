@@ -1,0 +1,93 @@
+/* B2B-Shop-Funktionen — gleiche Hülle und Farben wie „Meine Bestellungen". */
+.b2bs-tabs { display: flex; gap: 4px; padding: 8px 20px 0; border-bottom: 1px solid rgba(255,255,255,0.08); overflow-x: auto; }
+.b2bs-tab {
+  background: none; border: 0; border-bottom: 2px solid transparent; color: #8b949e; font: inherit; font-size: 13px;
+  font-weight: 600; padding: 8px 12px; cursor: pointer; white-space: nowrap;
+}
+.b2bs-tab:hover { color: #e6e6e6; }
+.b2bs-tab.is-active { color: #fff; border-bottom-color: #c6f542; }
+.b2bs-toolbar { padding: 10px 0; border-bottom: 0; }
+.b2bs-asof { margin-left: auto; font-size: 11px; color: #8b949e; }
+.b2bs-seg { display: inline-flex; border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; overflow: hidden; }
+.b2bs-seg button { background: none; border: 0; color: #c9d1d9; font: inherit; font-size: 13px; padding: 6px 12px; cursor: pointer; }
+.b2bs-seg button.is-active { background: rgba(198,245,66,0.18); color: #fff; }
+.b2bs-search {
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.15); color: #fff; padding: 6px 10px;
+  border-radius: 6px; font: inherit; font-size: 13px; min-width: 0; width: 180px;
+}
+.b2bs-hint { font-size: 12px; }
+.b2bs-more { align-self: center; }
+.b2bs-add { align-self: flex-start; }
+.b2bs-ok { background: rgba(63,185,80,0.15); border: 1px solid rgba(63,185,80,0.4); border-radius: 8px; padding: 8px 12px; font-size: 13px; }
+.b2bs-link { background: none; border: 0; padding: 0; color: #c6f542; font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.b2bs-sub { font-size: 11px; color: #8b949e; margin-top: 2px; }
+.b2bs-h { font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: #8b949e; margin: 14px 0 4px; }
+
+.b2b-order-status.b2bs-st-open { background: rgba(229,165,10,0.35); }
+.b2b-order-status.b2bs-st-partially_delivered { background: rgba(88,166,255,0.35); }
+.b2b-order-status.b2bs-st-completed { background: rgba(63,185,80,0.3); }
+.b2b-order-status.b2bs-st-cancelled { background: rgba(139,148,158,0.35); }
+.b2bs-line-open td { color: #fff; }
+.b2bs-parcels { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding-top: 10px; font-size: 12px; color: #8b949e; }
+.b2bs-parcels code { background: rgba(255,255,255,0.08); padding: 2px 6px; border-radius: 4px; color: #e6e6e6; font-size: 12px; }
+
+.b2bs-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.b2bs-kpis > * {
+  display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 12px; background: #16181d; color: inherit; font: inherit; text-align: left;
+}
+.b2bs-kpis > button { cursor: pointer; }
+.b2bs-kpis > button:hover { border-color: rgba(255,255,255,0.3); }
+.b2bs-kpis span { font-size: 12px; color: #8b949e; }
+.b2bs-kpis strong { font-size: 20px; color: #fff; }
+.b2bs-kpis em { font-style: normal; font-size: 12px; color: #8b949e; }
+.b2bs-kpis .is-warn { border-color: rgba(248,81,73,0.55); }
+.b2bs-kpis .is-warn strong { color: #ff7b72; }
+
+.b2bs-pill { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: rgba(255,255,255,0.08); }
+.b2bs-inv-pill-open { background: rgba(229,165,10,0.3); }
+.b2bs-inv-pill-overdue { background: rgba(248,81,73,0.4); }
+.b2bs-inv-pill-paid { background: rgba(63,185,80,0.25); }
+
+.b2bs-year { border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; background: #16181d; padding: 12px 14px; }
+.b2bs-year-head { display: flex; justify-content: space-between; font-size: 13px; color: #8b949e; }
+.b2bs-year-head strong { color: #fff; font-size: 15px; }
+.b2bs-bars { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; height: 90px; margin-top: 10px; align-items: end; }
+.b2bs-bar { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; gap: 3px; }
+.b2bs-bar-fill { width: 100%; max-width: 22px; background: #c6f542; border-radius: 3px 3px 0 0; }
+.b2bs-bar span { font-size: 10px; color: #8b949e; }
+
+.b2bs-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.b2bs-card { border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; background: #16181d; padding: 10px 12px; font-size: 13px; line-height: 1.45; }
+.b2bs-card a { color: #c6f542; }
+
+.b2bs-bundle { border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; background: #16181d; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.b2bs-bundle-head { display: flex; justify-content: space-between; gap: 12px; }
+.b2bs-bundle-head strong { color: #fff; font-size: 14px; }
+.b2bs-bundle-price { display: flex; gap: 14px; text-align: right; }
+.b2bs-bundle-price span { display: block; font-size: 11px; color: #8b949e; }
+.b2bs-bundle-price strong { font-size: 15px; white-space: nowrap; }
+.b2bs-bundle-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.b2bs-bundle-items li { display: grid; grid-template-columns: 90px 1fr auto; gap: 10px; align-items: center; }
+.b2bs-stock { font-size: 11px; }
+.b2bs-stock.is-ok { color: #3fbf6f; }
+.b2bs-stock.is-no { color: #ef6b5b; }
+
+.b2bs-groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }
+.b2bs-group {
+  display: flex; flex-direction: column; gap: 4px; padding: 12px; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px;
+  background: #16181d; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.b2bs-group:hover { border-color: rgba(198,245,66,0.5); }
+.b2bs-group strong { color: #fff; font-size: 13px; }
+.b2bs-group span { font-size: 12px; color: #8b949e; }
+
+@media (max-width: 767px) {
+  .b2bs-tabs { padding: 8px 12px 0; }
+  .b2bs-bundle-head { flex-direction: column; }
+  .b2bs-bundle-price { text-align: left; }
+  .b2bs-bundle-items li { grid-template-columns: 1fr auto; }
+  .b2bs-bundle-items li > :first-child { grid-column: 1 / -1; }
+  .b2bs-asof { width: 100%; margin-left: 0; }
+  .b2bs-invoices th:nth-child(3), .b2bs-invoices td:nth-child(3) { white-space: nowrap; }
+}

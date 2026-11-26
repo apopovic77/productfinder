@@ -364,3 +364,176 @@ export async function restockCreate(session: B2BSession, productId: number, size
 export async function restockDelete(session: B2BSession, id: number): Promise<void> {
   await restockFetch<void>(session, `/${id}`, { method: 'DELETE' });
 }
+
+// ---------------------------------------------------------------------------
+// B2B-Shop-Funktionen (Alex 26.11.2026, Punkte 2, 3, 5, 6, 7) —
+// oneal-api-v2 /v1/b2b/shop/*, Vertrag b2b-shop-features-1.0.0. Alles nur mit
+// Händler-Session; die Kundennummer kommt im BFF aus der Session. Quelle ist
+// die LIUS-Kopie (Stand in dataAsOf), nur lesend.
+// ---------------------------------------------------------------------------
+
+export interface ShopCatalogFlags {
+  dataAsOf: string | null;
+  newArrivalDays: number;
+  variants: Array<{ sku: string; productId: string; specialPrice: number | null; specialUntil: string | null; lastArrivalAt: string | null }>;
+}
+
+export interface ShopBundle {
+  bundleNumber: number;
+  name: string;
+  description: string | null;
+  validUntil: string | null;
+  dealerTotal: number | null;
+  rrpTotal: number | null;
+  items: Array<{ sku: string; productId: string | null; name: string | null; color: string | null; size: string | null;
+    quantity: number; dealerPrice: number | null; rrp: number | null; stockAvailable: number | null }>;
+}
+
+export interface ShopPreorderGroup { id: number; name: string; nameEn: string | null; productIds: string[]; skus: string[] }
+
+export interface ShopParcel { parcelNumber: string; carrier: string | null; shippedAt: string | null; invoiceNumber: number | null }
+
+export interface ShopOrder {
+  orderNumber: number;
+  orderDate: string | null;
+  customerReference: string | null;
+  status: 'open' | 'partially_delivered' | 'completed' | 'cancelled';
+  requestedDelivery: string | null;
+  confirmedDelivery: string | null;
+  isPreorder: boolean;
+  isOnline: boolean;
+  netTotal: number | null;
+  grossTotal: number | null;
+  openQuantity: number;
+  invoiceNumbers: number[];
+  lines: Array<{ position: number | null; sku: string | null; productId: string | null; name: string | null; quantity: number;
+    delivered: number; invoiced: number; cancelled: number; openQuantity: number; unitPrice: number | null;
+    discountPercent: number | null; requestedDelivery: string | null; confirmedDelivery: string | null; backorderNote: string | null }>;
+  parcels: ShopParcel[];
+}
+
+export interface ShopInvoice {
+  invoiceNumber: number | null;
+  invoiceDate: string | null;
+  dueDate: string | null;
+  grossTotal: number | null;
+  netTotal: number | null;
+  status: 'open' | 'overdue' | 'paid';
+  paidAt: string | null;
+  dunningLevel: number | null;
+  parcels: ShopParcel[];
+}
+
+export interface ShopAccount {
+  dataAsOf: string | null;
+  customerNumber: string;
+  customerClass: string | null;
+  revenue: Array<{ fiscalYear: number; netRevenue: number; months: Array<{ month: string; netRevenue: number; invoiceCount: number }> }>;
+  openOrders: number;
+  openInvoices: number;
+  openGross: number;
+  overdueGross: number;
+  deliveryAddresses: Array<{ lines: string[]; street: string | null; postalCode: string | null; city: string | null }>;
+  contacts: Array<{ salutation: string | null; firstName: string | null; lastName: string | null; role: string | null; phone: string | null; email: string | null }>;
+}
+
+const parcel = (p: any): ShopParcel => ({
+  parcelNumber: p.parcel_number, carrier: p.carrier ?? null, shippedAt: p.shipped_at ?? null, invoiceNumber: p.invoice_number ?? null,
+});
+
+export async function shopCatalogFlags(session: B2BSession): Promise<ShopCatalogFlags> {
+  const r = await request<any>('/shop/catalog-flags', { method: 'GET', token: session.token });
+  return {
+    dataAsOf: r.data_as_of ?? null,
+    newArrivalDays: r.new_arrival_days ?? 30,
+    variants: (r.variants || []).map((v: any) => ({
+      sku: v.sku, productId: String(v.product_id), specialPrice: v.special_price ?? null,
+      specialUntil: v.special_until ?? null, lastArrivalAt: v.last_arrival_at ?? null,
+    })),
+  };
+}
+
+export async function shopBundles(session: B2BSession): Promise<{ dataAsOf: string | null; bundles: ShopBundle[] }> {
+  const r = await request<any>('/shop/bundles', { method: 'GET', token: session.token });
+  return {
+    dataAsOf: r.data_as_of ?? null,
+    bundles: (r.bundles || []).map((b: any) => ({
+      bundleNumber: b.bundle_number, name: b.name, description: b.description ?? null, validUntil: b.valid_until ?? null,
+      dealerTotal: b.dealer_total ?? null, rrpTotal: b.rrp_total ?? null,
+      items: (b.items || []).map((i: any) => ({
+        sku: i.sku, productId: i.product_id == null ? null : String(i.product_id), name: i.name ?? null, color: i.color ?? null,
+        size: i.size ?? null, quantity: i.quantity ?? 1, dealerPrice: i.dealer_price ?? null, rrp: i.rrp ?? null,
+        stockAvailable: i.stock_available ?? null,
+      })),
+    })),
+  };
+}
+
+export async function shopPreorder(session: B2BSession): Promise<{ dataAsOf: string | null; groups: ShopPreorderGroup[] }> {
+  const r = await request<any>('/shop/preorder', { method: 'GET', token: session.token });
+  return {
+    dataAsOf: r.data_as_of ?? null,
+    groups: (r.groups || []).map((g: any) => ({
+      id: g.id, name: g.name, nameEn: g.name_en ?? null, productIds: (g.product_ids || []).map(String), skus: g.skus || [],
+    })),
+  };
+}
+
+export async function shopOrders(session: B2BSession, status: 'open' | 'all', limit = 25, offset = 0)
+  : Promise<{ dataAsOf: string | null; total: number; orders: ShopOrder[] }> {
+  const r = await request<any>(`/shop/orders?status=${status}&limit=${limit}&offset=${offset}`, { method: 'GET', token: session.token });
+  return {
+    dataAsOf: r.data_as_of ?? null,
+    total: r.total ?? 0,
+    orders: (r.orders || []).map((o: any) => ({
+      orderNumber: o.order_number, orderDate: o.order_date ?? null, customerReference: o.customer_reference ?? null,
+      status: o.status, requestedDelivery: o.requested_delivery ?? null, confirmedDelivery: o.confirmed_delivery ?? null,
+      isPreorder: !!o.is_preorder, isOnline: !!o.is_online, netTotal: o.net_total ?? null, grossTotal: o.gross_total ?? null,
+      openQuantity: o.open_quantity ?? 0, invoiceNumbers: o.invoice_numbers || [],
+      lines: (o.lines || []).map((l: any) => ({
+        position: l.position ?? null, sku: l.sku ?? null, productId: l.product_id == null ? null : String(l.product_id),
+        name: l.name ?? null, quantity: l.quantity ?? 0, delivered: l.delivered ?? 0, invoiced: l.invoiced ?? 0,
+        cancelled: l.cancelled ?? 0, openQuantity: l.open_quantity ?? 0, unitPrice: l.unit_price ?? null,
+        discountPercent: l.discount_percent ?? null, requestedDelivery: l.requested_delivery ?? null,
+        confirmedDelivery: l.confirmed_delivery ?? null, backorderNote: l.backorder_note ?? null,
+      })),
+      parcels: (o.parcels || []).map(parcel),
+    })),
+  };
+}
+
+export async function shopInvoices(session: B2BSession, status: 'open' | 'all', limit = 25, offset = 0)
+  : Promise<{ dataAsOf: string | null; total: number; openCount: number; openGross: number; overdueGross: number; invoices: ShopInvoice[] }> {
+  const r = await request<any>(`/shop/invoices?status=${status}&limit=${limit}&offset=${offset}`, { method: 'GET', token: session.token });
+  return {
+    dataAsOf: r.data_as_of ?? null,
+    total: r.total ?? 0,
+    openCount: r.open_count ?? 0,
+    openGross: r.open_gross ?? 0,
+    overdueGross: r.overdue_gross ?? 0,
+    invoices: (r.invoices || []).map((i: any) => ({
+      invoiceNumber: i.invoice_number ?? null, invoiceDate: i.invoice_date ?? null, dueDate: i.due_date ?? null,
+      grossTotal: i.gross_total ?? null, netTotal: i.net_total ?? null, status: i.status, paidAt: i.paid_at ?? null,
+      dunningLevel: i.dunning_level ?? null, parcels: (i.parcels || []).map(parcel),
+    })),
+  };
+}
+
+export async function shopAccount(session: B2BSession): Promise<ShopAccount> {
+  const r = await request<any>('/shop/account', { method: 'GET', token: session.token });
+  return {
+    dataAsOf: r.data_as_of ?? null,
+    customerNumber: r.customer_number,
+    customerClass: r.customer_class ?? null,
+    revenue: (r.revenue || []).map((y: any) => ({
+      fiscalYear: y.fiscal_year, netRevenue: y.net_revenue ?? 0,
+      months: (y.months || []).map((m: any) => ({ month: m.month, netRevenue: m.net_revenue ?? 0, invoiceCount: m.invoice_count ?? 0 })),
+    })),
+    openOrders: r.open_orders ?? 0,
+    openInvoices: r.open_invoices ?? 0,
+    openGross: r.open_gross ?? 0,
+    overdueGross: r.overdue_gross ?? 0,
+    deliveryAddresses: (r.delivery_addresses || []).map((a: any) => ({ lines: a.lines || [], street: a.street ?? null, postalCode: a.postal_code ?? null, city: a.city ?? null })),
+    contacts: (r.contacts || []).map((c: any) => ({ salutation: c.salutation ?? null, firstName: c.first_name ?? null, lastName: c.last_name ?? null, role: c.role ?? null, phone: c.phone ?? null, email: c.email ?? null })),
+  };
+}

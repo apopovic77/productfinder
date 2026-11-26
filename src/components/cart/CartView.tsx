@@ -65,6 +65,10 @@ export interface CartB2BState {
   onExportCsv?: () => void;
   confirmation?: OrderConfirmation | null;
   onDismissConfirmation?: () => void;
+  /** Vororder-Modus (B2B-Shop-Panel): Checkout startet mit Vororder. */
+  preorderMode?: boolean;
+  /** Anmerkung für Bundles im Warenkorb, z. B. „Bundles: 12 3SRS Helmet + QUIN“. */
+  bundleNote?: string | null;
 }
 
 /** Verfügbarkeit als Zellen-Klasse (owner 2026-09-13, media 125020: keine Punkte, nur dezenter Rahmen). */
@@ -206,6 +210,8 @@ export function CartView({
           positions={items.length}
           pieces={grandTotal}
           dealerTotal={b2b.hideDealerPrices ? null : b2b.dealerTotal}
+          initialPreorder={!!b2b.preorderMode}
+          bundleNote={b2b.bundleNote ?? null}
           lines={items.map(item => ({
             id: item.id,
             name: item.productName,

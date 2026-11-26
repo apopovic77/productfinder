@@ -48,6 +48,10 @@ interface CheckoutPanelProps {
   notOrderable?: Array<{ itemId: string; name: string; size: string | null; sku: string | null }>;
   submitting: boolean;
   error: string | null;
+  /** Vororder vorbelegt (Vororder-Modus aus dem B2B-Shop-Panel, Alex 26.11.2026). */
+  initialPreorder?: boolean;
+  /** Bundles im Warenkorb: gehen als Anmerkung mit (Veloconnect kennt keine Bundles). */
+  bundleNote?: string | null;
   onSubmit: (options: CheckoutOptions) => void;
   onBack: () => void;
 }
@@ -68,13 +72,13 @@ const Icon = {
  * Schrittanzeige, Liefer-Kacheln statt Radio-Punkten, Zusammenfassung mit
  * Artikeln rechts und grossem Uebergabe-Knopf.
  */
-export function CheckoutPanel({ customerNumber, testMode, positions, pieces, dealerTotal, lines = [], notOrderable = [], submitting, error, onSubmit, onBack }: CheckoutPanelProps) {
-  const [asap, setAsap] = useState(true);
+export function CheckoutPanel({ customerNumber, testMode, positions, pieces, dealerTotal, lines = [], notOrderable = [], submitting, error, initialPreorder = false, bundleNote = null, onSubmit, onBack }: CheckoutPanelProps) {
+  const [asap, setAsap] = useState(!initialPreorder);
   const [date, setDate] = useState('');
   const [note, setNote] = useState('');
   const [orderNumber, setOrderNumber] = useState('');
   const [freightFree, setFreightFree] = useState(false);
-  const [preorder, setPreorder] = useState(false);
+  const [preorder, setPreorder] = useState(initialPreorder);
   const [agb, setAgb] = useState(false);
   const today = new Date().toISOString().slice(0, 10);
   const blocked = notOrderable.length > 0;
@@ -88,7 +92,7 @@ export function CheckoutPanel({ customerNumber, testMode, positions, pieces, dea
   return (
     <form
       className="cart-checkout co"
-      onSubmit={e => { e.preventDefault(); if (canSubmit) onSubmit({ deliveryDate: asap ? null : date, note: note.trim(), customerOrderNumber: orderNumber.trim(), freightFree, preorder }); }}
+      onSubmit={e => { e.preventDefault(); if (canSubmit) onSubmit({ deliveryDate: asap ? null : date, note: [bundleNote, note.trim()].filter(Boolean).join('\n'), customerOrderNumber: orderNumber.trim(), freightFree, preorder }); }}
     >
       <ol className="co-steps" aria-label="Bestellschritte">
         <li className="is-done"><button type="button" onClick={onBack} disabled={submitting}><span className="co-step-num">1</span><span className="co-step-label">Warenkorb</span> <span aria-hidden="true">✓</span></button></li>

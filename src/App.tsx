@@ -6,7 +6,10 @@ import {
   b2bListOrders, clearCheckoutRef, getOrCreateCheckoutRef, loadB2BSession,
   B2BError, type B2BPrice, type B2BSession, type B2BStoredOrder,
   restockList, restockCreate, restockDelete, type RestockRequest,
+  shopCatalogFlags, type ShopBundle, type ShopCatalogFlags,
 } from './services/B2BService';
+import { B2BShopPanel, type B2BShopView } from './components/b2b/B2BShopPanel';
+import { b2bShopTexts } from './i18n/b2bShop';
 import { resolveCartLineSkus } from './utils/cartSku';
 import type { CartB2BState } from './components/cart/CartView';
 import type { CheckoutOptions, OrderConfirmation } from './components/cart/CheckoutPanel';
@@ -261,6 +264,16 @@ type State = {
   b2bOrders: B2BStoredOrder[] | null;
   b2bOrdersLoading: boolean;
   b2bOrdersError: string | null;
+  /** B2B-Shop-Funktionen im Warenkorb-Panel (Alex 26.11.2026); null = Warenkorb. */
+  b2bShopView: B2BShopView | null;
+  /** Sonderangebote / Neu eingetroffen je Variante (nur mit Händler-Session). */
+  shopFlags: ShopCatalogFlags | null;
+  /** Beschriftung des ID-Filters, wenn er aus einem Schnellfilter stammt (sonst „KI“). */
+  idFilterLabel: string | null;
+  /** Vororder-Modus: der Checkout startet mit Vororder. */
+  preorderMode: boolean;
+  /** Bundles, die in den Warenkorb gelegt wurden (Anmerkung zur Bestellung). */
+  cartBundles: Array<{ number: number; name: string }>;
   cartFullOverlay: boolean;
   realtimeShortcutEnabled: boolean;
 };
@@ -385,6 +398,11 @@ const createInitialState = (): State => {
     b2bOrders: null,
     b2bOrdersLoading: false,
     b2bOrdersError: null,
+    b2bShopView: null,
+    shopFlags: null,
+    idFilterLabel: null,
+    preorderMode: false,
+    cartBundles: [],
     cartFullOverlay: false,
     // ?voice=1 blendet die Realtime-Flaeche ohne Tastatur ein (Handy/Tablet,
     // owner 2026-08-26 „wie am Handy testen"); Desktop zusaetzlich Ctrl+Shift+V.
@@ -612,7 +630,7 @@ export default class App extends React.Component<Props, State> {
     }
     if (prevProps.categoryLabel !== this.props.categoryLabel) this.controller.setEntryTitle(this.props.categoryLabel ?? '');
     // Benachrichtigungen mit der Haendler-Session laden bzw. leeren
-    if (prevState.b2bSession?.token !== this.state.b2bSession?.token) { this.loadRestockRequests(); this.loadSavedOutfits(); this.loadFavorites(); }
+    if (prevState.b2bSession?.token !== this.state.b2bSession?.token) { this.loadRestockRequests(); this.loadSavedOutfits(); this.loadFavorites(); this.loadShopFlags(); }
     if (this.state.b2bSession && (prevState.cartItems !== this.state.cartItems
         || prevState.selectedProduct?.id !== this.state.selectedProduct?.id)) {
       this.scheduleB2BPriceRefresh();
@@ -2054,6 +2072,8 @@ export default class App extends React.Component<Props, State> {
           orderConfirmation: confirmation,
           cartItems: [],
           b2bPrices: {},
+          cartBundles: [],
+          preorderMode: false,
         });
         return;
       }
@@ -2228,7 +2248,9 @@ export default class App extends React.Component<Props, State> {
 
   private handleB2BLogout = async () => {
     const session = this.state.b2bSession;
-    this.setState({ b2bSession: null, b2bPrices: {}, b2bLoginError: null, b2bOrders: null, b2bOrdersOpen: false, b2bOrdersError: null });
+    this.setState({ b2bSession: null, b2bPrices: {}, b2bLoginError: null, b2bOrders: null, b2bOrdersOpen: false, b2bOrdersError: null,
+      b2bShopView: null, shopFlags: null, preorderMode: false });
+    if (this.state.idFilterLabel) this.clearAiFilter();
     await b2bLogout(session);
   };
 
@@ -2302,6 +2324,10 @@ export default class App extends React.Component<Props, State> {
       onLogin: (c, pw) => { void this.handleB2BLogin(c, pw); },
       onLogout: () => { void this.handleB2BLogout(); },
       onOpenLogin: () => this.setState({ b2bLoginOpen: true }),
+      preorderMode: this.state.preorderMode,
+      bundleNote: this.state.cartBundles.length
+        ? this.shopUi.bundleNote(this.state.cartBundles.map(b => `${b.number} ${b.name}`).join('; '))
+        : null,
     };
   };
 
@@ -2875,8 +2901,103 @@ export default class App extends React.Component<Props, State> {
   private clearAiFilter = () => {
     this.controller.setGlobalSearchProducts(null);
     this.outfitImageToken++;
-    this.setState({ aiFilterProductIds: [], aiLastResultCount: null, outfitImage: null, aiMissingCount: 0 }, () => this.syncPivotUI());
+    this.setState({ aiFilterProductIds: [], aiLastResultCount: null, outfitImage: null, aiMissingCount: 0, idFilterLabel: null }, () => this.syncPivotUI());
   };
+
+  // === B2B-Shop-Funktionen (Alex 26.11.2026, Punkte 2, 3, 5, 6, 7) ===
+
+  private get shopUi() { return b2bShopTexts(this.props.locale); }
+
+  private loadShopFlags = () => {
+    const session = this.state.b2bSession;
+    if (!session) { this.setState({ shopFlags: null }); return; }
+    shopCatalogFlags(session).then(flags => {
+      if (this.state.b2bSession?.token === session.token) this.setState({ shopFlags: flags });
+    }).catch(() => this.setState({ shopFlags: null }));
+  };
+
+  /** Produkt-IDs wie ein Suchergebnis zeigen, mit eigener Beschriftung im Chip. */
+  private applyIdFilter = (productIds: string[], label: string) => {
+    const matched = this.applyAiResult(productIds);
+    this.setState({ aiFilterProductIds: matched, aiLastResultCount: matched.length, aiMissingCount: 0,
+      idFilterLabel: matched.length ? label : null, b2bMenuOpen: false, cartPanelOpen: false, b2bShopView: null });
+  };
+
+  private showInStock = () => {
+    const ids = this.controller.getCatalogAllProducts()
+      // Die Katalogliste liefert keine Varianten, nur Größen mit Lagerbestand
+      .filter(p => {
+        const inStock = (p.raw as any)?.sizes_in_stock;
+        if (typeof inStock === 'number') return inStock > 0;
+        return (p.variants || []).some((v: any) => typeof v.stock_available === 'number' && v.stock_available > 0);
+      })
+      .map(p => String(p.id));
+    this.applyIdFilter(ids, this.shopUi.menuInStock);
+  };
+
+  private showFlagged = (kind: 'special' | 'new') => {
+    const flags = this.state.shopFlags;
+    if (!flags) return;
+    const cutoff = Date.now() - flags.newArrivalDays * 86400000;
+    const ids = Array.from(new Set(flags.variants
+      .filter(v => kind === 'special' ? v.specialPrice !== null
+        : !!v.lastArrivalAt && new Date(`${v.lastArrivalAt}T00:00:00`).getTime() >= cutoff)
+      .map(v => v.productId)));
+    this.applyIdFilter(ids, kind === 'special' ? this.shopUi.menuSpecial : this.shopUi.menuNew);
+  };
+
+  private openShopView = (view: B2BShopView) => {
+    this.setState({ b2bMenuOpen: false, cartPanelOpen: true, b2bOrdersOpen: false, b2bShopView: view });
+  };
+
+  private openProductById = (productId: string) => {
+    const product = this.controller.getCatalogAllProducts().find(p => String(p.id) === String(productId));
+    this.setState({ cartPanelOpen: false, b2bShopView: null });
+    if (product) { window.setTimeout(() => this.openProductDetails(product), 60); return; }
+    // Nicht im gezeigten Katalog (z. B. Zubehör eines Bundles): direkt die große Karte
+    void this.loadExtraProduct(productId).then(extra => {
+      if (extra) this.setState({ selectedProduct: extra, selectedVariant: null, shouldShowV4Dialog: true });
+    });
+  };
+
+  private loadExtraProduct = async (productId: string): Promise<Product | null> => {
+    const known = this.recommendationExtras.get(productId);
+    if (known) return known;
+    const fetched = await fetchProductById(productId).catch(() => null);
+    if (fetched) this.recommendationExtras.set(productId, fetched);
+    return fetched;
+  };
+
+  /** Bundle-Artikel einzeln in den Warenkorb; die Bundle-Nummer geht als Anmerkung mit. */
+  private handleAddBundle = async (bundle: ShopBundle): Promise<boolean> => {
+    const byId = new Map(this.controller.getCatalogAllProducts().map(p => [String(p.id), p]));
+    let added = 0;
+    for (const item of bundle.items) {
+      if (!item.productId) continue;
+      // Zubehör außerhalb der Kollektion (z. B. QUIN-Sensor) einzeln nachladen
+      const product = byId.get(item.productId) ?? await this.loadExtraProduct(item.productId);
+      if (!product) continue;
+      const variant = (product.variants || []).find((v: any) => v.sku === item.sku);
+      this.handleProductBuy({ product, variant, quantity: item.quantity, size: (variant as any)?.size || item.size || undefined });
+      added++;
+    }
+    if (!added) return false;
+    this.setState(prev => prev.cartBundles.some(b => b.number === bundle.bundleNumber) ? null
+      : { cartBundles: [...prev.cartBundles, { number: bundle.bundleNumber, name: bundle.name.replace(/^BUNDLE:\s*/i, '') }] });
+    return true;
+  };
+
+  /** Sonderpreis / Neu-eingetroffen einer Variante (für die Produktkarte). */
+  private shopFlagsBySku = (): Record<string, { specialPrice: number | null; specialUntil: string | null; lastArrivalAt: string | null }> => {
+    const flags = this.state.shopFlags;
+    if (!flags) return {};
+    if (this.shopFlagCache?.src === flags) return this.shopFlagCache.map;
+    const map: Record<string, { specialPrice: number | null; specialUntil: string | null; lastArrivalAt: string | null }> = {};
+    for (const v of flags.variants) map[v.sku] = { specialPrice: v.specialPrice, specialUntil: v.specialUntil, lastArrivalAt: v.lastArrivalAt };
+    this.shopFlagCache = { src: flags, map };
+    return map;
+  };
+  private shopFlagCache: { src: ShopCatalogFlags; map: Record<string, { specialPrice: number | null; specialUntil: string | null; lastArrivalAt: string | null }> } | null = null;
 
   /**
    * Outfit-Wunsch (Outfit-Layout aktiv): Bild im Hintergrund erzeugen lassen,
@@ -3466,7 +3587,7 @@ export default class App extends React.Component<Props, State> {
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/></svg>
                   </span>
                   <span className="pf-search-filter-chip-text">
-                    KI · {aiFilterProductIds.length}{this.state.aiMissingCount > 0 ? ` (+${this.state.aiMissingCount} andere Marke)` : ''}
+                    {this.state.idFilterLabel ?? 'KI'} · {aiFilterProductIds.length}{this.state.aiMissingCount > 0 ? ` (+${this.state.aiMissingCount} andere Marke)` : ''}
                   </span>
                   <button type="button" className="pf-search-filter-chip-close" onClick={this.clearAiFilter} aria-label={this.ui.resetAiFilter}>×</button>
                 </span>
@@ -3911,6 +4032,14 @@ export default class App extends React.Component<Props, State> {
               <span>{this.state.b2bSession ? this.ui.customer(String(this.state.b2bSession.customerNumber)) : this.ui.dealerLogin}</span>
               <span className="pf-mobile-sheet-row-meta">{this.state.b2bSession ? 'Abmelden' : 'B2B-Shop'}</span>
             </button>
+            {this.state.b2bSession && (
+              // B2B-Shop-Funktionen am Handy (Alex 26.11.2026): dasselbe Konto-Menü wie am Desktop
+              <button type="button" className="pf-mobile-sheet-row" onClick={() => this.setState({ mobilePivotOpen: false, b2bMenuOpen: true })}>
+                <i className="fa-solid fa-briefcase" aria-hidden="true"></i>
+                <span>{this.shopUi.title}</span>
+                <span className="pf-mobile-sheet-row-meta">{this.shopUi.menuOrders}</span>
+              </button>
+            )}
             <button
               type="button"
               className="pf-mobile-sheet-row"
@@ -4527,6 +4656,7 @@ export default class App extends React.Component<Props, State> {
                 dealerActive={!!this.state.b2bSession}
                 dealerPricesPending={this.state.b2bPricesPending}
                 hideDealerPrices={this.state.hideDealerPrices}
+                shopFlags={this.state.b2bSession ? this.shopFlagsBySku() : undefined}
               />,
             ];
           })()}
@@ -4536,8 +4666,18 @@ export default class App extends React.Component<Props, State> {
           <div className="pf-b2b-menu-backdrop" onClick={() => this.setState({ b2bMenuOpen: false })}>
             <div className="pf-b2b-menu" role="menu" onClick={e => e.stopPropagation()}>
               <div className="pf-b2b-menu-head">Kunde <strong>{this.state.b2bSession.customerNumber}</strong>{this.state.b2bSession.customerClass ? ` · ${this.state.b2bSession.customerClass}` : ''}</div>
-              <button type="button" className="pf-b2b-menu-item" onClick={() => this.setState({ b2bMenuOpen: false, cartPanelOpen: true, b2bOrdersOpen: false })}>{this.ui.orderOverview}</button>
-              <button type="button" className="pf-b2b-menu-item" onClick={() => this.setState({ b2bMenuOpen: false, cartPanelOpen: true, b2bOrdersOpen: true })}>{this.ui.myOrders}</button>
+              <button type="button" className="pf-b2b-menu-item" onClick={() => this.setState({ b2bMenuOpen: false, cartPanelOpen: true, b2bOrdersOpen: false, b2bShopView: null })}>{this.ui.orderOverview}</button>
+              <button type="button" className="pf-b2b-menu-item" onClick={() => this.setState({ b2bMenuOpen: false, cartPanelOpen: true, b2bOrdersOpen: true, b2bShopView: null })}>{this.ui.myOrders}</button>
+              <div className="pf-b2b-menu-sep">{this.shopUi.filterSection}</div>
+              <button type="button" className="pf-b2b-menu-item" onClick={this.showInStock}>{this.shopUi.menuInStock}</button>
+              <button type="button" className="pf-b2b-menu-item" disabled={!this.state.shopFlags} onClick={() => this.showFlagged('special')}>{this.shopUi.menuSpecial}</button>
+              <button type="button" className="pf-b2b-menu-item" disabled={!this.state.shopFlags} onClick={() => this.showFlagged('new')}>{this.shopUi.menuNew}</button>
+              <button type="button" className="pf-b2b-menu-item" onClick={() => this.openShopView('bundles')}>{this.shopUi.menuBundles}</button>
+              <button type="button" className="pf-b2b-menu-item" onClick={() => this.openShopView('preorder')}>{this.shopUi.menuPreorder}</button>
+              <div className="pf-b2b-menu-sep">{this.shopUi.accountSection}</div>
+              <button type="button" className="pf-b2b-menu-item" onClick={() => this.openShopView('orders')}>{this.shopUi.menuOrders}</button>
+              <button type="button" className="pf-b2b-menu-item" onClick={() => this.openShopView('invoices')}>{this.shopUi.menuInvoices}</button>
+              <button type="button" className="pf-b2b-menu-item" onClick={() => this.openShopView('account')}>{this.shopUi.menuAccount}</button>
               <button type="button" className="pf-b2b-menu-item" role="menuitemcheckbox" aria-checked={this.state.hideDealerPrices} onClick={this.toggleHideDealerPrices}>{this.state.hideDealerPrices ? this.ui.showDealerPrices : this.ui.hideDealerPrices}</button>
               <button type="button" className="pf-b2b-menu-item pf-b2b-menu-danger" onClick={() => { this.setState({ b2bMenuOpen: false }); void this.handleB2BLogout(); }}>Abmelden</button>
             </div>
@@ -4766,7 +4906,21 @@ export default class App extends React.Component<Props, State> {
         >
           <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
             <div style={{ flex: 1, minHeight: 0 }}>
-              {this.state.b2bOrdersOpen && this.state.b2bSession ? (
+              {this.state.b2bShopView && this.state.b2bSession ? (
+                <B2BShopPanel
+                  session={this.state.b2bSession}
+                  locale={this.props.locale}
+                  view={this.state.b2bShopView}
+                  hideDealerPrices={this.state.hideDealerPrices}
+                  preorderMode={this.state.preorderMode}
+                  onChangeView={view => this.setState({ b2bShopView: view })}
+                  onShowProducts={this.applyIdFilter}
+                  onOpenProduct={this.openProductById}
+                  onAddBundle={this.handleAddBundle}
+                  onStartPreorder={() => this.setState({ preorderMode: true })}
+                  onClose={() => this.setState({ cartPanelOpen: false, cartFullOverlay: false, b2bShopView: null })}
+                />
+              ) : this.state.b2bOrdersOpen && this.state.b2bSession ? (
                 <B2BOrdersPanel
                   customerNumber={this.state.b2bSession.customerNumber}
                   orders={this.state.b2bOrders}

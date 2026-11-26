@@ -77,3 +77,8 @@
 .pf-b2b-menu-item:hover { background: rgba(255,255,255,0.08); }
 .pf-b2b-menu-danger { color: #f88; }
 @media (max-width: 767px) { .pf-b2b-menu { top: calc(env(safe-area-inset-top) + 60px); right: 10px; } }
+/* Abschnitte im Konto-Menü (B2B-Shop-Funktionen, Alex 26.11.2026) */
+.pf-b2b-menu-sep { margin: 6px 10px 2px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #8b949e; }
+.pf-b2b-menu-item:disabled { opacity: 0.45; cursor: default; }
+.pf-b2b-menu-item:disabled:hover { background: transparent; }
+.pf-b2b-menu { max-height: calc(100vh - 90px); overflow-y: auto; }
